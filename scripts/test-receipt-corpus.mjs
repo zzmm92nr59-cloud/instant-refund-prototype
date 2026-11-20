@@ -443,6 +443,30 @@ const joinWrong = [];
     if (!p || p.refundPence !== pence) joinWrong.push(refund + " not joined to its order (" + JSON.stringify(p || null) + ")");
   }
 }
+{
+  // Round 15c: a grocer's order confirmation ("Order number: | 772104518 |", estimated total), its final receipt and its
+  // cancellation (the number only at the end of the subject) are one order, the final receipt's total winning; a refund's
+  // timing ("we'll send you a refund within 5 working days") is never the window for returning, which is the 14 days from
+  // the day after delivery the email states, with its 30-day goodwill returns; a shop's U+0092 apostrophe reads as one.
+  const fx = (id) => JSON.parse(readFileSync(join(dir, id + ".json"), "utf8"));
+  const det = (id) => ({ ...classifyEmail(rawEmail(fx(id))).details, id });
+  for (const app of [null, "gmail", "outlook", "apple"]) {
+    const read = (id) => ({ ...classifyEmail(rawEmail(app ? forwarded(fx(id), app) : fx(id))).details, id });
+    const cards = mergeOrderEmails([read("holdout16c-grocer-thanks-number-cell"), read("holdout16c-grocer-final-receipt")]);
+    if (cards.length !== 1 || cards[0].orderRef !== "772104518" || cards[0].totalPence !== 1142 || (cards[0].items || []).length !== 3)
+      joinWrong.push(`a grocer's confirmation and final receipt${app ? " (" + app + ")" : ""} made ${JSON.stringify(cards.map((c) => [c.orderRef, c.totalPence, (c.items || []).length]))}`);
+    const t = read("holdout16c-grocer-thanks-number-cell");
+    const said = ((t.returns && t.returns.instructions) || []).join(" ");
+    if (!t.returns || t.returns.windowDays !== 14 || t.returns.windowFrom !== "delivery" || !/30 day goodwill/i.test(said) || /5 working days/.test(said))
+      joinWrong.push(`a grocer's return window${app ? " (" + app + ")" : ""} read as ${JSON.stringify(t.returns)}`);
+  }
+  const both = mergeOrderEmails([det("holdout16c-grocer-thanks-number-cell")]);
+  const can = det("holdout16c-grocer-cancelled-subject-number");
+  attachCancellations(both, [can]);
+  if (can.kind !== "order_update" || can.stage !== "cancelled" || !both[0].cancelled) joinWrong.push("a grocer's cancellation by the number in its subject not joined: " + JSON.stringify([can.kind, can.stage, can.orderRef]));
+  const c1 = det("holdout16c-grocer-c1-apostrophe");
+  if (!(c1.items || []).some((i) => i.name === "By Hartley’s Ripe Avocado")) joinWrong.push("a U+0092 apostrophe read as " + JSON.stringify((c1.items || []).map((i) => i.name)));
+}
 console.log(`  Orders joined by later emails: ${joinWrong.length ? joinWrong.join("; ") : "a delivery-day payment and an Uber Eats adjustment join their orders; round 11: cancellations by number or by the items named, a PayPal receipt, a PDF-only invoice and a numbered parcel join their order; replies and someone else's forwarded booking are not purchases; round 12: a changed order shows its latest list and the day's substitutions, money back joins its order, and a booking's deposit and instalments join it; round 13: two Amazon orders in one email are two cards, cancel and withdrawal windows are read, a subscription's end shows on its payment, a PayPal receipt joins the game shop's"}`);
 
 let failed = 0;

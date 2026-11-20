@@ -1,0 +1,41 @@
+{
+ "id": "holdout16c-grocer-thanks-number-cell",
+ "sender": "Hartley's Grocers",
+ "layout": "subject 'Thanks for your order 772104518' (no dash); 'Order number: | 772104518 |'; 'Estimated total: | £10.42* |'; each item a row of name, quantity and price cells over 'Substitution allowed'; 'Right to return goods' under it: 'we'll send you a refund within 5 working days', 'within 14 days starting from the day after the date of delivery', a '30 day goodwill returns policy'",
+ "headers": {
+  "from": "Hartley's Grocers <service@hartleysgrocers.example>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Thanks for your order 772104518",
+  "date": "Fri, 13 Nov 2026 20:23:18 +0000"
+ },
+ "html": "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">\n<html xmlns=\"http://www.w3.org/1999/xhtml\"><head><meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\" /><meta name=\"viewport\" content=\"width=device-width\" />\n<title>Hartley's Grocers</title><style type=\"text/css\">body{margin:0;padding:0}td{font-family:Helvetica,Arial,sans-serif;font-size:14px;color:#222}.muted{color:#777}@media only screen and (max-width:600px){.w600{width:100%!important}}</style></head>\n<body style=\"margin:0;padding:0;background-color:#f3f3f3\">\n<div style=\"display:none;max-height:0;overflow:hidden\">&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;</div>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#f3f3f3\"><tr><td align=\"center\">\n<table role=\"presentation\" class=\"w600\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#ffffff\">\n<tr><td style=\"padding:24px 24px 8px 24px\"><a href=\"https://www.hartleysgrocers.example/?utm_source=email\"><img src=\"https://www.hartleysgrocers.example/static/email/logo.png\" alt=\"Hartley's Grocers\" width=\"140\" height=\"40\" border=\"0\" /></a></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"><tr><td>Here's your order confirmation, Sam</td></tr><tr><td>We've got your order</td></tr><tr><td>Order number:</td><td>772104518 |</td></tr><tr><td>Estimated total:</td><td>&pound;10.42* |</td></tr><tr><td>*Your total is an estimate due to products sold by weight and the possibility of substituted items.</td></tr><tr><td>Slot date: Sunday 15th November, 1:00pm to 5:00pm</td></tr><tr><td>Your items (3 items)</td></tr><tr><td>Items</td><td>Quantity</td><td>Price |</td></tr><tr><td>Hartley's Greek Feta 200g</td><td>2</td><td>&pound;5.80</td></tr><tr><td>Substitution allowed</td></tr><tr><td>Hartley's Black Beans 400g</td><td>3</td><td>&pound;1.47</td></tr><tr><td>Substitution allowed</td></tr><tr><td>Hartley's Free Range Eggs x12</td><td>1</td><td>&pound;3.15</td></tr><tr><td>Substitution allowed</td></tr><tr><td>Your order summary</td></tr><tr><td>Estimated total</td><td>&pound;10.42</td></tr><tr><td>Right to return goods</td></tr><tr><td>If you aren't happy with any of your items, hand it back to us and we'll send you a refund within 5 working days.</td></tr><tr><td>The Consumer Contracts Regulations 2013 give you the right to return most goods bought online without giving a reason within 14 days starting from the day after the date of delivery.</td></tr><tr><td>Hartley's offers a 30 day goodwill returns policy and goods which are not returned at the time of delivery should be returned in a new saleable condition with your receipt to any Hartley's store within 30 days.</td></tr></table></td></tr>\n<tr><td style=\"padding:24px;font-size:12px\" class=\"muted\">&copy; 2026 Hartley's Grocers. All rights reserved.<br /><a href=\"https://www.hartleysgrocers.example/help\">Help</a> | <a href=\"https://www.hartleysgrocers.example/privacy\">Privacy</a> | <a href=\"https://www.hartleysgrocers.example/unsubscribe\">Unsubscribe</a></td></tr>\n</table></td></tr></table>\n<img src=\"https://click.hartleysgrocers.example/open/abc123.gif\" width=\"1\" height=\"1\" alt=\"\" />\n</body></html>",
+ "text": "",
+ "expected": {
+  "shop": "Hartley's Grocers",
+  "date": "2026-11-13",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Hartley's Greek Feta 200g",
+    "qty": 2,
+    "linePence": 580
+   },
+   {
+    "name": "Hartley's Black Beans 400g",
+    "qty": 3,
+    "linePence": 147
+   },
+   {
+    "name": "Hartley's Free Range Eggs x12",
+    "qty": 1,
+    "linePence": 315
+   }
+  ],
+  "subtotalPence": 1042,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 1042,
+  "orderRef": "772104518"
+ }
+}

@@ -75,6 +75,11 @@ export const withoutInvisible = (s) => String(s || "").replace(INVISIBLE, "");
 // 0xA3): those bytes are read as windows-1252, and everything that is UTF-8 stays UTF-8 (round 4, 19 Nov 2026: the whole
 // email used to be read as UTF-8, so such a "£" was lost and no price could be read).
 const CP1252_HIGH = "€\u0081‚ƒ„…†‡ˆ‰Š‹Œ\u008dŽ\u008f\u0090‘’“”•–—˜™š›œ\u009džŸ";
+// A windows-1252 character sent inside UTF-8 as the control character with its number ("Sainsbury\u0092s": the shop's
+// system put its "’" byte, 0x92, into UTF-8 as U+0092): read as the character it is, the way browsers show it. Those control
+// characters are never text. Round 15.
+const C1_CONTROL = /[\u0080-\u009f]/g;
+const withoutC1 = (t) => (/[\u0080-\u009f]/.test(t) ? t.replace(C1_CONTROL, (c) => { const r = CP1252_HIGH[c.charCodeAt(0) - 0x80]; return r === c ? "" : r; }) : t);
 export function mailText(bytes) {
   const b = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes || []);
   try { return new TextDecoder("utf-8", { fatal: true }).decode(b); } catch { /* some bytes aren't UTF-8 */ }
@@ -108,7 +113,7 @@ function parseHeaders(block) {
   const unfolded = block.replace(/\r?\n[ \t]+/g, " ");
   for (const line of unfolded.split(/\r?\n/)) {
     const i = line.indexOf(":");
-    if (i > 0) headers[line.slice(0, i).trim().toLowerCase()] = withoutInvisible(decodeMimeWords(line.slice(i + 1).trim()));
+    if (i > 0) headers[line.slice(0, i).trim().toLowerCase()] = withoutC1(withoutInvisible(decodeMimeWords(line.slice(i + 1).trim())));
   }
   return headers;
 }
@@ -122,9 +127,9 @@ function splitMessage(raw) {
 function decodeBody(headers, body) {
   const enc = (headers["content-transfer-encoding"] || "").toLowerCase();
   const cs = ((headers["content-type"] || "").match(/charset="?([^";\s]+)"?/i) || [])[1] || "utf-8";
-  if (enc.includes("quoted-printable")) return decodeQuotedPrintable(body, cs);
-  if (enc.includes("base64")) return decodeBase64(body, cs);
-  return body;
+  if (enc.includes("quoted-printable")) return withoutC1(decodeQuotedPrintable(body, cs));
+  if (enc.includes("base64")) return withoutC1(decodeBase64(body, cs));
+  return withoutC1(body);
 }
 
 // Microsoft 365 rewrites every link in a protected mailbox to go through Safe Links
@@ -567,8 +572,8 @@ function fromText(text, refDate, ctx = {}) {
   text = text.replace(/(?<![£\d.,])(?<!£ )(\d{1,3}(?:,\d{3})+|\d+)(?:\.(\d{1,2}))?[ \t]?GBP\b/g, (m, n, p) => "£" + n + "." + String(p || "00").padEnd(2, "0"));
   const ref =
     // (Never a word: "Order Details" over a table is not order number "Details". A number has a digit, or is a code in
-    // capitals ("QWERTZ"). Round 11.)
-    [...text.matchAll(/\border\.?\s*(?:number|no\.?|id|ref(?:erence)?|#)\s*(?:is\s*)?[:#\s]*([A-Z0-9](?:[A-Z0-9-]|_(?=[A-Z0-9])){3,24})/gi)].find((m) => /\d/.test(m[1]) || /^[A-Z]{5,10}$/.test(m[1])) ||
+    // capitals ("QWERTZ"). Round 11.) (The number in the next cell, "Order number: | 851791895 |": round 15.)
+    [...text.matchAll(/\border\.?\s*(?:number|no\.?|id|ref(?:erence)?|#)\s*(?:is\s*)?[:#\s]*(?:\|[ \t]*)?([A-Z0-9](?:[A-Z0-9-]|_(?=[A-Z0-9])){3,24})/gi)].find((m) => /\d/.test(m[1]) || /^[A-Z]{5,10}$/.test(m[1])) ||
     // ("Order number |" with the number in the row under it, as an HTML email's table gives it. Round 10.) ("Your order
     // number is: |" over it too. Round 11.)
     text.match(/\border\s*(?:number|no\.?|id)\s*(?:is\s*)?:?[\s|]*\n[\s|]*#?((?=[A-Z0-9-]*\d)[A-Z0-9][A-Z0-9-]{3,24})[\s|]*$/im) ||
@@ -727,8 +732,9 @@ function extractReturns(text, html, orderDate) {
 
   // Window: "within 28 days of delivery", "30-day returns", "return ... within 14 days".
   // (A text part wrapped at a fixed width, "you can return it within\ntwo hours for a full refund", is read as the sentences
-  // it holds: a long line that stops mid-sentence runs on into the next. Round 13.)
-  const unwrapped = flat.split("\n").reduce((acc, line, k, all) => acc + line + (k === all.length - 1 ? "" : line.length >= 50 && !/[.!?:|]\s*$/.test(line) && /^[ \t]*[\p{Ll}\d(]/u.test(all[k + 1]) ? " " : "\n"), "");
+  // it holds: a long line that stops mid-sentence runs on into the next. Round 13.) (Also before a capital, when the line
+  // ends on a word no sentence ends with: "Cancellation and" / "Additional Charges) Regulations 2013". Round 15.)
+  const unwrapped = flat.split("\n").reduce((acc, line, k, all) => acc + line + (k === all.length - 1 ? "" : line.length >= 50 && !/[.!?:|]\s*$/.test(line) && (/^[ \t]*[\p{Ll}\d(]/u.test(all[k + 1]) || (/\b(?:and|or|the|of|to|an?|with|for|in|on|by|from|your|our|their|at|as)[ \t]*$/i.test(line) && /^[ \t]*\p{L}/u.test(all[k + 1] || ""))) ? " " : "\n"), "");
   const sentences = unwrapped.split(/(?<=[.!?])\s+|\n+/).map((x) => x.trim()).filter(Boolean);
   // (A subscription: an app store's rule for returning an app within two hours is not for it, "This does not apply for
   // in-app purchases or in-app subscriptions".)
@@ -758,8 +764,12 @@ function extractReturns(text, html, orderDate) {
   for (const sent of sentences) {
     if (out.cancelWithin) break;
     if (!/return|refund|exchange/i.test(sent) || sent.length > 400) continue;
-    let m = sent.match(/within\s+(\d{1,3})\s+(?:calendar\s+|working\s+)?days?(?:\s+(?:of|from|after)\s+(?:the\s+)?(delivery|receiv\w*|dispatch\w*|purchase|order\w*|today))?/i) ||
+    // (Not how soon money comes back, "hand it back to us and we'll send you a refund within 5 working days": that is no
+    // window for returning anything. And "within 14 days starting from the day after the date of delivery" counts from
+    // delivery. Round 15.)
+    let m = sent.match(/within\s+(\d{1,3})\s+(?:calendar\s+|working\s+)?days?(?:\s+(?:starting\s+)?(?:of|from|after)\s+(?:the\s+)?(?:day\s+after\s+(?:the\s+)?(?:date\s+of\s+)?)?(delivery|receiv\w*|dispatch\w*|purchase|order\w*|today))?/i) ||
       sent.match(/(\d{1,3})[-\s]days?\s+(?:free\s+)?returns?/i);
+    if (m && m.index != null && /\brefund(?:ed|s)?(?:\s+(?:to\s+)?(?:you|your\s+(?:card|account|original\s+payment(?:\s+method)?)))?\s*$/i.test(sent.slice(Math.max(0, m.index - 60), m.index))) continue;
     if (m) {
       out.windowDays = Number(m[1]);
       const basis = (m[2] || "").toLowerCase();
@@ -804,9 +814,15 @@ function extractReturns(text, html, orderDate) {
 
   // How-to wording straight from the email (max three short sentences).
   const seen = new Set();
-  for (const sent of sentences) {
+  // (The sentences that give a window for sending things back come first, a longer one too: a supermarket's "the right to
+  // return most goods … within 14 days starting from the day after the date of delivery" and its "30 day goodwill returns
+  // policy … to any Sainsbury's store within 30 days" were left out for their length, while "You'll be refunded … within 3 to
+  // 5 working days" was kept. Round 15.)
+  const windowed = (x) => /\b(?:within\s+\d{1,3}\s+(?:calendar\s+)?days?\b(?!\s+of\s+(?:receiving\s+)?(?:your\s+)?refund)|\d{1,3}[-\s]days?\s+(?:\w+\s+){0,2}returns?\b)/i.test(x) && !/\bworking days?\b/i.test(x);
+  const order = [...sentences.filter((x) => x.length <= 420 && /\breturn/i.test(x) && windowed(x)), ...sentences];
+  for (const sent of order) {
     if (out.instructions.length >= 3) break;
-    if (sent.length < 25 || sent.length > 220 || !/\breturn/i.test(sent) || appRule(sent)) continue;
+    if (sent.length < 25 || sent.length > (windowed(sent) ? 420 : 220) || !/\breturn/i.test(sent) || appRule(sent)) continue;
     // (A journey's way back, "Return Thursday 20 August", "Return journey: 16:27", is not a return of something bought. Round 15.)
     if (/^\W*return\s+(?:(?:mon|tues?|wed(?:nes)?|thu(?:rs)?|fri|sat(?:ur)?|sun)(?:day)?\b|(?:trip|journey|ticket|leg|train|flight|fare|travel|departure|date)s?\b)/i.test(sent)) continue;
     if (/unsubscribe|view (this )?(email|in browser)/i.test(sent)) continue;
@@ -2593,7 +2609,10 @@ function updateParts(rawEmail) {
   const refDate = headers.date ? new Date(headers.date) : null;
   const at = refDate && !Number.isNaN(refDate.getTime()) ? isoDate(refDate) : null;
   // The order number, from the subject first ("Your order KO-1001 has been dispatched"), then the body ("Order number: …").
-  const ref = subject.match(/\border\s*(?:number|no\.?)?\s*#?\s*((?=[A-Z0-9-]*\d)[A-Z0-9-]{4,24})\b/i) || text.match(/\border\s*(?:number|no\.?|id|#)\s*[:#\s]*#?\s*((?=[A-Z0-9-]*\d)[A-Z0-9-]{4,24})\b/i) ||
+  // (Or a number the subject ends with after saying what happened to the order, "Your order has been cancelled 930952163":
+  // digits only, so a word is never taken for it. Round 15.)
+  const ref = subject.match(/\border\s*(?:number|no\.?)?\s*#?\s*((?=[A-Z0-9-]*\d)[A-Z0-9-]{4,24})\b/i) ||
+    subject.match(/\border\b[^\n]{0,40}?[\s#:-](\d{6,16})\s*$/i) || text.match(/\border\s*(?:number|no\.?|id|#)\s*[:#\s]*#?\s*((?=[A-Z0-9-]*\d)[A-Z0-9-]{4,24})\b/i) ||
     text.slice(0, 1500).match(/\byour order\s+#?((?=[A-Z0-9-]*\d)[A-Z0-9-]{4,24})\b/i);
   return { headers, parts, html, text, subject, at, orderRef: ref ? ref[1] : null };
 }
