@@ -22,6 +22,22 @@ export const payPalToAppcharge = (offer, pre, tax, total, date, txn) => ({
     "Subtotal | " + pre, "Tax | " + tax, "Total | " + total + " GBP", "Paid Appcharge ltd with", "PayPal Credit | " + total + " GBP", "Transaction ID: " + txn],
     "<p>Copyright © 1999-2026 PayPal. All rights reserved.</p>") });
 
+// PayPal's receipt for a payment to a shop, its long name cut short as PayPal cuts it, with PayPal's own order number.
+export const payPalTo = ({ cut, full = cut, email, orderId, lines, money, total, date, txn }) => ({
+  from: "PayPal <service@paypal.co.uk>", subject: "Receipt for your payment to " + (full === cut ? cut + "..." : full), date,
+  html: htmlPage("PayPal", ["Receipt for your payment to " + cut + "...", `${SHOPPER.name}, you've successfully sent a payment.`, `Hi ${SHOPPER.name},`, `You paid ${total} GBP to ${cut}...`,
+    "Merchant | " + cut + "... " + email, "Transaction date | " + new Date(date).toUTCString().slice(5, 16), ...(orderId ? ["Order ID | " + orderId] : []), ...lines, ...money, "Total | " + total + " GBP",
+    "Paid " + cut + "... with", "VISA Debit ••4242 | " + total + " GBP", "Transaction ID: " + txn], "<p>Copyright © 1999-2026 PayPal. All rights reserved.</p>") });
+// A beer festival's ticket email (its own order number in the subject, a ticket per person, each priced, no total).
+export const festivalTickets = (orderNo, n, date) => ({
+  from: '"Hopfield Beer Festival" <info@hopfieldbeerfestival.co.uk>', subject: `Your Hopfield Beer Festival Tickets - Order Number [#${orderNo}]`, date,
+  html: htmlPage("Tickets", Array.from({ length: n }, (_, k) => ["Standard Entry Ticket", "Hopfield Beer Festival 2026 - Saturday Night", "Saturday 18 July 2026, 17:30 - 22:30",
+    "Ticket Number: 2001" + String(k).padStart(8, "0"), "Ticket Holder: " + SHOPPER.name, "Ticket Type: Standard Entry", "Price: £ 48.00"]).flat()) });
+// A shop's own order confirmation for an order also paid through PayPal.
+export const shopOrder = (orderNo, date, item, pre) => ({
+  from: '"Trailpoint" <team@trailpoint.co.uk>', subject: "Your Trailpoint order " + orderNo, date,
+  html: htmlPage("Trailpoint", ["Thanks for your order!", "Order number: " + orderNo, "Item | Qty | Price", `${item} | 1 | ${pre}`, "Order total (ex. VAT) | " + pre]) });
+
 export default function holdout16d() {
   const out = [];
   const add = (id, sender, layout, m, o, shop, date, extra = {}) => { const f = fixture(id, sender, layout, m, expected(shop, date, o, extra)); out.push(f); return f; };

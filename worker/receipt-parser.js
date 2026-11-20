@@ -1356,6 +1356,18 @@ function shopOf({ ld, sender, fromName, subject, text, html, otherText }) {
     // (The game's name is a heading in the HTML; a plain-text part may not carry it at all.)
     titleName: GAME_SHOP.test(sentDomain || "") ? (html && gameTitle(htmlToText(html))) || gameTitle(text) : null,
   });
+  // (A payment service cuts a long shop name short, "London Craft Beer Fe...", "ON THAT ASS Internat...": when the email
+  // writes it whole somewhere else, its subject "Receipt for your payment to Cellar Club Online Limited", the whole name is
+  // the shop's: the cut word finished and the capitalised words after it. Never a guess when it doesn't. Round 15.)
+  if (ranked.name && sentDomain && isVia(sentDomain) && ranked.name.length >= 6 && ranked.name.length <= 40) {
+    const q = ranked.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const hay = String(subject || "") + "\n" + text.slice(0, 20000);
+    if (new RegExp(q + "\\s?(?:\\.\\.\\.|…)").test(hay)) {
+      const whole = [...hay.matchAll(new RegExp("(?<![\\p{L}\\d])" + q + "[\\p{L}\\d&'’-]{0,20}(?: (?:\\p{Lu}[\\p{L}\\d&'’.-]{0,20}|&|and|of|the|de|B\\.V\\.)){0,4}(?!\\s?(?:\\.\\.\\.|…))", "gu"))]
+        .map((m) => m[0].replace(/[\s.,-]+$/, "").replace(/\s+(?:and|of|the|de|&)$/i, "")).filter((n) => n.length > ranked.name.length && !/(?:\.\.\.|…)$/.test(n));
+      if (whole.length) ranked.name = whole.sort((a, b) => b.length - a.length)[0];
+    }
+  }
   // Uber sends rides and Uber Eats orders from the same address and name: a food order is Uber Eats.
   if (/(^|\.)uber\.com$/i.test(sentDomain || "") && /^uber$/i.test(ranked.name || "") && (/\buber eats\b/i.test(subject) || (/\border\b/i.test(subject) && /\buber eats\b/i.test(text.slice(0, 4000))))) ranked.name = "Uber Eats";
   // "Tesco.com" as the sender's name, when the email calls the shop "Tesco" again and again (its own products, "Tesco Whole

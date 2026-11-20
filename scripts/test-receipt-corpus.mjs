@@ -410,6 +410,21 @@ const joinWrong = [];
   const ids = cards.map((c) => (c.emailIds || [c.id]).slice().sort().join("+")).sort();
   if (ids.join(" ") !== "g1+p1 g2+p2" || !cards.every((c) => /^6aaa0+\d$/.test(c.orderRef) && c.totalPence === 319 && c.retailer && !c.retailer.via))
     joinWrong.push("two same-money game purchases minutes apart, each with PayPal's receipt, made " + JSON.stringify(cards.map((c) => [c.emailIds, c.orderRef, c.retailer && c.retailer.name])));
+  // PayPal's receipt numbering the purchase its own way ("Order ID hbf-1201"), the shop's name cut short ("Hopfield Beer
+  // Fe..."), eight seconds after the festival's ticket email (its own number, no total): one card, the festival's, with the
+  // money PayPal says was paid.
+  const { payPalTo, festivalTickets, shopOrder } = await import("./fixtures/receipt-emails/holdout16d.mjs");
+  const t1 = read(festivalTickets("770104", 3, "Sun, 19 Apr 2026 17:43:37 +0000"), "t1");
+  const pp1 = read(payPalTo({ cut: "Hopfield Beer Fe", email: "tickets@hopfield.example", orderId: "hbf-1201", lines: ["Hopfield Beer Fe...", "Qty: 3", "Product ID: HBF-18-07-2026-EVE", "£40.00", "Booking Fee", "Qty: 1", "£3.00"],
+    money: ["Subtotal | £123.00", "Tax | £24.60"], total: "£147.60", date: "Sun, 19 Apr 2026 17:43:45 +0000", txn: "1AH37318AA3110638" }), "pp1");
+  const fest = mergeOrderEmails([t1, pp1]);
+  if (fest.length !== 1 || fest[0].orderRef !== "770104" || fest[0].totalPence !== 14760 || fest[0].items.length !== 3 || !/^Hopfield Beer Festival$/.test(fest[0].retailer && fest[0].retailer.name))
+    joinWrong.push("a festival's tickets and PayPal's receipt for them made " + JSON.stringify(fest.map((c) => [c.emailIds, c.orderRef, c.totalPence, c.items.length, c.retailer])));
+  // PayPal's receipt for an order the shop's own email (read from another inbox) prices before VAT: one card, PayPal's money.
+  const so = { ...read(shopOrder("106000001", "Sun, 21 Dec 2025 19:05:00 +0000", "Trail Running Jacket", "£66.65"), "so"), mailbox: 2 };
+  const pp2 = read(payPalTo({ cut: "Trailpoint Ltd", full: "Trailpoint Ltd", email: "team@trailpoint.co.uk", orderId: "106000001", lines: [], money: [], total: "£79.98", date: "Sun, 21 Dec 2025 19:02:59 +0000", txn: "9ZZ11111ZZ2223334" }), "pp2");
+  const sp = mergeOrderEmails([so, pp2]);
+  if (sp.length !== 1 || sp[0].totalPence !== 7998 || sp[0].orderRef !== "106000001") joinWrong.push("a shop's order and PayPal's receipt with the same number made " + JSON.stringify(sp.map((c) => [c.emailIds, c.orderRef, c.totalPence])));
   // (Further apart than two minutes, or two shop receipts as near as each other: no guess, each stays its own card.)
   const p3 = { ...p1, id: "p3", sentAt: "2026-04-30T02:30:00.000Z" };
   if (mergeOrderEmails([g1, g2, p3]).length !== 3) joinWrong.push("a PayPal receipt five minutes from either game purchase was joined to one");

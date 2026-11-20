@@ -1826,8 +1826,12 @@ export function mergeOrderEmails(orders) {
     if (!(p.retailer && p.retailer.via) || !p.orderRef || isForwarded(p)) continue;
     const r = refCore(p.orderRef);
     if (!/^\d{5,}$/.test(r) && !/\d/.test(r)) continue;
+    // (The money may differ when the numbers are exactly the same and so is the shop: PayPal's "You paid £79.98 GBP to
+    // SportPursuit Ltd" for "Order ID 106639728", and the shop's own email for 106639728 at £66.65 before VAT, read from
+    // another inbox. The money paid is PayPal's. Round 15.)
+    const sameNumber = (o) => refCore(o.orderRef) === r && r.length >= 6 && o.retailer && p.retailer.name && (nameFitsDomain(p.retailer.name, o.retailer.domain || "") || String(o.retailer.name || "").toLowerCase().replace(/[^a-z0-9]/g, "").startsWith(String(p.retailer.name).toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 8)));
     const fits = orders.filter((o) => o !== p && !(o.retailer && o.retailer.via) && o.orderRef && (refCore(o.orderRef) === r || new RegExp("^[A-Z]{1,4}[-#]?" + r.replace(/[^A-Z0-9]/g, "") + "$").test(refCore(o.orderRef))) &&
-      (o.totalPence == null || p.totalPence == null || Math.abs(o.totalPence - p.totalPence) <= 1) &&
+      (o.totalPence == null || p.totalPence == null || Math.abs(o.totalPence - p.totalPence) <= 1 || sameNumber(o)) &&
       (!o.orderDate || !p.orderDate || Math.abs(Date.parse(o.orderDate) - Date.parse(p.orderDate)) <= 3 * 864e5));
     if (fits.length === 1) paidVia.set(p, fits[0]);
   }
@@ -1850,6 +1854,19 @@ export function mergeOrderEmails(orders) {
     const o = fits.length ? nearest(p, fits) : null;
     if (!o || gap(p, o) > 2 * 60000) continue;
     if (nearest(o, unref.filter((q) => paidFits(q, o))) === p) paidVia.set(p, o);
+  }
+  // (A payment service's receipt that numbers the purchase its own way, PayPal's "Order ID lcbf-45343" for the shop's own
+  // "Order Number [#160104]", sent within two minutes of the shop's email, for a shop whose name it gives, whole or cut short
+  // ("London Craft Beer Fe..."), with the same money or the shop's email giving none: one purchase, when exactly one fits
+  // each way. Round 15.)
+  const sq = (x) => String(x || "").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "");
+  const sameShop = (name, r) => { const a = sq(name), b = sq(r && r.name); return (a.length >= 6 && b.length >= 6 && (a.startsWith(b) || b.startsWith(a))) || Boolean(r && r.domain && nameFitsDomain(name, r.domain)); };
+  const shopFits = (p, o) => o !== p && !(o.retailer && o.retailer.via) && o.orderRef && !isForwarded(o) && o.retailer && sameShop(p.retailer.name, o.retailer) &&
+    (o.totalPence == null || o.totalPence === p.totalPence) && (o.currency || "GBP") === (p.currency || "GBP") && o.sentAt && gap(o, p) <= 2 * 60000;
+  const loose = orders.filter((p) => p.retailer && p.retailer.via && p.retailer.name && !paidVia.has(p) && p.totalPence != null && p.sentAt && !isForwarded(p));
+  for (const p of loose) {
+    const fits = orders.filter((o) => shopFits(p, o));
+    if (fits.length === 1 && loose.filter((q) => shopFits(q, fits[0])).length === 1) paidVia.set(p, fits[0]);
   }
   const keyOf = (o) => {
     if (paidVia.has(o)) { const t = paidVia.get(o); return joinStore(t) + "|" + baseRef(t, String(t.orderRef).toUpperCase()); }
@@ -1948,7 +1965,9 @@ export function mergeOrderEmails(orders) {
       // order's (they add up), the items from the order's other emails that aren't on the card yet are added, once each, so
       // nothing bought is dropped and nothing is shown twice. The card says the items are complete only when they then add up.
       // (Not for a changed order: its latest list is the whole order, and what the earlier lists had more was taken off.)
-      if (!latest && !(c.itemsCheck && c.itemsCheck.complete === true) && c.items.length) {
+      // (Not from a payment service's receipt beside the shop's own list: it names the same things its own way, "London Craft
+      // Beer Fe... Qty: 6" for the shop's six tickets, so they would show twice. Round 15.)
+      if (!latest && !(c.itemsCheck && c.itemsCheck.complete === true) && c.items.length && !(o.retailer && o.retailer.via && !(c.retailer && c.retailer.via))) {
         const named = new Set(c.items.map(i => String(i.name || "").toLowerCase().trim()));
         const more = (o.items || []).filter(i => i && i.name && !named.has(String(i.name).toLowerCase().trim()));
         if (more.length) {
@@ -1979,6 +1998,10 @@ export function mergeOrderEmails(orders) {
         r.qrMentioned = Boolean(r.qrMentioned || o.returns.qrMentioned); r.labelMentioned = Boolean(r.labelMentioned || o.returns.labelMentioned);
       }
     }
+    // (What was paid, as the payment service says it, when the shop's own email gave another amount for the same order
+    // number: the shop's before VAT or before delivery. Round 15.)
+    const paidBy = !(c.retailer && c.retailer.via) && rest.find((o) => o.retailer && o.retailer.via && o.totalPence != null && (o.currency || "GBP") === (c.currency || "GBP") && o.orderRef && c.orderRef && refCore(o.orderRef) === refCore(c.orderRef));
+    if (paidBy && c.totalPence !== paidBy.totalPence && c.orderUpdate !== "paid") { if (c.totalPence != null) c.shopTotalPence = c.totalPence; c.totalPence = paidBy.totalPence; }
     // Which emails the card was made from, for choices the shopper made on an email that isn't the one shown (attachGifts).
     // Not enumerable, so it never goes to the app.
     Object.defineProperty(c, "emailIds", { value: g.map(o => o.id), enumerable: false });
