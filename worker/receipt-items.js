@@ -87,7 +87,7 @@ const NAME_LABEL = /^(?:plan|product|item|description|subscription)\s*:?$/i;
 const END = /^(?:retail price\b|sub-?\s?total|subtotal|order sub-?\s?total|items? sub-?\s?total|item\(s\) total|(?:order |grand |basket |estimated |trolley |items? |products? |goods |today(?:'|’)?s |your |net |bill |check )?total\b|trolley cost\b|total of items|item\(s\) subtotal|guide price|order value|items|products|delivery\b|delivery\/shipping|shipping\b|postage\b|p\s?&\s?p\b|service\b|bag\b|bag (?:fee|charge|levy)|carrier bags?\b|small order|basket charge|minimum basket|booking fee|vat\b|tax\b|discount|voucher|promo|promotion|offers?\b|offer savings|multi-?buy|savings?\b|you(?:'|’)?ve saved|you saved|credit\b|credit applied|(?:rider |driver |courier )?tip\b|gratuity|payment\b|payments\b|paid\b|amount (?:paid|due)|total paid|nectar|clubcard|more card|mywaitrose|rollback|member offer|adiclub|subscribe\s?&\s?save|3 for 2|deal\b|buyer protection|click\s?&\s?collect|fast track|installation|collect in store|store delivery|delivery to store|standard delivery|express delivery|airport surcharge|shop discount|includes vat|including vat|incl\.? vat|tickets?\s*:?(?=\s*(?:£|$))|royal mail\b|parcelforce\b|evri\b|(?:1st|2nd|first|second) class\b|tracked (?:24|48)\b|removal of\b|(?:city|visitor|tourist) (?:levy|tax)\b)/i;
 // Lines that are never part of an item: greetings, sentences, order details, dates, column and section headings.
 const LABELLED = /^(?:from|to|sent|subject|cc)\s*:|^(?:order|date|placed|ordered|booking|booked|transaction|receipt|invoice|deliver(?:y|ing)? (?:to|address|on|by)|delivering|collect(?:ion)? (?:from|on)|payment method|paid (?:with|by|using)|billed|apple (?:account|id)|account|document|reference|confirmation|merchant|seller|tracking|reservation|your (?:order|basket) (?:number|no))\b[^|]{0,60}?[:#]|^(?:order|booking|transaction|receipt) (?:no\.?|number|id|ref(?:erence)?)\b|^order #|^#\d|^(?:order|transaction|receipt|invoice|booking|ref(?:erence)?)\s+(?:no\.?\s*|number\s*)?#?\d[\d -]{2,}$/i;
-const HEADING = /^(?:shipping now|now shipping|on its way|shipped|items? shipped|in your parcel|track (?:package|parcel|order|delivery|your (?:order|parcel|package))|view (?:order|details|item|your order)|view or edit (?:your )?order|shop now|manage (?:your )?order|start a return|leave a review|buy again|your order|your items|order summary|order details|items? ordered|items? in (?:your|this) order|delivered items|substitutions?|substituted items|(?:shipment|delivery|parcel|package) \d+ of \d+[^|]*|in this (?:shipment|parcel|delivery)|summary|basket|bundle|app store|apple services|itunes store|apple books|apple arcade|description|items?|products?|qty|quantity|price|unit price|amount|each|cost|total|line total|item details?|item cost|order|receipt|other costs|fare details|restaurant|table|venue|check number|\d{1,3} items?|product details|size|colou?r|style|sku|article|options?|variant|total price|item price|qty\.?|units?|(?:shipping|billing|delivery|invoice|postal) (?:address|details)|deliver(?:ed|ing)? to|ship(?:ped|ping)? to)$/i;
+const HEADING = /^(?:shipping now|now shipping|on its way|shipped|items? shipped|in your parcel|track (?:package|parcel|order|delivery|your (?:order|parcel|package))|view (?:order|details|item|your order)|view or edit (?:your )?order|shop now|manage (?:your )?order|start a return|leave a review|buy again|your order|your items|order summary|order details|(?:items?|products?) ordered|items? in (?:your|this) order|delivered items|substitutions?|substituted items|(?:shipment|delivery|parcel|package) \d+ of \d+[^|]*|in this (?:shipment|parcel|delivery)|summary|basket|bundle|app store|apple services|itunes store|apple books|apple arcade|description|items?|products?|qty|quantity|price|unit price|amount|each|cost|total|line total|item details?|item cost|order|receipt|other costs|fare details|restaurant|table|venue|check number|\d{1,3} items?|product details|size|colou?r|style|sku|article|options?|variant|total price|item price|qty\.?|units?|(?:shipping|billing|delivery|invoice|postal) (?:address|details)|deliver(?:ed|ing)? to|ship(?:ped|ping)? to)$/i;
 const SKIP_START = /^(?:unavailable(?: items)?|missing items?|items? (?:not available|unavailable|we couldn(?:'|’)?t (?:find|deliver))|out of stock|sorry,? we couldn(?:'|’)?t|not (?:available|delivered))\b/i;
 const SKIP_END = /^(?:substitutions?|substituted items|delivered items|your items|items delivered|shipment \d+)\b/i;
 // Details under an item that are not extras: codes, sellers, delivery notes, links, a substitution's note.
@@ -289,7 +289,9 @@ function readLine(raw) {
     if (i === 0 && DATE_RANGE.test(t)) { line.noise = true; continue; }
     // (The end of a sentence carried onto its own line, "our nutritional page.": small letter first, a full stop last.)
     if (i === 0 && cells.length === 1 && /^\p{Ll}/u.test(t) && /\.$/.test(t) && t.split(/\s+/).length <= 6) { line.noise = true; continue; }
-    if (HEADING.test(t)) { line.heading = true; continue; }
+    // (A heading or a button's words after a drawn symbol, "🧾 View Order", or with how many after them, "Product Ordered (3)",
+    // are still that heading, never an item's name. Round 15e.)
+    if (HEADING.test(t) || HEADING.test(t.replace(/^[\p{Extended_Pictographic}\u{1F1E6}-\u{1F1FF}\uFE0F\u200D\s]+(?=\p{L})/u, "").replace(/\s*\(\d{1,3}\)$/, ""))) { line.heading = true; continue; }
     if (!line.names.length && s.tail) { line.nameRaw = s.untailed; line.nameTail = { name: keepAdd || t, raw: s.untailed }; }
     line.names.push(keepAdd || t);
   }
@@ -677,10 +679,31 @@ const FEE_LABEL = /\bfees?\b|^(?:city|tourist|local|resort|accommodation|visitor
 const TIP_LABEL = /\btip\b|\bgratuity\b/i;
 const DISCOUNT_LABEL = /\b(?:discount|voucher|promo\w*|offers?|savings?|saved|credit|coupon|deal|3 for 2|multi-?buy|rollback|clubcard|nectar|subscribe\s?&\s?save|member|adiclub|reward)\b/i;
 const NOT_MONEY_LINE = /\b(?:vat|tax|paid today|next payment|instal+ment|pay in \d|due\b|was\b|rrp)\b/i;
+// (Money lines set out as a column of labels beside a column of amounts, "Subtotal" / "Shipping(Royal Mail Tracked 48)" then
+// "£17.97" / "£2.99": each label with its amount, in order. Only when every label is a money line's own (a subtotal, a fee,
+// money off) and the amounts are as many as the labels. Round 15e.)
+const STACK_MONEY = /^-?(?:£|€|\$)\s?\d[\d,]*(?:\.\d{2})?$|^free$/i;
+function stackedMoney(lines) {
+  const out = [];
+  for (let i = 0; i < lines.length; i++) {
+    let n = 0;
+    while (n < 4 && i + n < lines.length) {
+      const c = lines[i + n].replace(/\|/g, "").trim(), l = c.replace(/\s*\(.*$/, "").replace(/[:*]+$/, "").trim();
+      if (!c || c.length > 80 || !/\p{L}/u.test(l) || /\d\.\d{2}/.test(l) || !(SUBTOTAL_LABEL.test(l) || FEE_LABEL.test(l) || DISCOUNT_LABEL.test(l) || /^(?:order |grand )?total$/i.test(l))) break;
+      n++;
+    }
+    if (n >= 2 && i + 2 * n <= lines.length && lines.slice(i + n, i + 2 * n).every((x) => STACK_MONEY.test(x.replace(/\|/g, "").trim()))) {
+      for (let k = 0; k < n; k++) out.push(lines[i + k].replace(/\|/g, "").trim().replace(/\s*\(.*$/, "") + " | " + lines[i + n + k].replace(/\|/g, "").trim());
+      i += 2 * n - 1; continue;
+    }
+    out.push(lines[i]);
+  }
+  return out;
+}
 export function moneyOf(text) {
   const out = { subtotal: null, fees: 0, tips: 0, discounts: 0, vat: null, found: [], offAboveSubtotal: 0 };
   // (Blank lines between an HTML email's rows say nothing: "Subtotal" and its amount can have one between them. Round 10.)
-  const lines = prepText(text).replace(/\r\n?/g, "\n").split("\n").map((x) => x.replace(/\s+/g, " ").trim()).filter((x) => x && !/^[|\s]+$/.test(x));
+  const lines = stackedMoney(prepText(text).replace(/\r\n?/g, "\n").split("\n").map((x) => x.replace(/\s+/g, " ").trim()).filter((x) => x && !/^[|\s]+$/.test(x)));
   // ("£-27.24": Domino's writes the minus after the pound sign. Round 10.)
   const amountOf = (s) => { const m = new RegExp("^([-−–])?\\s?" + MONEY + "\\s*\\*?$", "i").exec(s.trim().replace(/^£\s?[-−–]\s?(?=\d)/, "-£").replace(/^\+\s?(?=£)/, "")); return m ? { p: pence(m[2], m[3], m[4]), neg: Boolean(m[1]) } : /^(?:free|£0\.00)$/i.test(s.trim()) ? { p: 0, neg: false } : null; };
   const seen = new Set();

@@ -1733,6 +1733,31 @@ function soleItemOverPrice(text, m, total) {
   }
   return hits.length === 1 ? hits[0] : null;
 }
+// One thing set out as a bullet under a list's heading with no price of its own, "Medication Items:" then "- Sertraline
+// 100mg tablets" and "x 28", straight over the total, "Total £9.90", and no other money line: that thing is what the total
+// paid for. Never two or more (which cost what is not said). Round 15e.
+function soleBulletOverTotal(text, m, total) {
+  if (total == null || !m || m.fees || m.discounts || m.tips || m.subtotal != null) return null;
+  const rows = String(text || "").split("\n").map((x) => x.replace(/^[\s|]+|[\s|]+$/g, "")).filter(Boolean);
+  for (let i = 0; i < rows.length; i++) {
+    if (!/^[\p{L} ]{0,40}\b(?:items?|products?|medications?|medicines?|tickets?|your order)\s?:$/iu.test(rows[i])) continue;
+    const names = []; let k = i + 1, pack = null;
+    while (k < rows.length && names.length < 3) {
+      const b = /^[-•·*]\s*(.*)$/.exec(rows[k]);
+      if (!b) break;
+      const name = b[1] || rows[k + 1] || ""; k += b[1] ? 1 : 2;
+      if (!/^[\p{Lu}\d][^£$€:]{2,90}$/u.test(name) || !/\p{L}{3}/u.test(name)) return null;
+      const q = /^[x×]\s?(\d{1,4})$/i.exec(rows[k] || "");
+      if (q) { pack = rows[k].replace(/\s+/g, " "); k++; }
+      names.push(name);
+    }
+    if (names.length !== 1) return null;
+    const t = /^(?:order )?total\s*:?\s*£\s?([\d,]+\.\d{2})$/i.exec(rows[k] || "");
+    if (!t || money(t[1]) !== total) return null;
+    return { name: names[0], qty: 1, pricePence: total, ...(pack ? { variant: pack } : {}) };
+  }
+  return null;
+}
 // A plain-text name wrapped onto two lines ("Duchess Dolby Atmos 5.1.2 Cinematic Surround Sound", then "Ottoman Storage TV
 // Bed Frame × 1"): one name again, when it starts after a blank line and its second line ends with how many. Round 12.
 function unwrapNames(lines) {
@@ -2192,8 +2217,16 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
     const li = labelledItems(plain || text).length ? labelledItems(plain || text) : labelledItems(fromHtml || text);
     if (li.length) {
       const ck = checkItems(li, moneyOf(text), result.totalPence);
-      if (ck.complete || (result.totalPence == null && !result.items.length)) { result.items = li; result.itemsCheck = ck; }
+      // (Or nothing else was read and the total says it takes in postage the email doesn't set out, "Total (including Postage
+      // & Packaging costs): £44.97": the things as listed, the check saying they don't come to the total. Round 15e.)
+      const postageIn = !result.items.length && result.totalPence != null && ck.itemsPence < result.totalPence &&
+        /\btotal\b[^\n£]{0,12}\b(?:incl\w*|plus|with)\b[^\n£]{0,30}\b(?:postage|delivery|shipping|p\s?&\s?p)\b/i.test(fromHtml || text);
+      if (ck.complete || (result.totalPence == null && !result.items.length) || postageIn) { result.items = li; result.itemsCheck = ck; }
     }
+  }
+  if (!result.items.length && result.totalPence != null && !isFlight) {
+    const one = soleBulletOverTotal(fromHtml || text, moneyOf(fromHtml || text), result.totalPence) || (plain ? soleBulletOverTotal(plain, moneyOf(plain), result.totalPence) : null);
+    if (one) { result.items = [one]; result.itemsCheck = checkItems(result.items, moneyOf(fromHtml || text), result.totalPence); }
   }
   // (A code's percentage off with no amount, "ASSENHEIMS20" / "20% discount first order only", the subtotal already after
   // it (the old one struck through): when the items less that percentage come to what the email says, that is the money
