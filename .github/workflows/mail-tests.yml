@@ -112,6 +112,7 @@ jobs:
         run: |
           node scripts/test-outlook.mjs
           node scripts/test-outlook-throttle.mjs
+          node scripts/test-outlook-search.mjs
       - name: Gmail and Outlook give the same receipts, cards and Wrapped
         run: node scripts/test-mail-parity.mjs
       - name: Instant email (Gmail notices signed by Google, Outlook notices with their secret; set-up, renewal, disconnecting)

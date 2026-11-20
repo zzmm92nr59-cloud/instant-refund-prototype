@@ -36,8 +36,10 @@ const SIGN_IN = new Set([
 ]);
 // Each of these asks Google or Microsoft for someone's email (or reads a long pasted one).
 // A photo of a paper receipt (bank.js) is big and may be read by AI, so it counts here too.
-const MAIL = new Set(["/relay/my/gmail/find", "/relay/my/gmail/add", "/relay/my/gmail/connect", "/relay/my/receipts/add-pasted", "/relay/my/receipts/parse", "/relay/my/bank/receipt-photo"]);
+const MAIL = new Set(["/relay/my/gmail/find", "/relay/my/gmail/add", "/relay/my/gmail/connect", "/relay/my/receipts/add-pasted", "/relay/my/receipts/parse", "/relay/my/bank/receipt-photo", "/relay/my/outlook/search"]);
 const MAIL_RE = /^\/relay\/my\/receipts\/[0-9a-f-]{36}\/(original|reread)$/;
+// Relay's team reading one email of their own Outlook inbox (outlook-search.js).
+const MAIL_OUTLOOK_RE = /^\/relay\/my\/outlook\/message\/[^/]{1,1600}$/;
 // A long receipts list asks for many pictures at once; they're light and count only towards the address's allowance.
 const PICTURE_RE = /^\/relay\/my\/(logo\/[^/]{1,100}|receipts\/[0-9a-f-]{36}\/image|receipts\/[0-9a-f-]{36}\/receipt-photo|receipts\/[0-9a-f-]{36}\/codes\/\d{1,2}|resale\/listings\/[0-9a-f-]{36}\/image)$/;
 // Signed by Shopify or Square; checked there. Gmail's notices come signed by Google, and Outlook's carry each subscription's
@@ -109,7 +111,7 @@ export async function checkRateLimits(request, env, url, now = Date.now()) {
     const who = await fingerprint(auth.slice(0, 600));
     wait = await count(env, "user", who, now);
     if (wait) return { scope: "account", retryAfterMs: wait };
-    if (MAIL.has(path) || MAIL_RE.test(path)) {
+    if (MAIL.has(path) || MAIL_RE.test(path) || MAIL_OUTLOOK_RE.test(path)) {
       wait = await count(env, "mail", who, now);
       if (wait) return { scope: "mail", retryAfterMs: wait };
     }

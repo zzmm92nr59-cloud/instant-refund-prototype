@@ -25,6 +25,7 @@ import { handleReturnRoute } from "./returns.js";
 import { handleCrossSwapRoute, attachCrossSwaps, crossSwapDeleteStatements } from "./cross-swap.js";
 import { handleShopifyTestRoute, shopifyTestOrderDeleteStatements } from "./shopify-test-orders.js";
 import { handlePhotoSearchRoute, photoSearchDeleteStatements } from "./photo-search.js";
+import { handleOutlookSearchRoute, outlookSearchDeleteStatements } from "./outlook-search.js";
 import { handleSquareTestRoute, enrichSquarePurchases, squareOrderDeleteStatements } from "./square-orders.js";
 import { handleInstoreRoute, instoreDeleteStatements } from "./square-instore.js";
 import { squareIsProduction } from "./square-env.js";
@@ -633,6 +634,7 @@ async function deleteShopper(env, shopper, o) {
     ...(await crossSwapDeleteStatements(env.RELAY_DB, shopper.id)),
     ...(await shopifyTestOrderDeleteStatements(env.RELAY_DB, shopper.id)),
     ...(await photoSearchDeleteStatements(env.RELAY_DB, shopper.id)),
+    ...(await outlookSearchDeleteStatements(env.RELAY_DB, shopper.id)),
     // Which orders at shops connected to Relay were placed with this email address (the orders themselves stay with the shop).
     env.RELAY_DB.prepare("DELETE FROM retailer_order_emails WHERE email_hash = ?").bind(shopper.emailHash),
     env.RELAY_DB.prepare("DELETE FROM auth_sessions WHERE shopper_id = ?").bind(shopper.id),
@@ -743,6 +745,9 @@ export async function handleAuthRoute(request, env, url, cors = {}, opts = {}) {
     // Emails shoppers chose to send to Relay, for Relay's admins to read (each opening recorded). Admins only.
     const sharedResponse = await handleSharedEmailAdminRoute(path, request.method, request, env, cors, shopper, o);
     if (sharedResponse) return sharedResponse;
+    // Relay's team: search their own connected Outlook inbox, and read one of its emails (outlook-search.js). Admins only.
+    const outlookSearchResponse = await handleOutlookSearchRoute(path, request.method, env, url, cors, shopper, o);
+    if (outlookSearchResponse) return outlookSearchResponse;
     // The help chat (an AI assistant, and "Talk to a person"). Off until the ANTHROPIC_API_KEY secret is set.
     const supportResponse = await handleSupportRoute(path, request.method, request, env, cors, shopper, o);
     if (supportResponse) return supportResponse;

@@ -76,7 +76,8 @@ assert.ok(mine.length > 80, "found the shopper routes (" + mine.length + ")");
 {
   for (const [method, path, body] of [["GET", "/relay/my/admin/reports"], ["POST", "/relay/my/admin/reports/11111111-1111-4111-8111-111111111111/review", { outcome: "dismiss" }],
     ["GET", "/relay/my/admin/health"], ["POST", "/relay/my/admin/health/email", {}], ["GET", "/relay/my/admin/shared-emails"],
-    ["GET", "/relay/my/admin/shared-emails/11111111-1111-4111-8111-111111111111"], ["POST", "/relay/my/admin/shared-emails/11111111-1111-4111-8111-111111111111", { delete: true }]]) {
+    ["GET", "/relay/my/admin/shared-emails/11111111-1111-4111-8111-111111111111"], ["POST", "/relay/my/admin/shared-emails/11111111-1111-4111-8111-111111111111", { delete: true }],
+    ["GET", "/relay/my/outlook/search"], ["GET", "/relay/my/outlook/search?q=order"], ["GET", "/relay/my/outlook/message/AQMkADAwATM0MDAAMS1-abcdef0123"], ["POST", "/relay/my/outlook/search", {}]]) {
     const res = await call(path, { method, auth: "Bearer " + alice, body });
     assert.equal(res.status, 404, method + " " + path + " is hidden from shoppers"); assert.deepEqual(await res.json(), { error: "not_found" });
   }
@@ -84,7 +85,8 @@ assert.ok(mine.length > 80, "found the shopper routes (" + mine.length + ")");
   assert.equal((await call("/relay/my/admin/reports", { auth: "Bearer " + admin })).status, 200, "an admin can see reports");
   assert.equal((await call("/relay/my/admin/health", { auth: "Bearer " + admin })).status, 200, "an admin can see Relay health");
   assert.equal((await call("/relay/my/admin/shared-emails", { auth: "Bearer " + admin })).status, 200, "an admin can see the emails shoppers sent");
-  console.log("ok - admins: report reviews, Relay health and emails shoppers sent hidden from shoppers (not found), open to Relay's admins");
+  assert.equal((await call("/relay/my/outlook/search", { auth: "Bearer " + admin })).status, 409, "an admin reaches the Outlook search (no Outlook connected here)");
+  console.log("ok - admins: report reviews, Relay health, emails shoppers sent and the team's own-Outlook search hidden from shoppers (not found), open to Relay's admins");
 }
 // Shops: each route needs that shop's own key.
 {
