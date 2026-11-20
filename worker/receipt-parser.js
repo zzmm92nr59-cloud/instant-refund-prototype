@@ -2055,7 +2055,7 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
       // (Never one line made of the money lines themselves, "£10.00 Delivery: £0.00 Total Cost", that adds up only because it
       // is the total, while another reading lists the things bought by name. Round 15.)
       settled.find((c) => c.items.length && c.check.complete && !moneyAsName(c)) ||
-      settled.filter((c) => c.items.length >= 2 && namesCheck(c.items, { shop: shopName }).namesOk).sort((a, b) => gap(a) - gap(b))[0] ||
+      (settled.some((c) => c.items.length && c.check.complete && moneyAsName(c)) ? settled.filter((c) => c.items.length >= 2 && namesCheck(c.items, { shop: shopName }).namesOk).sort((a, b) => gap(a) - gap(b))[0] : null) ||
       settled.find((c) => c.items.length && c.check.complete) ||
       settled.filter((c) => c.items.length).sort((a, b) => gap(a) - gap(b))[0] || settled[settled.length - 1 - (settled.length > 3 ? settled.length - 3 : 0)] || settled[0];
     // When the older readings found the very same items, their copy is kept (the same fields as before for everything they
@@ -2101,6 +2101,18 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
     if (li.length) {
       const ck = checkItems(li, moneyOf(text), result.totalPence);
       if (ck.complete || (result.totalPence == null && !result.items.length)) { result.items = li; result.itemsCheck = ck; }
+    }
+  }
+  // (A code's percentage off with no amount, "ASSENHEIMS20" / "20% discount first order only", the subtotal already after
+  // it (the old one struck through): when the items less that percentage come to what the email says, that is the money
+  // off, and the receipt shows it. Round 15.)
+  let percentOff = null;
+  if (result.items.length && result.itemsCheck && !result.itemsCheck.complete && result.itemsCheck.expectedPence != null) {
+    const pl = /^[ \t|]*([^\n£|]{0,40}?\b(\d{1,2})\s?%\s?(?:discount|off)\b[^\n£|]{0,40})[ \t|]*$/im.exec(text);
+    const ip = result.itemsCheck.itemsPence, want = result.itemsCheck.expectedPence;
+    if (pl && ip > want && Math.abs(Math.round(ip * (100 - Number(pl[2])) / 100) - want) <= 1) {
+      percentOff = { label: pl[1].trim(), pence: ip - want };
+      result.itemsCheck = { ...result.itemsCheck, complete: true, expectedPence: ip, missingPence: 0, discountsPence: ip - want };
     }
   }
   // (A coach ticket's "Ticket Price: £22.89" is the journey the email names, "From: Nottingham, Greyfriars Gate" … "To:
@@ -2358,7 +2370,12 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
     const mon = moneyOf(text);
     // (Any amount taken off as a minus, "Happy Hour -£2.00", is money off whatever it is called; a card or payment never is.)
     const off = (mon.found || []).filter((f) => f[0] === "discount" && f[2] > 0 && f[1] !== zeroedGift && (f[3] === true || /\b(?:discounts?|promo(?:tion)?s?|offers?|vouchers?|coupons?|credit|savings?|saved|deals?|rewards?|loyalty|multi-?buy|money off|\d{1,3}% off)\b|\bapplied\b/i.test(String(f[1]))) && !/\b(?:card|payment|paid|pay|gift ?card|balance|refund)\b|\d{4}|\*{2,}|•/i.test(String(f[1]))).slice(0, 8).map((f) => ({ label: String(f[1]).replace(/[:\s]+$/, "").slice(0, 60), pence: f[2] }));
+    if (percentOff && !off.some((d) => d.pence === percentOff.pence)) off.push(percentOff);
     if (off.length) result.discounts = off;
+    // (And what it added for delivery, service and the like, "Service fee £0.82", "Delivery £5.00", as each is labelled, so the
+    // receipt can show every line of what was paid. Round 15.)
+    const fees = (mon.found || []).filter((f) => f[0] === "fee" && f[2] > 0 && !result.items.some((i) => String(i.name || "").toLowerCase() === String(f[1]).toLowerCase())).slice(0, 6).map((f) => ({ label: String(f[1]).replace(/[:\s]+$/, "").slice(0, 60), pence: f[2] }));
+    if (fees.length) result.fees = fees;
     // The items, less the money off the receipt shows, must come to what was paid (with its fees and tips): a check that only
     // adds up with money off the receipt doesn't show is not complete. Round 15.
     const shownOff = off.reduce((a, d) => a + d.pence, 0);

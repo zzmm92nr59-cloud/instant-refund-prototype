@@ -476,6 +476,9 @@ const joinWrong = [];
   { const th = det("holdout16c-theatre-total-paid-dash"); if (!(th.returns && th.returns.nonRefundable)) joinWrong.push("'Tickets are non-refundable' not kept: " + JSON.stringify(th.returns)); }
   { const g = det("holdout16c-gifts-priced-and-taken-off"); if (!g.itemsCheck.complete || (g.discounts || []).some((d) => /gift/i.test(d.label || d.name || "")) || (g.items || []).length !== 2)
       joinWrong.push("free gifts priced and taken off read as " + JSON.stringify([g.itemsCheck, g.discounts, (g.items || []).map((i) => i.name)])); }
+  { const d = det("holdout16c-delivery-dash-prices"); if ((d.discounts || []).length !== 1 || !(d.fees || []).some((f) => f.label === "Service fee" && f.pence === 82))
+      joinWrong.push("a delivery app's dash-priced items read as " + JSON.stringify([d.discounts, d.fees])); }
+  { const p = det("holdout16c-percent-code-no-amount"); if (!p.itemsCheck.complete || !(p.discounts || []).some((x) => x.pence === 299)) joinWrong.push("a percentage code with no amount read as " + JSON.stringify([p.itemsCheck, p.discounts])); }
   if (set.orderRef !== "ATM40112") joinWrong.push("'Order ATM40112 confirmed' read as order " + set.orderRef);
   if (bw.merchant !== "Riverside - Mill Lane" || bw.orderRef !== "034") joinWrong.push("a burger app's restaurant read as " + JSON.stringify([bw.merchant, bw.orderRef]));
   const c1 = det("holdout16c-grocer-c1-apostrophe");

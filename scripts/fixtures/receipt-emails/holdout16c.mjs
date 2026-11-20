@@ -186,5 +186,21 @@ export default function holdout16c() {
       text: "Valued Coachline Customer,\nThank you for making a reservation with Coachline. This email confirms your purchase.\nReservation summary for order QWZRTYP\nReservation Number\n 43-6840-031223-M22N-1335-LDS-LON-1\nDate:December 3, 2026\nFrom: Leeds, Bus Station (1:35 PM)\nTo: London, Victoria Coach Station (5:00 PM)\nPassengers: 1 Standard\nCost and Payment Summary\nTicket Price: GBR 18.99\nBooking Fee: GBR 1.00\nTotal Paid: GBR 19.99\n" },
       o, "Coachline", "2026-11-09", { orderRef: "QWZRTYP" });
   }
+  // ---- A delivery app's plain text: "1x    Name  - £11.95" (a dash before each price), a credit, a service fee ---------------
+  {
+    const o = order([{ name: "The Club Wrap", qty: 1, unit: 1095 }, { name: "Truffle Fries", qty: 1, unit: 450 }], { fees: [["Service fee", 82]], discounts: [["Credit", 400]] });
+    add("holdout16c-delivery-dash-prices", "Rooride", "plain text only: 'Order #5821'; '1x    The Club Wrap  - £10.95', '1x    Truffle Fries  - £4.50'; 'Subtotal £15.45', 'Delivery fee Free', 'Service fee £0.82', 'Credit -£4.00', 'Total £12.27'", {
+      from: "Rooride <noreply@rooride.example>", subject: "Your order's in the kitchen", date: "Thu, 12 Nov 2026 19:00:00 +0000",
+      text: "Here's your receipt\nOrder #5821\n  ---------------------\n\n  1x    The Club Wrap  - £10.95\n  1x    Truffle Fries  - £4.50\n\n  Subtotal               £15.45\n  Delivery fee           Free\n  Service fee            £0.82\n  Credit                 -£4.00\n  Total                  £12.27\n" },
+      o, "Rooride", "2026-11-12", { orderRef: "5821" });
+  }
+  // ---- A takeaway's code: "PIZZA20" / "20% discount first order only", the subtotal already after it --------------------------
+  {
+    const o = order([{ name: "Large Margherita", qty: 1, unit: 1295 }, { name: "Cola (can)", qty: 1, unit: 200 }], { discounts: [["20% discount first order only", 299]] });
+    add("holdout16c-percent-code-no-amount", "Slice Street", "'1 x | Large Margherita | £12.95'; '1 x | Cola (can) | £2.00'; 'PIZZA20' over '20% discount first order only' with no amount; 'Subtotal | £11.96' (the old subtotal struck through, gone from the text); 'Total | £11.96'", {
+      from: "Slice Street <orders@slicestreet.example>", subject: "Slice Street: Order #7QKAQK accepted", date: "Fri, 13 Nov 2026 18:30:00 +0000",
+      html: mail("Slice Street", "slicestreet.example", ["Your order 7QKAQK has been accepted by Slice Street and is being prepared.", "1 x | Large Margherita | £12.95", "1 x | Cola (can) | £2.00", "PIZZA20", "20% discount first order only", "Subtotal | £11.96", "Total | £11.96"]) },
+      o, "Slice Street", "2026-11-13", { orderRef: "7QKAQK" });
+  }
   return out;
 }

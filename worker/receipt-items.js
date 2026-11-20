@@ -705,7 +705,20 @@ export function moneyOf(text) {
     }
     if (!label || !amt) continue;
     label = label.replace(/[:*]+$/, "").trim();
+    // (A subtotal over two amounts, the old one struck through and the new, "Subtotal | £14.95 / £11.96", under a code's
+    // "20% discount first order only": the items come to the first, and the difference is that discount. Round 15.)
+    if (SUBTOTAL_LABEL.test(label) && out.subtotal == null && !amt.neg) {
+      const after = amountOf((lines[i + 2] || "").replace(/\|/g, "").trim()), nearOff = lines.slice(Math.max(0, i - 3), i).reverse().find((x) => /\b\d{1,3}\s?%\s?(?:discount|off)\b/i.test(x));
+      if (cells.length === 1 && after && !after.neg && after.p < amt.p && nearOff) {
+        out.subtotal = amt.p; out.offAboveSubtotal = out.discounts; out.discounts += amt.p - after.p;
+        out.found.push(["discount", nearOff.replace(/\|/g, " ").replace(/\s+/g, " ").trim().slice(0, 80), amt.p - after.p, false]);
+        i += 1; continue;
+      }
+    }
     if (/^(?:qty|quantity)\b/i.test(label)) continue;
+    // (An item's own line in a text part, "1x    The C.L.T  - £11.95": the dash sets the price apart, it is no minus, and an
+    // item is never money off. Round 15.)
+    if (cells.length === 1 && /^\d{1,3}\s?x\s+\S/i.test(label) && !DISCOUNT_LABEL.test(label)) continue;
     // The VAT added on top of a subtotal ("VAT charged at 20% | £1.83", "VAT - United Kingdom (20%) | £12.78"): kept apart, so
     // the check can tell prices that include it (Apple) from prices that don't (a software invoice). Round 10.
     if (/^(?:vat|tax)\b(?!\s*(?:no|number|id|reg))[^|]{0,40}$/i.test(label) && !/\b(?:included|inclusive|incl)\b/i.test(label) && !amt.neg) { if (out.vat == null) out.vat = amt.p; continue; }
