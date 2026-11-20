@@ -85,6 +85,9 @@ export async function exportShopperData(env, shopper, now = Date.now()) {
       // Receipts you said were (or weren't) a gift, and who for when you said.
       gifts: (await rows("SELECT receipt_id AS receiptId, is_gift AS isGift, recipient, updated_at AS updatedAt FROM receipt_gifts WHERE shopper_id = ?", id))
         .map((g) => ({ receiptId: g.receiptId, gift: Boolean(g.isGift), for: g.recipient || null, changedAt: iso(g.updatedAt) })),
+      // Receipts you said were one order, or different orders (worker/order-joins.js).
+      sameOrDifferentOrders: (await rows("SELECT a_id AS a, b_id AS b, kind, created_at AS at FROM receipt_joins WHERE shopper_id = ?", id))
+        .map((j) => ({ receipts: [j.a, j.b], youSaid: j.kind === "same" ? "same order" : "different orders", at: iso(j.at) })),
       returnReminders: (await rows("SELECT receipt_id AS receiptId, title, deadline, remind_at AS remindAt, sent_at AS sentAt FROM return_reminders WHERE shopper_id = ?", id))
         .map((r) => ({ receiptId: r.receiptId, title: r.title, deadline: r.deadline, remindAt: iso(r.remindAt), sentAt: iso(r.sentAt) })),
     },
