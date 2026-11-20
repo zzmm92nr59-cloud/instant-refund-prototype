@@ -471,6 +471,10 @@ const joinWrong = [];
   if (!(credit.discounts || []).some((d) => d.pence === 1000 && /^Unused time/.test(d.label))) joinWrong.push("Stripe's unused-time credit (−£10.00) not kept as money off: " + JSON.stringify(credit.discounts));
   const usd = parseReceiptEmail(rawEmail(fx("holdout16d-stripe-dollar-discount")));
   if (!(usd.discounts || []).some((d) => d.pence === 1153)) joinWrong.push("a dollar receipt's 51% discount not kept: " + JSON.stringify(usd.discounts));
+  const twice = parseReceiptEmail(rawEmail(fx("holdout16d-apple-two-copies")));
+  if (!(twice.returns && twice.returns.windowDays === 14 && twice.returns.cancelWithin)) joinWrong.push("Apple's two-copy invoice's 14 days to cancel read as " + JSON.stringify(twice.returns));
+  const gp = parseReceiptEmail(rawEmail(fx("holdout16d-google-play-links")));
+  if (!(gp.returns && /AFnwnKc3$/.test(gp.returns.portalUrl || "") && gp.returns.windowDays === 14 && !/two hours/i.test((gp.returns.instructions || []).join(" ")))) joinWrong.push("Google Play's refund link and 14 days read as " + JSON.stringify(gp.returns));
   // (Further apart than two minutes, or two shop receipts as near as each other: no guess, each stays its own card.)
   const p3 = { ...p1, id: "p3", sentAt: "2026-04-30T02:30:00.000Z" };
   if (mergeOrderEmails([g1, g2, p3]).length !== 3) joinWrong.push("a PayPal receipt five minutes from either game purchase was joined to one");

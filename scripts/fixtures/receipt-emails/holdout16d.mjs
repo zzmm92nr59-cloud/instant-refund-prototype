@@ -213,5 +213,36 @@ export default function holdout16d() {
     f.attach = [{ type: "application/pdf", name: "booking.pdf" }];
     out.push(f);
   }
+  // Apple's invoice as it is sent: the same invoice twice, a desktop copy and a hidden phone copy; the app over the thing bought;
+  // "To cancel your purchase within 14 days of receiving this invoice". One item, the app as its detail, the 14 days kept.
+  {
+    const copy = `<table><tr><td>Invoice</td></tr><tr><td><span>APPLE ACCOUNT</span><br>${h(SHOPPER.email)}</td><td><span>BILLED TO</span><br>Amex .... 1234 (Apple Pay)<br>${h(SHOPPER.name)}<br>GBR</td></tr>
+<tr><td><span>INVOICE DATE</span><br><span dir="auto">23 Feb 2025</span></td><td><span>SEQUENCE NO.</span><br>2-6600000001</td></tr><tr><td><span>ORDER ID</span><br><a href="https://support.apple.com/kb/HT204088">MQZZTEST01</a></td><td><span>DOCUMENT NO.</span><br>211900000001</td></tr></table>
+<table><tr class="section-header"><td colspan="3"><span>App Store</span></td></tr><tr><td class="item-cell"><span class="title" dir="auto">
+Puzzle Garden
+</span><br><span class="artist">Stack of Coins</span><br><span class="type">In-App Purchase</span><br><span class="device">Sam’s iPhone</span><br><a href="https://buy.itunes.apple.com/reportAProblem">Report a Problem</a></td>
+<td class="price-cell"><table><tr><td colspan="3"><span>£1.59</span></td></tr><tr><td><span>Inclusive of VAT at <b>20%</b></span></td><td> </td><td><span>£0.26</span></td></tr></table></td></tr></table>
+<table><tr><td>Subtotal</td><td> </td><td>£1.33</td></tr><tr><td>VAT charged at 20%</td><td> </td><td>£0.26</td></tr><tr><td>TOTAL</td><td></td><td>£1.59</td></tr></table>
+<p>To cancel your purchase within 14 days of receiving this invoice, <a href="https://buy.itunes.apple.com/reportAProblem">report a problem</a> or <a href="http://www.apple.com/uk/support/itunes/contact/">contact us</a>.<br><a href="http://www.apple.com/legal/">Learn more about your right of withdrawal</a></p>`;
+    add("holdout16d-apple-two-copies", "Apple", "desktop and hidden phone copies of one invoice; app 'Puzzle Garden' over 'Stack of Coins', 'In-App Purchase'; cancel within 14 days",
+      { from: "Apple <no_reply@email.apple.com>", subject: "Your invoice from Apple.", date: "Sun, 23 Feb 2025 23:21:31 +0000",
+        html: `<html><body><div class="aapl-desktop-div" style="display:block;">${copy}</div><div class="aapl-mobile-div" style="display:none;height:0;max-height:0;overflow:hidden;">${copy}</div></body></html>` },
+      { ...order([{ name: "Stack of Coins", qty: 1, unit: 159 }]), bought: [{ name: "Stack of Coins", qty: 1, line: 159, extras: ["Puzzle Garden"] }] }, "Apple", "2025-02-23");
+  }
+  // Google Play's subscription receipt with its links: the refund link is the one on "request a refund on the Google Play
+  // website", never the withdrawal form or "learn more"; the two-hour rule for apps is not for subscriptions.
+  {
+    const L = (t, k) => `<a href="https://www.google.com/appserve/mkt/p/AFnwnK${k}">${t}</a>`;
+    add("holdout16d-google-play-links", "Google Play", "subscription renewal with Google's links: 'learn more', 'form' (withdraw), 'request a refund on the Google Play website.', 'Refund Policy'",
+      { from: "Google Play <googleplay-noreply@google.com>", subject: "Your Google Play Order Receipt from 13-Jun-2019", date: "Thu, 13 Jun 2019 13:17:52 +0000",
+        text: "Google Play\n\n\nThank you.\n\n\nYour subscription from Google Commerce Limited on Google Play continues and you've been charged.\n\n\n\nOrder number: GPA.3399-0000-0000-00000..5\nOrder date: 13-Jun-2019 14:17:49 BST\n\n\nItem Price\n\n\nSketchbook Pro yearly with trial (Inkwell: Draw, Sketch & Paint Anywhere) (by Inkwell Studio Ltd) £8.99/month\n\n\nMonthly Subscription ‐ Next payment automatically charged on 13 Jul 2019\n\n\n\nTotal: £8.99/month\n\n(Includes VAT of £1.50)\n\n\nUnder the law, you have an automatic statutory right of withdrawal from contracts for the purchase of digital services for 14 days after you make the purchase. Use this form to withdraw. However, you can cancel your subscription, and the cancellation will be effective from the start of the next payment period.\nAfter purchasing an app or game on Google Play, you can return it within two hours for a full refund. This does not apply for in-app purchases or in-app subscriptions.\n\nIf the return period has passed and your purchase doesn't work properly or doesn't match its description on Google Play, you can request a refund on the Google Play website.\n",
+        html: `<html><body><div>Thank you.</div><div>Your subscription from Google Commerce Limited on Google Play continues and you've been charged.</div><div><b>Order number: </b> GPA.3399-0000-0000-00000..5<br><b>Order date: </b> 13-Jun-2019 14:17:49 BST</div>
+<table><tr><td>Item</td><td>Price</td></tr></table><table><tr><td><span>Sketchbook Pro yearly with trial (Inkwell: Draw, Sketch &amp; Paint Anywhere)</span> (by Inkwell Studio Ltd)</td><td>£8.99/month</td></tr><tr><td>Monthly Subscription ‐ Next payment automatically charged on 13 Jul 2019</td><td></td></tr></table>
+<table><tr><td><span>Total</span>: <span>£8.99/month</span></td></tr><tr><td>(Includes VAT of £1.50)</td></tr></table>
+<div>You can cancel at any time (${L("learn more", "a1")}).</div>
+Under the law, you have an automatic statutory right of withdrawal from contracts for the purchase of digital services for 14 days after you make the purchase. Use this ${L("form", "b2")} to withdraw. After the first 14 days you will not be eligible for a refund. However, you can cancel your subscription, and the cancellation will be effective from the start of the next payment period.<p>After purchasing an app or game on Google Play, you can return it within two hours for a full refund. This does not apply for in-app purchases or in-app subscriptions.</p><p>If the return period has passed and your purchase doesn’t work properly or doesn’t match its description on Google Play, you can ${L("request a refund on the Google Play website.", "c3")}</p>
+<div>See your Google Play ${L("Order History", "d4")}. View the Google Play ${L("Refund Policy", "e5")} and the ${L("Terms of Service", "f6")}.</div></body></html>` },
+      order([{ name: "Sketchbook Pro yearly with trial (Inkwell: Draw, Sketch & Paint Anywhere)", qty: 1, unit: 899 }]), "Google Play", "2019-06-13");
+  }
   return out;
 }

@@ -1,0 +1,33 @@
+{
+ "id": "holdout16d-apple-two-copies",
+ "sender": "Apple",
+ "layout": "desktop and hidden phone copies of one invoice; app 'Puzzle Garden' over 'Stack of Coins', 'In-App Purchase'; cancel within 14 days",
+ "headers": {
+  "from": "Apple <no_reply@email.apple.com>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your invoice from Apple.",
+  "date": "Sun, 23 Feb 2025 23:21:31 +0000"
+ },
+ "html": "<html><body><div class=\"aapl-desktop-div\" style=\"display:block;\"><table><tr><td>Invoice</td></tr><tr><td><span>APPLE ACCOUNT</span><br>sam.taylor@example.co.uk</td><td><span>BILLED TO</span><br>Amex .... 1234 (Apple Pay)<br>Sam Taylor<br>GBR</td></tr>\n<tr><td><span>INVOICE DATE</span><br><span dir=\"auto\">23 Feb 2025</span></td><td><span>SEQUENCE NO.</span><br>2-6600000001</td></tr><tr><td><span>ORDER ID</span><br><a href=\"https://support.apple.com/kb/HT204088\">MQZZTEST01</a></td><td><span>DOCUMENT NO.</span><br>211900000001</td></tr></table>\n<table><tr class=\"section-header\"><td colspan=\"3\"><span>App Store</span></td></tr><tr><td class=\"item-cell\"><span class=\"title\" dir=\"auto\">\nPuzzle Garden\n</span><br><span class=\"artist\">Stack of Coins</span><br><span class=\"type\">In-App Purchase</span><br><span class=\"device\">Sam’s iPhone</span><br><a href=\"https://buy.itunes.apple.com/reportAProblem\">Report a Problem</a></td>\n<td class=\"price-cell\"><table><tr><td colspan=\"3\"><span>£1.59</span></td></tr><tr><td><span>Inclusive of VAT at <b>20%</b></span></td><td> </td><td><span>£0.26</span></td></tr></table></td></tr></table>\n<table><tr><td>Subtotal</td><td> </td><td>£1.33</td></tr><tr><td>VAT charged at 20%</td><td> </td><td>£0.26</td></tr><tr><td>TOTAL</td><td></td><td>£1.59</td></tr></table>\n<p>To cancel your purchase within 14 days of receiving this invoice, <a href=\"https://buy.itunes.apple.com/reportAProblem\">report a problem</a> or <a href=\"http://www.apple.com/uk/support/itunes/contact/\">contact us</a>.<br><a href=\"http://www.apple.com/legal/\">Learn more about your right of withdrawal</a></p></div><div class=\"aapl-mobile-div\" style=\"display:none;height:0;max-height:0;overflow:hidden;\"><table><tr><td>Invoice</td></tr><tr><td><span>APPLE ACCOUNT</span><br>sam.taylor@example.co.uk</td><td><span>BILLED TO</span><br>Amex .... 1234 (Apple Pay)<br>Sam Taylor<br>GBR</td></tr>\n<tr><td><span>INVOICE DATE</span><br><span dir=\"auto\">23 Feb 2025</span></td><td><span>SEQUENCE NO.</span><br>2-6600000001</td></tr><tr><td><span>ORDER ID</span><br><a href=\"https://support.apple.com/kb/HT204088\">MQZZTEST01</a></td><td><span>DOCUMENT NO.</span><br>211900000001</td></tr></table>\n<table><tr class=\"section-header\"><td colspan=\"3\"><span>App Store</span></td></tr><tr><td class=\"item-cell\"><span class=\"title\" dir=\"auto\">\nPuzzle Garden\n</span><br><span class=\"artist\">Stack of Coins</span><br><span class=\"type\">In-App Purchase</span><br><span class=\"device\">Sam’s iPhone</span><br><a href=\"https://buy.itunes.apple.com/reportAProblem\">Report a Problem</a></td>\n<td class=\"price-cell\"><table><tr><td colspan=\"3\"><span>£1.59</span></td></tr><tr><td><span>Inclusive of VAT at <b>20%</b></span></td><td> </td><td><span>£0.26</span></td></tr></table></td></tr></table>\n<table><tr><td>Subtotal</td><td> </td><td>£1.33</td></tr><tr><td>VAT charged at 20%</td><td> </td><td>£0.26</td></tr><tr><td>TOTAL</td><td></td><td>£1.59</td></tr></table>\n<p>To cancel your purchase within 14 days of receiving this invoice, <a href=\"https://buy.itunes.apple.com/reportAProblem\">report a problem</a> or <a href=\"http://www.apple.com/uk/support/itunes/contact/\">contact us</a>.<br><a href=\"http://www.apple.com/legal/\">Learn more about your right of withdrawal</a></p></div></body></html>",
+ "text": "",
+ "expected": {
+  "shop": "Apple",
+  "date": "2025-02-23",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Stack of Coins",
+    "qty": 1,
+    "linePence": 159,
+    "extras": [
+     "Puzzle Garden"
+    ]
+   }
+  ],
+  "subtotalPence": 159,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 159
+ }
+}
