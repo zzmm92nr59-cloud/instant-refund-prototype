@@ -1,0 +1,31 @@
+{
+ "id": "holdout16e-bold-number-runon-money",
+ "sender": "Rivermode",
+ "layout": "text part 'Order number: *55120378*' (bold) and 'Subtotal (excl. promo) £45.00 Next day delivery £5.00 Total paid £50.00' on one line; the HTML part one line each",
+ "headers": {
+  "from": "Rivermode <noreply@rivermode.example>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Order Confirmation",
+  "date": "Mon, 16 Nov 2026 19:00:00 +0000"
+ },
+ "html": "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">\n<html xmlns=\"http://www.w3.org/1999/xhtml\"><head><meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\" /><meta name=\"viewport\" content=\"width=device-width\" />\n<title>Rivermode</title><style type=\"text/css\">body{margin:0;padding:0}td{font-family:Helvetica,Arial,sans-serif;font-size:14px;color:#222}.muted{color:#777}@media only screen and (max-width:600px){.w600{width:100%!important}}</style></head>\n<body style=\"margin:0;padding:0;background-color:#f3f3f3\">\n<div style=\"display:none;max-height:0;overflow:hidden\">&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;</div>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#f3f3f3\"><tr><td align=\"center\">\n<table role=\"presentation\" class=\"w600\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#ffffff\">\n<tr><td style=\"padding:24px 24px 8px 24px\"><a href=\"https://www.rivermode.example/?utm_source=email\"><img src=\"https://www.rivermode.example/static/email/logo.png\" alt=\"Rivermode\" width=\"140\" height=\"40\" border=\"0\" /></a></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"><tr><td>Thanks for your order! We'll let you know when it's on its way to you.</td></tr><tr><td>Order number: 55120378</td></tr><tr><td>Estimated delivery: Tuesday, 17 Nov</td></tr><tr><td>Delivery type</td></tr><tr><td>Next day</td></tr><tr><td>Your items in this order</td></tr><tr><td>Tan suede chelsea boots</td></tr><tr><td>Size: 9 (UK)</td></tr><tr><td>Qty: 1</td></tr><tr><td>&pound;45.00</td></tr><tr><td>Subtotal (excl. promo)</td></tr><tr><td>&pound;45.00</td></tr><tr><td>Next day delivery</td></tr><tr><td>&pound;5.00</td></tr><tr><td>Total paid</td></tr><tr><td>&pound;50.00</td></tr></table></td></tr>\n<tr><td style=\"padding:24px;font-size:12px\" class=\"muted\">&copy; 2026 Rivermode. All rights reserved.<br /><a href=\"https://www.rivermode.example/help\">Help</a> | <a href=\"https://www.rivermode.example/privacy\">Privacy</a> | <a href=\"https://www.rivermode.example/unsubscribe\">Unsubscribe</a></td></tr>\n</table></td></tr></table>\n<img src=\"https://click.rivermode.example/open/abc123.gif\" width=\"1\" height=\"1\" alt=\"\" />\n</body></html>",
+ "text": "Thanks for your order! We'll let you know when it's on its way to you.\n\nOrder number: *55120378* Estimated delivery: *Tuesday, 17 Nov*\nDelivery address\nSam Taylor, 12 Example Road, Leeds, LS1 4AB Delivery type Next day\nYour items in this order\nTan suede chelsea boots\nSize: 9 (UK) £45.00\nSubtotal (excl. promo) £45.00 Next day delivery £5.00 Total paid £50.00\nPayment methods ****1234 Visa £50.00\n",
+ "expected": {
+  "shop": "Rivermode",
+  "date": "2026-11-16",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Tan suede chelsea boots",
+    "qty": 1,
+    "linePence": 4500
+   }
+  ],
+  "subtotalPence": 4500,
+  "feesPence": 500,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 5000,
+  "orderRef": "55120378"
+ }
+}

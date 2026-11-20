@@ -1,0 +1,25 @@
+{
+ "id": "holdout16e-parking-hidden-sender-cost",
+ "sender": "Parkly",
+ "layout": "from 'noreply_at_parkly_example_ab12cd34ef_0a1b2c3d@privaterelay.appleid.com' (Apple's Hide My Email); subject 'Parkly Parking Receipt'; 'Transaction ID: 2071188801'; 'Cost: £1.40 including 20% VAT and Service Charge'; no item list",
+ "headers": {
+  "from": "<noreply_at_parkly_example_ab12cd34ef_0a1b2c3d@privaterelay.appleid.com>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Parkly Parking Receipt",
+  "date": "Sat, 14 Nov 2026 12:25:22 +0000"
+ },
+ "html": "Parkly Parking Receipt<br><br>Transaction ID: 2071188801<br>Location: 401122<br>License: AB12 CDE<br><br>Description: MARKET STREET<br><br>Start Parking: 2026/11/14 12:31PM<br>Stop Parking: 2026/11/14 1:31PM<br>Cost: &pound;1.40 including 20% VAT and Service Charge<br><br>Thank you for using the Parkly parking service.",
+ "text": "",
+ "expected": {
+  "shop": "Parkly",
+  "date": "2026-11-14",
+  "currency": "GBP",
+  "items": [],
+  "subtotalPence": 0,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 140,
+  "orderRef": "2071188801"
+ }
+}

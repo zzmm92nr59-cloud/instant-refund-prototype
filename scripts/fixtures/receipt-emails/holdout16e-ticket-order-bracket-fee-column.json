@@ -1,0 +1,31 @@
+{
+ "id": "holdout16e-ticket-order-bracket-fee-column",
+ "sender": "Ticketsy",
+ "layout": "subject 'Tickets for Dockside | New Years Eve | Saturday 31st December' (no word order); 'Thank you for your order from Dockside'; 'Your Order (#9C41AB77E0D2):'; 'Item' / 'Price' / 'Fee' each on its own line; '1 x EARLY ENTRY TICKET (WITH AFTER PARTY)' over '£28.00' over '£2.80'; 'Order Total' over '£30.80'; the event 'Thu 31st Dec 2026 at 8:00pm' (the day after the email)",
+ "headers": {
+  "from": "Ticketsy <team@ticketsy.example>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Tickets for Dockside | New Years Eve | Thursday 31st December",
+  "date": "Wed, 30 Dec 2026 15:54:03 +0000"
+ },
+ "html": "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">\n<html xmlns=\"http://www.w3.org/1999/xhtml\"><head><meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\" /><meta name=\"viewport\" content=\"width=device-width\" />\n<title>Ticketsy</title><style type=\"text/css\">body{margin:0;padding:0}td{font-family:Helvetica,Arial,sans-serif;font-size:14px;color:#222}.muted{color:#777}@media only screen and (max-width:600px){.w600{width:100%!important}}</style></head>\n<body style=\"margin:0;padding:0;background-color:#f3f3f3\">\n<div style=\"display:none;max-height:0;overflow:hidden\">&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;</div>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#f3f3f3\"><tr><td align=\"center\">\n<table role=\"presentation\" class=\"w600\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#ffffff\">\n<tr><td style=\"padding:24px 24px 8px 24px\"><a href=\"https://www.ticketsy.example/?utm_source=email\"><img src=\"https://www.ticketsy.example/static/email/logo.png\" alt=\"Ticketsy\" width=\"140\" height=\"40\" border=\"0\" /></a></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\"><tr><td>Download the Ticketsy App to get your tickets</td></tr></table><table role=\"presentation\" width=\"100%\"><tr><td>Order Details</td></tr></table><table role=\"presentation\" width=\"100%\"><tr><td>Thank you for your order from Dockside</td></tr></table><table role=\"presentation\" width=\"100%\"><tr><td>Your Details:</td></tr></table><table role=\"presentation\" width=\"100%\"><tr><td>Sam Taylor</td></tr></table><table role=\"presentation\" width=\"100%\"><tr><td>Your Order (#9C41AB77E0D2):</td></tr></table><table role=\"presentation\" width=\"100%\"><tr><td>Item</td></tr></table><table role=\"presentation\" width=\"100%\"><tr><td>Price</td></tr></table><table role=\"presentation\" width=\"100%\"><tr><td>Fee</td></tr></table><table role=\"presentation\" width=\"100%\"><tr><td>1 x EARLY ENTRY TICKET (WITH AFTER PARTY)</td></tr></table><table role=\"presentation\" width=\"100%\"><tr><td>&pound;28.00</td></tr></table><table role=\"presentation\" width=\"100%\"><tr><td>&pound;2.80</td></tr></table><table role=\"presentation\" width=\"100%\"><tr><td>Order Total</td></tr></table><table role=\"presentation\" width=\"100%\"><tr><td>&pound;30.80</td></tr></table><table role=\"presentation\" width=\"100%\"><tr><td>EVENT DETAILS</td></tr></table><table role=\"presentation\" width=\"100%\"><tr><td>Dockside | New Years Eve | Thursday 31st December</td></tr></table><table role=\"presentation\" width=\"100%\"><tr><td>Thu 31st Dec 2026 at 8:00pm - Fri 1st Jan 2027 at 3:00am</td></tr></table><table role=\"presentation\" width=\"100%\"><tr><td>Dockside Hall in Leeds, United Kingdom</td></tr></table></td></tr>\n<tr><td style=\"padding:24px;font-size:12px\" class=\"muted\">&copy; 2026 Ticketsy. All rights reserved.<br /><a href=\"https://www.ticketsy.example/help\">Help</a> | <a href=\"https://www.ticketsy.example/privacy\">Privacy</a> | <a href=\"https://www.ticketsy.example/unsubscribe\">Unsubscribe</a></td></tr>\n</table></td></tr></table>\n<img src=\"https://click.ticketsy.example/open/abc123.gif\" width=\"1\" height=\"1\" alt=\"\" />\n</body></html>",
+ "text": "",
+ "expected": {
+  "shop": "Ticketsy",
+  "date": "2026-12-30",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "EARLY ENTRY TICKET (WITH AFTER PARTY)",
+    "qty": 1,
+    "linePence": 2800
+   }
+  ],
+  "subtotalPence": 2800,
+  "feesPence": 280,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 3080,
+  "orderRef": "9C41AB77E0D2"
+ }
+}

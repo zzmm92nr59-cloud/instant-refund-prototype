@@ -15,7 +15,7 @@ import { fileURLToPath } from "node:url";
 import { parseReceiptEmail, parseReturnUpdateEmail, parseReturnEmail, parseReturnParcelEmail, parseCancellationEmail, parseOrderAdjustmentEmail } from "../worker/receipt-parser.js";
 import { matchReturnNews } from "../worker/return-tracking.js";
 import { storeKey } from "../worker/receipt-category.js";
-import { mergeOrderEmails, attachCancellations, attachAdjustments, attachReturnProgress, attachDeliveries, classifyEmail } from "../worker/gmail.js";
+import { mergeOrderEmails, attachCancellations, attachAdjustments, attachReturnProgress, attachDeliveries, classifyEmail, attachUnnumberedPlans } from "../worker/gmail.js";
 import { rawEmail, forwarded, SHOPPER } from "./fixtures/receipt-emails/lib.mjs";
 
 const dir = join(dirname(fileURLToPath(import.meta.url)), "fixtures", "receipt-emails");
@@ -546,6 +546,40 @@ const joinWrong = [];
   const det = (id) => ({ ...classifyEmail(rawEmail(fx(id))).details, id });
   const cards = mergeOrderEmails([det("holdout16b-shop-order-one-figure-pence"), det("holdout16b-shop-order-completed-resend")]);
   if (cards.length !== 1 || cards[0].orderRef !== "61822" || cards[0].totalPence !== 2100) joinWrong.push("a shop's order email re-sent with a new status made " + cards.length + " cards");
+  // (Round 15e: a despatch email with no items or money is the parcel's news and joins its order by the number; the carrier's
+  // "delivered" email that gives the parcel's number only in its tracking link joins by that number.)
+  { const { SHIRT_ORDER, SHIRT_DESPATCH, SHIRT_DELIVERED } = await import("./fixtures/receipt-emails/holdout16e.mjs");
+    const d = (f) => ({ ...classifyEmail(rawEmail(f)).details, id: f.id });
+    const [o, dsp, dlv] = [d(SHIRT_ORDER), d(SHIRT_DESPATCH), d(SHIRT_DELIVERED)];
+    if (dsp.kind !== "delivery_update" || dsp.orderRef !== "cwk55120931" || dsp.trackingNumber !== "UK4471100293") joinWrong.push("an empty despatch email read as " + JSON.stringify([dsp.kind, dsp.orderRef, dsp.trackingNumber]));
+    if (dlv.kind !== "delivery_update" || dlv.trackingNumber !== "UK4471100293") joinWrong.push("a carrier's delivered email read as " + JSON.stringify([dlv.kind, dlv.trackingNumber]));
+    const m = mergeOrderEmails([o]); attachDeliveries(m, [dsp, dlv]);
+    if (m.length !== 1 || !m[0].delivery || m[0].delivery.status !== "delivered") joinWrong.push("despatch and delivery didn't reach the order (" + JSON.stringify(m[0] && m[0].delivery) + ")"); }
+  // (Round 15e: a booking's confirmation sent again from the shop's "comms." address joins the first by its code; a parcel
+  // of a split order, its number the order's with "-1", brings its tracking to the order.)
+  { const b = (id, domain, date) => ({ id, kind: "receipt", retailer: { name: "Skyhop", domain }, orderRef: "QZXKPL", orderDate: date, totalPence: 8299, currency: "EUR", items: [{ name: "Flight", qty: 1, pricePence: 8299 }] });
+    if (mergeOrderEmails([b("a", "skyhop.example", "2026-06-20"), b("b", "comms.skyhop.example", "2026-08-23")]).length !== 1) joinWrong.push("a booking sent again from the airline's comms address made a second card");
+    const o = [{ id: "o", kind: "receipt", retailer: { name: "Hall", domain: "hallhome.example" }, orderRef: "HAL-7vxlt1dl", orderDate: "2026-11-01", totalPence: 15450, items: [] }];
+    attachDeliveries(o, [{ kind: "delivery_update", status: "shipped", at: "2026-11-04", carrier: "FedEx", trackingNumber: "391714842934", retailer: { name: "Hall", domain: "hallhome.example" }, orderRef: "HAL-7vxlt1dl-1" }]);
+    if (!o[0].delivery || o[0].delivery.trackingNumber !== "391714842934") joinWrong.push("a split order's parcel numbered '-1' didn't bring its tracking to the order"); }
+  // (Round 15e: "We have cancelled the following item(s) from your order …" cancels only the thing it lists.)
+  { const { NUTRITION_ORDER, NUTRITION_PART_CANCEL } = await import("./fixtures/receipt-emails/holdout16e.mjs");
+    const d = (f) => ({ ...classifyEmail(rawEmail(f)).details, id: f.id });
+    const c = d(NUTRITION_PART_CANCEL), m = mergeOrderEmails([d(NUTRITION_ORDER)]); attachCancellations(m, [c]);
+    const marked = (m[0] && m[0].items || []).filter((i) => i.cancelled).map((i) => i.name);
+    if (c.kind !== "order_update" || !m[0].cancelled || !m[0].cancelled.partial || marked.length !== 1 || !/protein bar/i.test(marked[0])) joinWrong.push("a cancellation of one listed thing read as " + JSON.stringify([c.kind, c.partial, c.orderRef, m[0] && m[0].cancelled, marked])); }
+  // (Round 15e: a return the shop accepted with no order number, only what it will refund, goes on the one order from that
+  // shop that cost exactly that; with two such orders it goes on neither.)
+  { const shop = { name: "Stretchwell", domain: "stretchwell.example" };
+    const ord = (id, ref, date, total) => ({ id, kind: "receipt", retailer: { name: "Stretchwell", domain: "stretchwell.example" }, orderRef: ref, orderDate: date, totalPence: total, currency: "GBP", items: [{ name: "Define Jacket", qty: 1, pricePence: total }] });
+    const plan = { kind: "return_instructions", retailer: shop, orderRef: null, at: "2026-11-18", returnId: "ret1", estimatedRefundPence: 9800, currency: "GBP" };
+    const one = [ord("a", "SW1", "2026-10-30", 9800), ord("b", "SW2", "2026-10-12", 4500)]; attachUnnumberedPlans(one, [plan]);
+    if (!(one[0].returnPlan && one[0].returnPlan.returnId === "ret1") || one[1].returnPlan) joinWrong.push("a return with no order number didn't join the one order that cost what it refunds");
+    const two = [ord("a", "SW1", "2026-10-30", 9800), ord("c", "SW3", "2026-11-02", 9800)]; attachUnnumberedPlans(two, [plan]);
+    if (two.some((o) => o.returnPlan)) joinWrong.push("a return with no order number was joined by guessing between two orders of the same price"); }
+  // (Round 15e: a despatch email that repeats the order's whole layout, items and total joins the order by its number.)
+  { const c2 = mergeOrderEmails([det("holdout16e-bold-number-runon-money"), det("holdout16e-bold-number-despatch")]);
+    if (c2.length !== 1 || c2[0].orderRef !== "55120378" || c2[0].totalPence !== 5000 || !(c2[0].fees || []).some((f) => f.pence === 500)) joinWrong.push("a despatch email repeating its order made " + c2.length + " cards (" + JSON.stringify(c2.map((c) => [c.orderRef, c.totalPence, c.fees])) + ")"); }
   for (const [order, refund, pence] of [["holdout16b-shop-order-one-figure-pence", "holdout16b-shop-refund-initiated", 300], ["holdout16b-rail-change-admin-fee", "holdout16b-rail-refund-by-transaction", 640]]) {
     const m = mergeOrderEmails([det(order)]); attachReturnProgress(m, [], [det(refund)]);
     const p = m[0] && m[0].returnProgress;
