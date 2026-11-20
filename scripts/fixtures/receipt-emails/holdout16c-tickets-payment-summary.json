@@ -1,0 +1,46 @@
+{
+ "id": "holdout16c-tickets-payment-summary",
+ "sender": "Ticketline",
+ "layout": "'Order #44-10293/UK1' over the event's name; '2x' 'Print-at-Home' 'View Tickets'; 'Payment Summary', '2 Full Price Ticket' over '£35.00 x2', '£70.00', 'Per Item Fees', '£4.10 (Service Charge Full Price Ticket) x2', '£2.00 (Facility Charge Full Price Ticket) x2', 'Order Processing Fees', 'Handling Fee (£2.75)', 'Total | £84.95'; 'does not issue refunds after purchase'",
+ "headers": {
+  "from": "Ticketline <customer_support@email.ticketline.example>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "You're in! Your Ticketline Order Confirmation",
+  "date": "Mon, 02 Nov 2026 18:00:00 +0000"
+ },
+ "html": "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">\n<html xmlns=\"http://www.w3.org/1999/xhtml\"><head><meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\" /><meta name=\"viewport\" content=\"width=device-width\" />\n<title>Ticketline</title><style type=\"text/css\">body{margin:0;padding:0}td{font-family:Helvetica,Arial,sans-serif;font-size:14px;color:#222}.muted{color:#777}@media only screen and (max-width:600px){.w600{width:100%!important}}</style></head>\n<body style=\"margin:0;padding:0;background-color:#f3f3f3\">\n<div style=\"display:none;max-height:0;overflow:hidden\">&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;</div>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#f3f3f3\"><tr><td align=\"center\">\n<table role=\"presentation\" class=\"w600\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#ffffff\">\n<tr><td style=\"padding:24px 24px 8px 24px\"><a href=\"https://www.ticketline.example/?utm_source=email\"><img src=\"https://www.ticketline.example/static/email/logo.png\" alt=\"Ticketline\" width=\"140\" height=\"40\" border=\"0\" /></a></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"><tr><td>Sam, You're In!</td></tr><tr><td>Order #44-10293/UK1</td></tr><tr><td>Comedy Night: The Big Tour</td></tr><tr><td>City Arena, Leeds</td></tr><tr><td>Fri 8 Jan 2027 @ 8:00 pm</td></tr><tr><td>Your Order</td></tr><tr><td>2x</td></tr><tr><td>Print-at-Home</td></tr><tr><td>View Tickets</td></tr><tr><td>Full Price Ticket</td></tr><tr><td>Payment Summary</td></tr><tr><td>2 Full Price Ticket</td></tr><tr><td>&pound;35.00 x2</td></tr><tr><td>&pound;70.00</td></tr><tr><td>Per Item Fees</td></tr><tr><td>&pound;4.10 (Service Charge Full Price Ticket) x2</td></tr><tr><td>&pound;2.00 (Facility Charge Full Price Ticket) x2</td></tr><tr><td>&pound;12.20</td></tr><tr><td>Order Processing Fees</td></tr><tr><td>Handling Fee (&pound;2.75)</td></tr><tr><td>&pound;2.75</td></tr><tr><td>Total</td></tr><tr><td>&pound;84.95</td></tr><tr><td>Ticketline does not issue refunds after purchase as set out in our Purchase Policy.</td></tr></table></td></tr>\n<tr><td style=\"padding:24px;font-size:12px\" class=\"muted\">&copy; 2026 Ticketline. All rights reserved.<br /><a href=\"https://www.ticketline.example/help\">Help</a> | <a href=\"https://www.ticketline.example/privacy\">Privacy</a> | <a href=\"https://www.ticketline.example/unsubscribe\">Unsubscribe</a></td></tr>\n</table></td></tr></table>\n<img src=\"https://click.ticketline.example/open/abc123.gif\" width=\"1\" height=\"1\" alt=\"\" />\n</body></html>",
+ "text": "",
+ "expected": {
+  "shop": "Ticketline",
+  "date": "2026-11-02",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Comedy Night: The Big Tour",
+    "qty": 2,
+    "linePence": 7000
+   },
+   {
+    "name": "Service Charge Full Price Ticket",
+    "qty": 2,
+    "linePence": 820
+   },
+   {
+    "name": "Facility Charge Full Price Ticket",
+    "qty": 2,
+    "linePence": 400
+   },
+   {
+    "name": "Handling Fee",
+    "qty": 1,
+    "linePence": 275
+   }
+  ],
+  "subtotalPence": 8495,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 8495,
+  "orderRef": "44-10293"
+ }
+}

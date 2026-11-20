@@ -1,0 +1,18 @@
+{
+ "id": "holdout16c-hotel-online-check-in",
+ "sender": "Harbour Hotels",
+ "layout": "subject 'Online Check In Confirmation - Quayside Hotel'; 'You did it! You completed your online check-in service.'; 'Double Room | £189.00', 'Total | £189.00', 'Paid Already | £189.00'",
+ "headers": {
+  "from": "Harbour Hotels <noreply@harbourhotels.example>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Online Check In Confirmation - Quayside Hotel",
+  "date": "Fri, 06 Nov 2026 19:02:20 +0000"
+ },
+ "html": "",
+ "text": "| Check-In Sat 07 Nov 2pm |\n| Check-Out Sun 08 Nov 11am |\n| Confirmation No. 400118273 |\n| Hello Sam Taylor, |\n| You did it! You completed your online check-in service. Safe travels! |\n| Double Room | Checked-In |\n| Double Room | £189.00 |\n| Total | £189.00 |\n| Paid Already | £189.00 |\n| Balance Due | £0.00 |\n",
+ "expected": {
+  "notPurchase": {
+   "kind": "check_in"
+  }
+ }
+}

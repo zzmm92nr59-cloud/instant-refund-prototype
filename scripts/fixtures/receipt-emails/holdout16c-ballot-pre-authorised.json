@@ -1,0 +1,18 @@
+{
+ "id": "holdout16c-ballot-pre-authorised",
+ "sender": "Racedays",
+ "layout": "subject 'Your Payment Receipt'; '1x Ballot Entry (Pre-authorised) £40.00', '1x Booking Fee (Pre-authorised) £2.00', 'Total Pre-authorised £42.00', 'Total paid today £0.00'",
+ "headers": {
+  "from": "Racedays <hello@info.racedays.example>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your Payment Receipt",
+  "date": "Thu, 05 Nov 2026 21:03:39 +0000"
+ },
+ "html": "",
+ "text": "Your\nreceipt\n\n1x Ballot Entry - November Ballot Entry (Pre-authorised)\n£40.00\n\n1x Booking Fee (Pre-authorised)\n£2.00\n\nTotal Pre-authorised\n£42.00\n\nCity Half Marathon 2027 Ballot - 1x Training Plan Free Trial\n£0.00\n\nTotal paid today\n£0.00\n\nPayment\nReference 6a7ee826c31fc5c2239742aa\n",
+ "expected": {
+  "notPurchase": {
+   "kind": "pre_authorised"
+  }
+ }
+}

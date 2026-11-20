@@ -1,0 +1,31 @@
+{
+ "id": "holdout16c-receipt-colon-number",
+ "sender": "SwapShop",
+ "layout": "subject 'SwapShop receipt :20440999'; 'Your order has now been collected'; '| Item: | Handheld Console … |', '| Quantity: | 1 |', '| Unit Price: | £95 |'; 'Order Total: £95 (1)'",
+ "headers": {
+  "from": "SwapShop <no_reply@swapshop.example>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "SwapShop receipt :20440999",
+  "date": "Sat, 07 Nov 2026 12:00:00 +0000"
+ },
+ "html": "",
+ "text": " Your order has now been collected, thank you for purchasing from SwapShop.\nDetails of your collected order are listed below:\n=========================================\nYour Order Number is: 20440999\n=========================================\n| Item: | Handheld Console, 64GB, Grey, Boxed |\n| Category: | Handheld Consoles |\n| Quantity: | 1 |\n| Unit Price: | £95 |\n-----------------------------------------\nPayment Details:\nApple Pay\n£95.00\n=========================================\nOrder Total: £95 (1)\n",
+ "expected": {
+  "shop": "SwapShop",
+  "date": "2026-11-07",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Handheld Console, 64GB, Grey, Boxed",
+    "qty": 1,
+    "linePence": 9500
+   }
+  ],
+  "subtotalPence": 9500,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 9500,
+  "orderRef": "20440999"
+ }
+}

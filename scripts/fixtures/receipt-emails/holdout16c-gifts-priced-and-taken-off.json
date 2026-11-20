@@ -1,0 +1,36 @@
+{
+ "id": "holdout16c-gifts-priced-and-taken-off",
+ "sender": "Liftwell",
+ "layout": "each item's name over 'Quantity' / '1' and 'Price' / '£20.00'; 'Free Recipe Box' priced '£5.00' (a promotion, never an item); 'Offers Used:' 'You've saved up to 60%' '- £2.00', 'Up to 60% off almost everything, plus FREE delivery!' '- £3.99', '3 FREE gifts on all orders' '- £5.00'; 'Delivery:' '£0.00'; 'Total Cost:' '£33.00'",
+ "headers": {
+  "from": "Liftwell <orders@liftwell.example>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your Liftwell order confirmation",
+  "date": "Sat, 31 Oct 2026 07:40:00 +0000"
+ },
+ "html": "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">\n<html xmlns=\"http://www.w3.org/1999/xhtml\"><head><meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\" /><meta name=\"viewport\" content=\"width=device-width\" />\n<title>Liftwell</title><style type=\"text/css\">body{margin:0;padding:0}td{font-family:Helvetica,Arial,sans-serif;font-size:14px;color:#222}.muted{color:#777}@media only screen and (max-width:600px){.w600{width:100%!important}}</style></head>\n<body style=\"margin:0;padding:0;background-color:#f3f3f3\">\n<div style=\"display:none;max-height:0;overflow:hidden\">&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;</div>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#f3f3f3\"><tr><td align=\"center\">\n<table role=\"presentation\" class=\"w600\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#ffffff\">\n<tr><td style=\"padding:24px 24px 8px 24px\"><a href=\"https://www.liftwell.example/?utm_source=email\"><img src=\"https://www.liftwell.example/static/email/logo.png\" alt=\"Liftwell\" width=\"140\" height=\"40\" border=\"0\" /></a></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"><tr><td>Thanks for your order</td></tr><tr><td>Order number: 491223376</td></tr><tr><td>Whey Isolate - 1kg - Vanilla</td></tr><tr><td>Quantity</td></tr><tr><td>1</td></tr><tr><td>Price</td></tr><tr><td>&pound;20.00</td></tr><tr><td>Protein Bar - 12 x 60g - Salted Caramel</td></tr><tr><td>Quantity</td></tr><tr><td>1</td></tr><tr><td>Price</td></tr><tr><td>&pound;15.00</td></tr><tr><td>Free Recipe Box</td></tr><tr><td>Quantity</td></tr><tr><td>1</td></tr><tr><td>Price</td></tr><tr><td>&pound;5.00</td></tr><tr><td>Offers Used:</td></tr><tr><td>You've saved up to 60%</td></tr><tr><td>- &pound;2.00</td></tr><tr><td>Up to 60% off almost everything, plus FREE delivery!</td></tr><tr><td>- &pound;3.99</td></tr><tr><td>3 FREE gifts on all orders</td></tr><tr><td>- &pound;5.00</td></tr><tr><td>Delivery:</td></tr><tr><td>&pound;0.00</td></tr><tr><td>Total Cost:</td></tr><tr><td>&pound;33.00</td></tr></table></td></tr>\n<tr><td style=\"padding:24px;font-size:12px\" class=\"muted\">&copy; 2026 Liftwell. All rights reserved.<br /><a href=\"https://www.liftwell.example/help\">Help</a> | <a href=\"https://www.liftwell.example/privacy\">Privacy</a> | <a href=\"https://www.liftwell.example/unsubscribe\">Unsubscribe</a></td></tr>\n</table></td></tr></table>\n<img src=\"https://click.liftwell.example/open/abc123.gif\" width=\"1\" height=\"1\" alt=\"\" />\n</body></html>",
+ "text": "",
+ "expected": {
+  "shop": "Liftwell",
+  "date": "2026-10-31",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Whey Isolate - 1kg - Vanilla",
+    "qty": 1,
+    "linePence": 2000
+   },
+   {
+    "name": "Protein Bar - 12 x 60g - Salted Caramel",
+    "qty": 1,
+    "linePence": 1500
+   }
+  ],
+  "subtotalPence": 3500,
+  "feesPence": 0,
+  "discountsPence": 200,
+  "tipsPence": 0,
+  "totalPence": 3300,
+  "orderRef": "491223376"
+ }
+}

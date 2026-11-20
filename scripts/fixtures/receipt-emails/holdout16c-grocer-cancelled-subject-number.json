@@ -1,0 +1,19 @@
+{
+ "id": "holdout16c-grocer-cancelled-subject-number",
+ "sender": "Hartley's Grocers",
+ "layout": "subject 'Your order has been cancelled 772104518'; 'Your order has been cancelled and you won't be charged'; no number in the body",
+ "headers": {
+  "from": "Hartley's Grocers <service@hartleysgrocers.example>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your order has been cancelled 772104518",
+  "date": "Sat, 14 Nov 2026 11:11:22 +0000"
+ },
+ "html": "",
+ "text": "Hartley's Grocers\n\nYour order has been cancelled, Sam\n\nWHAT YOU NEED TO KNOW\n\nYOUR ORDER HAS BEEN CANCELLED AND YOU WON'T BE CHARGED\n\nIf we've already taken payment for this order, we'll refund\nit within 3 to 5 working days. You don't need to do anything\nelse at this time.\n",
+ "expected": {
+  "notPurchase": {
+   "kind": "cancelled",
+   "orderRef": "772104518"
+  }
+ }
+}

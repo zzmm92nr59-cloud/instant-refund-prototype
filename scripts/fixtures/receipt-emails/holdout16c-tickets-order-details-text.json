@@ -1,0 +1,51 @@
+{
+ "id": "holdout16c-tickets-order-details-text",
+ "sender": "Eventix",
+ "layout": "plain text only: 'ORDER DETAILS', the event's name, 'Date:', 'Venue:', 'Seats, Full Price Ticket: 2 x £ 28.00 = £ 56.00', 'Booking fee: 2 x £ 3.50 = £ 7.00', 'Venue Levy: 2 x £ 1.00 = £ 2.00', 'Subtotal: £ 65.00', 'Processing fee: £ 1.50', 'Delivery/transaction costs: £ 2.50', 'Total incl. VAT: £ 69.00'",
+ "headers": {
+  "from": "Eventix <noreply@eventix.example>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your order 1061999123",
+  "date": "Sat, 07 Nov 2026 10:00:00 +0000"
+ },
+ "html": "",
+ "text": "Thank you for your order\nOrder number: 1061999123\nOrder total: £ 69.00\nORDER DETAILS\nBrass Night: Live\nDate: Thu., 04/03/2027, 19:30\nVenue: Town Hall, Leeds\nSeats, Full Price Ticket: 2 x £ 28.00 = £ 56.00\nEntrance STALLS, Row J, Seat 33\nBooking fee: 2 x £ 3.50 = £ 7.00\nVenue Levy: 2 x £ 1.00 = £ 2.00\n------------------\nSubtotal: £ 65.00\n==================\nTOTAL\nProcessing fee: £ 1.50\nDelivery/transaction costs: £ 2.50\n------------------\nTotal incl. VAT: £ 69.00\n",
+ "expected": {
+  "shop": "Eventix",
+  "date": "2026-11-07",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Brass Night: Live",
+    "qty": 2,
+    "linePence": 5600
+   },
+   {
+    "name": "Booking fee",
+    "qty": 2,
+    "linePence": 700
+   },
+   {
+    "name": "Venue Levy",
+    "qty": 2,
+    "linePence": 200
+   },
+   {
+    "name": "Processing fee",
+    "qty": 1,
+    "linePence": 150
+   },
+   {
+    "name": "Delivery/transaction costs",
+    "qty": 1,
+    "linePence": 250
+   }
+  ],
+  "subtotalPence": 6900,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 6900,
+  "orderRef": "1061999123"
+ }
+}

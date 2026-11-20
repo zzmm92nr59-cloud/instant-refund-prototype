@@ -1,0 +1,31 @@
+{
+ "id": "holdout16c-airline-codes-in-cells",
+ "sender": "Flyvia",
+ "layout": "subject 'Your booking confirmation - QWMZRT LGW-BCN 12 December'; 'Booking code QWMZRT'; 'London (Gatwick) | Barcelona (T1)' over '| LGW | BCN |'; '1 adult | 38.10 EUR', '1 rear seat | 0.00 EUR', 'Fees | 26.40 EUR', 'Total: 64.50 EUR'",
+ "headers": {
+  "from": "Flyvia Airlines <no-reply@flyvia.example>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your booking confirmation - QWMZRT LGW-BCN 12 December",
+  "date": "Tue, 10 Nov 2026 09:00:00 +0000"
+ },
+ "html": "",
+ "text": "| Booking code QWMZRT |\n| Outbound | |\n| Saturday, 12 December 2026 |\n| London (Gatwick) (TS) | Barcelona (T1) |\n| LGW | BCN |\n| 07:20h | 10:35h |\n| VY6012 |\n| Passengers and services |\n| 1 adult | 38.10 EUR |\n| 1 rear seat | 0.00 EUR |\n| Fees | 26.40 EUR |\n| Total: 64.50 EUR |\n| Status: | | Confirmed |\n",
+ "expected": {
+  "shop": "Flyvia Airlines",
+  "date": "2026-11-10",
+  "currency": "EUR",
+  "items": [
+   {
+    "name": "Flight London Gatwick to Barcelona",
+    "qty": 1,
+    "linePence": 6450
+   }
+  ],
+  "subtotalPence": 6450,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 6450,
+  "orderRef": "QWMZRT"
+ }
+}

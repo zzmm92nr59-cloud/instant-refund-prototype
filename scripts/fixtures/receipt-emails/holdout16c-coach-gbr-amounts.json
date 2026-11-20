@@ -1,0 +1,31 @@
+{
+ "id": "holdout16c-coach-gbr-amounts",
+ "sender": "Coachline",
+ "layout": "plain text: 'Reservation summary for order QWZRTYP'; 'Reservation Number' over '43-6840-031223-M22N-1335-LDS-LON-1'; 'From: Leeds, Bus Station (1:35 PM)', 'To: London, Victoria Coach Station (5:00 PM)'; 'Ticket Price: GBR 18.99', 'Booking Fee: GBR 1.00', 'Total Paid: GBR 19.99'",
+ "headers": {
+  "from": "Coachline <support@coachline.example>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "From Coachline Ltd: Your reservations have been made",
+  "date": "Mon, 09 Nov 2026 09:00:00 +0000"
+ },
+ "html": "",
+ "text": "Valued Coachline Customer,\nThank you for making a reservation with Coachline. This email confirms your purchase.\nReservation summary for order QWZRTYP\nReservation Number\n 43-6840-031223-M22N-1335-LDS-LON-1\nDate:December 3, 2026\nFrom: Leeds, Bus Station (1:35 PM)\nTo: London, Victoria Coach Station (5:00 PM)\nPassengers: 1 Standard\nCost and Payment Summary\nTicket Price: GBR 18.99\nBooking Fee: GBR 1.00\nTotal Paid: GBR 19.99\n",
+ "expected": {
+  "shop": "Coachline",
+  "date": "2026-11-09",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Leeds to London",
+    "qty": 1,
+    "linePence": 1899
+   }
+  ],
+  "subtotalPence": 1899,
+  "feesPence": 100,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 1999,
+  "orderRef": "QWZRTYP"
+ }
+}
