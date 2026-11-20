@@ -185,7 +185,9 @@ export function bookingStay(text) {
   let rooms = null, roomPence = null, roomName = null;
   const fees = [];
   for (let i = 0; i < block.length; i++) {
-    const r = block[i], [label, amount] = r.split(" | ");
+    // (A label and its amount on one line, as pasted text gives them: "2 rooms US$900".)
+    const one = r0 => /^(.{1,60}?)\s+((?:US\$|CA\$|A\$|€|£|\$)\s?\d[\d,]{0,9}(?:\.\d{2})?)$/.exec(r0);
+    const r = block[i].includes(" | ") || !one(block[i]) ? block[i] : one(block[i]).slice(1, 3).join(" | "), [label, amount] = r.split(" | ");
     const m = /^(\d{1,2})(?: rooms?)?$/i.exec(label);
     const money = amount != null ? stayPence(amount) : stayPence(block[i + 1]);
     if (m && rooms == null) {

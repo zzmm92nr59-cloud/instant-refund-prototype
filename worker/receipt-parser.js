@@ -2321,7 +2321,7 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   // (An order number PayPal gives under its label, "Order ID |" over "58d0cf0e-7b50-4c34-a8bd-ebc59dd2d0b8", however long.)
   // (Booking.com: the stay, read from its price details: the room or rooms for the nights booked, at the rooms' price, the
   // taxes and charges apart from it, never its terms as things bought; and whether it is paid at the property. Round 15.)
-  const bookingCom = /(^|\.)booking\.com$/i.test((fwdFrom && fwdFrom.domain) || sender?.domain || "");
+  const bookingCom = /(^|\.)booking\.com$/i.test((fwdFrom && fwdFrom.domain) || sender?.domain || "") || /^booking\.com$/i.test((result.retailer && (result.retailer.domain || result.retailer.name)) || "");
   const expedia = /(^|\.)expedia\.(?:com|co\.uk)$/i.test((fwdFrom && fwdFrom.domain) || sender?.domain || "");
   const stay = bookingCom ? bookingStay(fromHtml || text) || bookingStay(text) : expedia ? expediaStay(fromHtml || text) || expediaStay(text) : null;
   if (stay && stay.orderRef && !result.orderRef) result.orderRef = stay.orderRef;
@@ -2410,7 +2410,7 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   if (result.totalPence == null) { const pd = /\byour payment of £\s?(\d[\d,]{0,9}(?:\.\d{2})?) has been (?:successfully )?(?:processed|received|taken)\b/i.exec(text.slice(0, 5000)); if (pd) { result.totalPence = money(pd[1]); result.currency = "GBP"; result.itemsCheck = checkItems(result.items, moneyOf(text), result.totalPence); } }
   if (!result.orderRef) { const sr = /\b(?:payment receipt|payment|receipt|order) confirmation\s*[:#]?\s*(\d{5,12})\s*$/i.exec(String(subject || "")); if (sr) result.orderRef = sr[1]; }
   // (PayPal's own labels are never the thing bought: "Funding sources used (total)", "Sent to …", "Seller". Round 15.)
-  if (viaPayPal && result.items.some((i) => PAYPAL_LABEL.test(String(i.name || "")))) {
+  if ((viaPayPal || /\bpaypal\b/i.test(text.slice(0, 6000))) && result.items.some((i) => PAYPAL_LABEL.test(String(i.name || "")))) {
     result.items = result.items.filter((i) => !PAYPAL_LABEL.test(String(i.name || "")));
     result.itemsCheck = checkItems(result.items, moneyOf(text), result.totalPence);
   }
@@ -2587,8 +2587,26 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   // A credit set out like an item under the one thing bought ("Unused time on Claude Pro after 26 Oct 2026", "Qty 1",
   // "-£11.10"): kept as that item's detail, so the card says why less was paid. Round 12.
   // (Written so blank rows between them never make it slow: an email with thousands of them took minutes. Round 14.)
+  // A receipt's text part run into one line (Stripe's "Receipt #2343-9135 Oct 26–Nov 26, 2026 Max plan Qty 1 £75.00 Unused
+  // time on … Qty 1 -£11.10 Subtotal …"): each "name Qty n £x" after the receipt number is a thing bought; one taken off
+  // ("-£11.10") is not. Read only when nothing else was, and only straight on from the receipt number. Round 15.
+  if (!result.items.length && !fromHtml) {
+    const at = /\bReceipt\s*#\s*[\d-]{4,20}[ \t]+/i.exec(text);
+    if (at) {
+      let pos = at.index + at[0].length;
+      const period = /(?:[A-Z][a-z]{2,8} \d{1,2}(?:, \d{4})?[ \t]*[–-][ \t]*[A-Z][a-z]{2,8} \d{1,2}, \d{4}[ \t]+)?/y; period.lastIndex = pos; if (period.exec(text)) pos = period.lastIndex;
+      const seg = /(\p{L}[^£\n]{1,80}?)[ \t]+Qty[ \t]+(\d{1,3})[ \t]+([-−]?)£[ \t]?([\d,]+\.\d{2})[ \t]*/uy;
+      const got = [];
+      for (let m; got.length < 30 && (seg.lastIndex = pos, m = seg.exec(text)); pos = seg.lastIndex) {
+        if (m[3]) continue;
+        const qty = +m[2] || 1;
+        got.push({ name: m[1].trim(), qty, pricePence: money(m[4]), ...(qty > 1 ? { lineTotal: true } : {}) });
+      }
+      if (got.length) { result.items = got; result.itemsCheck = checkItems(result.items, moneyOf(text), result.totalPence); }
+    }
+  }
   if (result.items.length === 1) {
-    const cr = /^[ \t|]*(\p{L}[^\n|£]{8,80}?)[ \t|]*\n[\s|]*qty\s*:?\s*1[ \t|]*\n[\s|]*[-−–]\s?£\s?([\d,]+\.\d{2})[\s|]*$/imu.exec(fromHtml || text);
+    const cr =/^[ \t|]*(\p{L}[^\n|£]{8,80}?)[ \t|]*\n[\s|]*qty\s*:?\s*1[ \t|]*\n[\s|]*[-−–]\s?£\s?([\d,]+\.\d{2})[\s|]*$/imu.exec(fromHtml || text);
     if (cr && !/\b(?:discount|voucher|promo)/i.test(cr[1])) { const it = result.items[0]; const note = `${cr[1].trim()} −£${cr[2]}`; it.variant = it.variant ? `${it.variant}, ${note}` : note; }
   }
   // A stay booked through a booking site: the room is the item, and the hotel it is at ("Your booking is confirmed at
