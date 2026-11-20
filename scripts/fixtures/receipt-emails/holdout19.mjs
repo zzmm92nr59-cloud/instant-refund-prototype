@@ -3,7 +3,7 @@
 // people, numbers). An airline itinerary whose reservation code and amount paid sit on lines below their labels; an airline
 // that sets each airport on a line of its own with its time; an airline's fare, seat and fees lines; free partner gifts
 // listed with their worth; a store receipt with no items but its money off; a trainer named by its model number over its
-// style code; an invoice whose order number has no label; a trial set at £0.00 with a tax line named by its rate.
+// style code (in scripts/test-receipt-real-18.mjs: its all-figure name is right only with the code under it); an invoice whose order number has no label; a trial set at £0.00 with a tax line named by its rate.
 import { order, expected, page, fixture, h, gbp } from "./lib.mjs";
 
 const rows = (lines) => `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">${lines.map((l) => `<tr>${String(l).split(" | ").map((c) => `<td>${h(c)}</td>`).join("")}</tr>`).join("\n")}</table>`;
@@ -52,13 +52,13 @@ export default function holdout19() {
   // ---- A sports-nutrition shop: partner offers listed as free gifts with their worth, then taken off again ---------------
   {
     const its = [{ name: "Whey Isolate - 1kg - Vanilla", qty: 1, unit: 2499 }, { name: "Oat Bar - 12 x 60g - Toffee", qty: 1, unit: 1450 },
-      { name: "15% off sitewide at Kettleworks!", qty: 1, unit: 0 }, { name: "Free MealKit box", qty: 1, unit: 0 }];
+      { name: "10% off sitewide at Kettle!", qty: 1, unit: 0 }, { name: "Free MealKit box", qty: 1, unit: 0 }];
     const o = order(its, { discounts: [["Spring savings", 250]] });
     const lines = ["Thank you for your order"];
-    const shown = { "15% off sitewide at Kettleworks!": 150, "Free MealKit box": 1200 };
+    const shown = { "10% off sitewide at Kettle!": 150, "Free MealKit box": 1200 };
     for (const i of its) lines.push(i.name, "Quantity", "1", "Price", gbp(shown[i.name] ?? i.unit));
     lines.push("Order Summary", "Order Number:", "662019384", "Order Date:", "2026-11-08 10:12 UTC", "Offers Used:", "Spring savings", "- " + gbp(250), "2 FREE gifts on all orders", "- " + gbp(1350), "Delivery:", gbp(0), "Total Cost:", gbp(o.total));
-    add("holdout19-free-partner-gifts", "Proteo", "each line 'Name', 'Quantity', '1', 'Price', '£…'; two partner offers ('15% off sitewide at Kettleworks!' at £1.50, 'Free MealKit box' at £12.00) taken off again as '2 FREE gifts on all orders - £13.50'",
+    add("holdout19-free-partner-gifts", "Proteo", "each line 'Name', 'Quantity', '1', 'Price', '£…'; two partner offers ('10% off sitewide at Kettle!' at £1.50, 'Free MealKit box' at £12.00) taken off again as '2 FREE gifts on all orders - £13.50'",
       { from: "Proteo <service@t.proteo-nutrition.example>", subject: "Thank you for your order", date: "Sun, 08 Nov 2026 10:13:00 +0000", html: mail("Proteo", "proteo-nutrition.example", lines) },
       o, "Proteo", "2026-11-08", { orderRef: "662019384" });
   }
@@ -69,15 +69,6 @@ export default function holdout19() {
         text: "Thanks for shopping at Pantry Go\nOrder # 204-1111111-2222222\nTrip time: 1m 40s\nSubtotal £8.00\nPromotions applied - £1.00\nTotal £7.00\nFor further information about Pantry Go, please visit our home page.\n" },
       { shop: "Pantry Go", date: "2026-11-06", currency: "GBP", items: [], subtotalPence: 800, feesPence: 0, discountsPence: 100, tipsPence: 0, totalPence: 700, orderRef: "204-1111111-2222222" });
     out.push(f);
-  }
-  // ---- A trainer named by its model number over its style code, size and colour -----------------------------------------
-  {
-    const o = order([{ name: "574", qty: 1, unit: 7500, extras: ["ML574EV2", "UK 8 - D", "Navy with Grey"] }], { fees: [["Shipping", 450]], discounts: [["Discount", 750], ["Shipping Discount", 450]] });
-    add("holdout19-trainer-model-number", "Stridewell", "'YOUR ORDER', '574', 'Style #:', 'ML574EV2', 'UK Size: UK 8 - D', 'Navy with Grey', 'QUANTITY: 1', 'PRICE: £75.00'; 'Shipping: £4.50', 'Shipping Discount: £' with no amount",
-      { from: "Stridewell UK <stridewell@mail.stridewell.example>", subject: "Thank You for Your Order", date: "Thu, 05 Nov 2026 12:53:00 +0000",
-        html: mail("Stridewell", "stridewell.example", ["ORDER NUMBER: SW04040404", "SHIPPING METHOD", "Standard", "YOUR ORDER", "574", "Style #:", "ML574EV2", "UK Size: UK 8 - D", "Navy with Grey", "QUANTITY: 1", "PRICE: £75.00",
-          "Order Subtotal: £75.00", "Discount: £7.50", "Shipping: £4.50", "Shipping Discount: £", "Order Total: £67.50"]) },
-      o, "Stridewell", "2026-11-05", { orderRef: "SW04040404" });
   }
   // ---- A software invoice: its order number in a cell of its own beside the subscription's dates, with no label -----------
   {
@@ -99,3 +90,12 @@ export default function holdout19() {
   }
   return out;
 }
+
+// The trainer's email, read in scripts/test-receipt-real-18.mjs (not in the corpus: "574" alone is no name, only over its
+// labelled style code).
+export const TRAINER = {
+  id: "holdout19-trainer-model-number", sender: "Stridewell", layout: "",
+  headers: { from: "Stridewell UK <stridewell@mail.stridewell.example>", subject: "Thank You for Your Order", date: "Thu, 05 Nov 2026 12:53:00 +0000", to: "sam.taylor@example.co.uk" }, text: "",
+  html: mail("Stridewell", "stridewell.example", ["ORDER NUMBER: SW04040404", "SHIPPING METHOD", "Standard", "YOUR ORDER", "574", "Style #:", "ML574EV2", "UK Size: UK 8 - D", "Navy with Grey", "QUANTITY: 1", "PRICE: £75.00",
+    "Order Subtotal: £75.00", "Discount: £7.50", "Shipping: £4.50", "Shipping Discount: £", "Order Total: £67.50"]),
+};

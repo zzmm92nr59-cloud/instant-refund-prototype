@@ -11,7 +11,7 @@ import { cleanItems } from "../worker/receipt-reader.js";
 import { classifyEmail, attachCancellations } from "../worker/gmail.js";
 import { flightBooking } from "../worker/flight-booking.js";
 import { rawEmail } from "./fixtures/receipt-emails/lib.mjs";
-import holdout19 from "./fixtures/receipt-emails/holdout19.mjs";
+import holdout19, { TRAINER } from "./fixtures/receipt-emails/holdout19.mjs";
 
 const fx = Object.fromEntries(holdout19().map((f) => [f.id, f]));
 const read = (id) => parseReceiptEmail(rawEmail(fx[id]));
@@ -51,12 +51,12 @@ const mk = (from, subject, body, { html = false, date = "Wed, 11 Nov 2026 10:00:
 {
   const r = read("holdout19-free-partner-gifts");
   assert.deepEqual(r.items.map((i) => [i.name, i.pricePence, Boolean(i.free)]), [["Whey Isolate - 1kg - Vanilla", 2499, false], ["Oat Bar - 12 x 60g - Toffee", 1450, false],
-    ["15% off sitewide at Kettleworks!", 0, true], ["Free MealKit box", 0, true]]);
+    ["10% off sitewide at Kettle!", 0, true], ["Free MealKit box", 0, true]]);
   assert.deepEqual(listed(r).map((i) => i.name), r.items.map((i) => i.name));
   assert.ok(r.itemsCheck.complete && r.itemsCheck.namesOk);
   assert.ok(!(r.discounts || []).some((d) => /gift/i.test(d.label)), "the gifts' offer is not money off what was bought");
   // (An offer line that was never a gift of the order is still no item.)
-  assert.equal(cleanItems([{ name: "15% off sitewide at Kettleworks!", qty: 1, pricePence: 150 }], { stored: true }).length, 0);
+  assert.equal(cleanItems([{ name: "10% off sitewide at Kettle!", qty: 1, pricePence: 150 }], { stored: true }).length, 0);
   console.log("ok - free gifts the email lists with their worth are listed at £0.00 and stay listed");
 }
 // 5. A store receipt with no items: its money off is kept when it is exactly what takes the subtotal to the total.
@@ -69,7 +69,8 @@ const mk = (from, subject, body, { html = false, date = "Wed, 11 Nov 2026 10:00:
 }
 // 6. A trainer named by its model number: its code, size and colour are details, and the list keeps it.
 {
-  const r = read("holdout19-trainer-model-number");
+  const r = parseReceiptEmail(rawEmail(TRAINER));
+  assert.equal(r.totalPence, 6750);
   assert.deepEqual([r.items[0].name, r.items[0].variant], ["574", "ML574EV2, UK 8 - D, Navy with Grey"]);
   assert.deepEqual(listed(r).map((i) => [i.name, i.pricePence]), [["574", 7500]]);
   assert.equal(cleanItems([{ name: "574", qty: 1, pricePence: 7500 }], { stored: true }).length, 0, "a bare number with nothing to say it is a model is still no item");

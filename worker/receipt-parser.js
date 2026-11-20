@@ -9,7 +9,7 @@
 //    so the app can ask the shopper to confirm low-confidence captures.
 
 const MAX_INPUT = 600_000;
-import { flightBooking, flightItemName } from "./flight-booking.js";
+import { flightBooking, flightItemName, hasFlightNumber } from "./flight-booking.js";
 import { domainBase, cleanItems, isOfferLine, rankShop, shopNamesInText, forwardedSender, mainLinkDomain, isVia, itemsFromCells, GAME_SHOP, gameTitle, gameItems, looksLikePerson, hiddenSenderDomain } from "./receipt-reader.js";
 import { PERSONAL_MAIL } from "./receipt-category.js";
 import { readItems, moneyOf, settleItems, checkItems, statedItemCount, lineOf, unexplainedGap } from "./receipt-items.js";
@@ -3476,6 +3476,10 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
         : { complete: false, itemsPence: 0, expectedPence: null, missingPence: null };
     }
   }
+  // (A flight booking read without its flights, its only line the fare's passenger type, "Adult" £1,201.72, beside flight
+  // numbers: the thing bought is not known, so the list is flagged, never passed off as right. Round 18.)
+  if (!isFlight && result.items.length === 1 && /^(?:\d{1,2}\s?x?\s)?(?:adults?|child(?:ren)?|infants?|passengers?)$/i.test(String(result.items[0].name || "").trim()) && result.itemsCheck && hasFlightNumber(text) && /\b(?:flights?|airline|airport|boarding|departure|terminal|baggage|passenger)\b/i.test(text))
+    result.itemsCheck = { ...result.itemsCheck, complete: false, namesOk: false, suspectNames: [{ name: String(result.items[0].name).slice(0, 120), why: "fare" }] };
   // (Prices before VAT with the VAT added under them, "Plus: 1-month subscription £10.99/month", "VAT 20% - £2.20", "Total:
   // £13.19/month": the VAT is part of what was paid, kept as its own line so the receipt adds up. Round 17.)
   if (result.itemsCheck && result.itemsCheck.complete === true && Number.isInteger(result.totalPence) && Number.isInteger(result.itemsCheck.itemsPence) && !(result.fees || []).some((f) => /\b(?:vat|tax)\b/i.test(String(f.label || "")))) {

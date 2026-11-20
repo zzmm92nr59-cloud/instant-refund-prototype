@@ -323,6 +323,10 @@ export function categoryShares(card) {
 // (The seller says what was bought can't go back, a personalised order: not returnable, with the seller's own reason, so no
 // return date is worked out for it. Round 15.)
 export function categorise(card, learned) {
+  // (A free gift the shop added, "10% off sitewide at Ninja!" at £0.00, says nothing about what was bought: a protein shop's
+  // order stays food, never returnable because a gift names an appliance brand. Round 18.)
+  if (card && Array.isArray(card.items) && card.items.some((i) => i && i.free && i.pricePence === 0) && card.items.some((i) => i && !(i.free && i.pricePence === 0)))
+    card = { ...card, items: card.items.filter((i) => !(i && i.free && i.pricePence === 0)) };
   const out = categoriseBy(card, learned);
   const said = card && card.returns && card.returns.sellerNoReturn;
   return typeof said === "string" && said ? { ...out, returnable: false, notReturnableReason: said } : out;

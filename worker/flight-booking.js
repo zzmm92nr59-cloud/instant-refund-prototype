@@ -17,6 +17,7 @@ const RAIL_DOMAIN = /(^|\.)(thetrainline\.com|trainline\.com|lner\.co\.uk|avanti
 // postcode: "LS1 4AB", "W6 9HR" and "BA1 1AA" have a number and two letters after them.
 const FLIGHT_NO = /\b(BA|FR|EW|4Y|RK|U2|EZY|EJU|EC|DS|LS|EXS|W6|W9|W4|BY|TOM|LM|EI|VS|KL|EK|AF|LH|IB|VY|DY|D8|TK|QR|EY|AA|UA|DL|SK|TP|AZ|LX|OS|SN|BE|T3)\s?(\d{1,4})\b(?!\s?\d[A-Z]{2}\b)/;
 const FLIGHT_NO_G = new RegExp(FLIGHT_NO.source, "g");
+export const hasFlightNumber = (s) => FLIGHT_NO.test(String(s || "").slice(0, 200000));
 // Two airport codes in a row with a way between them: "London Gatwick (LGW) to Malaga (AGP)", "LGW → AGP", "LHR 07:10 - BCN".
 const BETWEEN = /\bto\b|→|->|–|—|✈|›|⇒|>|-|\barriv/i;
 function codePair(win, firstLen) {
