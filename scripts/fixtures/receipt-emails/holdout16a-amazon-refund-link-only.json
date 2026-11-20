@@ -1,0 +1,20 @@
+{
+ "id": "holdout16a-amazon-refund-link-only",
+ "sender": "Amazon",
+ "layout": "'We've issued your refund for the item below', the order only in the link to it ('orderID=…', URL-encoded in the HTML), 'Refund total: £4.49**'",
+ "headers": {
+  "from": "\"return@amazon.co.uk\" <return@amazon.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your refund for Brightway E14 Candle Bulb,4W,25W....",
+  "date": "Fri, 10 Mar 2023 14:13:43 +0000"
+ },
+ "html": "<html><body><table><tr><td><h3> Refund Confirmation </h3></td></tr><tr><td><b> Hello Sam, </b><p> We've issued your refund for the item below. Your return is now complete*. </p></td></tr><tr><td><a href=\"https://www.amazon.co.uk/gp/r.html?C=X&amp;U=https%3A%2F%2Fwww.amazon.co.uk%2Fgp%2Fyour-account%2Forder-details%3ForderID%3D206-1112223-3334445%26ref_%3Dpe_1&amp;H=Y\"><span> View return &amp; refund status </span></a></td></tr><tr><td><span>Brightway E14 Candle Bulb,4W,25W...</span></td></tr><tr><td><p><b><span> Refund total: <span>&pound;4.49** </span></span></b><br /><span> Refund is available now in your Amazon Account. </span></p></td></tr></table></body></html>",
+ "text": " Hello Sam, \n\n We've issued your refund for the item below. Your return is now complete*. \n\n View return & refund status :\nhttps://www.amazon.co.uk/gp/your-account/order-details?orderID=206-1112223-3334445&ref_=E_CReturnsRefundConfirmation_OrderDetail\n\n\n Item details: \n Brightway E14 Candle Bulb,4W,25W...\n\n Refund total:  £4.49**\n Refund is available now in your Amazon Account. \n\n*  This is an advanced refund. If we don't receive the item listed above, we may charge your original payment method. \n",
+ "expected": {
+  "notPurchase": {
+   "kind": "refund",
+   "refundPence": 449,
+   "orderRef": "206-1112223-3334445"
+  }
+ }
+}

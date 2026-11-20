@@ -1,0 +1,20 @@
+{
+ "id": "holdout16a-apple-credit-note",
+ "sender": "Apple",
+ "layout": "'Apple Credit Note' with 'ORDER ID: MQK…-1', the in-app purchase 'Cancellation Date: …', 'This sale was cancelled', 'TOTAL: -£4.99'",
+ "headers": {
+  "from": "Apple <no_reply@email.apple.com>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your invoice from Apple.",
+  "date": "Sun, 3 Mar 2024 09:10:00 +0000"
+ },
+ "html": "",
+ "text": "Apple Credit Note\n----------------------------------------\n\nAPPLE ID\nsam@example.com\n\nBILLED TO\nVisa .... 1234\nSam Jones\n1 Example Road\nLeeds, LS1 1AA\nGBR\n\nORDER ID:            MQKABCDE12-1\nDOCUMENT NO.:        123456789012\nSEQUENCE NO.:        2-1234567890\nINVOICE DATE:         3 Mar 2024\nTOTAL:                     -£4.99\n\nApp Store\n----------------------------------------\nPuzzle Garden: Match Fun               -£4.99\nGem Pack               Inclusive of VAT at 20%  -£0.83\nIn-App Purchase\nSam's iPhone\nCancellation Date: 3 Mar 2024\nThis sale was cancelled\n\n                    Subtotal    -£4.16\n          VAT charged at 20%    -£0.83\n\n                       TOTAL    -£4.99",
+ "expected": {
+  "notPurchase": {
+   "kind": "refund",
+   "refundPence": 499,
+   "orderRef": "MQKABCDE12"
+  }
+ }
+}

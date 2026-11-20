@@ -1,0 +1,31 @@
+{
+ "id": "holdout16a-amazon-book-gift-wrap",
+ "sender": "Amazon",
+ "layout": "a gift: the title over the author's row, then 'Condition', 'Sold by', 'Fulfilled by Amazon', 'Gift wrap: No', 'Qty: 1'; 'Order Total: £0.00' with 'Gift Card (£28.64)'",
+ "headers": {
+  "from": "\"Amazon.co.uk\" <auto-confirm@amazon.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your Amazon.co.uk order of \"Kanji in Context: A Workbook...\"",
+  "date": "Mon, 16 Dec 2024 08:15:00 +0000"
+ },
+ "html": "<html><head><title>Your Amazon.co.uk order of \"Kanji in Context: A Workbook...\"</title></head><body><table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"><tr><td>Your Orders</td></tr>\n<tr><td>Order Confirmation</td></tr>\n<tr><td>Arriving:</td></tr>\n<tr><td>Tuesday, December 17</td></tr>\n<tr><td>This order contains one or more items that you've marked as a gift.</td></tr>\n<tr><td>Your order will be sent to:</td></tr>\n<tr><td>Sam</td></tr>\n<tr><td>HEBDEN BRIDGE</td></tr>\n<tr><td>United Kingdom</td></tr>\n<tr><td>Order #</td></tr>\n<tr><td>204-3141529-2653589</td></tr>\n<tr><td>View order details</td></tr>\n<tr><td>Kanji in Context: A Workbook for Beginners in Elementary Japanese, Second Edition</td></tr>\n<tr><td>Hana Morita</td></tr>\n<tr><td>Condition: New</td></tr>\n<tr><td>Sold by:</td></tr>\n<tr><td>Tsubaki Books Ltd</td></tr>\n<tr><td>Fulfilled by Amazon</td></tr>\n<tr><td>Gift wrap: No</td></tr>\n<tr><td>Qty: 1</td></tr>\n<tr><td>&pound;28.64</td></tr>\n<tr><td>Order Total:</td></tr>\n<tr><td>&pound;0.00</td></tr>\n<tr><td>Selected Payment Method(s):</td></tr>\n<tr><td>Gift Card (&pound;28.64)</td></tr>\n<tr><td>Visa (&pound;0.00)</td></tr>\n<tr><td>Keep shopping for</td></tr>\n<tr><td>Pocket Kanji Flashcards Set...</td></tr>\n<tr><td>&pound;6.49</td></tr>\n<tr><td>Fulfilled By Amazon (usually referred to as FBA) items are generally sold by third-party sellers but stored in an Amazon Fulfilment Centre and sent to you from there.</td></tr></table></body></html>",
+ "text": "Amazon.co.uk Order Confirmation\n    Order #204-3141529-2653589\n\nHello,\n\nOrdered item(s):Kanji in Context: A Workbook for Beginners in Elementary Japanese, Second Edition                    of Hana Morita £28.64\nCondition: NewSold by: Tsubaki Books LtdFulfilled by AmazonGift wrap: No\nOrder Total:              £0.00\n\n=======================================================================================",
+ "expected": {
+  "shop": "Amazon",
+  "date": "2024-12-16",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Kanji in Context: A Workbook for Beginners in Elementary Japanese, Second Edition of Hana Morita",
+    "qty": 1,
+    "linePence": 2864
+   }
+  ],
+  "subtotalPence": 2864,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 2864,
+  "giftCardPence": 2864
+ }
+}

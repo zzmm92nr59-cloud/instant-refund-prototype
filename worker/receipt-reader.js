@@ -241,7 +241,23 @@ export function cleanItem(item) {
   if (/@|https?:|www\./i.test(name)) return null;
   // (A sign-off or a link's words where an item would be, "We hope to see you again soon.", "View order details". Round 13.)
   if (/^(?:we hope to see you (?:again|soon)\b|thank(?:s| you) for (?:shopping|your order)\b|we(?:'|’)ll let you know\b|view (?:or edit )?order(?: details)?$|view or edit order$)/i.test(name)) return null;
+  // (A plan's period with the tax note under the item, Apple's "Monthly Inclusive of VAT at 20%", or the note alone. Round 15.)
+  if (/^(?:(?:monthly|yearly|annual|weekly|quarterly)\s+)?(?:inclusive of|incl\.?|including)\s+vat(?:\s+at\s+\d{1,2}(?:\.\d)?%)?(?:\s*£\s?\d{1,4}\.\d{2})?$/i.test(name)) return null;
+  // (A returns sentence under the item, "Returns accepted within 14 days of delivery", "Returns & exchanges not accepted".
+  // Round 15.)
+  if (/^(?:returns?|exchanges?)(?:\s*(?:&|and)\s*(?:exchanges?|returns?))?\s+(?:(?:are\s+)?(?:not\s+)?accepted|within\s+\d)/i.test(name)) return null;
   const { keepName, ...rest } = item;
+  // (What follows an item is never the payer's own block, "Billing and Payment, Sam Jones, 1 High St…", nor the tax note,
+  // "Inclusive of VAT at 20%£0.50": the item's options stop where the billing or delivery block starts. Round 15.)
+  if (typeof rest.variant === "string" && rest.variant) {
+    const parts = rest.variant.split(", "), keep = [];
+    for (const p of parts) {
+      if (/^(?:billing(?: and payment)?|billed to|bill to|payment(?: method)?|deliver(?:y|ed)? (?:to|address)|ship(?:ping)? (?:to|address)|invoice (?:to|address))\b/i.test(p)) break;
+      if (/^(?:inclusive of|incl\.?|including)\s+vat\b/i.test(p)) continue;
+      keep.push(p);
+    }
+    if (keep.length) rest.variant = keep.join(", "); else delete rest.variant;
+  }
   return { ...rest, name, qty: qty || 1 };
 }
 export function cleanItems(items) {

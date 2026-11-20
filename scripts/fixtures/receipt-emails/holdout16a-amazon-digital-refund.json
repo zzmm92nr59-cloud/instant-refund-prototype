@@ -1,0 +1,20 @@
+{
+ "id": "holdout16a-amazon-digital-refund",
+ "sender": "Amazon",
+ "layout": "subject 'Your Amazon.co.uk Order #D01-…' over 'we have processed your refund for £1.99 for the above-referenced order', 'Item Refund', 'Item Tax Refund', 'Refund Total'",
+ "headers": {
+  "from": "\"Amazon.co.uk\" <digital-no-reply@amazon.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your Amazon.co.uk Order #D01-1234567-7654321",
+  "date": "Sat, 30 Dec 2023 18:49:43 +0000"
+ },
+ "html": "",
+ "text": "Greetings Sam,\n\nThank you for shopping with us.\n\nWe're writing to confirm that we have processed your refund for £1.99 for the above-referenced order.\n\nThe following is the breakdown of your refund:\n..........\n\n          Item(s) Returned:\n                Puddle Hoppers - Animated Series, Ep. 4 \"Rain Day\"\n                Prime Video\n                Sold by Amazon Digital UK Limited\n                Original Air Date: March 3, 2022\n                Item Refund:                                   £1.66\n                Item Tax Refund:                               £0.33\n                Refund Total:                                  £1.99\n          Payment Methods Credited:\n                Credit Card:                                   £1.99\n..........\n",
+ "expected": {
+  "notPurchase": {
+   "kind": "refund",
+   "refundPence": 199,
+   "orderRef": "D01-1234567-7654321"
+  }
+ }
+}

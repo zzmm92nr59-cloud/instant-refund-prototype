@@ -1,0 +1,34 @@
+{
+ "id": "holdout16a-prime-video-gift-card",
+ "sender": "Amazon Prime Video",
+ "layout": "a film paid by gift card: 'Total: £2.49', 'Gift Card Amount: -£2.49', 'Order Grand Total: £0.00'; the total is what it cost",
+ "headers": {
+  "from": "Amazon Prime Video <no-reply@primevideo.com>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Amazon.co.uk order of The Lighthouse Keepers",
+  "date": "Fri, 6 Sep 2024 20:31:00 +0100"
+ },
+ "html": "<html><head><title>Amazon.co.uk order confirmation</title></head><body><table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"><tr><td>Thank you for your order</td></tr>\n<tr><td>Order #</td></tr>\n<tr><td>D01-2718281-8284590</td></tr>\n<tr><td>Placed on Friday, September 6, 2024</td></tr>\n<tr><td>The Lighthouse Keepers</td></tr>\n<tr><td>Sold by Amazon Digital UK Limited.</td></tr>\n<tr><td>Review this item</td></tr>\n<tr><td>&pound;2.49</td></tr>\n<tr><td>Item Subtotal:</td></tr>\n<tr><td>&pound;2.08</td></tr>\n<tr><td>Total Before VAT:</td></tr>\n<tr><td>&pound;2.08</td></tr>\n<tr><td>VAT:</td></tr>\n<tr><td>&pound;0.41</td></tr>\n<tr><td>Total:</td></tr>\n<tr><td>&pound;2.49</td></tr>\n<tr><td>Gift Card Amount:</td></tr>\n<tr><td>-&pound;2.49</td></tr>\n<tr><td>Order Grand Total:</td></tr>\n<tr><td>&pound;0.00</td></tr></table></body></html>",
+ "text": "",
+ "expected": {
+  "shop": "Amazon Prime Video",
+  "date": "2024-09-06",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "The Lighthouse Keepers",
+    "qty": 1,
+    "linePence": 249
+   }
+  ],
+  "subtotalPence": 249,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 249,
+  "giftCardPence": 249,
+  "shopAlso": [
+   "Amazon"
+  ]
+ }
+}

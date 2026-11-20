@@ -290,7 +290,14 @@ export function categoryShares(card) {
 }
 
 // `learned` is what the app has been taught about this store (a category the shopper chose, or one many shoppers agree on).
+// (The seller says what was bought can't go back, a personalised order: not returnable, with the seller's own reason, so no
+// return date is worked out for it. Round 15.)
 export function categorise(card, learned) {
+  const out = categoriseBy(card, learned);
+  const said = card && card.returns && card.returns.sellerNoReturn;
+  return typeof said === "string" && said ? { ...out, returnable: false, notReturnableReason: said } : out;
+}
+function categoriseBy(card, learned) {
   card = card || {};
   const items = (card.items || []).map(i => i && i.name).filter(Boolean).join(" ");
   const r = card.retailer || {};
