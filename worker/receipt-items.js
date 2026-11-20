@@ -241,7 +241,7 @@ function readLine(raw) {
     if ((m = QTY_CELL.exec(c))) {
       // ("Sainsbury's Lemons x4 | Qty: 1": how many is in its own cell, so the name's "x4" is part of the name. Round 8.)
       if (line.nameTail && line.names[0] === line.nameTail.name) { line.names[0] = line.nameTail.raw; line.nameRaw = null; line.keepName = true; }
-      line.nameTail = null; line.qty = Number(m[1] || m[2] || m[3]); continue;
+      line.nameTail = null; line.qty = Number(m[1] || m[2] || m[3]); if (m[3]) line.pieces = c; continue;
     }
     if (FREE_CELL.test(c) && line.names.length) { line.free = true; continue; }
     if (NOT_CHARGED.test(c) && line.names.length) { line.notCharged = true; continue; }
@@ -488,6 +488,9 @@ export function readItems(text, opts = {}) {
     // price once. Round 16.)
     if (l.lineTotal != null && !hasName && pend && pend.name) { if (pend.prices[pend.prices.length - 1] !== l.lineTotal) pend.prices.push(l.lineTotal); pend.labelled = true; emit(); continue; }
     // How many on the line under the price ("Bosch Cordless Drill 18V", "£99.00", "Qty: 1").
+    // (How many pieces a dish comes in, "8 Pcs" under "1x" "Crispy Wings Meal": its size, never how many were ordered when
+    // the line already said how many. Round 17.)
+    if (pend && pend.name && pend.head && pend.qty != null && l.pieces && !hasName && !l.prices.length && l.cells.length === 1) { pend.variant.push(l.pieces); continue; }
     if (pend && pend.name && pend.prices.length && pend.qty == null && !pend.head && !hasName && l.qty != null && !l.prices.length && l.unit == null && !l.endWord) { pend.qty = l.qty; emit(); continue; }
     // (A size or colour on the line under an item's price, "£35.99" then "XS | BLACK", is still that item's. Round 8.)
     if (pend && pend.name && pend.prices.length && !hasName && !l.prices.length && !l.endWord && !l.negative && l.variant.length && !l.extras.length && l.unit == null) { pend.variant.push(...l.variant); if (l.qty != null && pend.qty == null) pend.qty = l.qty; continue; }

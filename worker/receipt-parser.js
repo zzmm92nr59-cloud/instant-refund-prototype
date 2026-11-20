@@ -766,7 +766,9 @@ function extractReturns(text, html, orderDate, other = "") {
     windowDays: null, windowFrom: null, deadline: null, address: null,
     portalUrl: null, instructions: [], qrMentioned: false, labelMentioned: false,
   };
-  const flat = text.replace(/[ \t]+/g, " ");
+  // (A text part sent "format=flowed" ends each wrapped line with a space: gone, so a sentence run back together has one space
+  // between its words, "for 14 days after you make the purchase". Round 17.)
+  const flat = text.replace(/[ \t]+/g, " ").replace(/ +$/gm, "");
 
   // Window: "within 28 days of delivery", "30-day returns", "return ... within 14 days".
   // (A text part wrapped at a fixed width, "you can return it within\ntwo hours for a full refund", is read as the sentences
@@ -871,9 +873,10 @@ function extractReturns(text, html, orderDate, other = "") {
 
   // Link to start a return: only https links whose text or address mentions returns.
   if (html) {
-    for (const a of html.matchAll(/<a\b[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi)) {
-      const href = a[1].replace(/&amp;/g, "&").trim();
-      const label = a[2].replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+    // (An address written without quotes, <a href=https://…>, as some shops' emails do, is read too. Round 17.)
+    for (const a of html.matchAll(/<a\b[^>]*href=(?:["']([^"']+)["']|([^\s"'>]+))[^>]*>([\s\S]*?)<\/a>/gi)) {
+      const href = (a[1] || a[2]).replace(/&amp;/g, "&").trim();
+      const label = a[3].replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
       if (!/^https:\/\//i.test(href) || href.length > 800) continue;
       if (/unsubscribe|privacy|terms/i.test(href + " " + label)) continue;
       if (/return|refund|exchange/i.test(label) || /\/returns?\b|returns?[-_.]|[?&]return/i.test(href)) { out.portalUrl = href; break; }
@@ -921,6 +924,12 @@ function extractReturns(text, html, orderDate, other = "") {
   const allNoRefund = fareLines.length > 0 && fareLines.every((m) => /^(?:[^\n]*\n){0,2}?[^\n]*\bno refunds?\b/i.test(String(text).slice(m.index + m[0].length, m.index + m[0].length + 200)));
   // (And a ticket seller that "does not issue refunds after purchase". Round 15.)
   const ticketsNoRefund = /\b(?:does|do) not (?:issue|give|offer) refunds? after (?:the )?purchase\b/i.test(flat) && /\btickets?\b/i.test(flat);
+  // (Only some of its tickets say so, "1x Advance Single" "Specified train only. No refunds." beside "1x Off-Peak Day Single":
+  // the booking isn't non-refundable as a whole, but which ticket can't be refunded is said, in the email's words. Round 17.)
+  if (fareLines.length > 1 && !allNoRefund) {
+    const said = fareLines.map((m) => { const after = String(text).slice(m.index + m[0].length, m.index + m[0].length + 200); const n = /^\s*\n?[ \t|]*([^\n]{0,80}\bno refunds?\b[^\n]{0,40})/i.exec(after); return n ? m[0].replace(/^[ \t|]*\d{1,2}x[ \t]+/, "").trim() + ": " + n[1].replace(/[ \t|]+$/, "").trim() : null; }).filter(Boolean);
+    if (said.length) out.instructions = [...said, ...out.instructions].slice(0, 3);
+  }
   if (allNoRefund || ticketsNoRefund || (/\b(?:this|your)\s+(?:booking|reservation|rate|stay|room|ticket|order|purchase)\s+(?:is|are)\s+(?:non-?\s?refundable|not refundable)\b/i.test(flat) || /(?:^|[.!|\n]\s*|\b(?:all|your|the|these)\s+|\bnote(?:\s+that)?,?\s+)tickets\s+are\s+(?:non-?\s?refundable|not refundable)\b/i.test(flat))) {
     Object.assign(out, { windowDays: null, windowFrom: null, deadline: null, portalUrl: null, instructions: [], qrMentioned: false, labelMentioned: false, nonRefundable: true });
   }
@@ -3333,6 +3342,20 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
       result.itemsCheck = { ...(result.itemsCheck || {}), complete: true, itemsPence, expectedPence: itemsPence, missingPence: 0, coveredBy: "promotion" };
     }
   }
+  // (Prices before VAT with the VAT added under them, "Plus: 1-month subscription £10.99/month", "VAT 20% - £2.20", "Total:
+  // £13.19/month": the VAT is part of what was paid, kept as its own line so the receipt adds up. Round 17.)
+  if (result.itemsCheck && result.itemsCheck.complete === true && Number.isInteger(result.totalPence) && Number.isInteger(result.itemsCheck.itemsPence) && !(result.fees || []).some((f) => /\b(?:vat|tax)\b/i.test(String(f.label || "")))) {
+    const vat = moneyOf(text).vat, fees = (result.fees || []).reduce((n, f) => n + (f.pence || 0), 0), off = (result.discounts || []).reduce((n, f) => n + (f.pence || 0), 0);
+    if (Number.isInteger(vat) && vat > 0 && result.itemsCheck.itemsPence + vat + fees - off === result.totalPence) result.fees = [...(result.fees || []), { label: "VAT", pence: vat }];
+  }
+  // (A fee the items already hold, Eventim's "Booking fee | 2 × £3.75 | £7.50" read as an item line and again as the fee
+  // "Booking fee: 2 x £3.75 = £7.50": counted once, as the item line. Round 17.)
+  if (Array.isArray(result.fees) && result.fees.length && result.items.length) {
+    const low = (x) => String(x || "").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+    const lineP = (i) => (Number.isInteger(i.pricePence) ? (i.lineTotal ? i.pricePence : i.pricePence * (i.qty || 1)) : null);
+    const kept = result.fees.filter((f) => { const lab = low(String(f.label || "").split(/[:(]/)[0]); return !(lab && result.items.some((i) => low(i.name) === lab && lineP(i) === f.pence)); });
+    if (kept.length !== result.fees.length) { if (kept.length) result.fees = kept; else delete result.fees; }
+  }
   return result;
 }
 
@@ -3485,9 +3508,10 @@ export function parseReturnEmail(rawEmail) {
     text.match(/\bcredit(?:ing)? you back\b[^£]{0,60}\bvalue of £\s*([0-9][0-9,]*\.[0-9]{2})/i);
   let trackUrl = null;
   if (html) {
-    for (const a of html.matchAll(/<a\b[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi)) {
-      const href = a[1].replace(/&amp;/g, "&").trim();
-      const label = a[2].replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+    // (An address written without quotes, <a href=https://…>, as some shops' emails do, is read too. Round 17.)
+    for (const a of html.matchAll(/<a\b[^>]*href=(?:["']([^"']+)["']|([^\s"'>]+))[^>]*>([\s\S]*?)<\/a>/gi)) {
+      const href = (a[1] || a[2]).replace(/&amp;/g, "&").trim();
+      const label = a[3].replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
       if (/^https:\/\//i.test(href) && href.length <= 800 && /track.{0,12}return/i.test(label)) { trackUrl = href; break; }
     }
   }
