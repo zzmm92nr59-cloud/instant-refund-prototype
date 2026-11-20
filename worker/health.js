@@ -35,6 +35,58 @@ export async function handleHealthRoute(path, method, env, cors, shopper, o) {
   return json(await relayHealth(env, shopper, (o && o.now) || Date.now()), 200, cors);
 }
 
+// Likely reading problems by shop (the "Likely reading problems" part of the page): counts only, never an email's contents,
+// a shopper, an order number or an amount. mine: only the admin's own receipts (named with no minimum, as "Your own
+// receipts"). Each count is one GROUP BY over the receipts, so it stays quick with thousands of receipts per account.
+//  * duplicates: a receipt with no order number beside another from the same shop for the same total within a day, or a
+//    shop's receipt with no order number sent within 10 minutes of a payment service's receipt (PayPal, Stripe, Klarna) for
+//    the same money (with no order number the reader can't join them, so the shopper sees two cards).
+//  * notAddingUp: the items don't come to the total (itemsCheck.complete false); noNumber, noTotal: what the email lacked.
+//  * saidSame / saidApart: shoppers who said two of their receipts were one order, or that one card was two (order-joins.js).
+export async function readingProblems(all, meId) {
+  const DOMAIN = "lower(json_extract(details, '$.retailer.domain'))";
+  const KEPT = "status NOT IN ('not_receipt', 'dismissed') AND json_extract(details, '$.kind') = 'receipt'";
+  const own = meId ? " AND shopper_id = ?" : "", args = meId ? [meId] : [];
+  const n = (v) => Number(v) || 0;
+  const [base, sameDay, paidBeside, said] = await Promise.all([
+    all(`SELECT ${DOMAIN} AS domain, COUNT(DISTINCT shopper_id) AS people, COUNT(*) AS receipts,
+      SUM(json_extract(details, '$.orderRef') IS NULL) AS noNumber, SUM(json_extract(details, '$.totalPence') IS NULL) AS noTotal,
+      SUM(json_extract(details, '$.itemsCheck.complete') = 0) AS notAddingUp
+      FROM captured_receipts WHERE ${KEPT} AND ${DOMAIN} IS NOT NULL${own} GROUP BY ${DOMAIN}`, ...args),
+    // (Each receipt beside its neighbours of the same shopper, shop and total, by day: no receipt is compared with every other.)
+    all(`WITH r AS (SELECT shopper_id AS s, ${DOMAIN} AS d, json_extract(details, '$.totalPence') AS t, json_extract(details, '$.orderRef') IS NULL AS bare,
+        julianday(COALESCE(json_extract(details, '$.orderDate'), date(created_at / 1000, 'unixepoch'))) AS j
+        FROM captured_receipts WHERE ${KEPT} AND ${DOMAIN} IS NOT NULL AND json_extract(details, '$.totalPence') IS NOT NULL${own}),
+      w AS (SELECT d, bare, j, LAG(j) OVER (PARTITION BY s, d, t ORDER BY j) AS pj, LEAD(j) OVER (PARTITION BY s, d, t ORDER BY j) AS nj FROM r)
+      SELECT d AS domain, COUNT(*) AS n FROM w WHERE bare = 1 AND (j - pj <= 1 OR nj - j <= 1) GROUP BY d`, ...args),
+    // (A shop's receipt with no number and the payment services' receipts of the same shopper and money, in time order: the
+    // nearest payment receipt before and after each.)
+    all(`WITH r AS (SELECT shopper_id AS s, json_extract(details, '$.retailer.via') IS NOT NULL AS paid, ${DOMAIN} AS d, json_extract(details, '$.orderRef') IS NULL AS bare,
+        json_extract(details, '$.totalPence') AS t, COALESCE(json_extract(details, '$.currency'), 'GBP') AS c, julianday(json_extract(details, '$.sentAt')) AS j
+        FROM captured_receipts WHERE ${KEPT} AND json_extract(details, '$.totalPence') IS NOT NULL AND json_extract(details, '$.sentAt') IS NOT NULL${own}),
+      w AS (SELECT d, paid, bare, j, MAX(CASE WHEN paid THEN j END) OVER (PARTITION BY s, t, c ORDER BY j ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS pj,
+        MIN(CASE WHEN paid THEN j END) OVER (PARTITION BY s, t, c ORDER BY j ROWS BETWEEN CURRENT ROW AND UNBOUNDED FOLLOWING) AS nj FROM r)
+      SELECT d AS domain, COUNT(*) AS n FROM w WHERE NOT paid AND bare = 1 AND d IS NOT NULL AND (j - pj <= 10.0 / 1440 OR nj - j <= 10.0 / 1440) GROUP BY d`, ...args),
+    all(`SELECT domain, COUNT(DISTINCT CASE WHEN kind = 'same' THEN shopper_id END) AS sameP, COUNT(DISTINCT CASE WHEN kind = 'apart' THEN shopper_id END) AS apartP,
+      SUM(kind = 'same') AS sameN, SUM(kind = 'apart') AS apartN
+      FROM (SELECT shopper_id, kind, domain FROM receipt_joins UNION ALL SELECT shopper_id, kind, other_domain AS domain FROM receipt_joins WHERE other_domain IS NOT NULL AND other_domain <> COALESCE(domain, ''))
+      WHERE domain IS NOT NULL${own} GROUP BY domain`, ...args)
+  ]);
+  const by = (rows) => new Map(rows.map((r) => [r.domain, n(r.n)]));
+  const dupDay = by(sameDay), dupPaid = by(paidBeside), choices = new Map(said.map((r) => [r.domain, r]));
+  const rows = base.map((r) => {
+    const c = choices.get(r.domain) || {}, a = dupDay.get(r.domain) || 0, b = dupPaid.get(r.domain) || 0;
+    const x = { domain: r.domain, people: n(r.people), receipts: n(r.receipts), duplicates: a + b, sameTotalNoNumber: a, paymentBeside: b,
+      notAddingUp: n(r.notAddingUp), noNumber: n(r.noNumber), noTotal: n(r.noTotal),
+      // Across everyone: how many shoppers said so. For the admin's own: how many times they did.
+      saidSame: meId ? n(c.sameN) : n(c.sameP), saidApart: meId ? n(c.apartN) : n(c.apartP) };
+    x.problems = x.duplicates + x.notAddingUp + x.noNumber + x.noTotal + x.saidSame + x.saidApart;
+    return x;
+  });
+  const order = (p, q) => q.problems - p.problems || q.receipts - p.receipts || String(p.domain).localeCompare(String(q.domain));
+  return rows.sort(order);
+}
+
 export async function relayHealth(env, me, now = Date.now()) {
   const db = env.RELAY_DB;
   // Whether inbox reading is working (gmail.js ensureHealthColumns): there before it's counted below.
@@ -121,6 +173,10 @@ export async function relayHealth(env, me, now = Date.now()) {
     one(`SELECT COUNT(*) AS n, SUM(created_at >= ?) AS week, SUM(fields IS NULL) AS failed, SUM(not_purchase) AS notPurchase,
       ${["shop", "total", "date", "number", "items"].map((k) => `SUM(${k} = 1) AS ${k}1, SUM(${k} = 2) AS ${k}2, SUM(${k} = 3) AS ${k}3`).join(", ")} FROM receipt_ai_reads`, d7)
   ]);
+  // Likely reading problems by shop, across everyone (named from MIN_SHOPPERS_PER_SHOP shoppers; the rest counted together)
+  // and in the admin's own receipts. A problem here never takes the rest of the page with it.
+  const problemsAll = await readingProblems(all).catch((e) => { console.error("Reading problems failed", String(e && e.message || e).slice(0, 160)); return null; });
+  const problemsMine = await readingProblems(all, me.id).catch(() => null);
   // Returns this week whose shop Relay couldn't email (no address for the shop, or the email wasn't accepted).
   const notEmailed = await one("SELECT COUNT(*) AS n FROM relay_returns WHERE created_at >= ? AND shop_notified_at IS NULL AND status != 'cancelled'", d7);
   // A problem working this part out never takes the rest of the page with it (the page says it couldn't be checked).
@@ -176,6 +232,15 @@ export async function relayHealth(env, me, now = Date.now()) {
     aiReader: { on: aiAvailable(env), shoppersOn: n(aiOn.n), reads: n(ai.n), thisWeek: n(ai.week), failed: n(ai.failed), notPurchase: n(ai.notPurchase),
       parts: Object.fromEntries(["shop", "total", "date", "number", "items"].map((k) => [k, { filled: n(ai[k + "1"]), agreed: n(ai[k + "2"]), differed: n(ai[k + "3"]) }])) },
     checkedByShops,
+    readingProblems: problemsAll ? (() => {
+      const nameable = (r) => r.people >= MIN_SHOPPERS_PER_SHOP && !PERSONAL_MAIL.test(r.domain);
+      const named = problemsAll.filter((r) => nameable(r) && r.problems > 0), rest = problemsAll.filter((r) => !nameable(r));
+      const sum = (k) => rest.reduce((t, r) => t + r[k], 0);
+      const keys = ["receipts", "duplicates", "sameTotalNoNumber", "paymentBeside", "notAddingUp", "noNumber", "noTotal", "saidSame", "saidApart", "problems"];
+      return { shops: named.slice(0, 15).map(({ people, ...r }) => ({ ...r, people })), moreShops: Math.max(0, named.length - 15),
+        others: { shops: rest.length, ...Object.fromEntries(keys.map((k) => [k, sum(k)])) },
+        mine: (problemsMine || []).filter((r) => r.problems > 0 && !PERSONAL_MAIL.test(r.domain)).slice(0, 15).map(({ people, ...r }) => r) };
+    })() : null,
     // Swap & resell reports (conversations and listings) waiting for a Relay admin; null if the board isn't set up.
     marketReports: await openReportCount(env).catch(() => null)
   };

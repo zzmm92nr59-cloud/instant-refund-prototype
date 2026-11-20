@@ -36,6 +36,7 @@ import { cleanItems, isVia, nameFitsDomain } from "./receipt-reader.js";
 import { stopMailPush, gmailPushOn, outlookPushOn } from "./mail-push.js";
 const CATEGORY_KEYS = Object.keys(CATEGORIES);;
 import { ensureResaleTables } from "./resale.js";
+import { RECEIPT_JOINS_SQL, readJoins, joinPlan, markJoins, handleJoinRoute } from "./order-joins.js";
 // Codes to show or scan (a return barcode, a drop-off QR code, a ticket): found when an email is read, kept with its receipt.
 import { RECEIPT_CODES_SQL, findCodes, codeEmailDetails, codeStatements, codeFetchCount, attachCodes, readCodeRows } from "./scan-codes.js";
 import { ensurePushTables, subsOf, sendPush } from "./push.js";
@@ -414,6 +415,8 @@ async function ensureGmailTablesRun(db) {
        created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, PRIMARY KEY (shopper_id, receipt_id))`,
     // "Send this email to Relay": the one email a shopper chose to send, details hidden, encrypted, kept 30 days at most.
     SHARED_EMAILS_SQL,
+    // "Same order" / "different orders" (order-joins.js): which of the shopper's emails are one purchase, by their own word.
+    RECEIPT_JOINS_SQL,
     // "AI help" (ai-reader.js): who switched it on, and what the AI read from emails the rules weren't sure about.
     AI_SETTING_SQL, AI_READS_SQL, PICKS_AI_SQL, ITEM_KINDS_SQL,
     // "Read it again" (receipt-reread.js): counts only, for its limits.
@@ -458,6 +461,7 @@ export function gmailDeleteStatements(db, shopperId) {
     db.prepare("DELETE FROM receipt_item_marks WHERE shopper_id = ?").bind(shopperId),
     db.prepare("DELETE FROM receipt_gifts WHERE shopper_id = ?").bind(shopperId),
     db.prepare("DELETE FROM receipt_fixes WHERE shopper_id = ?").bind(shopperId),
+    db.prepare("DELETE FROM receipt_joins WHERE shopper_id = ?").bind(shopperId),
     db.prepare("DELETE FROM shared_emails WHERE shopper_id = ?").bind(shopperId),
     db.prepare("DELETE FROM receipt_ai_reads WHERE shopper_id = ?").bind(shopperId),
     db.prepare("DELETE FROM receipt_rereads WHERE shopper_id = ?").bind(shopperId),
@@ -635,6 +639,7 @@ function oneReceiptDeletes(db, shopperId, receiptId) {
   const of = (table, col = "receipt_id") => db.prepare(`DELETE FROM ${table} WHERE shopper_id = ? AND ${col} = ?`).bind(shopperId, receiptId);
   return [of("receipt_images"), of("receipt_codes"), of("return_reminders"), of("receipt_item_marks"), of("receipt_gifts"), of("receipt_fixes"),
     of("shared_emails"), of("receipt_ai_reads"), of("receipt_rereads"), of("return_tracks"),
+    db.prepare("DELETE FROM receipt_joins WHERE shopper_id = ? AND (a_id = ? OR b_id = ?)").bind(shopperId, receiptId, receiptId),
     db.prepare("DELETE FROM captured_receipts WHERE shopper_id = ? AND id = ?").bind(shopperId, receiptId)];
 }
 export async function retireSkippedMail(env, now = Date.now(), fetchImpl = (...a) => fetch(...a)) {
@@ -845,6 +850,7 @@ function inboxReceiptDeletes(db, shopperId, slot) {
     db.prepare(`DELETE FROM receipt_item_marks WHERE shopper_id = ? AND receipt_id IN (${ids})`).bind(shopperId, ...args),
     db.prepare(`DELETE FROM receipt_gifts WHERE shopper_id = ? AND receipt_id IN (${ids})`).bind(shopperId, ...args),
     db.prepare(`DELETE FROM receipt_fixes WHERE shopper_id = ? AND receipt_id IN (${ids})`).bind(shopperId, ...args),
+    db.prepare(`DELETE FROM receipt_joins WHERE shopper_id = ? AND (a_id IN (${ids}) OR b_id IN (${ids}))`).bind(shopperId, ...args, ...args),
     db.prepare(`DELETE FROM shared_emails WHERE shopper_id = ? AND receipt_id IN (${ids})`).bind(shopperId, ...args),
     db.prepare(`DELETE FROM receipt_ai_reads WHERE shopper_id = ? AND receipt_id IN (${ids})`).bind(shopperId, ...args),
     db.prepare(`DELETE FROM receipt_rereads WHERE shopper_id = ? AND receipt_id IN (${ids})`).bind(shopperId, ...args),
@@ -1883,7 +1889,9 @@ function joinStore(o) {
   const k = storeKey(o), d = o && o.retailer && o.retailer.domain;
   return d && SEND_LABEL.test(d) && k === storeKey({ retailer: { domain: d } }) ? storeKey({ retailer: { domain: d.replace(SEND_LABEL, "") } }) : k;
 }
-export function mergeOrderEmails(orders) {
+// opts.keyFor(email): the group an email must be in (the shopper's own "same order" / "different orders", order-joins.js),
+// or undefined for the reader's own joining.
+export function mergeOrderEmails(orders, opts = {}) {
   // (One email confirming two orders: a card for each, the second named by its own number, total and items. Its id says
   // which email it came from. Round 12.)
   orders = orders.flatMap((o) => !Array.isArray(o.moreOrders) || !o.moreOrders.length ? [o] : [{ ...o, moreOrders: undefined },
@@ -1990,13 +1998,14 @@ export function mergeOrderEmails(orders) {
     if (near.length === 1) folded.set(o, near[0]); else if (!near.length && fits.length === 1) folded.set(o, fits[0]);
   }
   for (const o of orders) {
-    if (folded.has(o)) {
+    const forced = opts.keyFor ? opts.keyFor(o) : undefined;
+    if (folded.has(o) && forced === undefined) {
       const p = folded.get(o);
       if (!p.orderRef && o.orderRef) p.orderRef = o.orderRef;
       if (!p.detailsInAttachment) Object.defineProperty(p, "invoiceAttached", { value: o.detailsInAttachment, enumerable: false, configurable: true });
       continue;
     }
-    const k = keyOf(o);
+    const k = forced !== undefined ? forced : keyOf(o);
     if (!k) { out.push(o); continue; }
     if (!groups.has(k)) { groups.set(k, []); out.push(groups.get(k)); }
     groups.get(k).push(o);
@@ -2544,7 +2553,17 @@ async function listReceipts(env, shopperId, timing, opts = {}) {
   const deliveries = all.filter(x => x.kind === "delivery_update");
   const updates = all.filter(x => x.kind === "return_update");
   const cancels = all.filter(x => x.kind === "order_update");
-  const orders = mergeOrderEmails(all.filter(x => x.kind !== "return_instructions" && x.kind !== "delivery_update" && x.kind !== "return_update" && x.kind !== "order_update" && x.kind !== "order_codes"));
+  const bought = all.filter(x => x.kind !== "return_instructions" && x.kind !== "delivery_update" && x.kind !== "return_update" && x.kind !== "order_update" && x.kind !== "order_codes");
+  let orders = mergeOrderEmails(bought);
+  // The shopper's own "same order" / "different orders" (order-joins.js), applied after the reader's joining every time, so
+  // reading every email again never loses or undoes them.
+  const joinRows = await readJoins(env.RELAY_DB, shopperId);
+  const plan = joinPlan(orders, joinRows);
+  if (plan && plan.changed) orders = mergeOrderEmails(bought, { keyFor: (o) => plan.keys.get(o.id) });
+  const emailById = new Map(bought.map(x => [x.id, x]));
+  markJoins(orders, plan, (id) => { const e = emailById.get(id); if (!e) return null; const r = e.retailer || {};
+    return { id: /^[0-9a-f-]{36}$/.test(id) ? id : null, shop: r.name || r.domain || null, orderDate: e.orderDate || null, totalPence: Number.isInteger(e.totalPence) ? e.totalPence : null, currency: e.currency || "GBP" }; });
+  lap("joinsMs");
   const byOrder = new Map(orders.filter(o => o.orderRef).map(o => [o.orderRef, o]));
   // The remaining lookups do not depend on each other, so they run together instead of one after another.
   const keys = [...new Set(orders.flatMap(o => [storeKey(o), legacyStoreKey(o)]).filter(Boolean))];
@@ -3292,6 +3311,10 @@ export async function handleGmailRoute(request, env, url, cors, shopper, opts) {
       env.RELAY_DB.prepare("UPDATE captured_receipts SET details = ? WHERE id = ? AND shopper_id = ?").bind(JSON.stringify(d), own[1], shopper.id)]);
     return json({ ok: true }, 200, cors);
   }
+  // "Same order as another receipt" / "These are different orders", and undoing either (order-joins.js). Own receipts only.
+  const joined = await handleJoinRoute(path, m, request, env, cors, shopper, opts, {
+    list: () => listReceipts(env, shopper.id, null, ALL), ensure: () => ensureGmailTables(env.RELAY_DB), readerVersion: PARSER_VERSION });
+  if (joined) return joined;
   const fx = /^\/relay\/my\/receipts\/([0-9a-f-]{36})\/fix$/.exec(path);
   if (fx && m === "POST") {
     const b = await request.json().catch(() => ({}));

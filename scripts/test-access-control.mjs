@@ -106,7 +106,8 @@ assert.ok(mine.length > 80, "found the shopper routes (" + mine.length + ")");
   const before = JSON.stringify(sqlite.prepare("SELECT status, details FROM captured_receipts WHERE id = ?").get(id));
   const tries = [["GET", "/original"], ["GET", "/image"], ["GET", "/codes/1"], ["POST", "/confirm", {}], ["POST", "/dismiss", { reason: "promo" }], ["POST", "/category", { category: "home" }],
     ["POST", "/items", { items: [{ index: 0, status: "returning" }] }], ["POST", "/remind", { on: false }], ["POST", "/gift", { gift: true, for: "Bob" }], ["POST", "/fix", { totalPence: 1 }],
-    ["GET", "/share"], ["POST", "/share", { note: "mine now" }], ["POST", "/return-sent", { trackingNumber: "KO123456789GB" }], ["GET", "/return-parcel"], ["POST", "/reread", {}]];
+    ["GET", "/share"], ["POST", "/share", { note: "mine now" }], ["POST", "/return-sent", { trackingNumber: "KO123456789GB" }], ["GET", "/return-parcel"], ["POST", "/reread", {}],
+    ["GET", "/join"], ["POST", "/join", { action: "apart" }], ["POST", "/join", { action: "same", with: "33333333-3333-4333-8333-333333333333" }], ["POST", "/join", { action: "undo", kind: "same" }]];
   for (const [method, end, body] of tries) {
     const res = await call("/relay/my/receipts/" + id + end, { method, auth: "Bearer " + bob, body });
     assert.ok(res.status === 404 || res.status === 403, method + " " + end + " by someone else → " + res.status);
@@ -116,6 +117,7 @@ assert.ok(mine.length > 80, "found the shopper routes (" + mine.length + ")");
   assert.equal(sqlite.prepare("SELECT COUNT(*) AS n FROM receipt_fixes WHERE receipt_id = ?").get(id).n, 0, "or fixed");
   assert.equal(sqlite.prepare("SELECT COUNT(*) AS n FROM shared_emails WHERE receipt_id = ?").get(id).n, 0, "or sent to Relay");
   assert.equal(sqlite.prepare("SELECT COUNT(*) AS n FROM return_tracks WHERE receipt_id = ?").get(id).n, 0, "or marked as sent back");
+  assert.equal(sqlite.prepare("SELECT COUNT(*) AS n FROM receipt_joins WHERE a_id = ? OR b_id = ?").get(id, id).n, 0, "or joined to another receipt");
   const list = await (await call("/relay/my/receipts", { auth: "Bearer " + bob })).json();
   assert.ok(!JSON.stringify(list).includes("KO-9"), "bob's list doesn't include alice's receipt");
   const own = await call("/relay/my/receipts/" + id + "/category", { method: "POST", auth: "Bearer " + alice, body: { category: "home" } });
