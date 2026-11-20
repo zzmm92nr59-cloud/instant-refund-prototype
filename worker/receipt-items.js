@@ -271,7 +271,9 @@ function readLine(raw) {
     if (/\s-\s(?:not charged|unavailable|out of stock)$/i.test(t) || /^not charged$/i.test(t)) { line.notCharged = true; continue; }
     if (DETAIL.test(t)) { line.details = true; continue; }
     if (VARIANT.test(t) || (/^[\p{L}\d][\p{L}\d .'’-]{0,20}\s\/\s[\p{L}\d][\p{L}\d .'’()-]{0,20}$/u.test(t) && !/\b(?:and|or|with)\b/i.test(t))) { line.variant.push(t); continue; }
-    if (/^[+＋]$/.test(t)) { line.plus = true; continue; }
+    // ("ADD" or "EXTRA" alone over an option, "EXTRA Mayonnaise" in one: an extra on the item above, as "+" is. Round 15e.)
+    if (/^[+＋]$/.test(t) || (cells.length === 1 && /^(?:add|extra)$/i.test(t))) { line.plus = true; continue; }
+    if (cells.length === 1 && /^EXTRA\s+\p{Lu}/u.test(t)) { line.plus = true; line.extras.push(t.replace(/^EXTRA\s+/, "")); continue; }
     if (/^[+＋]\s*/.test(t)) { line.plus = true; line.extras.push((keepAdd || t).replace(/^[+＋]\s*/, "")); continue; }
     // (A shoe size on its own line, "UK 9", is what the item is: two of one shoe in two sizes can be told apart. Round 10.)
     if (/^(?:uk|eu|us)\s?\d{1,2}(?:\.5)?$/i.test(t)) { line.variant.push(t.toUpperCase()); continue; }
@@ -418,6 +420,13 @@ export function readItems(text, opts = {}) {
     if ((/^[\s|]*(?:size|colou?r|style|fit|length|width|product code|item code|sku|code|style\s*(?:#|no\.?|code)|model(?: no\.?)?|ref(?:erence)?|article(?: no\.?)?|art\. ?no\.?)\s*:[\s|]*$/i.test(raw[k]) || /^[\s|]*(?:order|transaction|payment|invoice|receipt)\s+(?:id|number|no\.?)\s*:?[\s|]*$/i.test(raw[k])) && !/£|:\s*$/.test(raw[k + 1]) && raw[k + 1].trim().length <= 60) {
       raw.splice(k, 2, raw[k].replace(/[\s|]+$/, "") + " " + raw[k + 1].replace(/^[\s|]+/, ""));
       afterRow.splice(k + 1, 1);
+    }
+  }
+  // ("ADD" or "+" alone, how many on the next line, then the option, "ADD" / "2" / "Dill Pickle Slice": one extra on the
+  // item above, "+ Dill Pickle Slice". Round 15e.)
+  for (let k = raw.length - 3; k >= 0; k--) {
+    if (/^[\s|]*(?:add|extra|[+＋])[\s|]*$/i.test(raw[k]) && /^[\s|]*\d{1,2}[\s|]*$/.test(raw[k + 1]) && /^[\s|]*\p{L}/u.test(raw[k + 2]) && !/£/.test(raw[k + 2])) {
+      raw.splice(k, 3, "+ " + raw[k + 2].replace(/^[\s|]+/, "")); afterRow.splice(k + 1, 2);
     }
   }
   const asWritten = raw;

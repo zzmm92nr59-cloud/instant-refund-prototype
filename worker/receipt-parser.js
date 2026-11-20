@@ -910,7 +910,7 @@ function extractReturns(text, html, orderDate, other = "") {
   const allNoRefund = fareLines.length > 0 && fareLines.every((m) => /^(?:[^\n]*\n){0,2}?[^\n]*\bno refunds?\b/i.test(String(text).slice(m.index + m[0].length, m.index + m[0].length + 200)));
   // (And a ticket seller that "does not issue refunds after purchase". Round 15.)
   const ticketsNoRefund = /\b(?:does|do) not (?:issue|give|offer) refunds? after (?:the )?purchase\b/i.test(flat) && /\btickets?\b/i.test(flat);
-  if (allNoRefund || ticketsNoRefund || (/\b(?:this|your)\s+(?:booking|reservation|rate|stay|room|ticket|order|purchase)\s+(?:is|are)\s+(?:non-?\s?refundable|not refundable)\b/i.test(flat) || /(?:^|[.!|\n]\s*|\b(?:all|your|the|these)\s+)tickets\s+are\s+(?:non-?\s?refundable|not refundable)\b/i.test(flat))) {
+  if (allNoRefund || ticketsNoRefund || (/\b(?:this|your)\s+(?:booking|reservation|rate|stay|room|ticket|order|purchase)\s+(?:is|are)\s+(?:non-?\s?refundable|not refundable)\b/i.test(flat) || /(?:^|[.!|\n]\s*|\b(?:all|your|the|these)\s+|\bnote(?:\s+that)?,?\s+)tickets\s+are\s+(?:non-?\s?refundable|not refundable)\b/i.test(flat))) {
     Object.assign(out, { windowDays: null, windowFrom: null, deadline: null, portalUrl: null, instructions: [], qrMentioned: false, labelMentioned: false, nonRefundable: true });
   }
   // A booking that can be cancelled for free until a day it names ("You can cancel for FREE until 6 June 2025 23:59",
@@ -2383,7 +2383,12 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
       const mine = new Set(words(i.name)), theirs = words(n.name); return !(theirs.length && theirs.every((w) => mine.has(w))); });
     // (How tickets come, "Venue Dispatch" or "E-Tickets" at £0.00, is not something bought. Round 15.)
     const howSent = (i) => !i.pricePence && /^(?:venue dispatch|e-?tickets?|print[- ]at[- ]home|mobile tickets?|ticket ?direct|box office collection|collect(?:ion)? (?:at|from) (?:the )?(?:venue|box office))$/i.test(String(i.name || "").trim());
-    const readable = (list) => cleanItems(oneDeal(list.filter((i) => !howSent(i) && !PRICE_WORDS.test(String(i.name || "").trim()) && !MONEY_LABEL.test(String(i.name || "").trim()) && !/^(?:gbp|eur|usd|cad|aud|chf|sek|nok|dkk|pln)$/i.test(String(i.name || "").trim()))));
+    // (A meal's title with its price, "£2.49 Extra Value Meal Sandwich and Medium Fries", then its parts each with theirs,
+    // "Filet-O-Fish® £2.00", "Medium Fries £0.49", that come to it: the parts are what was bought, never the title too. Round 15e.)
+    const dealHead = (list) => list.filter((i, k) => { if (!/\b(?:meal|deal|bundle|combo)\b/i.test(String(i.name || "")) || !(lineOf(i) > 0)) return true;
+      for (const n of [2, 3]) { const next = list.slice(k + 1, k + 1 + n); if (next.length === n && next.every((x) => lineOf(x) > 0) && next.reduce((a, x) => a + lineOf(x), 0) === lineOf(i)) return false; }
+      return true; });
+    const readable = (list) => cleanItems(oneDeal(dealHead(list).filter((i) => !howSent(i) && !PRICE_WORDS.test(String(i.name || "").trim()) && !MONEY_LABEL.test(String(i.name || "").trim()) && !/^(?:gbp|eur|usd|cad|aud|chf|sek|nok|dkk|pln)$/i.test(String(i.name || "").trim()))));
     // (Products the shop recommends, "You might also like", "Customers also bought", are not what was bought: those sections
     // are left out of the item readings. Round 4.)
     const [textR, otherR] = [withoutRecommendations(text), otherPart ? withoutRecommendations(otherPart) : otherPart];

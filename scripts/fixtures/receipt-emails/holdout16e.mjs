@@ -245,5 +245,18 @@ export default function holdout16e() {
         "Sub Total || £96.50", "Email Delivery with E-Voucher || £0.00", "Total || £96.50"]) },
       o, "Daysout Gifts", "2026-11-15", { orderRef: "7712093" });
   }
+  // ---- A burger app's receipt: how many over each name, options with no price, "EXTRA Mayonnaise", "ADD" / "2" / "Dill
+  // Pickle Slice" add-ons and one priced add-on, then a meal's title with its price over its two parts with theirs ------------
+  {
+    const o = order([{ name: "5 Crispy Strips®", qty: 1, unit: 579, extras: ["Smoky BBQ Dip"] }, { name: "Spicy Chicken Burger", qty: 2, unit: 149, extras: ["Mayonnaise", "Dill Pickle Slice", "Tomato Slice"] },
+      { name: "Fish Burger®", qty: 1, unit: 200 }, { name: "Medium Fries", qty: 1, unit: 49 }]);
+    o.lines[1].line = 338; o.bought[1].line = 338; o.subtotal = 1166; o.total = 1166;
+    add("holdout16e-burger-app-add-extras-meal", "Burgerworks", "'Qty' / 'Item Detail' / 'Item Cost'; '1' over '5 Crispy Strips®' over '£5.79'; '1' over 'Smoky BBQ Dip' (no price, an option); '2' over 'Spicy Chicken Burger' over '£2.98'; 'EXTRA Mayonnaise'; 'ADD' / '2' / 'Dill Pickle Slice'; 'ADD' / '1' / 'Tomato Slice' / '£0.40'; '£2.49 Extra Value Meal Burger and Medium Fries' over 'When ordering on the app'; its parts 'Fish Burger®' '£2.00' and 'Medium Fries' '£0.49'", {
+      from: "Burgerworks <noreply@burgerworks.example>", subject: "Thanks for your order", date: "Sun, 08 Nov 2026 02:58:00 +0000",
+      html: nested("Burgerworks", "burgerworks.example", ["We got your order, here's your receipt.", "Order Number:", "014", "Restaurant Name:", "High Street", "Qty", "Item Detail", "Item Cost",
+        "1", "5 Crispy Strips®", "£5.79", "1", "Smoky BBQ Dip", "2", "Spicy Chicken Burger", "£2.98", "EXTRA Mayonnaise", "ADD", "2", "Dill Pickle Slice", "ADD", "1", "Tomato Slice", "£0.40",
+        "1", "£2.49 Extra Value Meal Burger and Medium Fries", "When ordering on the app", "1", "Fish Burger®", "£2.00", "1", "Medium Fries", "£0.49", "VAT:", "£1.94", "Total (including VAT):", "£11.66"]) },
+      o, "Burgerworks", "2026-11-08", { orderRef: "014" });
+  }
   return out;
 }
