@@ -99,6 +99,17 @@ const placeIn = (s) => {
   return null;
 };
 
+// The flight number nearest a leg: the one above it ("BA2203" over the day, times and airports) or the one just after,
+// whichever is closer, never one above the leg before. Round 15.
+function nearestFlight(lines, i, prevAt) {
+  let best = null, dist = Infinity;
+  for (let k = Math.max(prevAt + 1, i - 12); k <= Math.min(lines.length - 1, i + 4); k++) {
+    if (NOT_FLIGHT_DAY.test(lines[k])) continue;
+    const v = flightNo(lines[k]);
+    if (v && Math.abs(k - i) < dist) { best = v; dist = Math.abs(k - i); }
+  }
+  return best || nearby(lines, i, flightNo);
+}
 // The flights an email names, in the order it names them (each once).
 export function flightLegs(text, refDate) {
   const lines = String(text || "").split(/\n/).map((l) => l.replace(/\s+/g, " ").trim()).filter(Boolean);
@@ -106,7 +117,7 @@ export function flightLegs(text, refDate) {
   let dir = null;
   const add = (from, to, i) => {
     if (!from || !to || from === to) return;
-    legs.push({ from, to, date: nearby(lines, i, (l) => legDay(l, refDate)), flight: nearby(lines, i, flightNo), dir, at: i });
+    legs.push({ from, to, date: nearby(lines, i, (l) => legDay(l, refDate)), flight: nearestFlight(lines, i, legs.length ? legs[legs.length - 1].at : -1), dir, at: i });
   };
   for (let i = 0; i < lines.length; i++) {
     const l = lines[i];

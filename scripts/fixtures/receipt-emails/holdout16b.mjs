@@ -93,5 +93,40 @@ export default function holdout16b() {
         "Order Id: 2508590001", "Order Date: Saturday, November 14, 2026", "Table Number: 41", "Qty | Description | Amount", "1 | Stout (Pint) | £4.62", "VAT (20%) | £0.77", "Payment Type | Apple Pay", "Order Total | £4.62"]) },
       o, "Tapster Inns", "2026-11-14", { orderRef: "2508590001", merchant: "Harbour Station Bar" });
   }
+  // ---- A pizza order listing what was ordered with no prices, a pizza's choices with and without "+" -------------------
+  {
+    const o = order([{ name: "Garlic Dip - 100g", qty: 1, unit: 0, extras: [] }, { name: "Medium Pepperoni Feast", qty: 1, unit: 0, extras: ["Thin Crust", "No Onions", "Extra Cheese"] }, { name: "BBQ Dip - 40g", qty: 1, unit: 0 }, { name: "14 Chicken Wings", qty: 1, unit: 0 }]);
+    const f = add("holdout16b-pizza-no-prices-choices", "Crust Club", "'1x Name' lines with no prices; '+ Thin Crust' then 'No Onions', 'Extra Cheese' with no '+'; '1x 14 Chicken Wings'; a '1x 40% off … when you spend £30' deal line; 'Delivery: £2.49'; '£28.40 (Including VAT)'", {
+      from: "Crust Club <orders@crustclub.example>", subject: "Your Crust Club order 551209384 is confirmed", date: "Sat, 14 Nov 2026 19:10:00 +0000",
+      html: mail("Crust Club", "crustclub.example", ["Thanks for your order", "Order number: 551209384", "Get excited for your |", "1x Garlic Dip - 100g", "1x Medium Pepperoni Feast", "+ Thin Crust", "No Onions", "Extra Cheese",
+        "1x BBQ Dip - 40g", "1x 14 Chicken Wings", "1x 40% off Pizza and Sides when you spend £30", "Delivery: £2.49", "£28.40 (Including VAT)", "Your order will be delivered to |"]) }, o, "Crust Club", "2026-11-14", { orderRef: "551209384" });
+    f.expected.items = f.expected.items.map((i) => ({ ...i, linePence: null }));
+    f.expected.totalPence = 2840; f.expected.noPrices = true;
+  }
+  // ---- A pub's receipt where each item's empty choice is set out as its own line, "No Choice" over "1" with no price ----
+  {
+    const o = order([{ name: "Steak & Ale Pie", qty: 1, unit: 1850 }, { name: "Fish & Chips (Large)", qty: 1, unit: 2150 }]);
+    add("holdout16b-pub-no-choice-rows", "Kingsgate Inns", "'Item | Qty | Price'; under each item 'No Choice' over '1' with no price", {
+      from: "Kingsgate Inns <noreply@kingsgateinns.example>", subject: "Your receipt from The Old Bell", date: "Sat, 14 Nov 2026 14:00:00 +0000",
+      html: mail("Kingsgate Inns", "kingsgateinns.example", ["Thanks for visiting", "Receipt number: 771203", "Item", "Qty", "Price", "Steak & Ale Pie", "1", "£18.50", "No Choice", "1", "No Choice", "1",
+        "Fish & Chips (Large)", "1", "£21.50", "No Choice", "1", "Promotion: £0.00", "Total: £40.00"]) }, o, "Kingsgate Inns", "2026-11-14", { orderRef: "771203" });
+  }
+  // ---- A card processor's receipt for a water bill: a bill, never a purchase -------------------------------------------
+  not("holdout16b-utility-bill-payment", "PayGate", "'Your transaction has been processed by PayGate, on behalf of Riverside Water Utilities Limited'; 'Amount: GBP 54.00'; 'Description: Riverside Water Payment'", {
+    from: "Riverside Water <do-not-reply@paygate.example>", subject: "PayGate card transaction receipt", date: "Mon, 16 Nov 2026 07:00:00 +0000",
+    html: mail("PayGate", "paygate.example", ["Thank You", "Your transaction has been processed by PayGate, on behalf of Riverside Water Utilities Limited.", "Payment details:", "Amount: GBP 54.00", "Description: Riverside Water Payment",
+      "From: Riverside Water Utilities Limited", "Merchant’s cart ID: 2703229800000", "Please note, this is not a tax receipt.", "Thank you for your payment to Riverside Water Utilities Limited."]) }, "bill");
+  // ---- A return rail booking: each way's legs under its heading, its tickets under "Outbound |" and "Return |" ------------
+  {
+    const o = order([{ name: "Marston Central to Oakford Parkway", qty: 1, unit: 3195 }, { name: "Oakford Parkway to Hollins Junction", qty: 1, unit: 480 }, { name: "Hollins Junction to Marston Terminals", qty: 1, unit: 1540 }, { name: "Booking Fee", qty: 1, unit: 199 }]);
+    const f = add("holdout16b-rail-return-split-legs", "Railwise", "return trip in the subject; 'Outbound Thursday 19 November' with one leg line; 'Return Thursday 19 November' with two 'Advance Single' legs; 'Order Details' 'Outbound |' one ticket, 'Return |' two; 'Specified train only. No refunds.'", {
+      from: rail, subject: "Your booking confirmation for return trip Marston to Oakford (19 November, 06:05)", date: "Tue, 17 Nov 2026 09:00:00 +0000",
+      html: mail("Railwise", "railwise.example", ["Your trip to Oakford Parkway departing Thursday, 19 November 2026 is confirmed", "There’s no difference to your journey, you just have multiple tickets",
+        "Outbound Thursday 19 November", "06:05 Marston Central", "Marston Central to Oakford Parkway", "07:50 Oakford Parkway", "1x Advance Single", "Specified train only. No refunds.", "1x Adult",
+        "Return Thursday 19 November", "14:50 Oakford Parkway", "Advance Single", "Oakford Parkway to Hollins Junction", "Advance Single", "Hollins Junction to Marston Terminals", "16:27 Marston Central", "2x Advance Single", "Specified train only. No refunds.", "1x Adult",
+        "Transaction ID:", "730118355120", "Transaction Date:", "17 November 2026", "Order Details |", "Outbound |", "Adult - Advance Single - [26-30 Railcard]", "£31.95", "Return |", "Adult - Advance Single - [26-30 Railcard]", "£4.80", "Adult - Advance Single - [26-30 Railcard]", "£15.40",
+        "Other costs |", "Booking Fee", "£1.99", "Total amount: | £54.14 |"]) }, o, "Railwise", "2026-11-17", { orderRef: "730118355120" });
+    f.expected.nonRefundable = true;
+  }
   return out;
 }

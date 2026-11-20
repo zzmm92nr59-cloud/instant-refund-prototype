@@ -53,7 +53,9 @@ const MEASURE = "\\d+(?:\\.\\d+)?\\s?(?:kg|g|l|ltr|litres?|m)\\s*@\\s*(?:£\\s?\
 // An English label after its Welsh (or other) twin, "Nifer / Qty: 1", "Cyfanswm / Total £115.50": read as the English one.
 const BILINGUAL = /(^|\|\s*)[\p{L}'’-]{2,20}(?:[ -][\p{L}'’-]{2,20}){0,2}\s?\/\s?(?=(?:qty|quantity|sub-?\s?total|total|postage|delivery|shipping|price|order(?: number| date)?|date|vat|discount|item|product)\b)/gimu;
 // ("£ 13.5", a shop's price written with one figure of pence: £13.50. Round 15.)
-export const prepText = (text) => inPoundSigns(text).replace(BILINGUAL, "$1").replace(/£([ \t]?)(\d{1,6})\.(\d)(?=[ \t]*(?:\||$))/gm, "£$1$2.$30");
+// ("No Choice" over "1" with no price under it: a till's empty choice for the item above, not a thing bought. Round 15.)
+const EMPTY_CHOICE = /^[ \t|]*(?:no choice|no selection|no thanks|none selected|no extras?|no options?)[ \t|]*\n(?:[ \t|]*\n){0,3}[ \t|]*\d{1,2}[ \t|]*$/gim;
+export const prepText = (text) => inPoundSigns(text).replace(EMPTY_CHOICE, "").replace(BILINGUAL, "$1").replace(/£([ \t]?)(\d{1,6})\.(\d)(?=[ \t]*(?:\||$))/gm, "£$1$2.$30");
 const COLOUR_LINE = new RegExp("^" + COLOUR + "(?:\\s?[/&,]\\s?" + COLOUR + ")*$", "i");
 // Receipts in euros or dollars read the same way: their amounts are read as they are written (never converted; the
 // receipt's currency comes from its total, receipt-parser.js). Only for an email with no pound amounts at all.
