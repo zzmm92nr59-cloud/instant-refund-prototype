@@ -1,0 +1,50 @@
+{
+ "id": "holdout21-ecrebo-till-ereceipt",
+ "sender": "Homewares Co",
+ "layout": "an e-receipt platform's till receipt: 'Item | Price', lines in pounds with no '£' ('Steel Mop Bucket | 18.00'), 'Quantity: 2 at £6.00 each' under a name, then 'S/N: | | 12.00', 'TOTAL' over '9 Items | £64.50'",
+ "headers": {
+  "from": "Homewares Co <no-reply@homewares-prod.ecrebo.com>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your Digital Receipt",
+  "date": "Sat, 21 Nov 2026 14:40:00 +0000"
+ },
+ "html": "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">\n<html xmlns=\"http://www.w3.org/1999/xhtml\"><head><meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\" /><meta name=\"viewport\" content=\"width=device-width\" />\n<title>Homewares Co</title><style type=\"text/css\">body{margin:0;padding:0}td{font-family:Helvetica,Arial,sans-serif;font-size:14px;color:#222}.muted{color:#777}@media only screen and (max-width:600px){.w600{width:100%!important}}</style></head>\n<body style=\"margin:0;padding:0;background-color:#f3f3f3\">\n<div style=\"display:none;max-height:0;overflow:hidden\">&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;</div>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#f3f3f3\"><tr><td align=\"center\">\n<table role=\"presentation\" class=\"w600\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#ffffff\">\n<tr><td style=\"padding:24px 24px 8px 24px\"><a href=\"https://www.homewares.example/?utm_source=email\"><img src=\"https://www.homewares.example/static/email/logo.png\" alt=\"Homewares Co\" width=\"140\" height=\"40\" border=\"0\" /></a></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"><tr><td>E-RECEIPT</td></tr>\n<tr><td>Homewares Co - Home Comforts</td></tr>\n<tr><td>E-Receipt</td></tr>\n<tr><td>Item</td><td>Price</td></tr>\n<tr><td>Steel Mop Bucket</td><td>18.00</td></tr>\n<tr><td>Linen Napkins Set of 4<br>Quantity: 2 at &pound;6.00 each<br>S/N:</td><td>| 12.00</td></tr>\n<tr><td>Glass Storage Jar 1L<br>Quantity: 3 at &pound;4.50 each<br>S/N:</td><td>| 13.50</td></tr>\n<tr><td>Beeswax Candle Small</td><td>3.50</td></tr>\n<tr><td>Oven Glove Pair<br>Quantity: 2 at &pound;9.75 each<br>S/N:</td><td>| 19.50</td></tr>\n<tr><td>TOTAL<br>9 Items</td><td>&pound;66.50</td></tr>\n<tr><td>Cashier</td><td>Till</td><td>Transaction No.</td></tr>\n<tr><td>alex</td><td>0002</td><td>1001</td></tr>\n<tr><td>21/11/26 14:39</td></tr>\n<tr><td>Card Type</td><td>Card</td><td>&pound;66.50</td></tr>\n<tr><td>Thank you for shopping at Homewares Co</td></tr>\n<tr><td>Powered by Ecrebo</td></tr></table></td></tr>\n<tr><td style=\"padding:24px;font-size:12px\" class=\"muted\">&copy; 2026 Homewares Co. All rights reserved.<br /><a href=\"https://www.homewares.example/help\">Help</a> | <a href=\"https://www.homewares.example/privacy\">Privacy</a> | <a href=\"https://www.homewares.example/unsubscribe\">Unsubscribe</a></td></tr>\n</table></td></tr></table>\n<img src=\"https://click.homewares.example/open/abc123.gif\" width=\"1\" height=\"1\" alt=\"\" />\n</body></html>",
+ "text": "",
+ "expected": {
+  "shop": "Homewares Co",
+  "date": "2026-11-21",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Steel Mop Bucket",
+    "qty": 1,
+    "linePence": 1800
+   },
+   {
+    "name": "Linen Napkins Set of 4",
+    "qty": 2,
+    "linePence": 1200
+   },
+   {
+    "name": "Glass Storage Jar 1L",
+    "qty": 3,
+    "linePence": 1350
+   },
+   {
+    "name": "Beeswax Candle Small",
+    "qty": 1,
+    "linePence": 350
+   },
+   {
+    "name": "Oven Glove Pair",
+    "qty": 2,
+    "linePence": 1950
+   }
+  ],
+  "subtotalPence": 6650,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 6650
+ }
+}

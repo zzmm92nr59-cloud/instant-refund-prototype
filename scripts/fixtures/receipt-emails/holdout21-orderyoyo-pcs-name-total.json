@@ -1,0 +1,49 @@
+{
+ "id": "holdout21-orderyoyo-pcs-name-total",
+ "sender": "Spice House",
+ "layout": "a takeaway's own ordering page: 'Spice House | Your order 10203040 is accepted', 'Pcs | Name | Total', each thing as '1' / name / '+ Paneer' / '£ | 8.50', then 'Subtotal', 'Discount 10%', 'Delivery', 'Bag fee', 'Service fee', 'Total (Incl. VAT)'",
+ "headers": {
+  "from": "no-reply@orderyoyo.com",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Spice House | Your order 10203040 is accepted",
+  "date": "Mon, 28 Dec 2026 18:30:00 +0000"
+ },
+ "html": "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">\n<html xmlns=\"http://www.w3.org/1999/xhtml\"><head><meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\" /><meta name=\"viewport\" content=\"width=device-width\" />\n<title>Spice House</title><style type=\"text/css\">body{margin:0;padding:0}td{font-family:Helvetica,Arial,sans-serif;font-size:14px;color:#222}.muted{color:#777}@media only screen and (max-width:600px){.w600{width:100%!important}}</style></head>\n<body style=\"margin:0;padding:0;background-color:#f3f3f3\">\n<div style=\"display:none;max-height:0;overflow:hidden\">&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;</div>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#f3f3f3\"><tr><td align=\"center\">\n<table role=\"presentation\" class=\"w600\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#ffffff\">\n<tr><td style=\"padding:24px 24px 8px 24px\"><a href=\"https://www.spicehouse.example/?utm_source=email\"><img src=\"https://www.spicehouse.example/static/email/logo.png\" alt=\"Spice House\" width=\"140\" height=\"40\" border=\"0\" /></a></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"><tr><td>Your order has been accepted</td></tr>\n<tr><td>Hello Sam,<br>Thank you for your order.<br>We have received it and will get started on your order.<br>Order No: 10203040</td></tr>\n<tr><td>Pcs</td><td>Name</td><td>Total</td></tr>\n<tr><td>1</td></tr>\n<tr><td>Paneer Tikka Masala</td></tr>\n<tr><td>+ Paneer</td></tr>\n<tr><td>&pound;</td><td>8.50</td></tr>\n<tr><td>1</td></tr>\n<tr><td>Vegetable Pakora</td></tr>\n<tr><td>&pound;</td><td>3.95</td></tr>\n<tr><td>2</td></tr>\n<tr><td>Garlic Naan</td></tr>\n<tr><td>&pound;</td><td>6.90</td></tr>\n<tr><td>1</td></tr>\n<tr><td>Mango Lassi</td></tr>\n<tr><td>&pound;</td><td>3.25</td></tr>\n<tr><td>Subtotal</td></tr>\n<tr><td>&pound;</td><td>22.60</td></tr>\n<tr><td>Discount 10%</td></tr>\n<tr><td>&pound;</td><td>-2.26</td></tr>\n<tr><td>Delivery</td></tr>\n<tr><td>&pound;</td><td>2.50</td></tr>\n<tr><td>Bag fee</td></tr>\n<tr><td>&pound;</td><td>0.10</td></tr>\n<tr><td>Service fee</td></tr>\n<tr><td>&pound;</td><td>0.50</td></tr>\n<tr><td>Total (Incl. VAT)</td></tr>\n<tr><td>&pound;</td><td>23.44</td></tr>\n<tr><td>Bon appetit!</td></tr>\n<tr><td>Powered by<br>OrderYOYO</td></tr></table></td></tr>\n<tr><td style=\"padding:24px;font-size:12px\" class=\"muted\">&copy; 2026 Spice House. All rights reserved.<br /><a href=\"https://www.spicehouse.example/help\">Help</a> | <a href=\"https://www.spicehouse.example/privacy\">Privacy</a> | <a href=\"https://www.spicehouse.example/unsubscribe\">Unsubscribe</a></td></tr>\n</table></td></tr></table>\n<img src=\"https://click.spicehouse.example/open/abc123.gif\" width=\"1\" height=\"1\" alt=\"\" />\n</body></html>",
+ "text": "",
+ "expected": {
+  "shop": "Spice House",
+  "date": "2026-12-28",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Paneer Tikka Masala",
+    "qty": 1,
+    "linePence": 850,
+    "extras": [
+     "Paneer"
+    ]
+   },
+   {
+    "name": "Vegetable Pakora",
+    "qty": 1,
+    "linePence": 395
+   },
+   {
+    "name": "Garlic Naan",
+    "qty": 2,
+    "linePence": 690
+   },
+   {
+    "name": "Mango Lassi",
+    "qty": 1,
+    "linePence": 325
+   }
+  ],
+  "subtotalPence": 2260,
+  "feesPence": 310,
+  "discountsPence": 226,
+  "tipsPence": 0,
+  "totalPence": 2344,
+  "orderRef": "10203040"
+ }
+}

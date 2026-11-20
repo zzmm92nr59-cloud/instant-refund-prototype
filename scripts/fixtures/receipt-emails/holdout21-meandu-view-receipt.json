@@ -1,0 +1,24 @@
+{
+ "id": "holdout21-meandu-view-receipt",
+ "sender": "Wine Bar Riverside",
+ "layout": "an order-and-pay platform's 'Your receipt from Wine Bar Riverside', the receipt only behind 'View receipt'",
+ "headers": {
+  "from": "me&u Mail <mail@noreply.meandu.com>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your receipt from Wine Bar Riverside",
+  "date": "Sat, 31 Oct 2026 17:24:00 +0000"
+ },
+ "html": "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">\n<html xmlns=\"http://www.w3.org/1999/xhtml\"><head><meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\" /><meta name=\"viewport\" content=\"width=device-width\" />\n<title>me&amp;u</title><style type=\"text/css\">body{margin:0;padding:0}td{font-family:Helvetica,Arial,sans-serif;font-size:14px;color:#222}.muted{color:#777}@media only screen and (max-width:600px){.w600{width:100%!important}}</style></head>\n<body style=\"margin:0;padding:0;background-color:#f3f3f3\">\n<div style=\"display:none;max-height:0;overflow:hidden\">&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;</div>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#f3f3f3\"><tr><td align=\"center\">\n<table role=\"presentation\" class=\"w600\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#ffffff\">\n<tr><td style=\"padding:24px 24px 8px 24px\"><a href=\"https://www.meandu.com/?utm_source=email\"><img src=\"https://www.meandu.com/static/email/logo.png\" alt=\"me&amp;u\" width=\"140\" height=\"40\" border=\"0\" /></a></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"><tr><td>Thanks for your order at Wine Bar Riverside!</td></tr>\n<tr><td>View your order &amp; receipt from Wine Bar Riverside by clicking the button below.</td></tr>\n<tr><td>View receipt</td></tr>\n<tr><td>Find out how restaurants use me&amp;u to serve their guests.</td></tr></table></td></tr>\n<tr><td style=\"padding:24px;font-size:12px\" class=\"muted\">&copy; 2026 me&amp;u. All rights reserved.<br /><a href=\"https://www.meandu.com/help\">Help</a> | <a href=\"https://www.meandu.com/privacy\">Privacy</a> | <a href=\"https://www.meandu.com/unsubscribe\">Unsubscribe</a></td></tr>\n</table></td></tr></table>\n<img src=\"https://click.meandu.com/open/abc123.gif\" width=\"1\" height=\"1\" alt=\"\" />\n</body></html>",
+ "text": "",
+ "expected": {
+  "shop": "Wine Bar Riverside",
+  "date": "2026-10-31",
+  "currency": null,
+  "items": [],
+  "subtotalPence": null,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": null
+ }
+}
