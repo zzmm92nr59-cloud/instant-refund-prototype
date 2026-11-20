@@ -111,5 +111,49 @@ export default function holdout16d() {
         "Unless specified otherwise, rates are quoted in British pounds sterling.", "Rate quotes in GBP are based on current exchange rates, which may vary at time of travel. Final payment will be settled in local currency directly with the property.",
         "© 2025 Expedia, Inc., an Expedia Group company. All rights reserved."]) },
     { shop: "Expedia", date: "2025-01-12", currency: "USD", totalPence: 156000, items: [{ name: "Deluxe Room, 1 King Bed", qty: 1, linePence: 140000, extras: ["7 nights"] }] });
+  // ---- Purchases Relay missed (made-up copies of their layouts) ---------------------------------------------------------------
+  // An airline's itinerary whose "text" part is really its web page; "Reservation:" over the code; "Total paid via … | 168.98 GBP".
+  {
+    const page = `<html><body><table><tr><td>myRyanair</td></tr><tr><td>Destination::</td></tr><tr><td>Faro</td></tr><tr><td>Reservation:</td></tr><tr><td>Q7WXYZ</td></tr>
+<tr><td>Your flight information</td></tr><tr><td>To Faro FR1234</td></tr><tr><td>Thu, 02 Jun 22</td></tr><tr><td>Passenger(s):</td></tr><tr><td>Mr SAM TAYLOR</td></tr>
+<tr><td>Receipt:</td></tr><tr><td><div>Total paid via<br>MasterCard<br>ending in<br>4242</div></td><td><strong>168.98 GBP</strong></td></tr>
+<tr><td>VAT is not applicable on international flights.</td></tr>${Array.from({ length: 12 }, () => "<tr><td><div><span>Add now</span></div></td></tr>").join("")}</table></body></html>`;
+    const f = fixture("holdout16d-airline-itinerary-html-as-text", "Ryanair", "the text part is the HTML page itself; 'Reservation:' over the code; 'Total paid via MasterCard ending in 4242 | 168.98 GBP'",
+      { from: "Itinerary@ryanair.com", subject: "Ryanair Travel Itinerary", date: "Thu, 5 May 2022 10:00:00 +0000", text: page, html: page },
+      { ...expected("Ryanair", "2022-05-05", order([])), items: [], totalPence: 16898 });
+    out.push(f);
+  }
+  // An airline's booking details with the total after its currency's code, "Total Price for all Passengers | GBP 1201.72".
+  {
+    const f = fixture("holdout16d-airline-total-code-first", "Lufthansa", "'Booking details | Departure: …' subject, 'booking code: | ABCDEF', 'Total Price for all Passengers | GBP 1201.72' (no thousands comma)",
+      { from: "lufthansa.com <online@booking.lufthansa.com>", subject: "Booking details | Departure: 14 December 2021 | LHR-WDH", date: "Wed, 10 Nov 2021 13:02:53 +0000",
+        html: htmlPage("Lufthansa", ["Ticket details & travel information", "Lufthansa booking code: | ABCDEF", "Passenger information", "TAYLOR/SAM MR", "Tue. 14 December 2021: London – Frankfurt", "LH 909",
+          "Total Price of your Ticket", "Passenger Type | Price | Taxes, fees & surcharges | Passengers | Total Price of your Ticket", "Adult | GBP 771.00 | GBP 430.72 | 1 | GBP 1201.72", "Total Price for all Passengers | GBP 1201.72"]) },
+      { ...expected("Lufthansa", "2021-11-10", order([])), items: [{ name: "Adult", qty: 1, linePence: 120172 }], totalPence: 120172, shopAlso: ["lufthansa.com"] });
+    out.push(f);
+  }
+  // Ticket Tailor: "Order complete: …", an order summary with its columns named and bare amounts.
+  add("holdout16d-ticket-order-summary", "Ticket Tailor", "'Order complete: …' subject; 'Item Price Fee Quantity Subtotal' then 'Individual Ticket 75.00 0.00 1 75.00'; 'Total paid GBP 75.00'",
+    { from: "Riverside Trust <riversidetrust@buytickets.at>", subject: "Order complete: Spring Ball 2025 - Riverside Trust", date: "Mon, 3 Feb 2025 12:00:00 +0000",
+      text: "Thank you for your order\n\nDear Sam Taylor\nWe can't wait to see you at the Spring Ball\n\nOrder summary\n\n Item Price Fee Quantity Subtotal\nIndividual Ticket 75.00 0.00 1 75.00\n\nTotal\nGBP 75.00\nTotal paid\nGBP 75.00\n" },
+    order([{ name: "Individual Ticket", qty: 1, unit: 7500 }]), "Riverside Trust", "2025-02-03");
+  // A "Payment received" email: "Your payment of £54.40 has been successfully processed", the order's number in the subject.
+  {
+    const f = fixture("holdout16d-payment-received", "Dr Fox", "'Payment receipt confirmation 3170000' subject; 'Your payment of £54.40 has been successfully processed'",
+      { from: "Dr Fox <noreply@doctorfox.co.uk>", subject: "Payment receipt confirmation 3170000", date: "Thu, 11 Dec 2025 09:00:00 +0000",
+        html: htmlPage("Payment received", ["Payment received", "Your payment of £54.40 has been successfully processed - payment will show as 'INDEXMED' on your bank statement. You will be notified by email once your order has been processed."]) },
+      { ...expected("Dr Fox", "2025-12-11", order([])), items: [], totalPence: 5440 });
+    out.push(f);
+  }
+  // Stripe's receipt for an invoice paid ("Your … Limited receipt [#1890-4978]"), the line under a list dash.
+  add("holdout16d-stripe-invoice-paid", "Stripe", "'Your Northgate Advisers Limited receipt [#1800-1234]'; '- - Payment for invoice(s) 250001 : £250.00'",
+    { from: "Northgate Advisers Limited <receipts+acct_1AB@stripe.com>", subject: "Your Northgate Advisers Limited receipt [#1800-1234]", date: "Wed, 19 Feb 2025 10:28:00 +0000",
+      text: "Receipt from Northgate Advisers Limited Receipt #1800-1234\nAmount paid\n£250.00\nDate paid\nFeb 19, 2025, 10:27:54 AM\nPayment method\n- - Apple Pay\nSummary\n- - Payment for invoice(s) 250001 : £250.00\n- Amount paid : £250.00\nYou're receiving this email because you made a purchase at Northgate Advisers Limited, which partners with Stripe to provide invoicing and payment processing.\n" },
+    order([{ name: "Payment for invoice(s) 250001", qty: 1, unit: 25000 }]), "Northgate Advisers Limited", "2025-02-19", { shopAlso: ["Northgate Advisers"] });
+  // A creator subscription: "Confirmation of NEW Subscription!", "Subscribed for $7.00".
+  add("holdout16d-creator-subscription", "OnlyFans", "'Confirmation of NEW Subscription!', 'You have successfully subscribed to …', 'Subscribed for $7.00'",
+    { from: "OnlyFans <no-reply@onlyfans.com>", subject: "Confirmation of NEW Subscription!", date: "Wed, 15 Jan 2025 16:18:08 +0000",
+      html: htmlPage("OnlyFans", ["Congratulations!", "You have successfully subscribed to A Creator.", "A Creator", "Subscribed for $7.00", "If you did not make this purchase, please click here immediately", "©2025 OnlyFans"]) },
+    order([{ name: "Subscription", qty: 1, unit: 700 }]), "OnlyFans", "2025-01-15", { currency: "USD" });
   return out;
 }

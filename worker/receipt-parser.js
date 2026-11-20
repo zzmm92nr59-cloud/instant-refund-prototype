@@ -193,8 +193,11 @@ function collectParts(headers, body, out, depth = 0) {
   if (/text\/html/i.test(type)) decoded = decoded.replace(/\bdata:[a-z]+\/[a-z0-9.+-]+;base64,[A-Za-z0-9+/=\s]{200,}/gi, "data:,").replace(/(\s[a-z][a-z0-9:-]*\s*=\s*)(["'])[^"'<>]{4000,}?\2/gi, '$1""');
   decoded = withoutMojibake(withoutInvisible(unwrapSafeLinks(decoded.slice(0, MAX_INPUT)))).replace(/\r\n?/g, "\n");
   if (/text\/html/i.test(type)) out.html.push(decoded);
-  else if (/text\/plain/i.test(type)) out.text.push(decoded);
+  // (A "text" part that is really a web page, Ryanair's itinerary sends its HTML as text/plain: read as the page shows it,
+  // never as tags. Round 15.)
+  else if (/text\/plain/i.test(type)) out.text.push(PLAIN_IS_HTML.test(decoded.slice(0, 3000)) || (decoded.slice(0, 20000).match(/<\/?(?:td|tr|table|div|span|br|p)\b/gi) || []).length >= 30 ? htmlToText(decoded) : decoded);
 }
+const PLAIN_IS_HTML = /^\s*(?:<!doctype html\b|<html\b|<head\b|<body\b)/i;
 // The longest raw email split into its parts (attachments are skipped without being decoded, so this is cheap).
 const MAX_RAW = 12_000_000;
 
@@ -359,7 +362,8 @@ function htmlToTextAll(html) {
 
 function money(str) {
   if (str == null) return null;
-  const m = String(str).match(/([0-9]{1,3}(?:,[0-9]{3})*|[0-9]+)(?:\.([0-9]{2}))?/);
+  // (Thousands with their commas, "1,201.72", or written without, "1201.72": never only the first three digits of it. Round 15.)
+  const m = String(str).match(/([0-9]{1,3}(?:,[0-9]{3})+(?![0-9])|[0-9]+)(?:\.([0-9]{2}))?/);
   if (!m) return null;
   const pence = Math.round(Number(m[1].replace(/,/g, "") + "." + (m[2] || "00")) * 100);
   return Number.isFinite(pence) ? pence : null;
@@ -895,6 +899,12 @@ function receiptSignals(subject, text) {
     /\byour\b[^!?]{0,40}\border summary\b/.test(s) ||
     // Stripe's "Your Capricorn Wealth Management Limited receipt [#1890-4978]" (round 15).
     /\byour\b[^!?\n]{0,60}\breceipt\s*\[#[\d-]{4,20}\]\s*$/.test(s) ||
+    // "Confirmation of NEW Subscription!" (a creator subscription, round 15).
+    /^\s*(?:(?:fwd?|fw)\s*:\s*)?confirmation of (?:new )?subscription\b/.test(s) ||
+    // An airline's "Booking details | Departure: 14 December 2021 | LHR-WDH" (Lufthansa, round 15).
+    /^\s*(?:(?:fwd?|fw)\s*:\s*)?booking details\s*\|\s*departure\b/.test(s) ||
+    // An airline's "Ryanair Travel Itinerary" (its booking's receipt, round 15).
+    /^\s*(?:(?:fwd?|fw)\s*:\s*)?\p{L}[\p{L} ]{1,30} travel itinerary\s*$/u.test(s) ||
     // Ticket Tailor's "Order complete: Colour Ball 2025 - …" (round 15).
     /^\s*(?:(?:fwd?|fw)\s*:\s*)?order complete\s*:/.test(s) ||
     // PayPal's "You've submitted an order in the amount of £25.00 GBP to …": an order paid through PayPal (round 15).
@@ -934,7 +944,7 @@ function receiptSignals(subject, text) {
   // (A total in euros counts as a total: the receipt is kept with its amount in euros, never turned into pounds.)
   // ("Amount paid | £20.62" with no word "total" counts too: coverage round.)
   // (A total in dollars counts too, "Total | $60.00": round 11.)
-  const bodyHit = /\byour payment of £\s?\d[\d,]{0,9}(?:\.\d{2})? has been (?:successfully )?(?:processed|received|taken)\b|\border\s*(number|no|id|ref|#)|\btotal\b[ \t|:]{0,40}(?:[£€]|US ?\$|\$\s?\d)|\btotal\b(?:\s*\([^)\n]{1,40}\))?[\s\S]{0,12}(?:[£€]|\$\s?\d)|^[^£€\n\r\u2028\u2029]*[£€].*\btotal\b|\bamount\s+paid\b[\s|:]{0,20}(?:[£€]|\$\s?\d)|^[|\t\v\f \u00a0\u1680\u2000-\u200a\u202f\u205f\u3000\ufeff]*(?:amount|total paid)\s*:[\s|]*£\s?\d/im.test(text);
+  const bodyHit = /\bsubscribed for (?:US ?\$|\$|£|€)\s?\d{1,4}\.\d{2}\b|\btotal price for all passengers\b[\s|:]{0,20}(?:GBP|EUR|£|€)\s?\d|\btotal paid via\b[^\n]{0,40}(?:\n[^\n]{0,40}){0,10}?\s(?:£\s?\d[\d,]{0,9}\.\d{2}|\d[\d,]{0,9}\.\d{2}\s?(?:GBP|EUR|USD)\b)|\byour payment of £\s?\d[\d,]{0,9}(?:\.\d{2})? has been (?:successfully )?(?:processed|received|taken)\b|\border\s*(number|no|id|ref|#)|\btotal\b[ \t|:]{0,40}(?:[£€]|US ?\$|\$\s?\d)|\btotal\b(?:\s*\([^)\n]{1,40}\))?[\s\S]{0,12}(?:[£€]|\$\s?\d)|^[^£€\n\r\u2028\u2029]*[£€].*\btotal\b|\bamount\s+paid\b[\s|:]{0,20}(?:[£€]|\$\s?\d)|^[|\t\v\f \u00a0\u1680\u2000-\u200a\u202f\u205f\u3000\ufeff]*(?:amount|total paid)\s*:[\s|]*£\s?\d/im.test(text);
   return { subjectHit, bodyHit };
 }
 function looksLikeReceipt(subject, text) {
@@ -2207,6 +2217,17 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
       if (got.length) { result.items = got; result.itemsCheck = checkItems(got, moneyOf(text), result.totalPence); }
     }
   }
+  // (An airline's itinerary, "Receipt:", "Total paid via MasterCard ending in 4156 | 168.98 GBP": what was paid, the amount
+  // before its currency's code. Round 15.)
+  if (result.totalPence == null) { const tp = /\btotal paid via\b[^\n]{0,40}(?:\n[^\n]{0,40}){0,10}?\s(?:(£)\s?(\d[\d,]{0,9}\.\d{2})|(\d[\d,]{0,9}\.\d{2})\s?(GBP|EUR|USD)\b)/i.exec(text.slice(0, 20000)); if (tp) { result.totalPence = money(tp[2] || tp[3]); result.currency = tp[1] ? "GBP" : tp[4].toUpperCase(); result.itemsCheck = checkItems(result.items, moneyOf(text), result.totalPence); } }
+  // (A subscription confirmed as "Subscribed for $7.00": that money, in its own currency; the subscription is the thing. Round 15.)
+  if (result.totalPence == null) { const sb = /\bsubscribed for (US ?\$|\$|£|€)\s?(\d{1,4}\.\d{2})\b/i.exec(text.slice(0, 6000)); if (sb) { result.totalPence = money(sb[2]); result.currency = sb[1] === "£" ? "GBP" : sb[1] === "€" ? "EUR" : "USD";
+    if (!result.items.length) result.items = [{ name: "Subscription", qty: 1, pricePence: result.totalPence }]; result.itemsCheck = { complete: true, itemsPence: result.totalPence, expectedPence: result.totalPence, missingPence: 0 }; } }
+  // (An airline's "Total Price for all Passengers | GBP 1201.72", its own code before the amount; "Lufthansa booking code: |
+  // VRDZLD". Round 15.)
+  if (result.totalPence == null) { const ap = /\btotal price for all passengers\b[\s|:]{0,20}(GBP|EUR|£|€)\s?(\d[\d,]{0,9}\.\d{2})\b/i.exec(text.slice(0, 30000)); if (ap) { result.totalPence = money(ap[2]); result.currency = /GBP|£/.test(ap[1]) ? "GBP" : "EUR"; result.itemsCheck = checkItems(result.items, moneyOf(text), result.totalPence); } }
+  if (!result.orderRef) { const bc = /\bbooking code[ \t]*:[ \t|]*(?:\n[ \t|]*){0,3}([A-Z0-9]{6})[ \t|]*$/m.exec(text.slice(0, 8000)); if (bc && /[A-Z]/.test(bc[1])) result.orderRef = bc[1]; }
+  if (!result.orderRef) { const rv = /^[ \t|]*[Rr]eservation[ \t]*:[ \t|]*(?:\n[ \t|]*){0,4}([A-Z0-9]{6})[ \t|]*$/m.exec(text.slice(0, 5000)); if (rv && /[A-Z]/.test(rv[1])) result.orderRef = rv[1]; }
   // (A shop's "Payment received" email, "Your payment of £54.40 has been successfully processed", subject "Payment receipt
   // confirmation 3173033": that money, for that order. Round 15.)
   if (result.totalPence == null) { const pd = /\byour payment of £\s?(\d[\d,]{0,9}(?:\.\d{2})?) has been (?:successfully )?(?:processed|received|taken)\b/i.exec(text.slice(0, 5000)); if (pd) { result.totalPence = money(pd[1]); result.currency = "GBP"; result.itemsCheck = checkItems(result.items, moneyOf(text), result.totalPence); } }

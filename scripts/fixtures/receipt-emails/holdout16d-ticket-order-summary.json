@@ -1,0 +1,30 @@
+{
+ "id": "holdout16d-ticket-order-summary",
+ "sender": "Ticket Tailor",
+ "layout": "'Order complete: …' subject; 'Item Price Fee Quantity Subtotal' then 'Individual Ticket 75.00 0.00 1 75.00'; 'Total paid GBP 75.00'",
+ "headers": {
+  "from": "Riverside Trust <riversidetrust@buytickets.at>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Order complete: Spring Ball 2025 - Riverside Trust",
+  "date": "Mon, 3 Feb 2025 12:00:00 +0000"
+ },
+ "html": "",
+ "text": "Thank you for your order\n\nDear Sam Taylor\nWe can't wait to see you at the Spring Ball\n\nOrder summary\n\n Item Price Fee Quantity Subtotal\nIndividual Ticket 75.00 0.00 1 75.00\n\nTotal\nGBP 75.00\nTotal paid\nGBP 75.00\n",
+ "expected": {
+  "shop": "Riverside Trust",
+  "date": "2025-02-03",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Individual Ticket",
+    "qty": 1,
+    "linePence": 7500
+   }
+  ],
+  "subtotalPence": 7500,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 7500
+ }
+}

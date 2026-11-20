@@ -1,0 +1,24 @@
+{
+ "id": "holdout16d-airline-itinerary-html-as-text",
+ "sender": "Ryanair",
+ "layout": "the text part is the HTML page itself; 'Reservation:' over the code; 'Total paid via MasterCard ending in 4242 | 168.98 GBP'",
+ "headers": {
+  "from": "Itinerary@ryanair.com",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Ryanair Travel Itinerary",
+  "date": "Thu, 5 May 2022 10:00:00 +0000"
+ },
+ "html": "<html><body><table><tr><td>myRyanair</td></tr><tr><td>Destination::</td></tr><tr><td>Faro</td></tr><tr><td>Reservation:</td></tr><tr><td>Q7WXYZ</td></tr>\n<tr><td>Your flight information</td></tr><tr><td>To Faro FR1234</td></tr><tr><td>Thu, 02 Jun 22</td></tr><tr><td>Passenger(s):</td></tr><tr><td>Mr SAM TAYLOR</td></tr>\n<tr><td>Receipt:</td></tr><tr><td><div>Total paid via<br>MasterCard<br>ending in<br>4242</div></td><td><strong>168.98 GBP</strong></td></tr>\n<tr><td>VAT is not applicable on international flights.</td></tr><tr><td><div><span>Add now</span></div></td></tr><tr><td><div><span>Add now</span></div></td></tr><tr><td><div><span>Add now</span></div></td></tr><tr><td><div><span>Add now</span></div></td></tr><tr><td><div><span>Add now</span></div></td></tr><tr><td><div><span>Add now</span></div></td></tr><tr><td><div><span>Add now</span></div></td></tr><tr><td><div><span>Add now</span></div></td></tr><tr><td><div><span>Add now</span></div></td></tr><tr><td><div><span>Add now</span></div></td></tr><tr><td><div><span>Add now</span></div></td></tr><tr><td><div><span>Add now</span></div></td></tr></table></body></html>",
+ "text": "<html><body><table><tr><td>myRyanair</td></tr><tr><td>Destination::</td></tr><tr><td>Faro</td></tr><tr><td>Reservation:</td></tr><tr><td>Q7WXYZ</td></tr>\n<tr><td>Your flight information</td></tr><tr><td>To Faro FR1234</td></tr><tr><td>Thu, 02 Jun 22</td></tr><tr><td>Passenger(s):</td></tr><tr><td>Mr SAM TAYLOR</td></tr>\n<tr><td>Receipt:</td></tr><tr><td><div>Total paid via<br>MasterCard<br>ending in<br>4242</div></td><td><strong>168.98 GBP</strong></td></tr>\n<tr><td>VAT is not applicable on international flights.</td></tr><tr><td><div><span>Add now</span></div></td></tr><tr><td><div><span>Add now</span></div></td></tr><tr><td><div><span>Add now</span></div></td></tr><tr><td><div><span>Add now</span></div></td></tr><tr><td><div><span>Add now</span></div></td></tr><tr><td><div><span>Add now</span></div></td></tr><tr><td><div><span>Add now</span></div></td></tr><tr><td><div><span>Add now</span></div></td></tr><tr><td><div><span>Add now</span></div></td></tr><tr><td><div><span>Add now</span></div></td></tr><tr><td><div><span>Add now</span></div></td></tr><tr><td><div><span>Add now</span></div></td></tr></table></body></html>",
+ "expected": {
+  "shop": "Ryanair",
+  "date": "2022-05-05",
+  "currency": "GBP",
+  "items": [],
+  "subtotalPence": 0,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 16898
+ }
+}
