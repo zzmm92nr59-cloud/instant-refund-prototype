@@ -117,5 +117,13 @@ export default function holdout16c() {
         "VAT: | £0.80", "Total (including VAT): | £4.77"]) },
       o, "Burgerworks", "2026-11-08", { orderRef: "034", merchant: "Riverside - Mill Lane" });
   }
+  // ---- A shirtmaker's order: "Sub-total", "Delivery charge", "VAT", then "Order total [Incl. VAT]" in square brackets -----
+  {
+    const o = order([{ name: "Navy Leather Trainer", qty: 1, unit: 7995 }, { name: "Slim Fit Stone Chinos", qty: 1, unit: 6396 }], { fees: [["Delivery charge", 495]] });
+    add("holdout16c-total-square-brackets", "Hartwell Shirts", "'Order Total' heading; 'Sub-total | £143.91'; 'Delivery charge | £4.95'; 'VAT | £24.81'; 'Order total [Incl. VAT] | £148.86'", {
+      from: "Hartwell Shirts <orders@hartwellshirts.example>", subject: "Thank you for your order", date: "Thu, 05 Nov 2026 09:00:00 +0000",
+      html: mail("Hartwell Shirts", "hartwellshirts.example", ["Order number: WUK20044123", "Navy Leather Trainer | In Stock | £79.95", "Slim Fit Stone Chinos | In Stock | £63.96", "Order Total", "Sub-total | £143.91", "Delivery charge | £4.95", "VAT | £24.81", "Order total [Incl. VAT] | £148.86"]) },
+      o, "Hartwell Shirts", "2026-11-05", { orderRef: "WUK20044123" });
+  }
   return out;
 }
