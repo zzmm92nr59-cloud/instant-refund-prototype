@@ -52,7 +52,8 @@ const FORMAT_LINE = /^(?:e-?book|audiobook|audio book|paperback|hardback|hardcov
 const MEASURE = "\\d+(?:\\.\\d+)?\\s?(?:kg|g|l|ltr|litres?|m)\\s*@\\s*(?:£\\s?\\d+(?:\\.\\d+)?|\\d+(?:\\.\\d+)?p)\\s*\\/\\s*(?:kg|g|l|ltr|litre|m)";
 // An English label after its Welsh (or other) twin, "Nifer / Qty: 1", "Cyfanswm / Total £115.50": read as the English one.
 const BILINGUAL = /(^|\|\s*)[\p{L}'’-]{2,20}(?:[ -][\p{L}'’-]{2,20}){0,2}\s?\/\s?(?=(?:qty|quantity|sub-?\s?total|total|postage|delivery|shipping|price|order(?: number| date)?|date|vat|discount|item|product)\b)/gimu;
-export const prepText = (text) => inPoundSigns(text).replace(BILINGUAL, "$1");
+// ("£ 13.5", a shop's price written with one figure of pence: £13.50. Round 15.)
+export const prepText = (text) => inPoundSigns(text).replace(BILINGUAL, "$1").replace(/£([ \t]?)(\d{1,6})\.(\d)(?=[ \t]*(?:\||$))/gm, "£$1$2.$30");
 const COLOUR_LINE = new RegExp("^" + COLOUR + "(?:\\s?[/&,]\\s?" + COLOUR + ")*$", "i");
 // Receipts in euros or dollars read the same way: their amounts are read as they are written (never converted; the
 // receipt's currency comes from its total, receipt-parser.js). Only for an email with no pound amounts at all.
@@ -81,7 +82,7 @@ const NAME_LABEL = /^(?:plan|product|item|description|subscription)\s*:?$/i;
 
 // Where the item list ends: subtotals, fees, discounts, tips, payment. (Only once an item has been read: some emails put
 // their total at the top.)
-const END = /^(?:retail price\b|sub-?\s?total|subtotal|order sub-?\s?total|items? sub-?\s?total|item\(s\) total|(?:order |grand |basket |estimated |trolley |items? |products? |goods |today(?:'|’)?s |your )?total\b|trolley cost\b|total of items|item\(s\) subtotal|guide price|order value|items|products|delivery\b|delivery\/shipping|shipping\b|postage\b|p\s?&\s?p\b|service\b|bag\b|bag (?:fee|charge|levy)|carrier bags?\b|small order|basket charge|minimum basket|booking fee|vat\b|tax\b|discount|voucher|promo|promotion|offers?\b|offer savings|multi-?buy|savings?\b|you(?:'|’)?ve saved|you saved|credit\b|credit applied|(?:rider |driver |courier )?tip\b|gratuity|payment\b|payments\b|paid\b|amount (?:paid|due)|total paid|nectar|clubcard|more card|mywaitrose|rollback|member offer|adiclub|subscribe\s?&\s?save|3 for 2|deal\b|buyer protection|click\s?&\s?collect|fast track|installation|collect in store|store delivery|delivery to store|standard delivery|express delivery|airport surcharge|shop discount|includes vat|including vat|incl\.? vat|tickets?\s*:?(?=\s*(?:£|$))|royal mail\b|parcelforce\b|evri\b|(?:1st|2nd|first|second) class\b|tracked (?:24|48)\b|removal of\b|(?:city|visitor|tourist) (?:levy|tax)\b)/i;
+const END = /^(?:retail price\b|sub-?\s?total|subtotal|order sub-?\s?total|items? sub-?\s?total|item\(s\) total|(?:order |grand |basket |estimated |trolley |items? |products? |goods |today(?:'|’)?s |your |net |bill |check )?total\b|trolley cost\b|total of items|item\(s\) subtotal|guide price|order value|items|products|delivery\b|delivery\/shipping|shipping\b|postage\b|p\s?&\s?p\b|service\b|bag\b|bag (?:fee|charge|levy)|carrier bags?\b|small order|basket charge|minimum basket|booking fee|vat\b|tax\b|discount|voucher|promo|promotion|offers?\b|offer savings|multi-?buy|savings?\b|you(?:'|’)?ve saved|you saved|credit\b|credit applied|(?:rider |driver |courier )?tip\b|gratuity|payment\b|payments\b|paid\b|amount (?:paid|due)|total paid|nectar|clubcard|more card|mywaitrose|rollback|member offer|adiclub|subscribe\s?&\s?save|3 for 2|deal\b|buyer protection|click\s?&\s?collect|fast track|installation|collect in store|store delivery|delivery to store|standard delivery|express delivery|airport surcharge|shop discount|includes vat|including vat|incl\.? vat|tickets?\s*:?(?=\s*(?:£|$))|royal mail\b|parcelforce\b|evri\b|(?:1st|2nd|first|second) class\b|tracked (?:24|48)\b|removal of\b|(?:city|visitor|tourist) (?:levy|tax)\b)/i;
 // Lines that are never part of an item: greetings, sentences, order details, dates, column and section headings.
 const LABELLED = /^(?:from|to|sent|subject|cc)\s*:|^(?:order|date|placed|ordered|booking|booked|transaction|receipt|invoice|deliver(?:y|ing)? (?:to|address|on|by)|delivering|collect(?:ion)? (?:from|on)|payment method|paid (?:with|by|using)|billed|apple (?:account|id)|account|document|reference|confirmation|merchant|seller|tracking|reservation|your (?:order|basket) (?:number|no))\b[^|]{0,60}?[:#]|^(?:order|booking|transaction|receipt) (?:no\.?|number|id|ref(?:erence)?)\b|^order #|^#\d|^(?:order|transaction|receipt|invoice|booking|ref(?:erence)?)\s+(?:no\.?\s*|number\s*)?#?\d[\d -]{2,}$/i;
 const HEADING = /^(?:shipping now|now shipping|on its way|shipped|items? shipped|in your parcel|track (?:package|parcel|order|delivery|your (?:order|parcel|package))|view (?:order|details|item|your order)|view or edit (?:your )?order|shop now|manage (?:your )?order|start a return|leave a review|buy again|your order|your items|order summary|order details|items? ordered|items? in (?:your|this) order|delivered items|substitutions?|substituted items|(?:shipment|delivery|parcel|package) \d+ of \d+[^|]*|in this (?:shipment|parcel|delivery)|summary|basket|bundle|app store|apple services|itunes store|apple books|apple arcade|description|items?|products?|qty|quantity|price|unit price|amount|each|cost|total|line total|item details|order|receipt|other costs|fare details|restaurant|table|venue|check number|\d{1,3} items?|product details|size|colou?r|style|sku|article|options?|variant|total price|item price|qty\.?|units?|(?:shipping|billing|delivery|invoice|postal) (?:address|details)|deliver(?:ed|ing)? to|ship(?:ped|ping)? to)$/i;
@@ -99,7 +100,7 @@ const GREETING = /^(?:for (?:full|more) (?:ingredients|information|details|nutri
 // A subscription's period on a line of its own ("Oct 26–Nov 26, 2026", "26 Oct – 26 Nov 2026"): when, never what. Round 10.
 const DATE_RANGE = /^(?:[a-z]{3,9}\.? \d{1,2}|\d{1,2} [a-z]{3,9})(?:,? \d{4})?\s*[–—-]\s*(?:[a-z]{3,9}\.? \d{1,2}|\d{1,2} [a-z]{3,9}),? \d{4}$/i;
 const FULL_DATE = /\b\d{1,2}(?:st|nd|rd|th)?\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?,?\s+\d{4}\b|\b\d{1,2}\/\d{1,2}\/\d{2,4}\b/i;
-const HARD_END = /^(?:retail price\b|sub-?\s?total|subtotal|items? sub-?\s?total|item\(s\) total|(?:order |grand |basket |estimated |trolley |items? |products? |goods )?total\b|trolley cost\b|total of items|item\(s\) subtotal|guide price|order value|items$|products$|payment|payments|paid\b|amount (?:paid|due)|total paid|includes vat|including vat|incl\.? vat|vat\b|tax\b)/i;
+const HARD_END = /^(?:retail price\b|sub-?\s?total|subtotal|items? sub-?\s?total|item\(s\) total|(?:order |grand |basket |estimated |trolley |items? |products? |goods |net |bill |check )?total\b|trolley cost\b|total of items|item\(s\) subtotal|guide price|order value|items$|products$|payment|payments|paid\b|amount (?:paid|due)|total paid|includes vat|including vat|incl\.? vat|vat\b|v\.a\.t\b|tax\b)/i;
 // (A supermarket's own long product names, "Glade Twinkling Apple & Cinnamon Festive Bathroom Air Freshener Gel, Limited
 // Edition 180g", run past 80 letters without being sentences: only a long line that reads as one, or one far longer, is.
 // Round 10.)
@@ -675,10 +676,10 @@ export function moneyOf(text) {
   const seen = new Set();
   for (let i = 0; i < lines.length; i++) {
     const cells = lines[i].split("|").map((x) => x.trim()).filter(Boolean);
-    let label = null, amt = null;
+    let label = null, amt = null, itemRow = false;
     if (cells.length === 2 && !amountOf(cells[0])) { label = cells[0]; amt = amountOf(cells[1]); }
     // ("1 | Promotion Applied | -£1.99": money off set out as a row of the item list, with how many first. Round 13.)
-    else if (cells.length === 3 && /^\d{1,2}$/.test(cells[0]) && !amountOf(cells[1]) && /\p{L}/u.test(cells[1]) && amountOf(cells[2]) && amountOf(cells[2]).neg) { label = cells[1]; amt = amountOf(cells[2]); }
+    else if (cells.length === 3 && /^\d{1,2}$/.test(cells[0]) && !amountOf(cells[1]) && /\p{L}/u.test(cells[1]) && amountOf(cells[2]) && amountOf(cells[2]).neg) { label = cells[1]; amt = amountOf(cells[2]); itemRow = true; }
     else if (cells.length === 1) {
       const m = new RegExp("^([^\\p{L}\\n\\r\\u2028\\u2029]*\\p{L}.*?)[\\s:]+((?:[-−–]\\s?)?" + MONEY + "|free)$", "iu").exec(cells[0]);
       if (m) { label = m[1]; amt = amountOf(m[2]); }
@@ -698,7 +699,8 @@ export function moneyOf(text) {
     // the check can tell prices that include it (Apple) from prices that don't (a software invoice). Round 10.
     if (/^(?:vat|tax)\b(?!\s*(?:no|number|id|reg))[^|]{0,40}$/i.test(label) && !/\b(?:included|inclusive|incl)\b/i.test(label) && !amt.neg) { if (out.vat == null) out.vat = amt.p; continue; }
     if ((NOT_MONEY_LINE.test(label) && !/^(?:city|tourist|local|resort|accommodation) tax\b/i.test(label)) || label.length > 50) continue;
-    const key = label.toLowerCase() + "=" + amt.p;
+    // (The same money off twice in an item list, "1 | Promotion Applied | -£1.00" under two items, is taken off twice. Round 15.)
+    const key = label.toLowerCase() + "=" + amt.p + (itemRow ? "@" + i : "");
     if (seen.has(key)) continue;
     seen.add(key);
     if (/\btotal\b/i.test(label) && !SUBTOTAL_LABEL.test(label)) continue;
@@ -706,7 +708,7 @@ export function moneyOf(text) {
     if (TIP_LABEL.test(label)) { out.tips += amt.p; out.found.push(["tip", label, amt.p]); continue; }
     // (The card the bill was paid with, "mastercard - 7613 | -£57.09": the payment, never money off. Round 14.)
     if (amt.neg && /^(?:visa|master ?card|maestro|amex|american express|debit card|credit card|card)\b[^|]{0,24}?\d{4}$/i.test(label)) continue;
-    if (amt.neg || DISCOUNT_LABEL.test(label)) { out.discounts += amt.p; out.found.push(["discount", label, amt.p]); continue; }
+    if (amt.neg || DISCOUNT_LABEL.test(label)) { out.discounts += amt.p; out.found.push(["discount", label, amt.p, amt.neg]); continue; }
     if (FEE_LABEL.test(label)) { out.fees += amt.p; out.found.push(["fee", label, amt.p]); continue; }
   }
   return out;

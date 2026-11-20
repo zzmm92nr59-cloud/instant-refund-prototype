@@ -1438,17 +1438,25 @@ export function orderNewsOf(rawEmail) {
 // ("Whole Milk 2 Pints      1.15 A"): the amounts at the end of its lines are pounds. Only for an email with no pound
 // sign anywhere, and only amounts in a column (two spaces or more before them), with the VAT letter after them dropped.
 const UK_POSTCODE_LINE = /^[ \t|]*(?:[\p{L} .,'’-]{2,40},?[ \t]+)?[A-Z]{1,2}\d[A-Z\d]?[ \t]?\d[A-Z]{2}[ \t|]*$/u;
+// ("Wetherspoons" over the pub's own name is the chain's name, as "J D Wetherspoon" is. Round 15.)
+function sameShopName(n, shop) {
+  const k = (x) => String(x || "").toLowerCase().replace(/[^a-z0-9]/g, "").replace(/s$/, "");
+  const a = k(n), b = k(shop);
+  return Boolean(a && b && (a === b || (a.length >= 5 && (b.endsWith(a) || b.startsWith(a))) || (b.length >= 5 && (a.endsWith(b) || a.startsWith(b)))));
+}
 function venueOf(text, shop) {
   const t = String(text || "").slice(0, 6000);
   if (!/\btable (?:number|no\.?)\s*:?|\bthanks?\s+for\s+visiting\b|\byour\s+bill\b|\bbill\s+has\s+been\s+paid\b/i.test(t)) return null;
-  const ok = (n) => n && n.length >= 3 && n.length <= 40 && /^\p{Lu}/u.test(n) && !/\d{3}|@|\b(?:order|receipt|bill|table|thank|total|paid|date|time)\b/i.test(n) && n.toLowerCase() !== String(shop || "").toLowerCase() ? n : null;
+  const ok = (n) => n && n.length >= 3 && n.length <= 40 && /^\p{Lu}/u.test(n) && !/\d{3}|@|\b(?:order|receipt|bill|table|thank|total|paid|date|time)\b/i.test(n) && !sameShopName(n, shop) ? n : null;
   const vis = /\bthanks?\s+for\s+visiting\s+(\p{Lu}[^\n|.!,]{1,40}?)\s+and\b/iu.exec(t.replace(/\s*\n\s*/g, " ").replace(/\s/g, " "));
   if (vis && ok(vis[1].trim())) return vis[1].trim();
   // (A name over a street, a town and a postcode: the venue's address block.)
   const ls = t.split("\n").map((x) => x.replace(/^[\s|]+|[\s|]+$/g, "")).filter(Boolean).slice(0, 120);
   for (let k = 0; k + 2 < ls.length; k++) {
-    if (!/^\p{Lu}[\p{L}'’&. -]{2,39}$/u.test(ls[k]) || !/\d|\b(?:road|street|st|lane|avenue|way|place|square|row|hill|green|parade|terrace|walk|close|drive|court|yard|wharf)\b/i.test(ls[k + 1])) continue;
-    for (let j = k + 2; j < Math.min(ls.length, k + 6); j++) if (UK_POSTCODE_LINE.test(ls[j])) return ok(ls[k]);
+    if (!/^\p{Lu}[\p{L}'’&. -]{2,39}$/u.test(ls[k])) continue;
+    const streety = /\d|\b(?:road|street|st|lane|avenue|way|place|square|row|hill|green|parade|terrace|walk|close|drive|court|yard|wharf)\b/i.test(ls[k + 1]);
+    // (Or any address line, "After Security, Stansted Airport", when the block ends in the venue's telephone. Round 15.)
+    for (let j = k + 2; j < Math.min(ls.length, k + 6); j++) if (UK_POSTCODE_LINE.test(ls[j]) && (streety || (ls[k + 1].length <= 60 && !/£/.test(ls[k + 1]) && /^tel(?:ephone)?\b/i.test(ls[j + 1] || ""))) && ok(ls[k])) return ok(ls[k]);
   }
   return null;
 }
@@ -1776,6 +1784,9 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   if (!result.orderRef) { const sr = /\border\b[^!?\n]{0,20}?\s[-–:#]\s*((?=[A-Za-z0-9-]*\d)[A-Za-z0-9-]{5,24})\s*$/i.exec(String(subject || "")); if (sr) result.orderRef = sr[1]; }
   // ("… Tickets - Order Number [#160104]": the number in brackets. Round 12.)
   if (!result.orderRef) { const sr = /\border (?:number|no\.?)\s*:?\s*\[\s*#?\s*([A-Za-z0-9-]*\d[A-Za-z0-9-]*)\s*\]/i.exec(String(subject || "")); if (sr && sr[1].length >= 4) result.orderRef = sr[1]; }
+  // ("Order Confirmation: #32297 | Vape and Go", or the body's "Your order (32297) has been received": the order's number,
+  // with the shop's name after it in the subject. Round 15.)
+  if (!result.orderRef) { const sr = /\border\s+(?:confirmation|confirmed|received|placed|update|status)\s*:?\s*#\s?(\d{3,12})\b/i.exec(String(subject || "")) || /\byour order \(#?(\d{3,12})\) (?:has been|is|was)\b/i.exec(text); if (sr) result.orderRef = sr[1]; }
   // Price wording ("Was £2,200", "You saved £330") sits on its own line in some shops' emails: it is never an item.
   result.items = cleanItems(result.items.filter((i) => !PRICE_WORDS.test(String(i.name || "").trim()) && !MONEY_LABEL.test(String(i.name || "").trim())));
   if (!result.items.length && /(^|\.)amazon\.(co\.uk|com)$/i.test(result.retailer.domain || sender?.domain || "") && html) result.items = amazonItems(html);
@@ -2199,8 +2210,18 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   // Money the email took off the order ("Promotion Applied -£1.99", "Discounts -£1.16", "Credit £4.11"), each as it is
   // labelled, so the receipt can say why the items come to more than was paid. Only a pounds receipt with items. Round 13.
   if (result.items.length && (result.currency || "GBP") === "GBP") {
-    const off = (moneyOf(text).found || []).filter((f) => f[0] === "discount" && f[2] > 0 && /\b(?:discounts?|promo(?:tion)?s?|offers?|vouchers?|coupons?|credit|savings?|saved|deals?|rewards?|loyalty|multi-?buy|money off|\d{1,3}% off)\b|\bapplied\b/i.test(String(f[1])) && !/\b(?:card|payment|paid|pay)\b|\d{4}|\*{2,}|•/i.test(String(f[1]))).slice(0, 8).map((f) => ({ label: String(f[1]).replace(/[:\s]+$/, "").slice(0, 60), pence: f[2] }));
+    const mon = moneyOf(text);
+    // (Any amount taken off as a minus, "Happy Hour -£2.00", is money off whatever it is called; a card or payment never is.)
+    const off = (mon.found || []).filter((f) => f[0] === "discount" && f[2] > 0 && (f[3] === true || /\b(?:discounts?|promo(?:tion)?s?|offers?|vouchers?|coupons?|credit|savings?|saved|deals?|rewards?|loyalty|multi-?buy|money off|\d{1,3}% off)\b|\bapplied\b/i.test(String(f[1]))) && !/\b(?:card|payment|paid|pay|gift ?card|balance|refund)\b|\d{4}|\*{2,}|•/i.test(String(f[1]))).slice(0, 8).map((f) => ({ label: String(f[1]).replace(/[:\s]+$/, "").slice(0, 60), pence: f[2] }));
     if (off.length) result.discounts = off;
+    // The items, less the money off the receipt shows, must come to what was paid (with its fees and tips): a check that only
+    // adds up with money off the receipt doesn't show is not complete. Round 15.
+    const shownOff = off.reduce((a, d) => a + d.pence, 0);
+    const ck = result.itemsCheck;
+    if (ck && ck.complete === true && result.totalPence != null && (mon.discounts || 0) > shownOff && mon.subtotal == null &&
+        Math.abs(ck.itemsPence - shownOff + (mon.fees || 0) + (mon.tips || 0) - result.totalPence) > 1 && Math.abs(ck.itemsPence - result.totalPence) > 1)
+      result.itemsCheck = { ...ck, complete: false, offNotShown: mon.discounts - shownOff };
+    if (shownOff && result.itemsCheck) result.itemsCheck = { ...result.itemsCheck, discountsPence: shownOff };
   }
   return result;
 }
@@ -2247,7 +2268,7 @@ export function parseDeliveryEmail(rawEmail) {
   const parts = { text: [], html: [] };
   collectParts(headers, body, parts);
   const html = parts.html.join("\n");
-  const text = ((parts.text.join("\n").trim()) || (html ? htmlToText(html) : "")).trim();
+  const text = shownText(parts, html);
   const subject = headers.subject || "";
   const from = String(headers.from || "");
   const fromCarrier = (CARRIER_SENDERS.find(([, re]) => re.test(from)) || [])[0] || null;
@@ -2379,6 +2400,17 @@ export function parseReturnEmail(rawEmail) {
 // Only emails whose subject is about a received return or a refund count, so a receipt or return-request email that
 // merely says "once we've received your return we'll refund you" is never mistaken for one. The refund amount is
 // what the shop's email says; Relay cannot confirm it.
+// The text of an update email: its plain part, unless that is only a stub ("Hello Sam, #") beside a full HTML part, which
+// is then what the email says. Round 15.
+function shownText(parts, html) {
+  const plain = parts.text.join("\n").trim();
+  if (!html) return plain;
+  if (!plain) return (htmlToText(html) || "").trim();
+  // (A plain part of some length is the email's own words: the HTML is only turned into text for a short one.)
+  if (plain.length > 1500) return plain;
+  const fromHtml = (htmlToText(html) || "").trim();
+  return plain.replace(/\s+/g, " ").length * 2 < fromHtml.replace(/[\s|]+/g, " ").length ? fromHtml : plain;
+}
 export function parseReturnUpdateEmail(rawEmail) {
   const raw = String(rawEmail || "").slice(0, MAX_INPUT);
   const { headers, body } = splitMessage(raw);
@@ -2390,7 +2422,7 @@ export function parseReturnUpdateEmail(rawEmail) {
   const parts = { text: [], html: [] };
   collectParts(headers, body, parts);
   const html = parts.html.join("\n");
-  const text = ((parts.text.join("\n").trim()) || (html ? htmlToText(html) : "")).trim();
+  const text = shownText(parts, html);
   const both = (subject + "\n" + text.slice(0, 6000)).replace(/￡/g, "£");
   // Money back for a price drop, or for an order the shop cancelled, is not a return: nothing was sent back, so Relay must
   // not show a return as refunded (round 3, 19 Nov 2026). The order's own card already says what was bought.
@@ -2406,7 +2438,7 @@ export function parseReturnUpdateEmail(rawEmail) {
   // approved, or the refund issued, is. Round 13.)
   if (/\brefund request\b|\brequest(?:ed)? (?:for )?a refund\b/i.test(subj) && !/\brefund(?: request)? (?:has been|was|is) (?:approved|granted|issued|processed|completed)\b|\bwe(?:'|’)?ve (?:approved|issued|processed) (?:your|a|the) refund\b|\bwe(?:'|’)?re refunding (?:your|the|this)\b|\byour refund is being (?:credited|paid|sent)\b/i.test(both)) return { ok: false, reason: "refund_request" };
   let stage = null;
-  if (/\brefund(?:ed)?\b[^.\n]{0,40}\b(?:has been|have been|was|is being|been)?\s*(?:processed|issued|approved|completed|sent|on (?:its|the) way)\b|\bwe(?:'|’)?ve (?:processed|issued|sent|completed) (?:your|a) refund|\bwe(?:'|’)?ve refunded\b|\brefund confirmation\b|\byour refund\b|\b(?:has|have) been (?:successfully )?refunded\b|\bhere comes the refund\b|\bsent you a refund\b|\brefund complete\b/i.test(both)) stage = "refunded";
+  if (/\brefund(?:ed)?\b[^.\n]{0,40}\b(?:has been|have been|was|is being|been)?\s*(?:processed|issued|approved|completed|sent|on (?:its|the) way)\b|\bwe(?:'|’)?ve (?:processed|issued|sent|completed) (?:your|a) refund|\bwe(?:'|’)?ve refunded\b|\brefund confirmation\b|\byour refund\b|\b(?:has|have) been (?:successfully )?refunded\b|\bhere comes the refund\b|\bsent you a refund\b|\brefund complete\b|\brefund (?:of £\s?[\d,.]+ )?has been (?:successfully )?initiated\b/i.test(both)) stage = "refunded";
   else if (/\b(?:we(?:'|’)?ve|we have) received your return|\byour return (?:has been received|has arrived|is with us)|\breturn (?:received|arrived)\b/i.test(both)) stage = "received";
   if (!stage) return { ok: false, reason: "not_a_return_update" };
   const sender = retailerFromFrom(headers.from);
@@ -2419,8 +2451,12 @@ export function parseReturnUpdateEmail(rawEmail) {
   const refDate = headers.date ? new Date(headers.date) : null;
   // (A labelled amount with the money on the line under its label, "Refunded total: |" over "£6.90", is the refund. Round 12.)
   const amt = stage === "refunded" ? (both.match(/\b(?:refund(?:ed)? (?:total|amount|value)|total (?:refund(?:ed)?|amount refunded)|amount refunded|refund due)\s*:?[\s|]{0,12}£\s*([0-9][0-9,]*\.[0-9]{2})/i) ||
-    both.match(/refund(?:ed)?[^£\n]{0,60}£\s*([0-9][0-9,]*\.[0-9]{2})/i) || both.match(/£\s*([0-9][0-9,]*\.[0-9]{2})[^.\n]{0,40}\brefund/i)) : null;
-  const ref = subject.match(/\border\s*#?\s*((?=[A-Z0-9-]*\d)[A-Z0-9-]{4,24})/i) || text.match(/\border\s*(?:number|no\.?|id|#)\s*[:#\s]*#?\s*((?=[A-Z0-9-]*\d)[A-Z0-9-]{4,24})/i);
+    both.match(/refund(?:ed)?[^£\n]{0,60}£\s*([0-9][0-9,]*\.[0-9]{2})/i) || both.match(/£\s*([0-9][0-9,]*\.[0-9]{2})[^.\n]{0,40}\brefund/i) ||
+    // ("A refund of £3 has been initiated": whole pounds. Round 15.)
+    both.match(/\ba refund of £\s*([0-9][0-9,]{0,8})(?![\d.,])/i)) : null;
+  const ref = subject.match(/\border\s*#?\s*((?=[A-Z0-9-]*\d)[A-Z0-9-]{4,24})/i) || text.match(/\border\s*(?:number|no\.?|id|#)\s*[:#\s]*#?\s*((?=[A-Z0-9-]*\d)[A-Z0-9-]{4,24})/i) ||
+    // ("Refund Initiated : #32297", "for your order 32297": the order's number. Round 15.)
+    subject.match(/\brefund\b[^#\n]{0,30}#\s?(\d{3,12})\b/i) || text.match(/\bfor your order #?(\d{4,12})\b/i);
   // (A payment service's refund names the shop's invoice, "Invoice ID: WB11050983-P001", which is that order's number. Round 12.)
   const inv = !ref ? text.match(/\binvoice\s*(?:id|number|no\.?)\s*[:#\s]*((?=[A-Z0-9-]*\d)[A-Z0-9-]{4,30})\b/i) ||
     // (A booking refunded by its "Transaction ID:" over the number, the number its booking email gave. Round 15.)
@@ -2456,7 +2492,7 @@ export function parseReturnParcelEmail(rawEmail) {
   const parts = { text: [], html: [] };
   collectParts(headers, body, parts);
   const html = parts.html.join("\n");
-  const text = ((parts.text.join("\n").trim()) || (html ? htmlToText(html) : "")).trim();
+  const text = shownText(parts, html);
   const lead = text.slice(0, 5000), head = subject + "\n" + lead;
   if (/\breturn(?:ed|ing)? to (?:the )?sender\b/i.test(head)) return no;
   const aboutReturn = /\breturn(?:s|ed|ing)?\b/i.test(subject) ||
@@ -2506,7 +2542,7 @@ function updateParts(rawEmail) {
   const parts = { text: [], html: [] };
   collectParts(headers, body, parts);
   const html = parts.html.join("\n");
-  const text = ((parts.text.join("\n").trim()) || (html ? htmlToText(html) : "")).trim();
+  const text = shownText(parts, html);
   const subject = String(headers.subject || "").replace(/^\s*(?:(?:fwd?|fw)\s*:\s*)+/i, "");
   const refDate = headers.date ? new Date(headers.date) : null;
   const at = refDate && !Number.isNaN(refDate.getTime()) ? isoDate(refDate) : null;

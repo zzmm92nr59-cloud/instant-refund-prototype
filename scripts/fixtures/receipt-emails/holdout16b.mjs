@@ -60,5 +60,38 @@ export default function holdout16b() {
         "Qty | Description | Amount", "1 | Spiced Rum (Double) | £4.55", "1 | Cola | £0.00", "1 | Promotion Applied | -£1.95", "1 | Big Breakfast | £9.25", "VAT (20.00%) | £2.14", "Payment Type | Apple Pay", "Order Total | £11.85"]) },
       o, "Tapster Inns", "2026-11-15", { orderRef: "2207731145" });
   }
+  // ---- A restaurant's bill paid at the table: "check number" over "#4412" beside "table" over "#18" -----------------------
+  {
+    const o = order([{ name: "house red (btl)", qty: 1, unit: 2400 }, { name: "chicken katsu", qty: 1, unit: 1350 }, { name: "edamame", qty: 1, unit: 550 }]);
+    add("holdout16b-bill-check-number", "Noodle Yard", "lower-case till receipt; 'table' over '#18' and 'check number' over '#4412' as headings; items 'name | x1 | £..'; 'bill total', 'amount paid'", {
+      from: "Noodle Yard <noreply@noodleyard.example>", subject: "Noodle Yard receipt", date: "Mon, 16 Nov 2026 20:06:00 +0000",
+      html: mail("Noodle Yard", "noodleyard.example", ["your receipt", "thanks for visiting noodle yard soho and paying online", "restaurant", "soho", "table", "#18", "check number", "#4412", "items",
+        "house red (btl) | x1 | £24.00", "chicken katsu | x1 | £13.50", "edamame | x1 | £5.50", "total items | x3", "net total | £35.83", "v.a.t | £7.17", "bill total | £43.00", "amount paid | £43.00"]) },
+      o, "Noodle Yard", "2026-11-16", { orderRef: "4412" });
+  }
+  // ---- A shop's order email: number in the subject after "Order Confirmation: #", prices with one figure of pence --------
+  const vapeOrder = (id, status, date) => {
+    const o = order([{ name: "Cloudpuff Pod - Mango - 10mg", qty: 4, unit: 150 }, { name: "Cloudpuff Pod - Cola - 10mg", qty: 9, unit: 150 }, { name: "Cloudpuff Pod - Lime - 10mg", qty: 1, unit: 150 }]);
+    return add(id, "Puff Depot", "'Order Confirmation: #61822 | Puff Depot'; 'Your order (61822) has been received and we are currently " + status + " it.'; 'Product | Quantity | Price' with '£ 6', '£ 13.5', '£ 1.5'; 'Subtotal', 'Total'", {
+      from: "Puff Depot <site@puffdepot.example>", subject: "Order Confirmation: #61822 | Puff Depot", date,
+      html: mail("Puff Depot", "puffdepot.example", ["Order placed successfully.", "Thank you for choosing us", "Hi Sam Taylor,", "Your order (61822) has been received and", "we are currently " + status + " it.",
+        "Customer Information", "Product | Quantity | Price", "Cloudpuff Pod - Mango - 10mg | 4 | £ 6", "Cloudpuff Pod - Cola - 10mg | 9 | £ 13.5", "Cloudpuff Pod - Lime - 10mg | 1 | £ 1.5",
+        "Subtotal | £ 21.00", "Royal Mail Tracked 48 Shipping | £ 0.00", "Total | £ 21.00"]) }, o, "Puff Depot", date.includes("12 Nov") ? "2026-11-12" : "2026-11-14", { orderRef: "61822" });
+  };
+  vapeOrder("holdout16b-shop-order-one-figure-pence", "Processing", "Thu, 12 Nov 2026 15:57:00 +0000");
+  vapeOrder("holdout16b-shop-order-completed-resend", "Completed", "Sat, 14 Nov 2026 08:14:00 +0000");
+  not("holdout16b-shop-refund-initiated", "Puff Depot", "subject 'Refund Initiated : #61822 | Puff Depot'; 'A refund of £3 has been initiated for your order 61822 .'; plain part only 'Hello Sam Taylor, #'", {
+    from: "Puff Depot <site@puffdepot.example>", subject: "Refund Initiated : #61822 | Puff Depot", date: "Mon, 16 Nov 2026 11:33:00 +0000", text: "Hello Sam Taylor, #",
+    html: mail("Puff Depot", "puffdepot.example", ["Refund Initiated!", "A refund of £3 has been initiated for your order 61822 .", "Hi Sam Taylor, your refund for Order 61822 has been successfully initiated and is currently being processed. It will take 1-3 business days for the refund to reflect in your account."]) },
+    "refund", { refundPence: 300, orderRef: "61822" });
+  // ---- A pub app's receipt: the chain's name over the pub's own name, and an address with no street word ---------------
+  {
+    const o = order([{ name: "Stout (Pint)", qty: 1, unit: 462 }]);
+    add("holdout16b-pub-app-chain-then-venue", "Tapster Inns", "the chain's name 'Tapsters' over 'Harbour Station Bar', 'North Concourse', town, postcode, 'Telephone:'", {
+      from: "Tapster Inns <orders@tapsterinns.example>", subject: "Tapster Inns Order Confirmation: 7886", date: "Sat, 14 Nov 2026 12:29:00 +0000",
+      html: mail("Tapster Inns", "tapsterinns.example", ["Thank you for your order...", "Tapsters", "Harbour Station Bar", "North Concourse", "Portview", "PV1 4DY", "Telephone: 0113 496 0000",
+        "Order Id: 2508590001", "Order Date: Saturday, November 14, 2026", "Table Number: 41", "Qty | Description | Amount", "1 | Stout (Pint) | £4.62", "VAT (20%) | £0.77", "Payment Type | Apple Pay", "Order Total | £4.62"]) },
+      o, "Tapster Inns", "2026-11-14", { orderRef: "2508590001", merchant: "Harbour Station Bar" });
+  }
   return out;
 }
