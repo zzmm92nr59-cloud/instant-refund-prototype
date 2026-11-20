@@ -86,7 +86,7 @@ const shopOf = (d) => { const n = d && d.retailer && d.retailer.name; return n &
 // For each part: whether the AI filled a gap, agreed, differed, or found nothing the rules did. The receipt as the rules
 // read it (details) against the AI's reading (ai).
 export function compareReadings(details, ai) {
-  const d = details || {}, rItems = cleanItems(d.items || []), aItems = ai.items || [];
+  const d = details || {}, rItems = cleanItems(d.items || [], { stored: true }), aItems = ai.items || [];
   return {
     shop: part(shopOf(d), ai.shop, () => sameText(shopOf(d), ai.shop)),
     total: part(d.totalPence == null ? null : d.totalPence, ai.totalPence, () => d.totalPence === ai.totalPence),
@@ -115,7 +115,7 @@ export function attachAiReads(orders, rows) {
     if (c.totalPence == null && f.totalPence != null) { c.totalPence = f.totalPence; c.currency = c.currency || f.currency || "GBP"; filled.push("total"); }
     if (!day(c.orderDate) && f.orderDate) { c.orderDate = f.orderDate; filled.push("date"); }
     if (!c.orderRef && f.orderRef) { c.orderRef = f.orderRef; filled.push("number"); }
-    if (!cleanItems(c.items || []).length && f.items && f.items.length) {
+    if (!cleanItems(c.items || [], { stored: true }).length && f.items && f.items.length) {
       c.items = f.items.map((i) => ({ ...i })); filled.push("items");
       // The totals check goes with the items: the AI's add up to what the email said, or the receipt still says some may be missing.
       if (c.itemsCheck && c.itemsCheck.expectedPence != null) {

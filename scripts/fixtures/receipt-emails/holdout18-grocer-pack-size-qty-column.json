@@ -1,0 +1,46 @@
+{
+ "id": "holdout18-grocer-pack-size-qty-column",
+ "sender": "Greenleaf",
+ "layout": "each item's name ending in its pack size ('Pittas x6'), then its quantity on a line of its own, the line price and '£0.55/unit'",
+ "headers": {
+  "from": "Greenleaf <orders@greenleaf-grocer.example>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Thanks for your order - 4410293387",
+  "date": "Wed, 11 Nov 2026 19:40:00 +0000"
+ },
+ "html": "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">\n<html xmlns=\"http://www.w3.org/1999/xhtml\"><head><meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\" /><meta name=\"viewport\" content=\"width=device-width\" />\n<title>Greenleaf</title><style type=\"text/css\">body{margin:0;padding:0}td{font-family:Helvetica,Arial,sans-serif;font-size:14px;color:#222}.muted{color:#777}@media only screen and (max-width:600px){.w600{width:100%!important}}</style></head>\n<body style=\"margin:0;padding:0;background-color:#f3f3f3\">\n<div style=\"display:none;max-height:0;overflow:hidden\">&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;</div>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#f3f3f3\"><tr><td align=\"center\">\n<table role=\"presentation\" class=\"w600\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#ffffff\">\n<tr><td style=\"padding:24px 24px 8px 24px\"><a href=\"https://www.greenleaf-grocer.example/?utm_source=email\"><img src=\"https://www.greenleaf-grocer.example/static/email/logo.png\" alt=\"Greenleaf\" width=\"140\" height=\"40\" border=\"0\" /></a></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"><tr><td>Thanks for your order</td></tr>\n<tr><td>Order number: 4410293387</td></tr>\n<tr><td>Delivery slot: Saturday 14 November, 9am - 10am</td></tr>\n<tr><td>Substitution allowed</td></tr>\n<tr><td>Greenleaf Wholemeal Pittas x6</td></tr>\n<tr><td>1</td></tr>\n<tr><td>&pound;0.55</td></tr>\n<tr><td>&pound;0.55/unit</td></tr>\n<tr><td>Substitution allowed</td></tr>\n<tr><td>Greenleaf Free Range Eggs Medium x12</td></tr>\n<tr><td>2</td></tr>\n<tr><td>&pound;6.20</td></tr>\n<tr><td>&pound;3.10/unit</td></tr>\n<tr><td>Substitution allowed</td></tr>\n<tr><td>Greenleaf Kitchen Towels x4</td></tr>\n<tr><td>1</td></tr>\n<tr><td>&pound;4.25</td></tr>\n<tr><td>&pound;4.25/unit</td></tr>\n<tr><td>Substitution allowed</td></tr>\n<tr><td>Greenleaf Red Onions x3</td></tr>\n<tr><td>3</td></tr>\n<tr><td>&pound;2.67</td></tr>\n<tr><td>&pound;0.89/unit</td></tr>\n<tr><td>Substitution allowed</td></tr>\n<tr><td>Subtotal</td></tr>\n<tr><td>&pound;13.67</td></tr>\n<tr><td>Delivery cost</td></tr>\n<tr><td>&pound;1.50</td></tr>\n<tr><td>Estimated total</td></tr>\n<tr><td>&pound;15.17</td></tr></table></td></tr>\n<tr><td style=\"padding:24px;font-size:12px\" class=\"muted\">&copy; 2026 Greenleaf. All rights reserved.<br /><a href=\"https://www.greenleaf-grocer.example/help\">Help</a> | <a href=\"https://www.greenleaf-grocer.example/privacy\">Privacy</a> | <a href=\"https://www.greenleaf-grocer.example/unsubscribe\">Unsubscribe</a></td></tr>\n</table></td></tr></table>\n<img src=\"https://click.greenleaf-grocer.example/open/abc123.gif\" width=\"1\" height=\"1\" alt=\"\" />\n</body></html>",
+ "text": "",
+ "expected": {
+  "shop": "Greenleaf",
+  "date": "2026-11-11",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Greenleaf Wholemeal Pittas x6",
+    "qty": 1,
+    "linePence": 55
+   },
+   {
+    "name": "Greenleaf Free Range Eggs Medium x12",
+    "qty": 2,
+    "linePence": 620
+   },
+   {
+    "name": "Greenleaf Kitchen Towels x4",
+    "qty": 1,
+    "linePence": 425
+   },
+   {
+    "name": "Greenleaf Red Onions x3",
+    "qty": 3,
+    "linePence": 267
+   }
+  ],
+  "subtotalPence": 1367,
+  "feesPence": 150,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 1517,
+  "orderRef": "4410293387"
+ }
+}

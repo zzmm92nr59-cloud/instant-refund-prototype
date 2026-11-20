@@ -1,0 +1,36 @@
+{
+ "id": "holdout18-marketplace-fulfilled-gift-wrap",
+ "sender": "Amazon",
+ "layout": "title, 'Condition: New', 'Sold by:' and the seller, 'Fulfilled by Amazon', 'Gift wrap: No', then the price; no gift wrap fee",
+ "headers": {
+  "from": "\"Amazon.co.uk\" <auto-confirm@amazon.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your Amazon.co.uk order of \"Hazel & Fig Chocolate Truffle ...\" and 1 more item.",
+  "date": "Tue, 15 Dec 2026 09:00:00 +0000"
+ },
+ "html": "<html><body><table><tr><td>Order Confirmation</td></tr><tr><td>Order #</td><td>205-2718281-8284591</td></tr><tr><td>Order Total:</td><td>&pound;22.98</td></tr><tr><td>Hazel &amp; Fig Chocolate Truffle Selection, 150G</td></tr><tr><td>Condition: New</td></tr><tr><td>Sold by:</td><td>Maple Lane Gifts</td></tr><tr><td>Fulfilled by Amazon</td></tr><tr><td>Gift wrap: No</td></tr><tr><td>&pound;7.99</td></tr><tr><td>Bath Fizzer Gift Set, 8 Pack</td></tr><tr><td>Condition: New</td></tr><tr><td>Sold by:</td><td>Maple Lane Gifts</td></tr><tr><td>Fulfilled by Amazon</td></tr><tr><td>Gift wrap: No</td></tr><tr><td>&pound;14.99</td></tr><tr><td>We hope to see you again soon.</td></tr></table></body></html>",
+ "text": "",
+ "expected": {
+  "shop": "Amazon",
+  "date": "2026-12-15",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Hazel & Fig Chocolate Truffle Selection, 150G",
+    "qty": 1,
+    "linePence": 799
+   },
+   {
+    "name": "Bath Fizzer Gift Set, 8 Pack",
+    "qty": 1,
+    "linePence": 1499
+   }
+  ],
+  "subtotalPence": 2298,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 2298,
+  "fees": []
+ }
+}

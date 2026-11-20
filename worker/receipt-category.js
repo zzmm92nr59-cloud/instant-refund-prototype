@@ -343,6 +343,10 @@ function categoriseBy(card, learned) {
   // drink, whatever a dish is called ("BBQ" is not a barbecue for the garden). Round 15.)
   if (/(^|\.)amazon\.[a-z.]+$/i.test(String(r.domain || "")) && /^D\d{2}-\d{7}-\d{7}$/i.test(String(card.orderRef || "").trim())) return finish("digital", items, noReturn);
   if (shopHintFor(card) === "eatery") return finish("food", items, noReturn, false, true);
+  // (A membership or subscription on its own, a ride app's "Uber One membership", "Prime membership": what was bought is the
+  // plan, never a ride or a parcel, whatever the shop mostly sells. Round 17.)
+  const names = (card.items || []).map((i) => i && i.name).filter(Boolean);
+  if (names.length && names.every((n) => /\b(?:membership|subscription)(?:\s+(?:fee|renewal|plan))?\s*(?:\((?:monthly|annual|yearly)\))?$/i.test(String(n).trim()))) return finish("digital", items, noReturn);
   const score = categoryScores(card);
   let best = null;
   for (const c of TIE_ORDER) if (score[c] && (!best || score[c] > score[best])) best = c;
@@ -479,7 +483,9 @@ function finish(category, items, noReturn, grocer, eatery) {
 // or no name at all, only the sending domain ("appcharge.com"), so this tidies the first and builds one from the second.
 const KNOWN_NAMES = { appcharge: "Appcharge", lycamobile: "Lycamobile", shopifyemail: null, stripe: null, paypal: null, squareup: null,
   mcdonalds: "McDonald's", ctshirts: "Charles Tyrwhitt", sharkninja: "Ninja", dominospizza: "Domino's", dominos: "Domino's", nordaccount: "NordVPN",
-  admiralcasino: "Admiral Casino", greatbeanbags: "Great Bean Bags", thescentreserve: "The Scent Reserve", myeflorist: "eFlorist", eflorist: "eFlorist" };
+  admiralcasino: "Admiral Casino", greatbeanbags: "Great Bean Bags", thescentreserve: "The Scent Reserve", myeflorist: "eFlorist", eflorist: "eFlorist",
+  // (CeX sends from its web address, webuy.com, and names itself "CeX" in every subject. Round 17.)
+  webuy: "CeX", cexwebuy: "CeX", cexwebuycom: "CeX" };
 const MAIL_SUBDOMAIN = /^(e|em|email|emails|mail|mailer|news|newsletter|info|hello|noreply|no-reply|orders?|shop|store|click|links?|g|t|m|r|reply|notify|notifications?|updates?|service|customerservice|support|accounts?)$/i;
 // Personal email services: a receipt "from" one of these is one the shopper (or a friend) forwarded, not a shop.
 export const PERSONAL_MAIL = /(^|\.)(gmail\.com|googlemail\.com|outlook\.com|hotmail\.(com|co\.uk)|live\.(com|co\.uk)|msn\.com|icloud\.com|me\.com|mac\.com|yahoo\.(com|co\.uk)|ymail\.com|aol\.com|proton\.me|protonmail\.com|pm\.me|btinternet\.com|sky\.com|virginmedia\.com)$/i;
@@ -601,7 +607,19 @@ export function agreedNameFor(agreed, retailer, domain) {
   if (!agreed || !domain) return null;
   const own = agreed.own && agreed.own.get(domain);
   if (own && own.size) { const shown = shopDisplayName({ ...(retailer || {}), domain }); if (shown && own.has(shown)) return shown; }
-  return agreed.get(domain) || null;
+  const best = agreed.get(domain) || null;
+  // (One address sending for a group's different places, a pub company's "The Swan" and "The Horniman at Hays": when neither
+  // name is the address's own and they share no word, each receipt keeps the place it names. A shop's names that are the same
+  // shop written two ways share a word, "Swarovski" and "Swarovski Customer Service GB", and still agree. Round 17.)
+  if (best && retailer && retailer.name) {
+    const shown = shopDisplayName({ ...retailer, domain });
+    if (shown && shown !== best && !nameFits(shown, domain) && !nameFits(best, domain) && !looksLikePerson(cleanShopName(retailer.name) || "", domain)) {
+      const words = (x) => new Set(String(x).toLowerCase().split(/[^\p{L}\p{N}]+/u).filter((w) => w.length > 2 && !/^(?:the|and|at|of|for|by|ltd|limited|plc|inc|shop|store|online|uk|gb|co|com)$/.test(w)));
+      const a = words(shown), b = words(best);
+      if (a.size && b.size && ![...a].some((w) => b.has(w))) return shown;
+    }
+  }
+  return best;
 }
 const nameFits = (name, domain) => { const n = letters(name), b = domainBase(domain); return Boolean(n && b && (n.includes(b) || b.includes(n))); };
 

@@ -99,7 +99,7 @@ function checkItems(read, lines) {
 }
 export function compareToOrder(card, order, agreed) {
   const shown = shownName(card, agreed), day = ukDay(order.orderedAt);
-  const items = checkItems(cleanItems(card.items), order.lines || []);
+  const items = checkItems(cleanItems(card.items, { stored: true }), order.lines || []);
   const parts = {
     shop: !shown ? "missing" : sameName(shown, order.label) || sameName(shown, order.handle) ? "right" : "wrong",
     total: card.totalPence == null ? "missing" : card.totalPence === n(order.amount) && (!card.currency || card.currency === order.currency) ? "right" : "wrong",
@@ -242,7 +242,7 @@ function difference(p) {
   if (parts.total !== "right") list.push({ part: "total", read: c.totalPence == null ? null : n(c.totalPence), shop: n(o.amount) });
   if (parts.date !== "right") list.push({ part: "date", read: validDay(c.orderDate) ? c.orderDate : null, shop: day });
   if (parts.number && parts.number !== "right") list.push({ part: "number", read: c.orderRef || null, shop: o.ref });
-  if (parts.items !== "right") list.push({ part: "items", verdict: parts.items, read: cleanItems(c.items).length, shop: (o.lines || []).length,
+  if (parts.items !== "right") list.push({ part: "items", verdict: parts.items, read: cleanItems(c.items, { stored: true }).length, shop: (o.lines || []).length,
     missing: items.missing.slice(0, 3).map((t) => String(t).slice(0, 80)), extra: items.extra.slice(0, 3).map((t) => String(t).slice(0, 80)) });
   return { shop: o.label, day, number: o.ref || null, readerVersion: n(c.parserVersion), how: p.how, parts: list };
 }

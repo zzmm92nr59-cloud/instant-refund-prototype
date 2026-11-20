@@ -1,0 +1,31 @@
+{
+ "id": "holdout18-film-gift-certificate-text",
+ "sender": "Amazon",
+ "layout": "a text-only digital receipt: 'Item Subtotal', 'Total Before Tax', 'Tax Collected', 'Gift Certificate/Card Amount: -£5.99', 'Grand Total: £0.00'; what it cost is £5.99, paid by the gift certificate",
+ "headers": {
+  "from": "\"Amazon.co.uk\" <digital-no-reply@amazon.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Amazon.co.uk order of The Harbour at Dusk.",
+  "date": "Thu, 24 Sep 2026 21:02:00 +0000"
+ },
+ "html": "",
+ "text": "Thanks for your order\n----------Order details\n\nOrder #D01-3141592-6535897 Placed on Thursday, September 24, 2026\n\nThe Harbour at Dusk\nSold by :Amazon Digital UK Limited\n\nItem Subtotal: £4.99\nTotal Before Tax: £4.99\nTax Collected: £1.00\nGift Certificate/Card Amount: -£5.99\nGrand Total: £0.00\n\nView order details (http://www.amazon.co.uk/gp/digital/your-account/order-summary.html)\n\nAmazon.co.uk is a trading name for Amazon EU Sarl.",
+ "expected": {
+  "shop": "Amazon",
+  "date": "2026-09-24",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "The Harbour at Dusk",
+    "qty": 1,
+    "linePence": 599
+   }
+  ],
+  "subtotalPence": 599,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 599,
+  "giftCardPence": 599
+ }
+}
