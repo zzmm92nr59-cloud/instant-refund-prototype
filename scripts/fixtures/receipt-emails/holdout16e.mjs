@@ -105,5 +105,45 @@ export default function holdout16e() {
         "FAMILY TICKET - Max 4 People (2 under 15s & 2 adults)", "4 people", "×1", "£48.00", "Important Information:", "Please have this email ready to show on arrival."]) },
       o, "Frost Fair Leeds", "2026-11-11", { orderRef: "5520193" });
   }
+  // ---- A rail booking's change in the older layout: "Pay The Difference:" over its amount with no ticket named, then
+  // "Other costs*" (a footnote mark) over "Booking Fee" / "No booking fee" --------------------------------------------------
+  {
+    const o = order([{ name: "Leeds to York", qty: 1, unit: 45 }]);
+    add("holdout16e-rail-change-older-layout", "Railgo", "'You have successfully changed your journey'; '09:30 Leeds' and '10:00 York'; '1x Advance Single'; 'Order Details' then 'Pay The Difference:' over '£0.45', 'Other costs*' over 'Booking Fee' over 'No booking fee'; 'Total amount: | £0.45 |'", {
+      from: "Railgo <auto-confirm@info.railgo.example>", subject: "Your booking confirmation", date: "Thu, 05 Nov 2026 10:00:00 +0000",
+      html: nested("Railgo", "railgo.example", ["You have successfully changed your journey", "Your trip to York departing Friday, 13 November 2026 is confirmed", "Leeds", "York", "Outbound Friday, 13 November",
+        "09:30 Leeds", "Northern", "10:00 York", "1x Advance Single", "Specified train only. No refunds.", "1x Adult", "Payment information", "Transaction ID:", "771122334455",
+        "Order Details", "Pay The Difference:", "£0.45", "Other costs*", "Booking Fee", "No booking fee", "Total amount: || £0.45"]) },
+      o, "Railgo", "2026-11-05", { orderRef: "771122334455" });
+  }
+  // ---- A shoe shop's order: "Shipping: £3.95" then "Shipping Discount: £" with its amount left blank, the total showing
+  // the delivery was taken off again ---------------------------------------------------------------------------------------
+  {
+    const o = order([{ name: "574 Classic", qty: 1, unit: 7000 }], { fees: [["Shipping", 395]], discounts: [["Discount", 1050], ["Shipping Discount", 395]] });
+    add("holdout16e-blank-shipping-discount", "Stridewell", "'574 Classic' with 'Style #:', 'UK Size: UK 8', 'QUANTITY: 1', 'PRICE: £70.00'; 'Order Subtotal: £70.00', 'Discount: £10.50', 'Shipping: £3.95', 'Shipping Discount: £' (blank), 'Order Total: £59.50'", {
+      from: "Stridewell <orders@stridewell.example>", subject: "Your Stridewell order confirmation", date: "Tue, 10 Nov 2026 20:53:21 +0000",
+      html: nested("Stridewell", "stridewell.example", ["Order Number: SW04419920", "YOUR ORDER", "574 Classic", "Style #:", "ML574EVG", "UK Size: UK 8", "Grey with White", "QUANTITY: 1", "PRICE: £70.00",
+        "Order Subtotal: £70.00", "Discount: £10.50", "Shipping: £3.95", "Shipping Discount: £", "Order Total: £59.50", "Thanks for your order, Sam."]) },
+      o, "Stridewell", "2026-11-10", { orderRef: "SW04419920" });
+  }
+  // ---- An exam board's invoice: its columns one under another and the row's prices written without "£" ------------------
+  {
+    const o = order([{ name: "Motorcycle", qty: 1, unit: 2300 }]);
+    add("holdout16e-stacked-invoice-row", "Examboard", "'INVOICE' over its number; 'Quantity' / 'Item ID' / 'Description' / 'Shipped To' / 'Unit Price' / 'Amount' each on its own line, then '1' / '480012345' / 'Motorcycle' / … / '23.00' / '23.00' / 'GBP'; 'Total' over '23.00 GBP'", {
+      from: "Examboard Bookings <noreply@examboard.example>", subject: "Examboard Confirmation of Payment", date: "Mon, 09 Nov 2026 10:04:00 +0000",
+      html: nested("Examboard", "examboard.example", ["This is an invoice for your order and should be kept as your receipt.", "INVOICE", "0071-4410-2290", "09 November 2026 10:04",
+        "Quantity", "Item ID", "Description", "Shipped To", "Unit Price", "Amount", "1", "480012345", "Motorcycle", "English-UK", "Appointment: 03 December 2026 02:15 PM", "Candidate Name:", "SAM TAYLOR",
+        "23.00", "23.00", "GBP", "VAT", "Exempt", "0.00", "GBP", "Total", "23.00 GBP"]) },
+      o, "Examboard", "2026-11-09", {});
+  }
+  // ---- A scooter ride's receipt: each charge's name over its amount ("Riding – £0.19/min" over "£2.09"), then the totals --
+  {
+    const o = order([{ name: "Starting fee", qty: 1, unit: 100 }, { name: "Riding", qty: 1, unit: 209 }]);
+    add("holdout16e-ride-charge-pairs", "Zipscoot", "'Starting fee' over '£1.00'; 'Riding – £0.19/min' over '£2.09'; 'Total (excl. VAT)' over '£2.74'; 'VAT 20.0%' over '£0.55'; 'Total (incl. VAT)' over '£3.09'", {
+      from: "Zipscoot Receipts <no-reply@zipscoot.example>", subject: "Receipt for your Zipscoot ride", date: "Sat, 07 Nov 2026 03:09:27 +0000",
+      html: nested("Zipscoot", "zipscoot.example", ["Thank you for riding with Zipscoot.", "07 Nov 2026", "1.71mi distance", "3:58 AM - 4:09 AM", "Starting fee", "£1.00", "Riding – £0.19/min", "£2.09",
+        "Total (excl. VAT)", "£2.74", "VAT 20.0%", "£0.55", "Total (incl. VAT)", "£3.09", "Apple Pay", "£3.09"]) },
+      o, "Zipscoot", "2026-11-07", {});
+  }
   return out;
 }

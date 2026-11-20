@@ -1500,7 +1500,7 @@ function legOf(text, type, nth = 0) {
 // (each fee or extra over its price, or "No booking fee"), down to "Total amount": a rail booking, a railcard, a ticket
 // change ("Pay The Difference: Adult - Advance Single" with no price of its own, then "Admin Fee" over "£7.50"). Null when
 // the email has no such list. Round 15.
-const DETAILS_HEAD = /^order details$/i, COSTS_HEAD = /^other costs$/i, DETAILS_END = /^(?:total(?: amount| paid| price| cost)?)\s*:?(?:\s*£\s?[\d,]+\.\d{2})?$/i;
+const DETAILS_HEAD = /^order details$/i, COSTS_HEAD = /^other costs\s*\*?$/i, DETAILS_END = /^(?:total(?: amount| paid| price| cost)?)\s*:?(?:\s*£\s?[\d,]+\.\d{2})?$/i;
 function detailsList(text) {
   const rows = String(text || "").split("\n").map((x) => x.replace(/\s*\|\s*/g, " ").replace(/\s+/g, " ").trim()).filter(Boolean);
   const start = rows.findIndex((r) => DETAILS_HEAD.test(r));
@@ -1845,6 +1845,55 @@ function bookingOverCost(text, total) {
     }
     if (!who.length || k < 0 || !/^\p{Lu}[\p{L}\d '’&+-]{2,60}$/u.test(rows[k]) || /\b(?:total|order|booking|time|date)\b/i.test(rows[k])) return null;
     return { name: rows[k], qty: 1, pricePence: total, variant: who.join(", ") };
+  }
+  return null;
+}
+// An invoice's columns set out one under another, "Quantity" / "Item ID" / "Description" / … / "Unit Price" / "Amount", then
+// the row's values the same way with the prices written without "£", "1" / "369896836" / "Car" / … / "23.00" / "23.00" /
+// "GBP": the one line, when its amount is the whole total. Round 15e.
+function stackedInvoiceRow(text, total) {
+  if (total == null) return null;
+  const rows = String(text || "").split("\n").map((x) => x.replace(/^[\s|\u200e\u200f]+|[\s|\u200e\u200f]+$/g, "")).filter(Boolean);
+  for (let i = 0; i + 4 < rows.length; i++) {
+    if (!/^(?:quantity|qty)$/i.test(rows[i])) continue;
+    const head = rows.slice(i, i + 8);
+    const d = head.findIndex((h) => /^description$/i.test(h)), u = head.findIndex((h) => /^unit price$/i.test(h)), a = head.findIndex((h) => /^(?:amount|total)$/i.test(h));
+    if (d < 0 || u < 0 || a < 0 || !(d < u && u < a)) return null;
+    let k = i + a + 1;
+    if (!/^\d{1,3}$/.test(rows[k] || "")) return null;
+    const qty = Number(rows[k]);
+    let name = null;
+    for (let j = k + 1; j < Math.min(rows.length, k + 4); j++) if (/\p{L}{3}/u.test(rows[j]) && !/^\d+$/.test(rows[j])) { name = rows[j]; k = j; break; }
+    if (!name || name.length > 80) return null;
+    for (let j = k + 1; j + 1 < Math.min(rows.length, k + 40); j++) {
+      const p1 = /^£?\s?(\d[\d,]*\.\d{2})$/.exec(rows[j]), p2 = /^£?\s?(\d[\d,]*\.\d{2})$/.exec(rows[j + 1]);
+      if (!p1 || !p2) continue;
+      const unit = money(p1[1]), line = money(p2[1]);
+      return unit * qty === line && line === total ? { name, qty, pricePence: unit } : null;
+    }
+    return null;
+  }
+  return null;
+}
+// What a ride or a service charged set out as each charge's name over its amount, "Starting fee" / "£0.99", "Riding –
+// £0.21/min" / "£2.31" (or "Base fare (3 min)" / "3.48 zł"), straight up to the total's line: those charges are what was
+// bought, when they come to the total. Round 15e.
+const PAIR_AMOUNT = /^(?:(?:£|€|US\$|\$)\s?(\d{1,6}(?:,\d{3})*)[.,](\d{2})|(\d{1,6}(?:[ .]\d{3})*)[.,](\d{2})\s?(?:zł|zl|pln|€|eur|kr|sek|nok|dkk|chf|kč|czk|ft|huf))$/i;
+function chargePairs(text, total) {
+  if (total == null) return null;
+  const rows = String(text || "").split("\n").map((x) => x.replace(/^[\s|]+|[\s|]+$/g, "")).filter(Boolean);
+  const amt = (r) => { const m = PAIR_AMOUNT.exec(r || ""); return m ? Number(String(m[1] || m[3]).replace(/[ .,]/g, "")) * 100 + Number(m[2] || m[4]) : null; };
+  for (let i = 0; i + 3 < rows.length; i++) {
+    const out = []; let k = i;
+    while (k + 1 < rows.length && out.length < 8) {
+      const a = amt(rows[k + 1]);
+      if (a == null || amt(rows[k]) != null || !/\p{L}{3}/u.test(rows[k]) || rows[k].length > 60 || /\b(?:total|subtotal|vat|tax|paid|payment|balance|discount|credit)\b/i.test(rows[k])) break;
+      // (A rate written after the charge's name, "Riding – £0.21/min", is what it is, not its name.)
+      const rate = /^(.{3,40}?)\s*[–—-]\s*((?:£|€|\$)\s?\d[\d.,]*\s?\/\s?\p{L}{1,6}|\d[\d.,]*\s?(?:zł|€|kr)\s?\/\s?\p{L}{1,6})$/u.exec(rows[k]);
+      out.push({ name: rate ? rate[1] : rows[k], ...(rate ? { variant: rate[2] } : {}), qty: 1, pricePence: a }); k += 2;
+    }
+    if (out.length >= 2 && /^total\b/i.test(rows[k] || "")) return out.reduce((n, x) => n + x.pricePence, 0) === total ? out : null;
+    if (out.length) i = k - 1;
   }
   return null;
 }
@@ -2204,6 +2253,12 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
         const toM = /\byour (?:trip|journey) to (\p{Lu}[\p{L}\d .'’&-]{1,40}?) (?:departing|leaving|on)\b/u.exec(body);
         const trip = times.length >= 2 ? `${times[0]} to ${toM ? toM[1] : times[times.length - 1]}` : null;
         const asItem = (l) => {
+          // (A change that names no ticket, "Pay The Difference:" over "£0.05" (the older layout): the trip, as a change.
+          // Round 15e.)
+          if (trip && /^pay the difference\s*:?$/i.test(l.name.trim())) {
+            const tk = rows.map((r) => /^\d{1,2}x ((?:advance|anytime|off-peak|super off-peak|flexible|standard|first class)[\p{L} -]{0,30})$/iu.exec(r)).find(Boolean);
+            return { name: trip, variant: ["Ticket change", tk ? tk[1].trim() : null].filter(Boolean).join(", "), qty: 1, pricePence: l.pricePence };
+          }
           const m = RAIL_TICKET.exec(l.name.replace(/^pay the difference\s*:\s*/i, ""));
           if (!m || !trip) return { name: l.name, qty: 1, pricePence: l.pricePence };
           const change = /^pay the difference\b/i.test(l.name);
@@ -2327,9 +2382,14 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
     const cf = stackedFeeColumns(fromHtml || text, result.totalPence) || (plain ? stackedFeeColumns(plain, result.totalPence) : null);
     if (cf) { result.items = cf.items; columnFee = cf; result.itemsCheck = { complete: true, itemsPence: cf.items.reduce((n, x) => n + x.pricePence, 0), expectedPence: result.totalPence - cf.fee, missingPence: 0, ...namesCheck(cf.items, {}) }; }
   }
+  if (result.totalPence != null && !isFlight && !journey && !(result.itemsCheck && result.itemsCheck.complete)) {
+    const ch = chargePairs(fromHtml || text, result.totalPence) || (plain ? chargePairs(plain, result.totalPence) : null);
+    if (ch) { result.items = ch; result.itemsCheck = { complete: true, itemsPence: result.totalPence, expectedPence: result.totalPence, missingPence: 0, ...namesCheck(ch, {}) }; }
+  }
   if (!result.items.length && result.totalPence != null && !isFlight) {
     const one = soleBulletOverTotal(fromHtml || text, moneyOf(fromHtml || text), result.totalPence) || (plain ? soleBulletOverTotal(plain, moneyOf(plain), result.totalPence) : null) ||
-      bookingOverCost(fromHtml || text, result.totalPence) || (plain ? bookingOverCost(plain, result.totalPence) : null);
+      bookingOverCost(fromHtml || text, result.totalPence) || (plain ? bookingOverCost(plain, result.totalPence) : null) ||
+      stackedInvoiceRow(fromHtml || text, result.totalPence) || (plain ? stackedInvoiceRow(plain, result.totalPence) : null);
     if (one) { result.items = [one]; result.itemsCheck = checkItems(result.items, moneyOf(fromHtml || text), result.totalPence); }
     else {
       const cols = stackedColumns(fromHtml || text, moneyOf(fromHtml || text), result.totalPence) || (plain ? stackedColumns(plain, moneyOf(plain), result.totalPence) : null);
@@ -2616,6 +2676,11 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   const others = amazonSplit && amazonSplit.length > 1 && amazonSplit[0].orderRef.toUpperCase() === String(result.orderRef || "").toUpperCase() ? amazonSplit.slice(1) :
     isFlight || dayOf || amended ? [] : moreOrders(text, result.orderRef).length ? moreOrders(text, result.orderRef) : moreOrders(otherPart, result.orderRef);
   if (others.length) result.moreOrders = others;
+  // (The total found only late, an invoice's own: its one stacked row read again against it. Round 15e.)
+  if (!result.items.length && result.totalPence != null && !isFlight && !dayOf) {
+    const row = stackedInvoiceRow(fromHtml || text, result.totalPence) || (plain ? stackedInvoiceRow(plain, result.totalPence) : null);
+    if (row) { result.items = [row]; result.itemsCheck = { complete: true, itemsPence: row.pricePence * row.qty, expectedPence: result.totalPence, missingPence: 0, ...namesCheck([row], {}) }; }
+  }
   // Money the email took off the order ("Promotion Applied -£1.99", "Discounts -£1.16", "Credit £4.11"), each as it is
   // labelled, so the receipt can say why the items come to more than was paid. Only a pounds receipt with items. Round 13.
   if (result.items.length && (result.currency || "GBP") === "GBP") {
@@ -2637,6 +2702,17 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
         Math.abs(ck.itemsPence - shownOff + (mon.fees || 0) + (mon.tips || 0) - result.totalPence) > 1 && Math.abs(ck.itemsPence - result.totalPence) > 1)
       result.itemsCheck = { ...ck, complete: false, offNotShown: mon.discounts - shownOff };
     if (shownOff && result.itemsCheck) result.itemsCheck = { ...result.itemsCheck, discountsPence: shownOff };
+    // (A delivery charge and its own discount line left blank, "Shipping: £4.50" then "Shipping Discount: £", when the total
+    // is the items less the money off with no delivery paid: the delivery was taken off again. Round 15e.)
+    const ck2 = result.itemsCheck;
+    if (ck2 && ck2.complete === false && result.totalPence != null && (result.fees || []).length === 1 && ck2.missingPence === -result.fees[0].pence) {
+      const lbl = String(result.fees[0].label).replace(/[^\p{L} ]/gu, "").trim();
+      const blank = lbl && new RegExp("^[ \\t|]*" + lbl.replace(/\s+/g, "\\s+") + "\\s+discount\\s*:?[ \\t]*£?[ \\t|]*$", "im").test(text);
+      if (blank) {
+        result.discounts = [...(result.discounts || []), { label: lbl + " Discount", pence: result.fees[0].pence }];
+        result.itemsCheck = { ...ck2, complete: true, missingPence: 0, expectedPence: ck2.itemsPence, discountsPence: (ck2.discountsPence || 0) + result.fees[0].pence };
+      }
+    }
   }
   // (Amazon's digital receipt, a film paid by gift card: "Total: £1.99" "Gift Card Amount: -£1.99" "Order Grand Total: £0.00".
   // What it cost is the total before the gift card, the gift card's part kept beside it. Round 15.)

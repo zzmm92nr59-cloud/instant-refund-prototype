@@ -14,8 +14,19 @@
   "shop": "Zoomr",
   "date": "2026-11-13",
   "currency": "PLN",
-  "items": [],
-  "subtotalPence": 0,
+  "items": [
+   {
+    "name": "Unlock fee",
+    "qty": 1,
+    "linePence": 300
+   },
+   {
+    "name": "Per minute fare (24 min)",
+    "qty": 1,
+    "linePence": 1914
+   }
+  ],
+  "subtotalPence": 2214,
   "feesPence": 0,
   "discountsPence": 0,
   "tipsPence": 0,
