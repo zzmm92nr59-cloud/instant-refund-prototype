@@ -1040,6 +1040,8 @@ function classify(rawText, ref, lenient = false) {
       // (When the email was sent, to the minute, so a payment service's receipt can find the shop's receipt for the same
       // purchase, and what a gift card paid of an Amazon order. Round 13.)
       ...(receipt.sentAt ? { sentAt: receipt.sentAt } : {}), ...(receipt.giftCardPence ? { giftCardPence: receipt.giftCardPence } : {}),
+      // (A stay booked to be paid at the property: nothing was taken up front, the card only guaranteed it. Round 15.)
+      ...(receipt.payAtProperty ? { payAtProperty: true } : {}),
       // The receipt is only in the email's attachment ("pdf" or "image"): the app says so and nothing is read from it.
       ...(receipt.detailsInAttachment ? { detailsInAttachment: receipt.detailsInAttachment } : {}),
       needsShopperConfirmation: receipt.needsShopperConfirmation, method: receipt.method, returns: receipt.returns, shipment: receipt.shipment || null,
@@ -1061,7 +1063,7 @@ function classify(rawText, ref, lenient = false) {
         ...(adj.orderRefs ? { orderRefs: adj.orderRefs } : {}), ...(adj.creditPence ? { creditPence: adj.creditPence } : {}), ...(adj.bySupport ? { bySupport: true } : {}),
         previousTotalPence: adj.previousTotalPence, newTotalPence: adj.newTotalPence, currency: adj.currency, retailer: adj.retailer, source: "shopper_email", refundEligible: false, parserVersion: PARSER_VERSION };
     } else if (can.ok) {
-      details = { kind: "order_update", ...ref, stage: "cancelled", partial: can.partial, at: can.at, orderRef: can.orderRef, amountPence: can.amountPence, currency: can.currency, ...(can.byItems ? { byItems: true } : {}),
+      details = { kind: "order_update", ...ref, stage: "cancelled", partial: can.partial, at: can.at, orderRef: can.orderRef, amountPence: can.amountPence, currency: can.currency, ...(can.byItems ? { byItems: true } : {}), ...(can.free ? { free: true } : {}),
         ...(Array.isArray(can.cancelledItems) && can.cancelledItems.length ? { cancelledItems: can.cancelledItems } : {}),
         ...(can.subscription ? { subscription: true, subscriptionName: can.subscriptionName, endsOn: can.endsOn, refund: can.refund } : {}),
         retailer: can.retailer, source: "shopper_email", refundEligible: false, parserVersion: PARSER_VERSION };
@@ -2091,8 +2093,12 @@ export function sameOrderRef(a, b) { return Boolean(a && b) && refCore(a) !== ""
 // An update names this order's shop: by its address or name when it says, any shop when it doesn't say (a carrier's).
 // (Or the same shop's name, from the company that sends its parcel news, "lululemon" <noreply@lululemon-intl.narvar.com>, for
 // an order with the same number. Round 12.)
+// (The same shop's address, whatever name each email gives, "Booking" or "Booking.com", counts too: never a payment
+// service's or a personal one. Round 15.)
+const siteOf = (d) => String(d || "").toLowerCase().replace(/^(?:[^.]+\.)*?([^.]+\.(?:(?:co|org|ac)\.uk|[a-z]{2,6}))$/, "$1");
 const sameShop = (u, o) => !u.retailer || (!u.retailer.domain && !u.retailer.name) || storeKey(u) === storeKey(o) ||
-  (letters(u.retailer.name).length >= 3 && letters(u.retailer.name) === letters(o.retailer && o.retailer.name));
+  (letters(u.retailer.name).length >= 3 && letters(u.retailer.name) === letters(o.retailer && o.retailer.name)) ||
+  Boolean(u.retailer.domain && o.retailer && o.retailer.domain && !isVia(u.retailer.domain) && !PERSONAL_MAIL.test(u.retailer.domain) && siteOf(u.retailer.domain) === siteOf(o.retailer.domain));
 export function attachDeliveries(orders, deliveries) {
   for (const o of orders) {
     // The parcel's tracking numbers: the order's own emails', and those of the shop's parcel emails that name this order

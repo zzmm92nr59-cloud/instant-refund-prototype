@@ -14,7 +14,7 @@ import { domainBase, cleanItems, rankShop, shopNamesInText, forwardedSender, mai
 import { PERSONAL_MAIL } from "./receipt-category.js";
 import { readItems, moneyOf, settleItems, checkItems, statedItemCount, lineOf } from "./receipt-items.js";
 import { namesCheck } from "./item-names.js";
-import { uberEmail, takeawayMerchant, groceryDayOf, gameBundle, grocerySubstitutions, orderAmended, supportRefund, paymentAuthorised } from "./receipt-senders.js";
+import { uberEmail, takeawayMerchant, groceryDayOf, gameBundle, grocerySubstitutions, orderAmended, supportRefund, paymentAuthorised, bookingStay } from "./receipt-senders.js";
 
 function decodeQuotedPrintable(text, charset = "utf-8") {
   const joined = text.replace(/=\r?\n/g, "");
@@ -2158,6 +2158,21 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
     if (pp.length) { result.items = pp; const sum = pp.reduce((n, i) => n + (i.pricePence ?? 0) * (i.qty || 1), 0); result.itemsCheck = result.currency === "GBP" ? checkItems(pp, moneyOf(text), result.totalPence) : { complete: null, itemsPence: sum, expectedPence: result.totalPence ?? null, missingPence: null, foreignItems: true }; }
   }
   // (An order number PayPal gives under its label, "Order ID |" over "58d0cf0e-7b50-4c34-a8bd-ebc59dd2d0b8", however long.)
+  // (Booking.com: the stay, read from its price details: the room or rooms for the nights booked, at the rooms' price, the
+  // taxes and charges apart from it, never its terms as things bought; and whether it is paid at the property. Round 15.)
+  const bookingCom = /(^|\.)booking\.com$/i.test((fwdFrom && fwdFrom.domain) || sender?.domain || "");
+  const stay = bookingCom ? bookingStay(fromHtml || text) || bookingStay(text) : null;
+  if (stay && stay.rooms) {
+    const feesPence = stay.fees.reduce((n, f) => n + f.pence, 0);
+    const roomPence = stay.roomPence ?? (result.totalPence != null && !stay.fees.length ? result.totalPence : null);
+    const name = stay.roomName || (stay.rooms === 1 ? "Room" : "Rooms");
+    const sameRoom = !/ and /.test(name);
+    result.items = [{ name, qty: sameRoom ? stay.rooms : 1, pricePence: roomPence, lineTotal: true, ...(stay.nights ? { variant: stay.nights + (stay.nights === 1 ? " night" : " nights") } : {}) }];
+    const sum = roomPence == null ? null : roomPence + feesPence;
+    result.itemsCheck = { complete: sum != null && result.totalPence != null && Math.abs(sum - result.totalPence) <= 1, itemsPence: roomPence ?? 0, expectedPence: result.totalPence == null ? null : result.totalPence - feesPence,
+      missingPence: sum == null || result.totalPence == null ? null : result.totalPence - sum };
+    if (stay.payAtProperty) result.payAtProperty = true;
+  }
   // (PayPal's own labels are never the thing bought: "Funding sources used (total)", "Sent to …", "Seller". Round 15.)
   if (viaPayPal && result.items.some((i) => PAYPAL_LABEL.test(String(i.name || "")))) {
     result.items = result.items.filter((i) => !PAYPAL_LABEL.test(String(i.name || "")));
@@ -2901,6 +2916,17 @@ export function parseCancellationEmail(rawEmail) {
     return { ok: true, kind: "order_update", stage: "cancelled", subscription: true, subscriptionName: sub[1].trim(), endsOn: endsOn || null,
       refund: /\bno refunds? (?:will be|is|are) (?:issued|given|made|due)\b/i.test(top) ? false : null, partial: false, at: u.at, orderRef: u.orderRef || null,
       amountPence: null, currency: null, retailer: shopOfUpdate(u.headers, u.text, u.html, u.parts) };
+  }
+  // (A stay or a trip booked and then cancelled, Booking.com's "Booking cancelled for Swarn by Hawks", "Your booking has been
+  // successfully cancelled for free", "Confirmation number: 6381624292": the booking it names is cancelled, joined to it by
+  // that number. Round 15.)
+  const stayGone = /\b(?:booking|reservation|stay)\b[^\n]{0,30}\bcancell?ed\b|\bcancell?ed\b[^\n]{0,12}\b(?:booking|reservation)\b/i.test(u.subject) ||
+    /\byour (?:booking|reservation) (?:has been|was|is) (?:successfully )?cancell?ed\b/i.test(top);
+  if (stayGone && !/\b(?:appointment|table|class|test)\b/i.test(u.subject)) {
+    const num = u.orderRef || (/\b(?:confirmation|booking|reservation) (?:number|no\.?|reference|ref\.?)[\s:|]{0,6}([A-Z0-9][A-Z0-9-]{5,15})\b/i.exec(top) || [])[1] || null;
+    if (num && /\d/.test(num)) return { ok: true, kind: "order_update", stage: "cancelled", partial: false, at: u.at, orderRef: num, amountPence: null, currency: null,
+      ...(/\bcancell?ed for free\b|\bfree cancellation\b|\bcancellation cost\b[^\n]{0,80}?(?:US\$|€|£|\$)\s?0(?:\.00)?\b/i.test(top + " " + u.text.slice(0, 4000).replace(/\s+/g, " ")) ? { free: true } : {}),
+      retailer: shopOfUpdate(u.headers, u.text, u.html, u.parts) };
   }
   // A price adjustment or a subscription ("Your membership has been cancelled") is not a cancelled order.
   if (!said || PRICE_ADJUSTMENT.test(u.subject + " " + top) || /\b(?:subscription|membership|plan|direct debit|account|booking|reservation|appointment|trial)\b/i.test(u.subject)) return no;

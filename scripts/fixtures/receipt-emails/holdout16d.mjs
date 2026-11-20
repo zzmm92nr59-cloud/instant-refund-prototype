@@ -84,5 +84,23 @@ export default function holdout16d() {
       { ...expected("Cellar Club Onlined Limited", "2025-02-14", order([])), items: [], totalPence: 2500 });
     out.push(f);
   }
+  // ---- Booking.com: the stay from its price details; paid at the property; its terms never things bought -----------------------
+  own("holdout16d-booking-pay-at-stay", "Booking.com", "'You'll pay when you stay at …', 'Price details', '2 rooms | US$900', taxes and a service charge on rows of their own, 'Total price US$1,140.00', 'Room 1:' over the room",
+    { from: "Booking.com <noreply@booking.com>", subject: "Your booking is confirmed at Palm Reef Lodge", date: "Fri, 1 Aug 2025 09:00:00 +0000",
+      html: htmlPage("Booking.com", ["Thanks! Your booking is confirmed at Palm Reef Lodge", "Palm Reef Lodge is expecting you on Sat 14 Mar", "You'll pay when you stay at Palm Reef Lodge",
+        "Check-in | Saturday, 14 March 2026 (from 14:00)", "Check-out | Sunday, 22 March 2026 (until 12:00)", "Your reservation | 8 nights, 2 rooms", "Confirmation number: 5550001111", "PIN code: | 1234",
+        "Price details", "2 rooms | US$900", "Goods & services tax | US$150.00", "Property service charge | US$90.00", "Total price | US$1,140.00",
+        "Payment information", "You’ve guaranteed your booking by credit card", "•••• 4242", "Some charges will be collected by the property:", "Environment fee | US$96", "Room", "1:", "Garden Villa with Pool", "Copyright © 1996–2025 Booking.com. All rights reserved."]) },
+    { shop: "Booking.com", date: "2025-08-01", currency: "USD", totalPence: 114000, items: [{ name: "Garden Villa with Pool", qty: 2, linePence: 90000, extras: ["8 nights"] }] });
+  own("holdout16d-booking-terms-not-items", "Booking.com", "older layout: 'Price details', '1' over the room's name, 'VAT is included.', '€ 4.90 City tax per person per night is included.', 'Total price € 614.48', a non-refundable booking",
+    { from: "Booking.com <noreply@booking.com>", subject: "Your booking is confirmed at Hotel Mirador", date: "Mon, 21 Aug 2023 20:14:00 +0000",
+      html: htmlPage("Booking.com", ["Thanks! Your booking is confirmed at Hotel Mirador", "Check-in | Thursday 7 September 2023", "Check-out | Monday 11 September 2023", "Your reservation | 4 nights, 1 room",
+        "Confirmation number: 5550002222", "This booking is non-refundable. Changing the dates of your stay is not possible.", "Price details", "1", "Double or Twin Room", "10 % VAT is included.",
+        "€ 4.90 City tax per person per night is included.", "Total price | € 614.48", "Double or Twin Room", "This twin/double room comes with 2 single beds.", "Copyright © 1996–2023 Booking.com. All rights reserved."]) },
+    { shop: "Booking.com", date: "2023-08-21", currency: "EUR", totalPence: 61448, items: [{ name: "Double or Twin Room", qty: 1, linePence: 61448, extras: ["4 nights"] }] });
+  not("holdout16d-booking-cancelled", "Booking.com", "'Booking cancelled for Palm Reef Lodge', 'Your booking has been successfully cancelled for free', 'Confirmation number: 5550001111'",
+    { from: "Booking.com <noreply@booking.com>", subject: "Booking cancelled for Palm Reef Lodge", date: "Sat, 20 Sep 2025 10:00:00 +0000",
+      html: htmlPage("Booking.com", ["Booking cancelled for Palm Reef Lodge", "Confirmation number: 5550001111", "PIN code: 1234", "Your booking has been successfully cancelled for free",
+        "We can confirm that your reservation at Palm Reef Lodge has been cancelled.", "Booking number | 5550001111", "Cancellation cost | US$ 0"]) }, "cancelled", { orderRef: "5550001111" });
   return out;
 }

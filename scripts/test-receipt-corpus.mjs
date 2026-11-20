@@ -437,6 +437,12 @@ const joinWrong = [];
   const delivery = { kind: "delivery_update", status: "delivered", at: "2025-07-20", merchant: "Cellar Club", orderRef: "V5550001AA", trackingNumber: null, retailer: { name: "Cellar Club", domain: "cellarclub.example" } };
   attachDeliveries([topUp], [delivery]);
   if (topUp.delivery || topUp.returnBy) joinWrong.push("another order's delivery joined a top-up by the shop's name: " + JSON.stringify([topUp.delivery, topUp.returnBy]));
+  // Booking.com: a stay paid at the property says so; its cancellation joins it by the confirmation number.
+  const stayCard = [{ ...classifyEmail(rawEmail(fx("holdout16d-booking-pay-at-stay"))).details, id: "st" }];
+  const gone = classifyEmail(rawEmail(fx("holdout16d-booking-cancelled"))).details;
+  attachCancellations(stayCard, [gone]);
+  if (!stayCard[0].payAtProperty || !stayCard[0].cancelled || stayCard[0].cancelled.partial || gone.orderRef !== "5550001111" || !gone.free)
+    joinWrong.push("a Booking.com stay paid at the property and its cancellation read as " + JSON.stringify([stayCard[0].payAtProperty, stayCard[0].cancelled, gone.orderRef, gone.free]));
   // (Further apart than two minutes, or two shop receipts as near as each other: no guess, each stays its own card.)
   const p3 = { ...p1, id: "p3", sentAt: "2026-04-30T02:30:00.000Z" };
   if (mergeOrderEmails([g1, g2, p3]).length !== 3) joinWrong.push("a PayPal receipt five minutes from either game purchase was joined to one");
