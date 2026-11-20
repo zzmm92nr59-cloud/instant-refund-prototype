@@ -219,3 +219,26 @@ export function ticketSummary(text, totalPence) {
   const sum = items.reduce((n, i) => n + i.qty * i.pricePence, 0);
   return items.length && items.some((i) => i.variant || /ticket/i.test(i.name)) && sum === totalPence ? items : null;
 }
+
+// ---- Items set out as labelled fields, and "N x Name @ £P" lines (round 15) ---------------------------------------------
+// "Item: Xbox One S Console, 1TB", "Category: …", "Quantity: 1", "Unit Price: £135.00" (a plain-text order email), each item
+// its own block; and a booking's "4 x Make a pot like Grayson Perry @ £40.00". Only what the email says, nothing worked out.
+export function labelledItems(text) {
+  const list = rows(String(text || "").slice(0, 40000)).map((l) => l.replace(/\s*\|\s*/g, " ").trim());
+  const out = [];
+  for (let k = 0; k < list.length && out.length < 30; k++) {
+    const at = /^(\d{1,3})\s*x\s+(\p{L}[^@£]{1,80}?)\s*@\s*£\s?([\d,]+\.\d{2})(?:\s*(?:each|per person|pp))?$/iu.exec(list[k]);
+    if (at) { out.push({ name: at[2].trim(), qty: Number(at[1]), pricePence: pence(MONEY.exec("£" + at[3])), lineTotal: false }); continue; }
+    const item = /^item\s*:\s*(\p{L}.{2,120})$/iu.exec(list[k]);
+    if (!item) continue;
+    let qty = null, unit = null;
+    for (let j = k + 1; j < Math.min(list.length, k + 7) && !/^item\s*:/i.test(list[j]); j++) {
+      const q = /^(?:quantity|qty)\s*:\s*(\d{1,3})$/i.exec(list[j]);
+      if (q) qty = Number(q[1]);
+      const u = /^(?:unit price|price|item price)\s*:\s*£\s?(\d[\d,]*)(?:\.(\d{2}))?$/i.exec(list[j]);
+      if (u) unit = Number(u[1].replace(/,/g, "")) * 100 + Number(u[2] || 0);
+    }
+    if (unit != null) out.push({ name: item[1].trim(), qty: qty || 1, pricePence: unit, lineTotal: false });
+  }
+  return out;
+}

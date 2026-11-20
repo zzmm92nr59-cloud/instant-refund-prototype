@@ -1,0 +1,31 @@
+{
+ "id": "holdout16c-labelled-fields-order",
+ "sender": "SwapShop",
+ "layout": "plain text only: 'Your Order Number is: 20440312'; 'Item: Games Console, 1TB, Black, Unboxed', 'Category:', 'Quantity: 1', 'Unit Price: £120.00', 'Item Delivery Charge: £2.95'; 'Order Total £122.95(1)'",
+ "headers": {
+  "from": "SwapShop <no_reply@swapshop.example>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "SwapShop order confirmation: 20440312",
+  "date": "Fri, 06 Nov 2026 15:55:27 +0000"
+ },
+ "html": "",
+ "text": "Thank you for purchasing from SwapShop.\n\nDetails of your order are listed below:\n\n=========================================\nYour Order Number is: 20440312\n=========================================\n\nItem: Games Console, 1TB, Black, Unboxed\nCategory: Consoles\nQuantity: 1\nUnit Price: £120.00\nItem Delivery Charge: £2.95\n\n-----------------------------------------\nTotal Shipping Cost: £2.95\n-----------------------------------------\nPayment Details:\nApple Pay: £122.95\n\n=========================================\nOrder Total £122.95(1)\n=========================================\n",
+ "expected": {
+  "shop": "SwapShop",
+  "date": "2026-11-06",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Games Console, 1TB, Black, Unboxed",
+    "qty": 1,
+    "linePence": 12000
+   }
+  ],
+  "subtotalPence": 12000,
+  "feesPence": 295,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 12295,
+  "orderRef": "20440312"
+ }
+}

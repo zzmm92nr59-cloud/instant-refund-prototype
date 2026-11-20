@@ -143,5 +143,48 @@ export default function holdout16c() {
         "Free Recipe Box", "Quantity", "1", "Price", "£5.00", "Offers Used:", "You've saved up to 60%", "- £2.00", "Up to 60% off almost everything, plus FREE delivery!", "- £3.99", "3 FREE gifts on all orders", "- £5.00", "Delivery:", "£0.00", "Total Cost:", "£33.00"]) },
       o, "Liftwell", "2026-10-31", { orderRef: "491223376" });
   }
+  // ---- A second-hand shop's plain-text emails: "Item:", "Quantity:", "Unit Price:"; a receipt by "receipt :N"; its refund ----
+  {
+    const o = order([{ name: "Games Console, 1TB, Black, Unboxed", qty: 1, unit: 12000 }], { fees: [["Item Delivery Charge", 295]] });
+    add("holdout16c-labelled-fields-order", "SwapShop", "plain text only: 'Your Order Number is: 20440312'; 'Item: Games Console, 1TB, Black, Unboxed', 'Category:', 'Quantity: 1', 'Unit Price: £120.00', 'Item Delivery Charge: £2.95'; 'Order Total £122.95(1)'", {
+      from: "SwapShop <no_reply@swapshop.example>", subject: "SwapShop order confirmation: 20440312", date: "Fri, 06 Nov 2026 15:55:27 +0000",
+      text: "Thank you for purchasing from SwapShop.\n\nDetails of your order are listed below:\n\n=========================================\nYour Order Number is: 20440312\n=========================================\n\nItem: Games Console, 1TB, Black, Unboxed\nCategory: Consoles\nQuantity: 1\nUnit Price: £120.00\nItem Delivery Charge: £2.95\n\n-----------------------------------------\nTotal Shipping Cost: £2.95\n-----------------------------------------\nPayment Details:\nApple Pay: £122.95\n\n=========================================\nOrder Total £122.95(1)\n=========================================\n" },
+      o, "SwapShop", "2026-11-06", { orderRef: "20440312" });
+  }
+  {
+    const o = order([{ name: "Handheld Console, 64GB, Grey, Boxed", qty: 1, unit: 9500 }]);
+    add("holdout16c-receipt-colon-number", "SwapShop", "subject 'SwapShop receipt :20440999'; 'Your order has now been collected'; '| Item: | Handheld Console … |', '| Quantity: | 1 |', '| Unit Price: | £95 |'; 'Order Total: £95 (1)'", {
+      from: "SwapShop <no_reply@swapshop.example>", subject: "SwapShop receipt :20440999", date: "Sat, 07 Nov 2026 12:00:00 +0000",
+      text: " Your order has now been collected, thank you for purchasing from SwapShop.\nDetails of your collected order are listed below:\n=========================================\nYour Order Number is: 20440999\n=========================================\n| Item: | Handheld Console, 64GB, Grey, Boxed |\n| Category: | Handheld Consoles |\n| Quantity: | 1 |\n| Unit Price: | £95 |\n-----------------------------------------\nPayment Details:\nApple Pay\n£95.00\n=========================================\nOrder Total: £95 (1)\n" },
+      o, "SwapShop", "2026-11-07", { orderRef: "20440999" });
+  }
+  not("holdout16c-refund-total-amount-refunded", "SwapShop", "subject 'Refund for your SwapShop order 20440312'; 'We have now sent you a refund for item(s)'; 'Your refund order number is: 20440312'; 'Refund Value: £120.00', 'Item Delivery Charge Refund Amount:£2.95', 'Total Amount Refunded: £122.95'", {
+    from: "SwapShop <no_reply@swapshop.example>", subject: "Refund for your SwapShop order 20440312", date: "Sun, 08 Nov 2026 10:00:00 +0000",
+    text: "Hi Sam Taylor\nWe have now sent you a refund for item(s) you had ordered from us.\n=========================================\nYour refund order number is: 20440312\nRefund payment method: Apple Pay\n============== Item(s) Refunded =============\nItem Name: Games Console, 1TB, Black, Unboxed\nRefund Value: £120.00\nItem Delivery Charge Refund Amount:£2.95\n\nTotal Amount Refunded: £122.95\nThe refund will be returned to your original payment method.\n" }, "refund", { refundPence: 12295, orderRef: "20440312" });
+  // ---- A restaurant's order email with a subject that says nothing ("We're on it!") ---------------------------------------
+  {
+    const o = order([{ name: "1/4 Chicken", qty: 1, unit: 990 }, { name: "Spicy Rice", qty: 1, unit: 395 }]);
+    add("holdout16c-restaurant-subject-silent", "Peri House", "subject 'We’re on it!'; 'Peri House Riverside - Table 12'; 'Thanks for your order, we’re just prepping it now.'; 'Here’s what we’re cooking up for order #7a1c09'; '1 | 1/4 Chicken | £9.90', '1 | Spicy Rice | £3.95'; 'Total | £13.85'", {
+      from: "Peri House <noreply@perihouse.example>", subject: "We’re on it!", date: "Wed, 04 Nov 2026 12:43:00 +0000",
+      html: mail("Peri House", "perihouse.example", ["Peri House Riverside - Table 12", "Thanks for your order, we’re just prepping it now.", "Here’s what we’re cooking up for order #7a1c09", "04th Nov 2026 | Ordered at 12:43pm", "1 | 1/4 Chicken | £9.90", "1 | Spicy Rice | £3.95", "Total | £13.85"]) },
+      o, "Peri House", "2026-11-04", { orderRef: "7a1c09" });
+  }
+  // ---- A class booking: "Your booking reference is: KQWZT", "4 x Throw a pot @ £40.00", no total ---------------------------
+  {
+    const o = order([{ name: "Throw a pot like a pro", qty: 4, unit: 4000 }]);
+    const f = add("holdout16c-booking-at-price-no-total", "Clayworks Studio", "plain text: 'Your booking reference is: KQWZT'; 'Booking details:'; '4 x Throw a pot like a pro @ £40.00' and four names; no total", {
+      from: "Clayworks Studio <mail@bookings.example>", subject: "Booking confirmation. Ref: KQWZT", date: "Sat, 14 Nov 2026 09:00:00 +0000",
+      text: "Your booking reference is: KQWZT\n\nYou can access your booking using the link below.\n\nBooking details:\n\nADULT CLASS - Throw a pot like a pro\nClayworks, Mill Lane, Leeds, LS1 4AB\n  Sat 21 Nov, 10:00am - 1:00pm\n    4 x Throw a pot like a pro @ £40.00\n    sam taylor\n    alex taylor\n    jo taylor\n    kim taylor\n" },
+      o, "Clayworks Studio", "2026-11-14", { orderRef: "KQWZT" });
+    f.expected.totalPence = null;
+  }
+  // ---- A coach company: "GBR 22.89", "Reservation summary for order QWZRTYP", the journey "From:" and "To:" -----------------
+  {
+    const o = order([{ name: "Leeds to London", qty: 1, unit: 1899 }], { fees: [["Booking Fee", 100]] });
+    add("holdout16c-coach-gbr-amounts", "Coachline", "plain text: 'Reservation summary for order QWZRTYP'; 'Reservation Number' over '43-6840-031223-M22N-1335-LDS-LON-1'; 'From: Leeds, Bus Station (1:35 PM)', 'To: London, Victoria Coach Station (5:00 PM)'; 'Ticket Price: GBR 18.99', 'Booking Fee: GBR 1.00', 'Total Paid: GBR 19.99'", {
+      from: "Coachline <support@coachline.example>", subject: "From Coachline Ltd: Your reservations have been made", date: "Mon, 09 Nov 2026 09:00:00 +0000",
+      text: "Valued Coachline Customer,\nThank you for making a reservation with Coachline. This email confirms your purchase.\nReservation summary for order QWZRTYP\nReservation Number\n 43-6840-031223-M22N-1335-LDS-LON-1\nDate:December 3, 2026\nFrom: Leeds, Bus Station (1:35 PM)\nTo: London, Victoria Coach Station (5:00 PM)\nPassengers: 1 Standard\nCost and Payment Summary\nTicket Price: GBR 18.99\nBooking Fee: GBR 1.00\nTotal Paid: GBR 19.99\n" },
+      o, "Coachline", "2026-11-09", { orderRef: "QWZRTYP" });
+  }
   return out;
 }

@@ -14,7 +14,7 @@ import { domainBase, cleanItems, rankShop, shopNamesInText, forwardedSender, mai
 import { PERSONAL_MAIL } from "./receipt-category.js";
 import { readItems, moneyOf, settleItems, checkItems, statedItemCount, lineOf } from "./receipt-items.js";
 import { namesCheck } from "./item-names.js";
-import { uberEmail, takeawayMerchant, groceryDayOf, gameBundle, grocerySubstitutions, orderAmended, supportRefund, paymentAuthorised, ticketSummary } from "./receipt-senders.js";
+import { uberEmail, takeawayMerchant, groceryDayOf, gameBundle, grocerySubstitutions, orderAmended, supportRefund, paymentAuthorised, ticketSummary, labelledItems } from "./receipt-senders.js";
 
 function decodeQuotedPrintable(text, charset = "utf-8") {
   const joined = text.replace(/=\r?\n/g, "");
@@ -581,7 +581,11 @@ function fromText(text, refDate, ctx = {}) {
     // ("Order:" alone on its line, the number on the next: Homary. Round 11.)
     text.match(/^[|\t\v\f \u00a0\u1680\u2000-\u200a\u202f\u205f\u3000\ufeff]*order\s*:[\s|]*\n[\s|]*((?=[A-Z0-9-]*\d)[A-Z0-9][A-Z0-9-]{3,30})[\s|]*$/im) ||
     // A booking's own number ("Confirmation # : 2110090879", "Booking reference: ABC123"), so its later emails match it.
-    text.match(/\b(?:confirmation|booking|reservation)\s*(?:number|no\.?|ref(?:erence)?|code|#)\s*(?:is\s*)?[:#\s]*((?=[A-Z0-9-]*\d)[A-Z0-9][A-Z0-9-]{3,24})\b/i) ||
+    // (A booking reference of capitals only, "Your booking reference is: NTEFH", "Reservation summary for order AGQNAOQ". Round 15.)
+    text.match(/\b(?:[Bb]ooking|[Rr]eservation) [Rr]eference(?: is)?\s*:?\s*([A-Z]{5,8})\b(?![a-z])/) ||
+    text.match(/\b(?:[Ss]ummary|[Cc]onfirmation) for order\s+((?=[A-Z0-9]*[A-Z])[A-Z0-9]{5,12})\b(?![a-z])/) ||
+    // (Whole, never cut: "Your booking reference is 20220316-NZ194227806625361" as it is. Round 15.)
+    text.match(/\b(?:confirmation|booking|reservation)\s*(?:number|no\.?|ref(?:erence)?|code|#)\s*(?:is\s*)?[:#\s]*((?=[A-Z0-9-]*\d)[A-Z0-9][A-Z0-9-]{3,34})(?![A-Z0-9-])/i) ||
     // ("Confirmation: 6943887618", a hotel booking's number with no word for "number": digits only. Round 12.)
     text.match(/\b(?:confirmation|booking|reservation)\s*:\s*\|?\s*(\d{6,14})\b/i) ||
     // A shop that sends an invoice instead of an order confirmation ("Invoice number: INV-2290"): its number is the order's
@@ -926,12 +930,21 @@ function receiptSignals(subject, text) {
     // Round 13: "Los Pollos Bravos has your order!" (a takeaway app's order), "Your bill has been paid: #14541694" (a pub's
     // order-and-pay app), "wagamama receipt" (a shop's name and "receipt"), "APPROVED: Payment transaction for your order
     // M589966 … at Embassy of Nepal" (a card payment page's receipt). The body must still show a total, below.
+    // (Round 15: "CeX receipt :19593646", a shop's receipt by its number; "Your reservations have been made", a coach
+    // ticket's reservation.)
+    /\breceipt\s*[:#]\s*#?\d{4,}\s*$|\breservations? (?:have|has) been (?:made|confirmed)\b/.test(s) ||
     /\bhas (?:got )?your order\b|\byour order(?:'|’)?s (?:in the kitchen|being prepared|being made)\b|\byour bill (?:has been|was|is) paid\b|\bpayment transaction for your order\b|^\s*(?:(?:fwd?|fw)\s*:\s*)?[\w&'’.-]+(?:\s+[\w&'’.-]+){0,2}\s+(?:e-?)?receipt\s*$/.test(s);
   // (A total in euros counts as a total: the receipt is kept with its amount in euros, never turned into pounds.)
   // ("Amount paid | £20.62" with no word "total" counts too: coverage round.)
   // (A total in dollars counts too, "Total | $60.00": round 11.)
   const bodyHit = /\border\s*(number|no|id|ref|#)|\btotal\b[ \t|:]{0,40}(?:[£€]|US ?\$|\$\s?\d)|\btotal\b(?:\s*\([^)\n]{1,40}\))?[\s\S]{0,12}(?:[£€]|\$\s?\d)|^[^£€\n\r\u2028\u2029]*[£€].*\btotal\b|\bamount\s+paid\b[\s|:]{0,20}(?:[£€]|\$\s?\d)|^[|\t\v\f \u00a0\u1680\u2000-\u200a\u202f\u205f\u3000\ufeff]*(?:amount|total paid)\s*:[\s|]*£\s?\d/im.test(text);
-  return { subjectHit, bodyHit };
+  // (A restaurant's order email whose subject says nothing about it, "We're on it!": the email itself opens with "Thanks for
+  // your order" and names the order, "order #500dc2". Round 15.)
+  const top = String(text || "").slice(0, 2500);
+  const bodyOrder = /\bthanks? (?:you )?for your order\b/i.test(top) && /\border\s*#\s?[a-z0-9]{4,12}\b/i.test(top);
+  // (A booking's line "4 x Make a pot like Grayson Perry @ £40.00": what was bought and its price, with no total. Round 15.)
+  const atPrice = /^[ \t|]*\d{1,3}\s*x\s+[^\n@£|]{2,80}@\s*£\s?\d/m.test(String(text || "").slice(0, 20000));
+  return { subjectHit: subjectHit || bodyOrder, bodyHit: bodyHit || atPrice };
 }
 function looksLikeReceipt(subject, text) {
   const { subjectHit, bodyHit } = receiptSignals(subject, text);
@@ -1531,7 +1544,8 @@ function tillPounds(t) {
   // (A price set as three cells, "£" over "16" over "99" (Amazon's newer emails, as text): £16.99. Round 13.)
   if (t && /£[ \t|]*\n/.test(t)) t = t.replace(/£[ \t|]*\n[ \t|]*(\d{1,5})[ \t|]*\n[ \t|]*(\d{2})(?=[ \t|]*(?:\n|$))/g, "£$1.$2");
   // ("GBP 15.00" and "15.00 GBP", written that way throughout an email with no pound sign: pounds.)
-  if (t && !/£/.test(t) && /\bGBP\s?\d[\d,]*\.\d{2}\b/.test(t)) return t.replace(/\bGBP\s?(\d[\d,]*\.\d{2})\b/g, "£$1").replace(/\b(\d[\d,]*\.\d{2})\s?GBP\b/g, "£$1");
+  // ("GBR 23.89", a coach company's misspelt code for pounds, read the same. Round 15.)
+  if (t && !/£/.test(t) && /\bGB[PR]\s?\d[\d,]*\.\d{2}\b/.test(t)) return t.replace(/\bGB[PR]\s?(\d[\d,]*\.\d{2})\b/g, "£$1").replace(/\b(\d[\d,]*\.\d{2})\s?GBP\b/g, "£$1");
   // ("137.5 GBP", "17 GBP", "0 GBP": a shop that drops the pence it doesn't need, Detale; only in an email that writes an
   // amount with one figure of pence, so that is how it writes money. Round 11.)
   const twoPlaces = (n, p) => n + "." + String(p || "").padEnd(2, "0");
@@ -2080,6 +2094,21 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
       }
     }
   }
+  // (Items set out as labelled fields, "Item:", "Quantity:", "Unit Price:", or as "4 x Name @ £40.00": taken when the other
+  // readings found nothing whole and these come to what the email says (or there is no total to come to). Round 15.)
+  if (!(result.itemsCheck && result.itemsCheck.complete) && !isFlight) {
+    const li = labelledItems(plain || text).length ? labelledItems(plain || text) : labelledItems(fromHtml || text);
+    if (li.length) {
+      const ck = checkItems(li, moneyOf(text), result.totalPence);
+      if (ck.complete || (result.totalPence == null && !result.items.length)) { result.items = li; result.itemsCheck = ck; }
+    }
+  }
+  // (A coach ticket's "Ticket Price: £22.89" is the journey the email names, "From: Nottingham, Greyfriars Gate" … "To:
+  // London, Victoria Coach Station": "Nottingham to London". Round 15.)
+  if (result.items.length === 1 && /^(?:ticket price|ticket|fare|price)$/i.test(String(result.items[0].name || "").trim())) {
+    const fr = /^[ \t|]*from\s*:\s*(\p{Lu}[\p{L}' .-]{1,30}?)\s*[,(]/imu.exec(text), to = /^[ \t|]*to\s*:\s*(\p{Lu}[\p{L}' .-]{1,30}?)\s*[,(]/imu.exec(text);
+    if (fr && to && fr[1] !== to[1]) { result.items[0] = { ...result.items[0], name: fr[1].trim() + " to " + to[1].trim() }; result.itemsCheck = { ...checkItems(result.items, moneyOf(text), result.totalPence), ...namesCheck(result.items, {}) }; }
+  }
   // (A ticket seller's "Payment Summary": the tickets under the event's name, each per-ticket fee and the order's handling fee,
   // as the summary lists them, when they come to the total. Round 15.)
   const tixItems = ticketSummary(fromHtml || text, result.totalPence) || (plain ? ticketSummary(plain, result.totalPence) : null);
@@ -2566,7 +2595,8 @@ export function parseReturnUpdateEmail(rawEmail) {
   if (PERSONAL_MAIL.test(sender?.domain || "") && shop.name && !shop.domain && looksLikePerson(shop.name, null)) shop.name = null;
   const refDate = headers.date ? new Date(headers.date) : null;
   // (A labelled amount with the money on the line under its label, "Refunded total: |" over "£6.90", is the refund. Round 12.)
-  const amt = stage === "refunded" ? (both.match(/\b(?:refund(?:ed)? (?:total|amount|value)|total (?:refund(?:ed)?|amount refunded)|amount refunded|refund due)\s*:?[\s|]{0,12}£\s*([0-9][0-9,]*\.[0-9]{2})/i) ||
+  // (The whole refund first, "Total Amount Refunded: £137.95", over the item's "Refund Value: £135.00" above it. Round 15.)
+  const amt = stage === "refunded" ? (both.match(/\btotal (?:amount )?refunded\s*:?[\s|]{0,12}£\s*([0-9][0-9,]*\.[0-9]{2})/i) || both.match(/\b(?:refund(?:ed)? (?:total|amount|value)|total (?:refund(?:ed)?|amount refunded)|amount refunded|refund due)\s*:?[\s|]{0,12}£\s*([0-9][0-9,]*\.[0-9]{2})/i) ||
     both.match(/refund(?:ed)?[^£\n]{0,60}£\s*([0-9][0-9,]*\.[0-9]{2})/i) || both.match(/£\s*([0-9][0-9,]*\.[0-9]{2})[^.\n]{0,40}\brefund/i) ||
     // ("A refund of £3 has been initiated": whole pounds. Round 15.)
     both.match(/\ba refund of £\s*([0-9][0-9,]{0,8})(?![\d.,])/i)) : null;
