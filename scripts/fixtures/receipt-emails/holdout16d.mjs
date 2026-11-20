@@ -73,5 +73,16 @@ export default function holdout16d() {
         "Payment to: The Riverside Herald Ltd accounts@riversideherald.example | Payment from: " + SHOPPER.name, "Invoice ID: WC-31002", "Delivery address", SHOPPER.name + " " + SHOPPER.address,
         "Quantity | 1", "Item | 3 Month Print Subscription (United Kingdom)", "ID number |", "Price | €80.00 EUR", "Subtotal | €80.00 EUR", "Total | €80.00 EUR", "You paid using: Apple Pay - AmEx 1004"]) },
     order([{ name: "3 Month Print Subscription (United Kingdom)", qty: 1, unit: 8000 }]), "The Riverside Herald Ltd", "2023-09-25", { currency: "EUR", shopAlso: ["The Riverside Herald", "Riverside Herald"] });
+  // ---- PayPal's "You've submitted an order": an order paid through PayPal, the seller named, the thing not described -------------
+  {
+    const f = fixture("holdout16d-paypal-submitted-order", "PayPal", "'You've submitted an order in the amount of £25.00 GBP to …', 'You placed a £25.00 GBP order with … (help@…)', 'Seller' over the name, an empty Description",
+      { from: '"service@paypal.co.uk" <service@paypal.co.uk>', subject: "You've submitted an order in the amount of £25.00 GBP to Cellar Club Onlined Limited", date: "Fri, 14 Feb 2025 01:06:10 +0000",
+        html: htmlPage("PayPal", ["You've submitted an order in the amount of £25.00 GBP to Cellar Club Onlined Limited", `${SHOPPER.name}, thanks for using PayPal.`, `Hi ${SHOPPER.name},`,
+          "You placed a £25.00 GBP order with Cellar Club Onlined Limited (help@cellarclub.example)", "You won't be charged until Cellar Club Onlined Limited processes your order.",
+          "Transaction ID", "O-1AB23456C78901234", "Transaction date", "14 February 2025 01:06:04 GMT", "Seller", "Cellar Club Onlined Limited", "help@cellarclub.example",
+          "Description | Unit price | Qty | Amount", " | £25.00 GBP | 1 | £25.00 GBP", "Subtotal | £25.00 GBP", "Total | £25.00 GBP", "Funding sources used (total) | Mastercard-1234 | £25.00 GBP"]) },
+      { ...expected("Cellar Club Onlined Limited", "2025-02-14", order([])), items: [], totalPence: 2500 });
+    out.push(f);
+  }
   return out;
 }

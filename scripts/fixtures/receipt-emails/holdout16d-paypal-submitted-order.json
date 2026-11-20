@@ -1,0 +1,24 @@
+{
+ "id": "holdout16d-paypal-submitted-order",
+ "sender": "PayPal",
+ "layout": "'You've submitted an order in the amount of £25.00 GBP to …', 'You placed a £25.00 GBP order with … (help@…)', 'Seller' over the name, an empty Description",
+ "headers": {
+  "from": "\"service@paypal.co.uk\" <service@paypal.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "You've submitted an order in the amount of £25.00 GBP to Cellar Club Onlined Limited",
+  "date": "Fri, 14 Feb 2025 01:06:10 +0000"
+ },
+ "html": "<html><head><title>PayPal</title></head><body><table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"><tr><td>You've submitted an order in the amount of &pound;25.00 GBP to Cellar Club Onlined Limited</td></tr>\n<tr><td>Sam Taylor, thanks for using PayPal.</td></tr>\n<tr><td>Hi Sam Taylor,</td></tr>\n<tr><td>You placed a &pound;25.00 GBP order with Cellar Club Onlined Limited (help@cellarclub.example)</td></tr>\n<tr><td>You won't be charged until Cellar Club Onlined Limited processes your order.</td></tr>\n<tr><td>Transaction ID</td></tr>\n<tr><td>O-1AB23456C78901234</td></tr>\n<tr><td>Transaction date</td></tr>\n<tr><td>14 February 2025 01:06:04 GMT</td></tr>\n<tr><td>Seller</td></tr>\n<tr><td>Cellar Club Onlined Limited</td></tr>\n<tr><td>help@cellarclub.example</td></tr>\n<tr><td>Description</td><td>Unit price</td><td>Qty</td><td>Amount</td></tr>\n<tr><td></td><td>&pound;25.00 GBP</td><td>1</td><td>&pound;25.00 GBP</td></tr>\n<tr><td>Subtotal</td><td>&pound;25.00 GBP</td></tr>\n<tr><td>Total</td><td>&pound;25.00 GBP</td></tr>\n<tr><td>Funding sources used (total)</td><td>Mastercard-1234</td><td>&pound;25.00 GBP</td></tr></table></body></html>",
+ "text": "",
+ "expected": {
+  "shop": "Cellar Club Onlined Limited",
+  "date": "2025-02-14",
+  "currency": "GBP",
+  "items": [],
+  "subtotalPence": 0,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 2500
+ }
+}

@@ -891,6 +891,8 @@ function receiptSignals(subject, text) {
     /\byour\b[^!?]{0,30}\b(?:trip|ride|order)\b[^!?]{0,20}\bwith\b|\byour\b[^!?]{0,30}\border from\b|\bprocessing your order\b|\byour\b[^!?]{0,30}\bpurchase (?:from|with|at)\b|\breceipt for your payment\b|\byour\b[^!?]{0,20}\btickets? for\b/.test(s) ||
     // "Your Sainsbury's order summary" (round 8).
     /\byour\b[^!?]{0,40}\border summary\b/.test(s) ||
+    // PayPal's "You've submitted an order in the amount of £25.00 GBP to …": an order paid through PayPal (round 15).
+    /^\s*(?:(?:fwd?|fw)\s*:\s*)?you(?:'|’)?ve submitted an order\b/.test(s) ||
     // "Your payment #39814759" (a bar's order-and-pay app), "Payment receipt for …" (round 11).
     /^\s*(?:(?:fwd?|fw)\s*:\s*)?your payment\s+(?:no\.?\s*|number\s*)?#\s?\d{4,}\s*$|^\s*(?:(?:fwd?|fw)\s*:\s*)?payment receipt\b/.test(s) ||
     // "Order Info - DET-7vxlt1dlf1s", "NESPRESSO Club: Your order on www.nespresso.com" (round 11).
@@ -1072,6 +1074,7 @@ function transactionBlockItems(text) {
 
 // A PayPal receipt lists each thing as its name, "Qty: 2", an optional "Product ID: …" line and its price in the payment's
 // currency ("US$5.00", "£3.99", "€4.00", "MX$30.94"), the cells' "|" around them. Round 13.
+const PAYPAL_LABEL = /^(?:funding sources? used|paid with|paid using|you paid using|sent (?:to|from)|transaction (?:id|date)|seller|instructions to seller|payment from|payment to)\b/i;
 function payPalItems(text) {
   const lines = String(text || "").split("\n").map((l) => l.replace(/\|/g, " ").replace(/\s+/g, " ").trim()).filter(Boolean);
   const out = [];
@@ -1364,7 +1367,9 @@ function shopOf({ ld, sender, fromName, subject, text, html, otherText }) {
       text.match(/\byour PayPal Debit Card (?:ending in [•·*.\d ]{2,12} )?at ([^\n|]{2,40}?) on \d{1,2} [A-Za-z]{3,9} \d{4}/i) ||
       // (PayPal's older receipt: "Payment to: The Clare Champion Ltd accounts@…", "purchase details from The Clare Champion Ltd
       // on 25 September 2023". Round 15.)
-      text.match(/^[ \t|*]*payment to\s*:\s*([^\n|@]{2,60}?)\s+[^\s@|]+@[^\s|]+/im) || text.match(/\bpurchase details from ([^\n|]{2,60}?) on \d{1,2} [A-Za-z]{3,9} \d{4}/i) ||
+      text.match(/^[ \t|*]*payment to\s*:\s*([^\n|@]{2,60}?)\s+[^\s@|]+@[^\s|]+/im) ||
+      // (PayPal's "You placed a £25.00 GBP order with Virgin Wines Onlined Limited (help@…)", "Seller" over the name. Round 15.)
+      text.match(/\byou placed an? [^\n]{0,30}?\border with ([^\n(|]{2,60}?)\s*\(/i) || text.match(/^[ \t|*]*seller[ \t|]*\n[ \t|]*([^\n|@]{2,60}?)[ \t|]*$/im) || text.match(/\bpurchase details from ([^\n|]{2,60}?) on \d{1,2} [A-Za-z]{3,9} \d{4}/i) ||
       /\b[Pp]ayment transaction\b.*\sat\s+(\p{Lu}[\p{L}\d&'’. -]{2,40}?)\s*$/u.exec(subject) || [])[1] || "").replace(/\s+\S+@\S+$/, "") || null) : null,
     linkDomain: mainLinkDomain(html),
     // (The game's name is a heading in the HTML; a plain-text part may not carry it at all.)
@@ -2153,6 +2158,11 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
     if (pp.length) { result.items = pp; const sum = pp.reduce((n, i) => n + (i.pricePence ?? 0) * (i.qty || 1), 0); result.itemsCheck = result.currency === "GBP" ? checkItems(pp, moneyOf(text), result.totalPence) : { complete: null, itemsPence: sum, expectedPence: result.totalPence ?? null, missingPence: null, foreignItems: true }; }
   }
   // (An order number PayPal gives under its label, "Order ID |" over "58d0cf0e-7b50-4c34-a8bd-ebc59dd2d0b8", however long.)
+  // (PayPal's own labels are never the thing bought: "Funding sources used (total)", "Sent to …", "Seller". Round 15.)
+  if (viaPayPal && result.items.some((i) => PAYPAL_LABEL.test(String(i.name || "")))) {
+    result.items = result.items.filter((i) => !PAYPAL_LABEL.test(String(i.name || "")));
+    result.itemsCheck = checkItems(result.items, moneyOf(text), result.totalPence);
+  }
   // (A PayPal Debit Card purchase in a shop names no order: its PayPal transaction ID, "Transaction ID |" over
   // "0HJ67367JW2999345", is the reference the shopper and PayPal go by. Round 15.)
   if (!result.orderRef && viaPayPal && /\bPayPal Debit Card\b/i.test(text.slice(0, 3000))) { const tid = /\btransaction id[ \t|:]*(?:\n[ \t|]*){0,3}([A-Z0-9]{17})\b/i.exec(text); if (tid) result.orderRef = tid[1]; }

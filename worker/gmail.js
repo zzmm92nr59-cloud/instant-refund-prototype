@@ -2104,7 +2104,9 @@ export function attachDeliveries(orders, deliveries) {
     let best = o.shipment ? { status: o.shipment.status || "shipped", at: null, carrier: o.shipment.carrier || null, trackingNumber: t || null } : null;
     for (const d of deliveries) {
       let hit = (d.trackingNumber && nums.has(d.trackingNumber)) || byRef(d);
-      if (!hit && !d.trackingNumber && d.merchant && o.orderDate && d.at) {
+      // (Never by the shop's name alone when the parcel's email names an order and this card has another number: a wine
+      // order's delivery is not the same shop's monthly top-up's. Round 15.)
+      if (!hit && !d.trackingNumber && d.merchant && o.orderDate && d.at && !(d.orderRef && o.orderRef)) {
         const word = letters(d.merchant.split(/\s+/)[0]);
         const days = (Date.parse(d.at) - Date.parse(o.orderDate)) / 86400000;
         hit = word.length >= 3 && (letters(o.retailer && o.retailer.name).includes(word) || storeKey(o).includes(word)) && days >= 0 && days <= 31 &&

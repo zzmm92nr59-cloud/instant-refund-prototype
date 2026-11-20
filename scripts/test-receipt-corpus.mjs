@@ -431,6 +431,12 @@ const joinWrong = [];
   if (debit.orderRef !== "4AB12345CD6789012") joinWrong.push("a PayPal Debit Card purchase's reference read as " + debit.orderRef);
   const older = parseReceiptEmail(rawEmail(fx("holdout16d-paypal-older-receipt")));
   if (older.orderRef !== "WC-31002") joinWrong.push("PayPal's older receipt's Invoice ID read as " + older.orderRef);
+  // A parcel's news for one order of a shop (it names V-5550001AA) never joins the same shop's other card by its name alone
+  // (a monthly top-up paid through PayPal, numbered WB-…).
+  const topUp = { id: "wb", kind: "receipt", retailer: { name: "Cellar Club Online L", domain: null, via: "paypal.co.uk" }, orderRef: "WB10000001-P001", orderDate: "2025-07-14", totalPence: 2500, items: [{ name: "Wine Plan recurring p", qty: 1, pricePence: 2500 }] };
+  const delivery = { kind: "delivery_update", status: "delivered", at: "2025-07-20", merchant: "Cellar Club", orderRef: "V5550001AA", trackingNumber: null, retailer: { name: "Cellar Club", domain: "cellarclub.example" } };
+  attachDeliveries([topUp], [delivery]);
+  if (topUp.delivery || topUp.returnBy) joinWrong.push("another order's delivery joined a top-up by the shop's name: " + JSON.stringify([topUp.delivery, topUp.returnBy]));
   // (Further apart than two minutes, or two shop receipts as near as each other: no guess, each stays its own card.)
   const p3 = { ...p1, id: "p3", sentAt: "2026-04-30T02:30:00.000Z" };
   if (mergeOrderEmails([g1, g2, p3]).length !== 3) joinWrong.push("a PayPal receipt five minutes from either game purchase was joined to one");
