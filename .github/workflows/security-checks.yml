@@ -56,3 +56,5 @@ jobs:
         run: node scripts/test-interests.mjs
       - name: First-run tips seen (kept with the account, only ids on the list, each account its own, exported and deleted with it)
         run: node scripts/test-tips.mjs
+      - name: Relay's team searching their own Outlook inbox (team only, own inbox only, read-only, Outlook busy, limits)
+        run: node scripts/test-outlook-search.mjs

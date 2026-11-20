@@ -144,6 +144,8 @@ export async function exportShopperData(env, shopper, now = Date.now()) {
     },
     // When you searched by photo, kept 2 days for the daily limit. The pictures themselves are never kept.
     photoSearches: (await rows("SELECT created_at AS at FROM photo_search_uses WHERE shopper_id = ? ORDER BY created_at", id)).map((r) => iso(r.at)),
+    // Relay's team only: when they searched or read their own Outlook inbox (kept 2 days for the daily limits; nothing from the emails).
+    outlookSearches: (await rows("SELECT kind, created_at AS at FROM outlook_search_uses WHERE shopper_id = ? ORDER BY created_at", id)).map((r) => ({ kind: r.kind, at: iso(r.at) })),
     swapAndSell: {
       listings: (await rows("SELECT id, title, store, size, condition, ask_pence AS askPence, swap_ok AS swapOk, note, area, status, created_at AS createdAt FROM resale_listings WHERE seller_id = ?", id))
         .map((l) => ({ ...l, swapOk: Boolean(l.swapOk), createdAt: iso(l.createdAt) })),
