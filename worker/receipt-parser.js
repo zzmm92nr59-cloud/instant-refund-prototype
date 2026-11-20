@@ -783,6 +783,16 @@ function extractReturns(text, html, orderDate) {
       break;
     }
   }
+  // (The window's start said apart from it, "30-Day Return" then "Within 30-Day Of Delivery". Round 15.)
+  if (out.windowDays && !out.windowFrom && !out.cancelWithin) {
+    const b = new RegExp("\\bwithin\\s+" + out.windowDays + "[-\\s]+(?:calendar\\s+|working\\s+)?days?\\s+(?:of|from|after)\\s+(?:the\\s+)?(delivery|receiv\\w*|receipt|dispatch\\w*|purchase|order\\w*)", "i").exec(flat);
+    if (b) out.windowFrom = /^(?:delivery|receiv|receipt|dispatch)/i.test(b[1]) ? "delivery" : "order";
+  }
+  // (The right to cancel an order of goods "within 14 days from receipt of the goods": the window, from delivery. Round 15.)
+  if (!out.windowDays) {
+    const rc = /\bright to cancel (?:your |the |this )?(?:order|contract|purchase)\s+within\s+(\d{1,3})\s+days?\s+(?:from|of|after)\s+(?:the\s+)?(?:receipt|delivery|receiving)\s+(?:of\s+)?(?:the\s+|your\s+)?(?:goods|items?|order|products?)\b/i.exec(flat.replace(/\s+/g, " "));
+    if (rc) { out.windowDays = Number(rc[1]); out.windowFrom = "delivery"; const sent = sentences.find((x) => /\bright to cancel\b/i.test(x) && x.length <= 420); if (sent && !out.instructions.includes(sent)) out.instructions.unshift(sent); }
+  }
   // Explicit date: "return by 14 November 2026".
   const byDate = flat.match(/return\w*[^.\n]{0,60}?\bby\s+(\d{1,2}(?:st|nd|rd|th)?\s+[A-Za-z]{3,9}\.?,?\s+\d{4}|\d{4}-\d{2}-\d{2})/i);
   if (byDate) out.deadline = parseDate(byDate[1]);
@@ -1863,6 +1873,9 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   // ("Order Confirmation: #32297 | Vape and Go", or the body's "Your order (32297) has been received": the order's number,
   // with the shop's name after it in the subject. Round 15.)
   if (!result.orderRef) { const sr = /\border\s+(?:confirmation|confirmed|received|placed|update|status)\s*:?\s*#\s?(\d{3,12})\b/i.exec(String(subject || "")) || /\byour order \(#?(\d{3,12})\) (?:has been|is|was)\b/i.exec(text); if (sr) result.orderRef = sr[1]; }
+  // ("Merchant Reference: a82d1340-3ad7-4d8d-9352-1c48ea195b90", a card payment page's receipt: the shop's own number for the
+  // payment, whole. Round 15.)
+  if (!result.orderRef) { const mr = /\bmerchant (?:reference|ref\.?)(?: number)?\s*:?[ \t|]*((?=[A-Za-z0-9-]*\d)[A-Za-z0-9][A-Za-z0-9-]{5,63})(?![A-Za-z0-9-])/i.exec(text); if (mr) result.orderRef = mr[1]; }
   // ("Order TSR89717 confirmed": a number of letters and digits right after "Order", with what happened to it after. Round 15.)
   if (!result.orderRef) { const sr = /^\s*(?:(?:fwd?|fw)\s*:\s*)*(?:your\s+)?order\s+#?((?=[A-Za-z0-9-]*\d)(?=[A-Za-z0-9-]*[A-Za-z])[A-Za-z0-9-]{5,20}|\d{5,14})\s+(?:is\s+|has\s+been\s+)?(?:confirmed|received|placed|shipped|dispatched|despatched|on its way)\b/i.exec(String(subject || "")); if (sr) result.orderRef = sr[1]; }
   // Price wording ("Was £2,200", "You saved £330") sits on its own line in some shops' emails: it is never an item.

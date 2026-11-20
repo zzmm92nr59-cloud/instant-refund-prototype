@@ -202,5 +202,28 @@ export default function holdout16c() {
       html: mail("Slice Street", "slicestreet.example", ["Your order 7QKAQK has been accepted by Slice Street and is being prepared.", "1 x | Large Margherita | £12.95", "1 x | Cola (can) | £2.00", "PIZZA20", "20% discount first order only", "Subtotal | £11.96", "Total | £11.96"]) },
       o, "Slice Street", "2026-11-13", { orderRef: "7QKAQK" });
   }
+  // ---- A mattress maker: "you also have the right to cancel your order within 14 days from receipt of the goods" -------------
+  {
+    const o = order([{ name: "Cloudrest Medium Mattress (King Size)", qty: 1, unit: 69900 }]);
+    add("holdout16c-right-to-cancel-from-receipt", "Restwell", "'Order number: 5180999123'; 'Cloudrest Medium Mattress (King Size) | 1 | £699.00'; 'Total | £699.00'; 'Where this does not apply, you also have the right to cancel your order within 14 days from receipt of the goods.'", {
+      from: "Restwell <orders@restwell.example>", subject: "Your Restwell order confirmation", date: "Tue, 10 Nov 2026 10:00:00 +0000",
+      html: mail("Restwell", "restwell.example", ["Order number: 5180999123", "Cloudrest Medium Mattress (King Size) | 1 | £699.00", "Total | £699.00", "Selected items may include an extended home trial period. Where this does not apply, you also have the right to cancel your order within 14 days from receipt of the goods."]) },
+      o, "Restwell", "2026-11-10", { orderRef: "5180999123" });
+  }
+  // ---- A homeware shop: "30-Day Return" over "Within 30-Day Of Delivery"; a card page's "Merchant Reference:" ----------------
+  {
+    const o = order([{ name: "Arched Floor Mirror", qty: 1, unit: 8999 }]);
+    add("holdout16c-window-start-apart", "Homeloft", "'Order: UKB2507301203130001'; '30-Day Return' over 'Within 30-Day Of Delivery'; 'Arched Floor Mirror | 1 | £89.99'; 'Total | £89.99'", {
+      from: "Homeloft <service@homeloft.example>", subject: "Thanks for your order", date: "Wed, 11 Nov 2026 10:00:00 +0000",
+      html: mail("Homeloft", "homeloft.example", ["Order number: UKB2507301203130001", "30-Day Return", "Within 30-Day Of Delivery", "Arched Floor Mirror | 1 | £89.99", "Total | £89.99"]) },
+      o, "Homeloft", "2026-11-11", { orderRef: "UKB2507301203130001" });
+  }
+  {
+    const o = order([{ name: "Credits", qty: 1, unit: 1120 }]);
+    add("holdout16c-merchant-reference", "Payzone Pages", "subject 'Payment Confirmation'; 'Merchant Reference: 9f2d1340-3ad7-4d8d-9352-1c48ea195b11'; 'Credits | £11.20'; 'Total | £11.20'", {
+      from: "Payzone Pages <receipts@payzonepages.example>", subject: "Payment Confirmation", date: "Thu, 12 Nov 2026 10:00:00 +0000",
+      html: mail("Payzone Pages", "payzonepages.example", ["Thank you for your payment", "Merchant Reference: 9f2d1340-3ad7-4d8d-9352-1c48ea195b11", "Credits | £11.20", "Total | £11.20"]) },
+      o, "Payzone Pages", "2026-11-12", { orderRef: "9f2d1340-3ad7-4d8d-9352-1c48ea195b11" });
+  }
   return out;
 }
