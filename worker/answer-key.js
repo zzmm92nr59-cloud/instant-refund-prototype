@@ -12,7 +12,7 @@
 //  * It only measures. What shoppers see is unchanged, and it's the reader's own reading that's checked: a shopper's
 //    corrections ("Fix this receipt") are left out.
 import { mergeOrderEmails } from "./gmail.js";
-import { shopDisplayName, agreedShopNames, PERSONAL_MAIL } from "./receipt-category.js";
+import { shopDisplayName, agreedShopNames, agreedNameFor, PERSONAL_MAIL } from "./receipt-category.js";
 import { cleanItems, isVia, domainBase, nameFitsDomain } from "./receipt-reader.js";
 import { ensureOrderRefColumn } from "./order-ref.js";
 
@@ -58,7 +58,7 @@ const validDay = (d) => /^\d{4}-\d{2}-\d{2}$/.test(String(d || "")) && Number.is
 function shownName(card, agreed) {
   const r = card.retailer || {}, domain = r.domain ? String(r.domain).toLowerCase().replace(/[^a-z0-9.-]/g, "") : null;
   if (domain && PERSONAL_MAIL.test(domain)) return null;
-  return (domain && agreed && agreed.get(domain)) || shopDisplayName({ ...r, domain }) || null;
+  return (domain && agreed && agreedNameFor(agreed, r, domain)) || shopDisplayName({ ...r, domain }) || null;
 }
 function shopsDomain(card) {
   const d = String((card.retailer && card.retailer.domain) || "").toLowerCase();

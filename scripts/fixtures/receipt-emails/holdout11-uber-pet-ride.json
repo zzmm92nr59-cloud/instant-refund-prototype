@@ -18,12 +18,12 @@
    {
     "name": "Uber Pet ride",
     "qty": 1,
-    "linePence": 2785
+    "linePence": 2562
    }
   ],
-  "subtotalPence": 2785,
-  "feesPence": 0,
-  "discountsPence": 0,
+  "subtotalPence": 2562,
+  "feesPence": 347,
+  "discountsPence": 124,
   "tipsPence": 0,
   "totalPence": 2785
  }
