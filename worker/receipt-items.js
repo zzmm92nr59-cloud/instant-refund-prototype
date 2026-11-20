@@ -744,6 +744,8 @@ export function moneyOf(text) {
     if (cells.length === 1 && /^\d{1,3}\s?x\s+\S/i.test(label) && !DISCOUNT_LABEL.test(label)) continue;
     // The VAT added on top of a subtotal ("VAT charged at 20% | £1.83", "VAT - United Kingdom (20%) | £12.78"): kept apart, so
     // the check can tell prices that include it (Apple) from prices that don't (a software invoice). Round 10.
+    // (A dash set apart by spaces between the VAT and its amount, "VAT 20% - £2.20", is no minus. Round 15e.)
+    if (amt.neg && cells.length === 1 && /^(?:vat|tax)\b/i.test(label) && /\s[-–]\s+£/.test(cells[0])) amt = { ...amt, neg: false };
     if (/^(?:vat|tax)\b(?!\s*(?:no|number|id|reg))[^|]{0,40}$/i.test(label) && !/\b(?:included|inclusive|incl)\b/i.test(label) && !amt.neg) { if (out.vat == null) out.vat = amt.p; continue; }
     // (An offer's name can be long, "Up to 80% off almost everything, plus FREE delivery!" over "- £3.48": money off. Round 15.)
     if ((NOT_MONEY_LINE.test(label) && !/^(?:city|tourist|local|resort|accommodation) tax\b/i.test(label)) || label.length > (amt.neg ? 90 : 50)) continue;

@@ -1745,7 +1745,7 @@ function soleBulletOverTotal(text, m, total) {
     while (k < rows.length && names.length < 3) {
       const b = /^[-•·*]\s*(.*)$/.exec(rows[k]);
       if (!b) break;
-      const name = b[1] || rows[k + 1] || ""; k += b[1] ? 1 : 2;
+      const rest = b[1].replace(/^[\s|]+/, ""), name = rest || rows[k + 1] || ""; k += rest ? 1 : 2;
       if (!/^[\p{Lu}\d][^£$€:]{2,90}$/u.test(name) || !/\p{L}{3}/u.test(name)) return null;
       const q = /^[x×]\s?(\d{1,4})$/i.exec(rows[k] || "");
       if (q) { pack = rows[k].replace(/\s+/g, " "); k++; }
@@ -1755,6 +1755,30 @@ function soleBulletOverTotal(text, m, total) {
     const t = /^(?:order )?total\s*:?\s*£\s?([\d,]+\.\d{2})$/i.exec(rows[k] || "");
     if (!t || money(t[1]) !== total) return null;
     return { name: names[0], qty: 1, pricePence: total, ...(pack ? { variant: pack } : {}) };
+  }
+  return null;
+}
+// Column headings on lines of their own, "Item" over "Price", then each thing's name over its price, a plan's price perhaps
+// with its period, "Plus: 1-month subscription" over "£10.99/month", up to the money lines: those things, when they come to
+// what the email says (with its VAT on top when it sets that out). Round 15e.
+function stackedColumns(text, m, total) {
+  if (total == null) return null;
+  const rows = String(text || "").split("\n").map((x) => x.replace(/^[\s|]+|[\s|]+$/g, "")).filter(Boolean);
+  const PRICE = /^£\s?([\d,]+\.\d{2})(?:\s*(?:\/|per|a)\s*(?:month|mo|year|yr|annum|week))?$/i;
+  for (let i = 0; i + 3 < rows.length; i++) {
+    if (!/^(?:items?|products?|description|plan|service)$/i.test(rows[i]) || !/^(?:price|amount|cost)$/i.test(rows[i + 1])) continue;
+    const items = [];
+    let k = i + 2;
+    for (; k + 1 < rows.length && items.length < 10; k += 2) {
+      const p = PRICE.exec(rows[k + 1]);
+      if (!p || !/\p{L}{3}/u.test(rows[k]) || rows[k].length > 100 || /£|\b(?:sub-?total|total|vat|tax|discount|delivery)\b/i.test(rows[k])) break;
+      items.push({ name: rows[k], qty: 1, pricePence: money(p[1]) });
+    }
+    if (!items.length) return null;
+    const sum = items.reduce((n, x) => n + x.pricePence, 0);
+    const vat = m && m.vat != null ? m.vat : 0;
+    if (sum === total || (m && m.subtotal == null && !m.fees && !m.discounts && sum + vat === total)) return items;
+    return null;
   }
   return null;
 }
@@ -2227,6 +2251,10 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   if (!result.items.length && result.totalPence != null && !isFlight) {
     const one = soleBulletOverTotal(fromHtml || text, moneyOf(fromHtml || text), result.totalPence) || (plain ? soleBulletOverTotal(plain, moneyOf(plain), result.totalPence) : null);
     if (one) { result.items = [one]; result.itemsCheck = checkItems(result.items, moneyOf(fromHtml || text), result.totalPence); }
+    else {
+      const cols = stackedColumns(fromHtml || text, moneyOf(fromHtml || text), result.totalPence) || (plain ? stackedColumns(plain, moneyOf(plain), result.totalPence) : null);
+      if (cols) { result.items = cols; result.itemsCheck = checkItems(cols, moneyOf(fromHtml || text), result.totalPence); }
+    }
   }
   // (A code's percentage off with no amount, "ASSENHEIMS20" / "20% discount first order only", the subtotal already after
   // it (the old one struck through): when the items less that percentage come to what the email says, that is the money
