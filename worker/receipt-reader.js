@@ -234,6 +234,8 @@ export function cleanItem(item) {
   name = name.replace(/\s*[-–:|]+$/, "").trim();
   // (A list's dash or bullet before the name, "- Payment for invoice(s) 250515", is not part of it. Round 15.)
   name = name.replace(/^(?:[-–•·*]\s+)+(?=\S)/, "");
+  // (Amazon's "Gift wrap: No" note run into the next item's title, "Gift wrap: No 12packs Bath Bombs…": not part of it.)
+  name = name.replace(/^gift ?wrap(?:ped)?:\s*(?:yes|no)\s+(?=\S{2})/i, "");
   if (letters(name).replace(/[0-9]/g, "").length < 2) return null;
   if (/:\s*$/.test(item.name.trim()) || /:$/.test(name)) return null;
   if (CARD_DIGITS.test(name) || MONEY_WORDS.test(name) || LABEL_ONLY.test(name) || OFFER_LINE.test(name)) return null;

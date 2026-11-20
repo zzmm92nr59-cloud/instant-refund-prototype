@@ -197,5 +197,21 @@ export default function holdout16d() {
       html: htmlPage("Stripe", ["Receipt from Brainwave, Inc.", "$11.08", "Paid March 1, 2026", "Receipt number 2700-0001", "Receipt #2700-0001", "Mar 1–Apr 2, 2026", "Thinker Pro Subscription", "Qty 1 | $22.61", "Subtotal | $22.61",
         "Pro Subscription 51% Discount (51% off) | -$11.53", "Total | $11.08", "Amount paid | $11.08"]) },
     order([{ name: "Thinker Pro Subscription", qty: 1, unit: 2261 }], { discounts: [["Pro Subscription 51% Discount (51% off)", 1153]] }), "Brainwave, Inc", "2026-03-01", { currency: "USD", shopAlso: ["Brainwave", "Brainwave, Inc."] });
+  // A news site's subscription started on a trial: "Trial charge: GBP 1.00" is what was paid, not the monthly price after it.
+  add("holdout16d-subscription-trial-charge", "Financial Times", "'Your subscription is ready to use'; 'signed up to a Premium Digital subscription'; 'Trial charge: GBP 1.00', 'Monthly payment: GBP 55.00 per month'",
+    { from: "Financial Times <service@mail.ft.com>", subject: "Your subscription is ready to use", date: "Sat, 2 Dec 2023 10:00:00 +0000",
+      html: htmlPage("FT", ["Welcome to the Financial Times", "Hello Sam,", "You have signed up to a Premium Digital subscription with a trial price of GBP 1.00 for your first four weeks.", "Billing details",
+        "Trial charge: GBP 1.00", "Trial end date: 29 December 2023", "Monthly payment: GBP 55.00 per month", "Renewal date: 30 December 2023", "Payment method: Credit Card"]) },
+    order([{ name: "Premium Digital subscription (trial)", qty: 1, unit: 100 }]), "Financial Times", "2023-12-02");
+  // A holiday booked, its details only in the PDF it attaches: a purchase with its reference, nothing made up.
+  {
+    const f = fixture("holdout16d-holiday-documents-attached", "loveholidays", "'Booking Confirmation', 'Your Booking Reference: LOV1000001A', 'Please find all of your documents attached to this email', a PDF attached",
+      { from: "loveholidays <noreply@loveholidays.com>", subject: "Your loveholidays Booking Confirmation and Vouchers", date: "Mon, 29 May 2023 09:00:00 +0000",
+        html: htmlPage("loveholidays", ["Booking Confirmation", "Your Booking Reference: LOV1000001A", "Please find all of your documents attached to this email", "Hi Sam,", "Thank you for choosing loveholidays.",
+          "Your booking is now confirmed and your holiday countdown can now begin!", "Also attached is a PDF which contains the full details of your booking."]) },
+      { shop: "loveholidays", date: "2023-05-29", currency: null, totalPence: null, items: [], attachmentOnly: "pdf" });
+    f.attach = [{ type: "application/pdf", name: "booking.pdf" }];
+    out.push(f);
+  }
   return out;
 }

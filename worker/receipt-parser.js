@@ -914,6 +914,8 @@ function receiptSignals(subject, text) {
     /\byour\b[^!?\n]{0,60}\breceipt\s*\[#[\d-]{4,20}\]\s*$/.test(s) ||
     // "Thank You For Shopping At Tiffany & Co." with the order's details (round 15).
     /^\s*(?:(?:fwd?|fw)\s*:\s*)?thanks?(?: you)? for shopping (?:at|with)\b/.test(s) ||
+    // "Your subscription is ready to use" with what was charged for it (the Financial Times, round 15).
+    /^\s*(?:(?:fwd?|fw)\s*:\s*)?your subscription is (?:ready|confirmed|active)\b/.test(s) ||
     // "Confirmation of NEW Subscription!" (a creator subscription, round 15).
     /^\s*(?:(?:fwd?|fw)\s*:\s*)?confirmation of (?:new )?subscription\b/.test(s) ||
     // An airline's "Booking details | Departure: 14 December 2021 | LHR-WDH" (Lufthansa, round 15).
@@ -959,7 +961,7 @@ function receiptSignals(subject, text) {
   // (A total in euros counts as a total: the receipt is kept with its amount in euros, never turned into pounds.)
   // ("Amount paid | £20.62" with no word "total" counts too: coverage round.)
   // (A total in dollars counts too, "Total | $60.00": round 11.)
-  const bodyHit = /\bsubscribed for (?:US ?\$|\$|£|€)\s?\d{1,4}\.\d{2}\b|\btotal price for all passengers\b[\s|:]{0,20}(?:GBP|EUR|£|€)\s?\d|\btotal paid via\b[^\n]{0,40}(?:\n[^\n]{0,40}){0,10}?\s(?:£\s?\d[\d,]{0,9}\.\d{2}|\d[\d,]{0,9}\.\d{2}\s?(?:GBP|EUR|USD)\b)|\byour payment of £\s?\d[\d,]{0,9}(?:\.\d{2})? has been (?:successfully )?(?:processed|received|taken)\b|\border\s*(number|no|id|ref|#)|\btotal\b[ \t|:]{0,40}(?:[£€]|US ?\$|\$\s?\d)|\btotal\b(?:\s*\([^)\n]{1,40}\))?[\s\S]{0,12}(?:[£€]|\$\s?\d)|^[^£€\n\r\u2028\u2029]*[£€].*\btotal\b|\bamount\s+paid\b[\s|:]{0,20}(?:[£€]|\$\s?\d)|^[|\t\v\f \u00a0\u1680\u2000-\u200a\u202f\u205f\u3000\ufeff]*(?:amount|total paid)\s*:[\s|]*£\s?\d/im.test(text);
+  const bodyHit = /^[ \t|]*trial charge\s*:[ \t|]*(?:GBP|£)\s?\d|\bsubscribed for (?:US ?\$|\$|£|€)\s?\d{1,4}\.\d{2}\b|\btotal price for all passengers\b[\s|:]{0,20}(?:GBP|EUR|£|€)\s?\d|\btotal paid via\b[^\n]{0,40}(?:\n[^\n]{0,40}){0,10}?\s(?:£\s?\d[\d,]{0,9}\.\d{2}|\d[\d,]{0,9}\.\d{2}\s?(?:GBP|EUR|USD)\b)|\byour payment of £\s?\d[\d,]{0,9}(?:\.\d{2})? has been (?:successfully )?(?:processed|received|taken)\b|\border\s*(number|no|id|ref|#)|\btotal\b[ \t|:]{0,40}(?:[£€]|US ?\$|\$\s?\d)|\btotal\b(?:\s*\([^)\n]{1,40}\))?[\s\S]{0,12}(?:[£€]|\$\s?\d)|^[^£€\n\r\u2028\u2029]*[£€].*\btotal\b|\bamount\s+paid\b[\s|:]{0,20}(?:[£€]|\$\s?\d)|^[|\t\v\f \u00a0\u1680\u2000-\u200a\u202f\u205f\u3000\ufeff]*(?:amount|total paid)\s*:[\s|]*£\s?\d/im.test(text);
   return { subjectHit, bodyHit };
 }
 function looksLikeReceipt(subject, text) {
@@ -1831,7 +1833,7 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   // still the shop's receipt, read for what the email itself says (the shop, the day, a total if written), and it says
   // that the details are in the attachment. Nothing is read from the attachment, so nothing is made up.
   const attachedDoc = (parts.attached || []).find((a) => a.kind === "pdf" || a.kind === "image");
-  const saysAttached = Boolean(attachedDoc) && /\b(?:receipt|invoice|order|bill)\b[^.\n]{0,60}\b(?:is |are )?attached\b|\battached\b[^.\n]{0,40}\b(?:receipt|invoice)\b|\b(?:receipt|invoice)\b[^.\n]{0,30}\bas an? (?:pdf|attachment)\b/i.test(text.slice(0, 4000));
+  const saysAttached = Boolean(attachedDoc) && /\b(?:receipt|invoice|order|bill)\b[^.\n]{0,60}\b(?:is |are )?attached\b|\battached\b[^.\n]{0,40}\b(?:receipt|invoice)\b|\b(?:receipt|invoice)\b[^.\n]{0,30}\bas an? (?:pdf|attachment)\b|\battached is an? pdf\b[^.\n]{0,60}\b(?:details|booking|order)\b|\byour documents? (?:are |is )?attached\b|\b(?:all of )?your documents attached\b/i.test(text.slice(0, 4000));
   if (saysAttached) sig.bodyHit = true;
   // A flight booked with an airline or a travel site (flight-booking.js): its confirmation is the receipt even when it
   // doesn't say "order" ("Your booking is confirmed", "Ryanair Travel Itinerary", "Total paid GBP 245.98"). A check-in
@@ -2232,6 +2234,10 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   // (An airline's itinerary, "Receipt:", "Total paid via MasterCard ending in 4156 | 168.98 GBP": what was paid, the amount
   // before its currency's code. Round 15.)
   if (result.totalPence == null) { const tp = /\btotal paid via\b[^\n]{0,40}(?:\n[^\n]{0,40}){0,10}?\s(?:(£)\s?(\d[\d,]{0,9}\.\d{2})|(\d[\d,]{0,9}\.\d{2})\s?(GBP|EUR|USD)\b)/i.exec(text.slice(0, 20000)); if (tp) { result.totalPence = money(tp[2] || tp[3]); result.currency = tp[1] ? "GBP" : tp[4].toUpperCase(); result.itemsCheck = checkItems(result.items, moneyOf(text), result.totalPence); } }
+  // (A subscription's first, trial charge, "Trial charge: GBP 1.00" with "Monthly payment: GBP 55.00 per month" after it: the
+  // trial charge is what was paid; the monthly price is only what comes next. Round 15.)
+  if (result.totalPence == null || /^[ \t|]*trial charge\s*:/im.test(text.slice(0, 6000))) { const tc = /^[ \t|]*trial charge\s*:[ \t|]*(?:GBP ?|£ ?)(\d{1,4}\.\d{2})\b/im.exec(text.slice(0, 6000)); if (tc) { result.totalPence = money(tc[1]); result.currency = "GBP";
+    const plan = /\bsigned up to an? ([\p{L}][\p{L} ]{2,40}? subscription)\b/iu.exec(text.slice(0, 4000)); result.items = [{ name: plan ? plan[1] + " (trial)" : "Subscription (trial)", qty: 1, pricePence: result.totalPence }]; result.itemsCheck = { complete: true, itemsPence: result.totalPence, expectedPence: result.totalPence, missingPence: 0 }; } }
   // (A subscription confirmed as "Subscribed for $7.00": that money, in its own currency; the subscription is the thing. Round 15.)
   if (result.totalPence == null) { const sb = /\bsubscribed for (US ?\$|\$|£|€)\s?(\d{1,4}\.\d{2})\b/i.exec(text.slice(0, 6000)); if (sb) { result.totalPence = money(sb[2]); result.currency = sb[1] === "£" ? "GBP" : sb[1] === "€" ? "EUR" : "USD";
     if (!result.items.length) result.items = [{ name: "Subscription", qty: 1, pricePence: result.totalPence }]; result.itemsCheck = { complete: true, itemsPence: result.totalPence, expectedPence: result.totalPence, missingPence: 0 }; } }
