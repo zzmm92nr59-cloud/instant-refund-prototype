@@ -3296,8 +3296,12 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   const amazonFamily = /(^|\.)(?:amazon\.(?:co\.uk|com)|primevideo\.com)$/i.test(result.retailer.domain || sender?.domain || "") || amazonPasted ||
     (!(result.retailer.domain || sender?.domain) && /^amazon(?:\.co\.uk)?(?: prime video)?$/i.test(String(result.retailer.name || "")));
   if (!result.giftCardPence && Number.isInteger(result.totalPence) && amazonFamily) {
-    const g = /^[ \t|]*Gift Card(?: Amount)?[ \t]*:?[ \t|]*(?:\n[ \t|]*){0,2}[-−]£\s?(\d{1,5}(?:,\d{3})*\.\d{2})/im.exec(text);
-    const before = /^[ \t|]*Total[ \t]*:[ \t|]*(?:\n[ \t|]*){0,2}£\s?(\d{1,5}(?:,\d{3})*\.\d{2})/im.exec(text);
+    const g = /^[ \t|]*Gift (?:Certificate\/)?Card(?: Amount)?[ \t]*:?[ \t|]*(?:\n[ \t|]*){0,2}[-−]£\s?(\d{1,5}(?:,\d{3})*\.\d{2})/im.exec(text);
+    // (The older text receipt has no "Total:" line, only "Total Before Tax: £7.49" and "Tax Collected: £1.50" over
+    // "Gift Certificate/Card Amount: -£8.99" and "Grand Total: £0.00": what it cost is those two added up. Round 17.)
+    const pre = /^[ \t|]*Total Before (?:Tax|VAT)[ \t]*:[ \t|]*£\s?(\d{1,5}(?:,\d{3})*\.\d{2})[ \t|]*$/im.exec(text), taxed = pre && /^[ \t|]*(?:Tax Collected|VAT)[ \t]*:[ \t|]*£\s?(\d{1,5}(?:,\d{3})*\.\d{2})[ \t|]*$/im.exec(text);
+    const before = /^[ \t|]*Total[ \t]*:[ \t|]*(?:\n[ \t|]*){0,2}£\s?(\d{1,5}(?:,\d{3})*\.\d{2})/im.exec(text) ||
+      (pre && taxed ? [null, ((money(pre[1]) + money(taxed[1])) / 100).toFixed(2)] : null);
     // (Or the payment methods under "Order Total:", "Gift Card (£28.64)" "Visa (£0.00)", as a pasted page shows them; the
     // summary repeated over each parcel gives the gift card once.)
     let paidBy = 0;

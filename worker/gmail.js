@@ -2071,6 +2071,16 @@ export function mergeOrderEmails(orders, opts = {}) {
     // (A changed order's email, "We got your changes", never leads: the order's own confirmation keeps its day and number.)
     const [lead, ...rest] = g.slice().sort((a, b) => (a.orderUpdate === "amended") - (b.orderUpdate === "amended") || score(b) - score(a) || a.createdAt - b.createdAt);
     const c = { ...lead, items: (lead.items || []).map(i => ({ ...i })), returns: lead.returns ? { ...lead.returns } : null };
+    // (The order's day is the day it was placed: a date the emails state ("Order date: 1 September") over the day an email
+    // was sent, and among the days sent, the first. A re-sent confirmation or a status email can lead with its fuller
+    // list, but it never moves the order to its own later day. Round 17.)
+    if (c.orderDateFrom === "email" || !c.orderDate) {
+      const ok = (o) => o.orderDate && /^\d{4}-\d{2}-\d{2}/.test(String(o.orderDate)) && !isForwarded(o) && o.kind !== "return_update" && o.kind !== "refund";
+      const stated = g.filter((o) => ok(o) && o.orderDateFrom !== "email").map((o) => String(o.orderDate)).sort();
+      const sent = g.filter((o) => ok(o) && o.orderDateFrom === "email").map((o) => String(o.orderDate)).sort();
+      const day = stated[0] || sent[0];
+      if (day && (!c.orderDate || day < String(c.orderDate))) { c.orderDate = day; if (stated[0]) delete c.orderDateFrom; else c.orderDateFrom = "email"; }
+    }
     // The order as it now is: the latest change's whole list and estimated total ("We got your changes", sent after each
     // change) replace what the confirmation listed, so taken-off items are gone and added ones are there. Round 12.
     const changes = g.filter(o => o.orderUpdate === "amended" && (o.items || []).length).sort((a, b) => String(a.amendedAt || "").localeCompare(String(b.amendedAt || "")) || a.createdAt - b.createdAt);
