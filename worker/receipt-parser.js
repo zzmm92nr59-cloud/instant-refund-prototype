@@ -1526,7 +1526,9 @@ const MONEY_OFF_NOTE = /^(?:[\p{L}'’ -]{0,20}\s)?(?:discount|multi-?buy(?: dis
 // (Also the marketing email itself, dressed as a confirmation: "Order #58204 confirmed" … "Oops… there's no order here (yet)".)
 const NO_ORDER = /\bthere (?:was|is) no order\b|\bthere(?:'|’)s no order here\b|\bnothing (?:was|has been) (?:ordered|charged)\b|\bnothing has been charged\b|\byou (?:haven(?:'|’)t|have not) been charged (?:a penny|anything)\b|\bthere wasn(?:'|’)t one\b[^\n]{0,40}\bsorry\b/i;
 const UTILITY_BILL = /\b(?:on behalf of|(?:your )?payment to|thank you for your payment to)\s+(?:[\p{L}&'’.-]+\s){0,3}?(?:water|energy|electricity|gas|power|council|borough council|city council)(?:\s+(?:utilities|services|supply|plc|limited|ltd))*\b(?![\p{L}-])|\bcouncil tax (?:payment|bill)\b|\b(?:water|energy|gas|electricity) bill payment\b/iu;
-const ACCOUNT_DEPOSIT =/\bthank you for (?:making|your) (?:a )?deposit\b|\bdeposit of [^\n.]{1,30}? has (?:now )?been (?:credited|added) to your (?:account|balance|wallet)\b/i;
+// (Round 15: a gambling or trading site's "Thanks for depositing with partypoker", money put into an
+// account to play or trade with, never a purchase, like a bill or an investment.)
+const ACCOUNT_DEPOSIT =/\bthank you for (?:making|your) (?:a )?deposit\b|\bdeposit of [^\n.]{1,30}? has (?:now )?been (?:credited|added) to your (?:account|balance|wallet)\b|\bthanks? (?:you )?for depositing\b/i;
 const PAYMENT_PROBLEM = /\b(?:(?:couldn(?:'|’)?t|could not|were unable to|we(?:'|’)re unable to|unable to) (?:charge|take (?:the )?payment|process (?:your |the )?payment|authori[sz]e (?:your |the )?payment)|payment (?:was |has been )?declined|payment (?:has )?failed|problem with (?:the|your) payment method)\b/i;
 
 // An email as the reader sees it: its subject, sender and date, its plain-text part, and its HTML part turned into text the
@@ -1872,16 +1874,24 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   if (!opts.lenient && /^\s*(?:fwd?|fw)\s*:/i.test(String(subject || "")) && PERSONAL_MAIL.test(sender?.domain || "")) {
     const addr = (h) => ((String(h || "").match(/<([^>]+)>/) || [])[1] || String(h || "").trim()).toLowerCase();
     const nameOf = (h) => (String(h || "").match(/^\s*"?([^"<]+?)"?\s*</) || [])[1] || "";
-    const fromA = addr(headers.from), toName = nameOf(headers.to), fromName0 = nameOf(headers.from);
+    // (Gmail's two spellings of one address, "@gmail.com" and "@googlemail.com", are the same person's; with no name on the
+    // "To:" line, the addresses' own words say whether it is the same person. Round 15.)
+    const same = (a) => a.replace(/@googlemail\.com$/, "@gmail.com");
+    const fromA = same(addr(headers.from)), toName = nameOf(headers.to) || addr(headers.to).split("@")[0], fromName0 = nameOf(headers.from) || fromA.split("@")[0];
     const innerTo = /^[>\s*]*to:\s*(.+)$/im.exec(text.slice(0, 4000));
     const words = (n) => new Set(n.toLowerCase().split(/[^\p{L}]+/u).filter((w) => w.length >= 3));
-    const shared = [...words(fromName0)].some((w) => words(toName).has(w));
-    if (fromA && innerTo && innerTo[1].toLowerCase().includes(fromA) && toName && fromName0 && !shared) return { ok: false, reason: "someone_elses_purchase", source: "shopper_email" };
+    const squeezed = (n) => n.toLowerCase().replace(/[^\p{L}]+/gu, "");
+    const fromAll = fromName0 + " " + fromA.split("@")[0], toAll = toName + " " + addr(headers.to).split("@")[0];
+    const shared = [...words(fromAll)].some((w) => squeezed(toAll).includes(w)) || [...words(toAll)].some((w) => squeezed(fromAll).includes(w));
+    if (fromA && innerTo && same(innerTo[1].toLowerCase()).includes(fromA) && toName && fromName0 && !shared) return { ok: false, reason: "someone_elses_purchase", source: "shopper_email" };
   }
   // A notice that the payment didn't go through is not a receipt ("we couldn't charge your account for your order").
   if (PAYMENT_PROBLEM.test(subject || "") || PAYMENT_PROBLEM.test(text.slice(0, 1500))) {
     return { ok: false, reason: "payment_problem", source: "shopper_email" };
   }
+  // (Things someone else bought and sent to the shopper, Apple's "Youxian Huang has sent you the following items.", "… has
+  // sent you a gift": their purchase, not the shopper's. Round 15.)
+  if (/\b\p{Lu}[\p{L}'’-]{1,30}(?: \p{Lu}[\p{L}'’-]{1,30}){0,3} (?:has|have) sent you (?:the following items?|a gift|an? e-?gift|something)\b/u.test(text.slice(0, 3000))) return { ok: false, reason: "gift_received", source: "shopper_email" };
   // Money paid into an account to spend later (a deposit credited to a balance) is not a purchase.
   if (ACCOUNT_DEPOSIT.test(text.slice(0, 3000))) return { ok: false, reason: "account_deposit", source: "shopper_email" };
   // A payment towards a household bill (water, energy, council tax), taken by a card processor "on behalf of Thames Water

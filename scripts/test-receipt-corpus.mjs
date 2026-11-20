@@ -445,6 +445,22 @@ const joinWrong = [];
     joinWrong.push("a Booking.com stay paid at the property and its cancellation read as " + JSON.stringify([stayCard[0].payAtProperty, stayCard[0].cancelled, gone.orderRef, gone.free]));
   const exp = classifyEmail(rawEmail(fx("holdout16d-expedia-dollars-at-property"))).details;
   if (exp.orderRef !== "73000000000001" || !exp.payAtProperty) joinWrong.push("Expedia's itinerary read as " + JSON.stringify([exp.orderRef, exp.payAtProperty]));
+  // Not purchases: someone else's booking forwarded from their own Gmail (written "@googlemail.com" inside, no name on the "To:"
+  // line); money deposited to play poker; things someone else bought and had sent to the shopper. The shopper's own
+  // forward from another of their addresses, with no name on the "To:" line, is still theirs.
+  const mail = (lines) => lines.join("\r\n");
+  const theirs = mail(["From: Robin Ashdown <robin.ashdown@gmail.com>", "To: sam.taylor99@gmail.com", "Subject: Fwd: Booking Confirmation For Minster Hotel", "Date: Mon, 4 Dec 2023 10:00:00 +0000", "Content-Type: text/plain; charset=utf-8", "",
+    "Sent from my iPhone", "Begin forwarded message:", "> From: The Giftbox Team <team@giftbox.example>", "> Date: 3 December 2023 at 22:25:24 GMT", "> To: robin.ashdown@googlemail.com", "> Subject: Booking Confirmation For Minster Hotel",
+    ">", "> Thank you for your booking, your reservation details are below.", "> Booking reference: RSV10000000001", "> Check in", "> 22/12/23", "> TOTAL:", "> £207"]);
+  if (parseReceiptEmail(theirs).ok) joinWrong.push("someone else's booking forwarded from their Gmail read as the shopper's purchase");
+  const ownFwd = theirs.replace("From: Robin Ashdown <robin.ashdown@gmail.com>", "From: Sam Taylor <sam.taylor@outlook.com>").replace("> To: robin.ashdown@googlemail.com", "> To: sam.taylor@outlook.com");
+  if (!parseReceiptEmail(ownFwd).ok) joinWrong.push("the shopper's own forward from another address, no name on 'To:', not read");
+  const poker = mail(["From: \"Cardroom\" <info@emails.cardroom.example>", "To: " + SHOPPER.email, "Subject: Your deposit receipt", "Date: Tue, 29 Dec 2020 18:20:00 +0000", "Content-Type: text/plain; charset=utf-8", "",
+    "Your deposit receipt", "Hi,", "Thanks for depositing with Cardroom. You’ll find your deposit receipt below.", "Deposit Option: VISA", "Amount: GBP 10.00", "Transaction ID: 16090000000000001", "Status: CREDITED"]);
+  if (parseReceiptEmail(poker).ok) joinWrong.push("money deposited to play read as a purchase");
+  const sentToMe = mail(["From: Apple Store <shipping_notification@orders.apple.com>", "To: " + SHOPPER.email, "Subject: Your shipment is on its way. Order No. W1000000001", "Date: Wed, 25 Mar 2026 18:00:00 +0000", "Content-Type: text/plain; charset=utf-8", "",
+    "Your items have shipped.", "Jo Rivers has sent you the following items.", "Order Number: W1000000001", "Ordered on: 25/03/2026", "Personalised AirPods Pro 3", "Qty 1", "Engravings", "FREE"]);
+  if (parseReceiptEmail(sentToMe).ok) joinWrong.push("things someone else sent the shopper read as the shopper's purchase");
   // (Further apart than two minutes, or two shop receipts as near as each other: no guess, each stays its own card.)
   const p3 = { ...p1, id: "p3", sentAt: "2026-04-30T02:30:00.000Z" };
   if (mergeOrderEmails([g1, g2, p3]).length !== 3) joinWrong.push("a PayPal receipt five minutes from either game purchase was joined to one");
