@@ -245,7 +245,7 @@ export function cleanItem(item, stored = false) {
   if (tail) { name = name.slice(0, name.length - tail[0].trim().length).trim(); if (!qty || qty === 1) qty = Number(tail[1]) || qty; }
   // (A column table's other amounts run into the name, "Adult £771.00 £430.72" (the fare and its taxes beside the passenger
   // type): the name is what comes before them. Round 17.)
-  if (name.length <= 200 && /\S\s+£\s?\d[\d,]*\.\d{2}$/.test(name)) name = name.replace(/(?:\s+£\s?\d[\d,]*\.\d{2}){1,4}$/, "");
+  if (name.length <= 200 && /\S\s+£\s?\d[\d,]*\.\d{2}\s+£\s?\d[\d,]*\.\d{2}$/.test(name)) name = name.replace(/(?:\s+£\s?\d[\d,]*\.\d{2}){2,4}$/, "");
   name = name.replace(/\s*[-–:|]+$/, "").trim();
   // (A list's dash or bullet before the name, "- Payment for invoice(s) 250515", is not part of it. Round 15.)
   name = name.replace(/^(?:[-–•·*]\s+)+(?=\S)/, "");

@@ -818,6 +818,9 @@ export function moneyOf(text) {
     if (amt.neg && /^(?:outstanding |remaining )?balance\b|\bbalance (?:due|outstanding|remaining|to pay)\b|^amount (?:due|outstanding|remaining|left to pay)\b/i.test(label)) continue;
     if (amt.neg && (/^(?:\d{1,2}(?:st|nd|rd|th)? [A-Za-z]{3,9},? \d{4}|\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4})\b[^|\p{L}]{0,12}(?:\d{1,2}:\d{2}(?::\d{2})?)?$/u.test(label) || /^payments?\b/i.test(lines[i - 1] || ""))) continue;
     if (amt.neg || DISCOUNT_LABEL.test(label)) { out.discounts += amt.p; out.found.push(["discount", label, amt.p, amt.neg]); continue; }
+    // (An item's seller notes over its price, "Fulfilled by Amazon Gift wrap: No" then "£8.99": no gift wrap, no fee; the
+    // price is the item's. Round 17.)
+    if (/\bgift ?wrap(?:ped|ping)?\s*:\s*no\b|^(?:sold|fulfilled|dispatched|shipped) by\b/i.test(label)) continue;
     if (FEE_LABEL.test(label)) { out.fees += amt.p; out.found.push(["fee", label, amt.p]); continue; }
   }
   return out;

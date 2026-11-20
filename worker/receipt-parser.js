@@ -1161,6 +1161,8 @@ export function amazonItems(html, given) {
       // (A video's "Review this item" and "Original Air Date:" over the day it first aired sit before its price. Round 13.)
       let reach = i + 3;
       for (let k = i + 1; k <= i + 4 && /^(?:review this item|original air date:?|release date:?|\p{L}{3,9}\.? \d{1,2},? \d{4})$/iu.test(rows[k] || ""); k++) reach++;
+      // (And the older layout's "Fulfilled by Amazon" and "Gift wrap: No" under the seller, before the price. Round 17.)
+      for (let k = i + 1; k <= i + 5; k++) if (/^(?:fulfill?ed by\b|gift (?:wrap|message|note|receipt)\s*:)/i.test(rows[k] || "")) reach++;
       for (let k = i + 1; k <= reach && price == null; k++) price = priceAt(k);
       items.push({ name: tidy(name), ...cut(name), ...(at > 0 && !qOver ? { above: rows[at - 1] } : {}), ...(bits.length ? { variant: bits.join(", ") } : {}), qty, pricePence: price });
     }
@@ -1208,6 +1210,19 @@ function payPalItems(text) {
     if (/^ID number\b/i.test(lines[k] || "")) k++;
     const pm = /^Price:? (?:US\$|CA\$|A\$|MX\$|£|€|\$)\s?(\d{1,5}(?:,\d{3})*\.\d{2})(?:\s*[A-Z]{3})?$/.exec(lines[k] || "");
     if (pm) out.push({ name: n[1].replace(/\s*(?:\.\.\.|…)$/, ""), qty: Number(q[1]), pricePence: Math.round(Number(pm[1].replace(/,/g, "")) * 100) });
+  }
+  if (out.length) return out;
+  // (Or a table, "Description | Unit price | Qty | Amount" over each thing's four cells, "3 Month Print Subscription (United
+  // Kingdom)" "€80.00 EUR" "1" "€80.00 EUR", down to "Subtotal". Round 17.)
+  const money = (x) => { const m = /^(?:US\$|CA\$|A\$|MX\$|£|€|\$)\s?(\d{1,5}(?:,\d{3})*\.\d{2})(?:\s*[A-Z]{3})?$/.exec(x || ""); return m ? Math.round(Number(m[1].replace(/,/g, "")) * 100) : null; };
+  for (let i = 0; i + 3 < lines.length; i++) {
+    if (!(/^description$/i.test(lines[i]) && /^unit price$/i.test(lines[i + 1]) && /^(?:qty|quantity)$/i.test(lines[i + 2]) && /^amount$/i.test(lines[i + 3]))) continue;
+    for (let k = i + 4; k + 3 < lines.length && out.length < 30; k += 4) {
+      const name = lines[k], unit = money(lines[k + 1]), q = /^(\d{1,3})$/.exec(lines[k + 2]), amt = money(lines[k + 3]);
+      if (/^(?:subtotal|total|shipping|postage|tax)\b/i.test(name) || unit == null || !q || amt == null || name.length > 120) break;
+      out.push({ name: name.replace(/\s*(?:\.\.\.|…)$/, ""), qty: Number(q[1]), pricePence: amt, ...(Number(q[1]) > 1 ? { lineTotal: true } : {}) });
+    }
+    break;
   }
   if (out.length) return out;
   for (let i = 1; i < lines.length; i++) {
