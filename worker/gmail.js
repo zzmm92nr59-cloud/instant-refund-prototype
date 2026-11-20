@@ -199,6 +199,9 @@ const LOOKBACK_DAYS = 500, WINDOW_DAYS = 30, MAX_WINDOWS_PER_CALL = 6, DAY_MS = 
 const SEARCH_TERMS =
   '(category:purchases OR category:reservations OR subject:(order OR "order confirmation" OR "order confirmed" OR "your order" OR receipt OR "thank you for your order" OR "thanks for your order" OR purchase OR "thanks for shopping" OR return OR refund OR "QR code"' +
   ' OR booking OR reservation OR itinerary OR tickets OR "e-ticket"' +
+  // (Gmail matches whole words: a coach company's "Your reservations have been made" and a pub app's "Your bill has been
+  // paid: #14541694" were never fetched. Round 17.)
+  ' OR reservations OR bookings OR "bill has been paid" OR "your bill"' +
   // (Amazon's "Ordered: 'Wireless Earbuds…'" and "Ordered: 3 items": Gmail matches whole words, so "order" never finds
   // "Ordered", and these were missed whenever Gmail didn't file them under Purchases. Round 13.)
   ' OR ordered' +
@@ -1229,7 +1232,7 @@ function gmailMailbox(fetchImpl, token) {
 // subject and sender only, and just the emails that look like orders, receipts, returns or parcel updates are read in full.
 // Payments, tickets, rides and collections are included too ("Your payment to Rains", "Your Monday trip with Uber",
 // "Ready to collect"), and senders whose address says what they send (orders@, billing@, PayPal's service@).
-const SHOPPING_SUBJECT = /\b(orders?|ordered|receipts?|e-?receipts?|purchases?|purchased|bought|thanks? (you )?for (shopping|your)|returns?|returned|refunds?|refunded|qr code|delivered|delivery|deliveries|dispatched|despatched|dispatch|despatch|shipped|shipping|shipment|on (its|it's|the) way|invoice|booking|booked|reservation|itinerary|confirmation|confirmed|payments?|paid|tickets?|e-?tickets?|trip|rides?|collection|ready (to|for) collect(ion)?|subscriptions?|renewal|renewed|membership|your (items?|parcel|package|purchase|delivery|booking|tickets?|trip|ride|bill))\b/i;
+const SHOPPING_SUBJECT = /\b(orders?|ordered|receipts?|e-?receipts?|purchases?|purchased|bought|thanks? (you )?for (shopping|your)|returns?|returned|refunds?|refunded|qr code|delivered|delivery|deliveries|dispatched|despatched|dispatch|despatch|shipped|shipping|shipment|on (its|it's|the) way|invoice|bookings?|booked|reservations?|itinerary|confirmation|confirmed|payments?|paid|tickets?|e-?tickets?|trip|rides?|collection|ready (to|for) collect(ion)?|subscriptions?|renewal|renewed|membership|your (items?|parcel|package|purchase|delivery|booking|tickets?|trip|ride|bill))\b/i;
 const SHOPPING_SENDER = /(^|[.@])(royalmail\.com|parcelforce\.com|evri\.com|dpd\.co\.uk|inpost\.co\.uk|yodel\.co\.uk|collectplus\.co\.uk)$|^(orders?|order-?confirm(ation)?|order-?updates?|orderstatus|receipts?|returns?|shipping|ship-confirm|auto-confirm|confirm|confirmation|transactional|transactions?|billing|invoices?|payments?|purchases?|sales|bookings?|tickets?|delivery|dispatch|service|customerservice|customer-service)(\+[^@\s]*)?@/i;
 export function looksLikeShopping(subject, from) {
   return SHOPPING_SUBJECT.test(String(subject || "")) || SHOPPING_SENDER.test(String(from || "").trim());
@@ -2565,11 +2568,14 @@ export function attachReturnProgress(orders, deliveries, updates) {
     const received = mine.filter(u => u.stage === "received").sort((a, b) => (a.at || "").localeCompare(b.at || ""))[0] || null;
     const refunded = mine.filter(u => u.stage === "refunded").sort((a, b) => (b.at || "").localeCompare(a.at || ""))[0] || null;
     if (!parcel && !received && !refunded && !t) continue;
+    // (A second "refund" email that gives no amount, sent the day after the one that said "£15.35 will be refunded": the
+    // amount the first said still stands. Round 17.)
+    const said = refunded && !Number.isInteger(refunded.amountPence) ? mine.filter(u => u.stage === "refunded" && Number.isInteger(u.amountPence)).sort((a, b) => (b.at || "").localeCompare(a.at || ""))[0] : null;
     o.returnProgress = {
       trackingNumber: t || null, carrier: (parcel && parcel.carrier) || (plan && plan.carrier) || null,
       trackUrl: t ? trackingLink((parcel && parcel.carrier) || (plan && plan.carrier) || null, t) : null,
       parcel, receivedAt: received ? received.at : null,
-      refundedAt: refunded ? refunded.at : null, refundPence: refunded ? refunded.amountPence : null, currency: refunded ? refunded.currency : null
+      refundedAt: refunded ? refunded.at : null, refundPence: refunded ? (said ? said.amountPence : refunded.amountPence) : null, currency: refunded ? (said ? said.currency : refunded.currency) : null
     };
   }
 }

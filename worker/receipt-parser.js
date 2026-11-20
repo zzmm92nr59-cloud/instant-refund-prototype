@@ -2237,7 +2237,9 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
     const nameOf = (h) => (String(h || "").match(/^\s*"?([^"<]+?)"?\s*</) || [])[1] || "";
     // (Gmail's two spellings of one address, "@gmail.com" and "@googlemail.com", are the same person's. Round 15.)
     const same = (a) => a.replace(/@googlemail\.com$/, "@gmail.com");
-    const fromA = same(addr(headers.from)), toName = nameOf(headers.to), fromName0 = nameOf(headers.from);
+    // (A "name" that is only the address again, "\"sam@gmail.com\" <sam@gmail.com>", names nobody. Round 17.)
+    const realName = (n) => (/@/.test(n) ? "" : n);
+    const fromA = same(addr(headers.from)), toName = realName(nameOf(headers.to)), fromName0 = realName(nameOf(headers.from));
     const innerTo = /^[>\s*]*to:\s*(.+)$/im.exec(text.slice(0, 4000));
     const words = (n) => new Set(n.toLowerCase().split(/[^\p{L}]+/u).filter((w) => w.length >= 3));
     // (Two people of one family share a surname: "Jo Taylor" forwarding to "Sam Taylor" is still someone else. The same
@@ -2341,6 +2343,8 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   if (!result.orderRef) { const rv = /\b(?:reservation|booking) (?:id|number|no\.?)\s*:[ \t|]*((?=[A-Za-z0-9-]*\d)[A-Za-z0-9][A-Za-z0-9-]{3,23})(?![A-Za-z0-9-])/i.exec(text); if (rv) result.orderRef = rv[1]; }
   // (The word "Order" alone on its line over the order's number on the next, "Order" / "GL31207733-118". Round 15e.)
   if (!result.orderRef) { const ol = /^[ \t|]*order[ \t|]*\n(?:[ \t|]*\n){0,3}[ \t|]*((?=[A-Za-z0-9-]*\d{5})[A-Za-z0-9][A-Za-z0-9-]{5,23})[ \t|]*$/im.exec(fromHtml || text) || /^[ \t|]*order[ \t|]*\n(?:[ \t|]*\n){0,3}[ \t|]*((?=[A-Za-z0-9-]*\d{5})[A-Za-z0-9][A-Za-z0-9-]{5,23})[ \t|]*$/im.exec(plain || ""); if (ol) result.orderRef = ol[1]; }
+  // (A labelled line of its own, "Order Reference Number: 61393406", under the customer's number. Round 17.)
+  if (!result.orderRef) { const orn = /^[ \t|]*order reference (?:number|no\.?)[ \t]*:[ \t|]*((?=[A-Za-z0-9-]*\d)[A-Za-z0-9][A-Za-z0-9-]{4,23})[ \t|]*$/im.exec(text); if (orn) result.orderRef = orn[1]; }
   if (!result.orderRef) { const mr = /\bmerchant (?:reference|ref\.?)(?: number)?\s*:?[ \t|]*((?=[A-Za-z0-9-]*\d)[A-Za-z0-9][A-Za-z0-9-]{5,63})(?![A-Za-z0-9-])/i.exec(text); if (mr) result.orderRef = mr[1]; }
   // ("Order TSR89717 confirmed": a number of letters and digits right after "Order", with what happened to it after. Round 15.)
   if (!result.orderRef) { const sr = /^\s*(?:(?:fwd?|fw)\s*:\s*)*(?:your\s+)?order\s+#?((?=[A-Za-z0-9-]*\d)(?=[A-Za-z0-9-]*[A-Za-z])[A-Za-z0-9-]{5,20}|\d{5,14})\s+(?:is\s+|has\s+been\s+)?(?:confirmed|received|placed|shipped|dispatched|despatched|on its way)\b/i.exec(String(subject || "")); if (sr) result.orderRef = sr[1]; }
@@ -2775,7 +2779,7 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   }
   // ("Your order reference number is BUY37490811 ." in a sentence; and the thing bought as its name over "Product Code:",
   // "Quantity:" and "Price:" rows (Buyagift), never a "You may also like" offer further down. Round 15.)
-  if (!result.orderRef) { const ty = /\bthank you for your order \(#?([A-Z0-9][A-Z0-9-]{5,24})\)/i.exec(text.slice(0, 8000)); if (ty && /\d/.test(ty[1])) result.orderRef = ty[1]; }
+  if (!result.orderRef) { const ty = /\bthank you for your order \([ \t]?#?[ \t]?([A-Z0-9][A-Z0-9-]{5,24})[ \t]?\)/i.exec(text.slice(0, 8000)); if (ty && /\d/.test(ty[1])) result.orderRef = ty[1]; }
   if (!result.orderRef) { const sn = /\byour order (?:reference )?(?:number|reference)(?: number)? is ([A-Z]{0,4}\d[A-Z0-9-]{4,20})\b/i.exec(text.slice(0, 8000)); if (sn) result.orderRef = sn[1]; }
   {
     const L = text.slice(0, 30000).split("\n").map((l) => l.replace(/\|/g, " ").replace(/\s+/g, " ").trim()).filter(Boolean);
