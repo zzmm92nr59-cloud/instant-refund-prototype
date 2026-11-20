@@ -155,5 +155,21 @@ export default function holdout16d() {
     { from: "OnlyFans <no-reply@onlyfans.com>", subject: "Confirmation of NEW Subscription!", date: "Wed, 15 Jan 2025 16:18:08 +0000",
       html: htmlPage("OnlyFans", ["Congratulations!", "You have successfully subscribed to A Creator.", "A Creator", "Subscribed for $7.00", "If you did not make this purchase, please click here immediately", "©2025 OnlyFans"]) },
     order([{ name: "Subscription", qty: 1, unit: 700 }]), "OnlyFans", "2025-01-15", { currency: "USD" });
+  // A jeweller's second email two seconds after its order confirmation: "Thank You For Shopping At …", "1 Item", the name over
+  // "£ 310", "Size18.00 inches", "Qty1".
+  add("holdout16d-jeweller-details", "Tiffany & Co.", "'Thank You For Shopping At …' subject; 'Order Number' over the number; '1 Item', the name, '£ 310', 'Size18.00 inches', 'Qty1', 'Subtotal £310.00'",
+    { from: "Tiffany & Co. <no-reply@clientservices.tiffany.com>", subject: "Thank You For Shopping At Tiffany & Co.", date: "Fri, 5 Dec 2025 17:00:02 +0000",
+      html: htmlPage("Tiffany", ["Thank you for shopping at Tiffany & Co.", "Dear Sam Taylor,", "We’re carefully preparing your Tiffany & Co. order and will let you know as soon as it’s on its way.", "Order Details", "Order Number", "00300001", "Order Date", "05/12/2025",
+        "1 Item", "Knot Pendant", "£ 310", "Size18.00 inches", "Qty1", "Packaging", "Type", "Classic", "Subtotal", "£310.00", "Shipping - Standard £0.00", "Total", "£310.00"]) },
+    { ...order([{ name: "Knot Pendant", qty: 1, unit: 31000 }]) }, "Tiffany & Co", "2025-12-05", { shopAlso: ["Tiffany & Co.", "Tiffany"] });
+  // A gift experience shop: the order number in a sentence, the thing over "Product Code / Quantity / Price" rows, the money
+  // summary's labels and amounts several cells apart, "You may also like" offers under it.
+  add("holdout16d-gift-experience-order", "Buyagift", "'Your order reference number is BUY10000001 .', name over 'Product Code:' 'Quantity:' 'Price:', 'Discount Code Applied: | £36.00', 'Total: |' cells apart from '£143.99', offers after",
+    { from: "Buyagift <noreply@buyagift.co.uk>", subject: "Your Buyagift Order Confirmation", date: "Tue, 10 Feb 2026 20:00:00 +0000",
+      html: htmlPage("Buyagift", ["Thank you for ordering from Buyagift!", "Your Order Confirmation", "Hello Sam ,", "Your order reference number is BUY10000001 . Please use this reference number if you need to talk to us about your order.",
+        "Two Night Hotel Break for Two", "Please click on the link below to download your E-voucher.", "DOWNLOAD YOUR E-VOUCHER", "Product Code:", "10900001", "Quantity:", "1", "Price:", "£179.99", "Gift Box Price:", "£0",
+        "Order Confirmation Summary", "Subtotal:", "£179.99", "Promotion Discount:", "£0.00", "Discount Code Applied:", "£36.00", "Delivery Charges:", "£0.00", "Total: | | |", "£143.99",
+        "WE THINK YOU MAY ALSO LIKE", "Afternoon Tea for Two | £49.00", "Spa Day for Two | £99.00"]) },
+    order([{ name: "Two Night Hotel Break for Two", qty: 1, unit: 17999 }], { discounts: [["Discount Code Applied", 3600]] }), "Buyagift", "2026-02-10");
   return out;
 }

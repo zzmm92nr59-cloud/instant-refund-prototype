@@ -1,0 +1,34 @@
+{
+ "id": "holdout16d-jeweller-details",
+ "sender": "Tiffany & Co.",
+ "layout": "'Thank You For Shopping At …' subject; 'Order Number' over the number; '1 Item', the name, '£ 310', 'Size18.00 inches', 'Qty1', 'Subtotal £310.00'",
+ "headers": {
+  "from": "Tiffany & Co. <no-reply@clientservices.tiffany.com>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Thank You For Shopping At Tiffany & Co.",
+  "date": "Fri, 5 Dec 2025 17:00:02 +0000"
+ },
+ "html": "<html><head><title>Tiffany</title></head><body><table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"><tr><td>Thank you for shopping at Tiffany &amp; Co.</td></tr>\n<tr><td>Dear Sam Taylor,</td></tr>\n<tr><td>We&rsquo;re carefully preparing your Tiffany &amp; Co. order and will let you know as soon as it&rsquo;s on its way.</td></tr>\n<tr><td>Order Details</td></tr>\n<tr><td>Order Number</td></tr>\n<tr><td>00300001</td></tr>\n<tr><td>Order Date</td></tr>\n<tr><td>05/12/2025</td></tr>\n<tr><td>1 Item</td></tr>\n<tr><td>Knot Pendant</td></tr>\n<tr><td>&pound; 310</td></tr>\n<tr><td>Size18.00 inches</td></tr>\n<tr><td>Qty1</td></tr>\n<tr><td>Packaging</td></tr>\n<tr><td>Type</td></tr>\n<tr><td>Classic</td></tr>\n<tr><td>Subtotal</td></tr>\n<tr><td>&pound;310.00</td></tr>\n<tr><td>Shipping - Standard &pound;0.00</td></tr>\n<tr><td>Total</td></tr>\n<tr><td>&pound;310.00</td></tr></table></body></html>",
+ "text": "",
+ "expected": {
+  "shop": "Tiffany & Co",
+  "date": "2025-12-05",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Knot Pendant",
+    "qty": 1,
+    "linePence": 31000
+   }
+  ],
+  "subtotalPence": 31000,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 31000,
+  "shopAlso": [
+   "Tiffany & Co.",
+   "Tiffany"
+  ]
+ }
+}
