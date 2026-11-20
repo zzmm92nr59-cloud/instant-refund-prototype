@@ -1792,10 +1792,13 @@ function stackedColumns(text, m, total) {
   for (let i = 0; i + 3 < rows.length; i++) {
     if (!/^(?:items?|products?|description|plan|service)$/i.test(rows[i]) || !/^(?:price|amount|cost)$/i.test(rows[i + 1])) continue;
     const items = [];
-    let k = i + 2;
-    for (; k + 1 < rows.length && items.length < 10; k += 2) {
+    // (A third column of words after the price's, "Delivery method chosen", holds a note for each row: passed over.)
+    const third = /^[\p{L} ]{3,30}$/u.test(rows[i + 2] || "") && !/\b(?:total|qty|quantity)\b/i.test(rows[i + 2]) && !PRICE.test(rows[i + 3] || "") && PRICE.test(rows[i + 4] || "") ? 1 : 0;
+    let k = i + 2 + third;
+    for (; k + 1 < rows.length && items.length < 10; k += 2 + third) {
       const p = PRICE.exec(rows[k + 1]);
       if (!p || !/\p{L}{3}/u.test(rows[k]) || rows[k].length > 100 || /£|\b(?:sub-?total|total|vat|tax|discount|delivery)\b/i.test(rows[k])) break;
+      if (third && (!rows[k + 2] || /£|\d\.\d{2}/.test(rows[k + 2]))) break;
       items.push({ name: rows[k], qty: 1, pricePence: money(p[1]) });
     }
     if (!items.length) return null;
@@ -1896,6 +1899,15 @@ function chargePairs(text, total) {
     if (out.length) i = k - 1;
   }
   return null;
+}
+// A ride's receipt that lists no charges, only its "Trip Details", "Vehicle: Scooter", "Trip duration: 8min 39sec", "Trip
+// distance: 1.53km", and the one amount: the trip itself is what was paid for. Round 15e.
+function tripOfVehicle(text, total) {
+  if (total == null) return null;
+  const v = /^[ \t|]*vehicle(?: type)?\s*:\s*(\p{L}[\p{L} -]{1,20}?)[ \t|]*$/imu.exec(text), d = /^[ \t|]*trip duration\s*:\s*([^\n|]{2,20}?)[ \t|]*$/im.exec(text);
+  if (!v || !d || !/\btrip\b/i.test(String(text).slice(0, 3000))) return null;
+  const km = /^[ \t|]*trip distance\s*:\s*([\d.,]+\s?(?:km|mi|miles?))[ \t|]*$/im.exec(text);
+  return { name: v[1].trim() + " trip", qty: 1, pricePence: total, variant: [d[1].trim(), km ? km[1] : null].filter(Boolean).join(", ") };
 }
 // A plain-text name wrapped onto two lines ("Duchess Dolby Atmos 5.1.2 Cinematic Surround Sound", then "Ottoman Storage TV
 // Bed Frame × 1"): one name again, when it starts after a blank line and its second line ends with how many. Round 12.
@@ -2397,7 +2409,8 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   if (!result.items.length && result.totalPence != null && !isFlight) {
     const one = soleBulletOverTotal(fromHtml || text, moneyOf(fromHtml || text), result.totalPence) || (plain ? soleBulletOverTotal(plain, moneyOf(plain), result.totalPence) : null) ||
       bookingOverCost(fromHtml || text, result.totalPence) || (plain ? bookingOverCost(plain, result.totalPence) : null) ||
-      stackedInvoiceRow(fromHtml || text, result.totalPence) || (plain ? stackedInvoiceRow(plain, result.totalPence) : null);
+      stackedInvoiceRow(fromHtml || text, result.totalPence) || (plain ? stackedInvoiceRow(plain, result.totalPence) : null) ||
+      tripOfVehicle(fromHtml || text, result.totalPence);
     if (one) { result.items = [one]; result.itemsCheck = checkItems(result.items, moneyOf(fromHtml || text), result.totalPence); }
     else {
       const cols = stackedColumns(fromHtml || text, moneyOf(fromHtml || text), result.totalPence) || (plain ? stackedColumns(plain, moneyOf(plain), result.totalPence) : null);

@@ -157,5 +157,25 @@ export default function holdout16e() {
         "Kappa", "Kappa Runway Lite", "Qty - 1", "Size - 9", "£28.50", ...empty, "Order Delivery", "£3.99", "Order Total Price", "£32.49"]) },
       o, "Kickhouse", "2026-11-18", { orderRef: "990123456" });
   }
+  // ---- An online doctor's order: "Item" / "Price" / "Delivery method chosen" headings, then the item, its price and its
+  // delivery note, each on its own line; "TOTAL" over the amount -----------------------------------------------------------
+  {
+    const o = order([{ name: "COVID-19 travel test kit", qty: 1, unit: 1299 }]);
+    add("holdout16e-three-columns-delivery-note", "Clinicly", "'Your order number: CL_4410021_1'; 'Item' / 'Price' / 'Delivery method chosen' headings; 'COVID-19 travel test kit' / '£12.99' / 'Delivery within two working days'; 'TOTAL' over '£12.99'", {
+      from: "Clinicly Online Doctor <noreply@clinicly.example>", subject: "Your Clinicly Online Doctor order no: CL_4410021_1", date: "Thu, 12 Nov 2026 13:05:02 +0000",
+      html: nested("Clinicly Online Doctor", "clinicly.example", ["Your order number: CL_4410021_1", "Item", "Price", "Delivery method chosen", "COVID-19 travel test kit", "£12.99", "Delivery within two working days", "TOTAL", "£12.99",
+        "Check below for more information about your order"]) },
+      o, "Clinicly Online Doctor", "2026-11-12", { orderRef: "CL_4410021_1" });
+  }
+  // ---- A scooter trip's receipt with no charges listed: "Trip Details", "Vehicle: Scooter", "Trip duration:", then the
+  // receipt's number, "Amount charged: £2.16" and the total -----------------------------------------------------------------
+  {
+    const o = order([{ name: "Scooter trip", qty: 1, unit: 216 }]);
+    add("holdout16e-trip-details-vehicle-no-charges", "Zapride", "'Here's your trip receipt.'; 'Trip Details' with 'Vehicle: Scooter', 'Trip duration: 7min 12sec', 'Trip distance: 1.20km'; 'Receipt number: 99120261112011223'; 'Amount charged: £2.16'; 'Total: £2.16 (inclusive of 20% VAT)'", {
+      from: "Zapride <feedback@zapride.example>", subject: "Your Zapride Trip e-Receipt", date: "Thu, 12 Nov 2026 14:15:16 +0000",
+      html: nested("Zapride", "zapride.example", ["Hi ,", "Here's your trip receipt.", "Trip Details", "Vehicle: Scooter", "Trip duration: 7min 12sec", "Trip distance: 1.20km",
+        "Trip start time: Thursday, 12 Nov 2026, 2:06 PM", "Receipt Summary", "Receipt number: 99120261112011223", "Amount charged: £2.16", "Payment type: Apple Pay", "Total: £2.16 (inclusive of 20% VAT)"]) },
+      o, "Zapride", "2026-11-12", { orderRef: "99120261112011223" });
+  }
   return out;
 }
