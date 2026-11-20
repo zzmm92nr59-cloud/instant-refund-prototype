@@ -367,7 +367,7 @@ function htmlToTextAll(html) {
 
 function money(str) {
   if (str == null) return null;
-  // (Thousands with their commas, "1,201.72", or written without, "1201.72": never only the first three digits of it. Round 15.)
+  // (Thousands with their commas, "1,184.36", or written without, "1184.36": never only the first three digits of it. Round 15.)
   const m = String(str).match(/([0-9]{1,3}(?:,[0-9]{3})+(?![0-9])|[0-9]+)(?:\.([0-9]{2}))?/);
   if (!m) return null;
   const pence = Math.round(Number(m[1].replace(/,/g, "") + "." + (m[2] || "00")) * 100);
@@ -980,7 +980,7 @@ function receiptSignals(subject, text) {
     /^\s*(?:(?:fwd?|fw)\s*:\s*)?your subscription is (?:ready|confirmed|active)\b/.test(s) ||
     // "Confirmation of NEW Subscription!" (a creator subscription, round 15).
     /^\s*(?:(?:fwd?|fw)\s*:\s*)?confirmation of (?:new )?subscription\b/.test(s) ||
-    // An airline's "Booking details | Departure: 14 December 2021 | LHR-WDH" (Lufthansa, round 15).
+    // An airline's "Booking details | Departure: 9 March 2022 | LHR-WDH" (Lufthansa, round 15).
     /^\s*(?:(?:fwd?|fw)\s*:\s*)?booking details\s*\|\s*departure\b/.test(s) ||
     // An airline's "Ryanair Travel Itinerary" (its booking's receipt, round 15).
     /^\s*(?:(?:fwd?|fw)\s*:\s*)?\p{L}[\p{L} ]{1,30} travel itinerary\s*$/u.test(s) ||
@@ -2833,7 +2833,7 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   // (A subscription confirmed as "Subscribed for $7.00": that money, in its own currency; the subscription is the thing. Round 15.)
   if (result.totalPence == null) { const sb = /\bsubscribed for (US ?\$|\$|£|€)\s?(\d{1,4}\.\d{2})\b/i.exec(text.slice(0, 6000)); if (sb) { result.totalPence = money(sb[2]); result.currency = sb[1] === "£" ? "GBP" : sb[1] === "€" ? "EUR" : "USD";
     if (!result.items.length) result.items = [{ name: "Subscription", qty: 1, pricePence: result.totalPence }]; result.itemsCheck = { complete: true, itemsPence: result.totalPence, expectedPence: result.totalPence, missingPence: 0 }; } }
-  // (An airline's "Total Price for all Passengers | GBP 1201.72", its own code before the amount; "Lufthansa booking code: |
+  // (An airline's "Total Price for all Passengers | GBP 1184.36", its own code before the amount; "Lufthansa booking code: |
   // VRDZLD". Round 15.)
   if (result.totalPence == null) { const ap = /\btotal price for all passengers\b[\s|:]{0,20}(GBP|EUR|£|€)\s?(\d[\d,]{0,9}\.\d{2})\b/i.exec(text.slice(0, 30000)); if (ap) { result.totalPence = money(ap[2]); result.currency = /GBP|£/.test(ap[1]) ? "GBP" : "EUR"; result.itemsCheck = checkItems(result.items, moneyOf(text), result.totalPence); } }
   if (!result.orderRef) { const bc = /\bbooking code[ \t]*:[ \t|]*(?:\n[ \t|]*){0,3}([A-Z0-9]{6})[ \t|]*$/m.exec(text.slice(0, 8000)); if (bc && /[A-Z]/.test(bc[1])) result.orderRef = bc[1]; }
@@ -3476,7 +3476,7 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
         : { complete: false, itemsPence: 0, expectedPence: null, missingPence: null };
     }
   }
-  // (A flight booking read without its flights, its only line the fare's passenger type, "Adult" £1,201.72, beside flight
+  // (A flight booking read without its flights, its only line the fare's passenger type, "Adult" £1,184.36, beside flight
   // numbers: the thing bought is not known, so the list is flagged, never passed off as right. Round 18.)
   if (!isFlight && result.items.length === 1 && /^(?:\d{1,2}\s?x?\s)?(?:adults?|child(?:ren)?|infants?|passengers?)$/i.test(String(result.items[0].name || "").trim()) && result.itemsCheck && hasFlightNumber(text) && /\b(?:flights?|airline|airport|boarding|departure|terminal|baggage|passenger)\b/i.test(text))
     result.itemsCheck = { ...result.itemsCheck, complete: false, namesOk: false, suspectNames: [{ name: String(result.items[0].name).slice(0, 120), why: "fare" }] };

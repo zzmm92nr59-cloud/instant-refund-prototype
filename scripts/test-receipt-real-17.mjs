@@ -156,7 +156,7 @@ const listed = async () => (await (await call("/relay/my/receipts?all=1", { toke
   const fwd = classifyEmail(mk("Sam Taylor <sam.taylor@hotmail.example>", "Fwd: Booking details | Departure: 14 December 2026 | LHR-WDH",
     ["---------- Forwarded message ---------", "From: Skyline Airways <online@booking.skyline.example>", "Date: Wed, 11 Nov 2026 at 09:12", "Subject: Booking details | Departure: 14 December 2026 | LHR-WDH",
       "To: <sam.taylor@hotmail.example>", "", "Skyline booking code: QWERTZ", "Total Price of your Ticket", "Passenger Type", "Price", "Taxes, fees & surcharges", "Passengers", "Total Price of your Ticket",
-      "Adult", "GBP 771.00", "GBP 430.72", "1", "GBP 1201.72", "Total Price for all Passengers", "GBP 1201.72"].join("\n"), { to: '"sam.taylor@gmail.com" <sam.taylor@gmail.com>' })).details;
+      "Adult", "GBP 760.00", "GBP 424.36", "1", "GBP 1184.36", "Total Price for all Passengers", "GBP 1184.36"].join("\n"), { to: '"sam.taylor@gmail.com" <sam.taylor@gmail.com>' })).details;
   assert.equal(fwd.kind, "receipt", "the shopper's own forward is a purchase");
   // A payment service's "Description | Unit price | Qty | Amount" table.
   assert.deepEqual(read("holdout18-payment-service-description-table").items.map((i) => [i.name, i.qty, i.pricePence]), [["6 Month Print Subscription (United Kingdom)", 1, 6500]]);
