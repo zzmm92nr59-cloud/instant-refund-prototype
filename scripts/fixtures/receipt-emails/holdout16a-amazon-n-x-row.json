@@ -1,0 +1,35 @@
+{
+ "id": "holdout16a-amazon-n-x-row",
+ "sender": "Amazon",
+ "layout": "'3 x' on the row over the title in the HTML ('3 x Title' in the text part), the price of one under 'Sold by:'",
+ "headers": {
+  "from": "\"Amazon.co.uk\" <auto-confirm@amazon.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your Amazon.co.uk order of \"Ridgeback Protein Shaker Bottle - 700ml\" and 1 more item.",
+  "date": "Sat, 7 Jan 2023 10:05:00 +0000"
+ },
+ "html": "<html><head><title>Your Amazon.co.uk order of \"Ridgeback Protein Shaker Bottle - 700ml\" and 1 more item.</title></head><body><table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"><tr><td>Amazon.co.uk</td></tr>\n<tr><td>Order Confirmation</td></tr>\n<tr><td>Order #</td></tr>\n<tr><td>205-1029384-7564738</td></tr>\n<tr><td>Hello,</td></tr>\n<tr><td>Thanks for your order. We&rsquo;ll let you know once your item(s) have dispatched.</td></tr>\n<tr><td>Your order will be sent to:</td></tr>\n<tr><td>Sam</td></tr>\n<tr><td>YORK</td></tr>\n<tr><td>United Kingdom</td></tr>\n<tr><td>Order Total:</td></tr>\n<tr><td>&pound;9.94</td></tr>\n<tr><td>Selected Payment Method:</td></tr>\n<tr><td>Mastercard</td></tr>\n<tr><td>Ridgeback Protein Shaker Bottle - 700ml</td></tr>\n<tr><td>Sold by: Amazon EU S.a.r.L.</td></tr>\n<tr><td>&pound;3.49</td></tr>\n<tr><td>3 x</td></tr>\n<tr><td>Meadowsoft Gentle Hydrating Day Cream for Sensitive Skin, 100 ml (Pack of 1)</td></tr>\n<tr><td>Sold by: Amazon EU S.a.r.L.</td></tr>\n<tr><td>&pound;2.15</td></tr>\n<tr><td>Fulfilled By Amazon (usually referred to as FBA) items are generally sold by third-party sellers but stored in an Amazon Fulfilment Centre and sent to you from there.</td></tr></table></body></html>",
+ "text": "Amazon.co.uk Order Confirmation\n    Order #205-1029384-7564738\n\nHello,\nThanks for your order.\n\nOrdered item(s):\n     Ridgeback Protein Shaker Bottle - 700ml\n     £3.49\n     Sold by: Amazon EU S.a.r.L.\n\n     3 x Meadowsoft Gentle Hydrating Day Cream for Sensitive Skin, 100 ml (Pack of 1)   \n     £2.15\n     Sold by: Amazon EU S.a.r.L.\n\n\n     Order Total:                      £9.94\n=======================================================================================",
+ "expected": {
+  "shop": "Amazon",
+  "date": "2023-01-07",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Ridgeback Protein Shaker Bottle - 700ml",
+    "qty": 1,
+    "linePence": 349
+   },
+   {
+    "name": "Meadowsoft Gentle Hydrating Day Cream for Sensitive Skin, 100 ml (Pack of 1)",
+    "qty": 3,
+    "linePence": 645
+   }
+  ],
+  "subtotalPence": 994,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 994
+ }
+}

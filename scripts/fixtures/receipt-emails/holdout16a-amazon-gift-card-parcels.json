@@ -1,0 +1,41 @@
+{
+ "id": "holdout16a-amazon-gift-card-parcels",
+ "sender": "Amazon",
+ "layout": "one order in three parcels, the summary with 'Gift Card (£4.00)' and 'Visa (£51.49)' repeated over each; the total is what was bought",
+ "headers": {
+  "from": "\"Amazon.co.uk\" <auto-confirm@amazon.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your Amazon.co.uk order of \"Northgate Microfibre Fitted Sheet, Double, Slate\" and 2 more items",
+  "date": "Sun, 23 Apr 2023 18:40:00 +0100"
+ },
+ "html": "<html><head><title>Your Amazon.co.uk order of \"Northgate Microfibre Fitted Sheet, Double, Slate\" and 2 more items</title></head><body><table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"><tr><td>Amazon.co.uk</td></tr>\n<tr><td>Order Confirmation</td></tr>\n<tr><td>Order #</td></tr>\n<tr><td>204-5566778-1122334</td></tr>\n<tr><td>Hello,</td></tr>\n<tr><td>Thanks for your order.</td></tr>\n<tr><td>Arriving:</td></tr>\n<tr><td>Thursday, April 26</td></tr>\n<tr><td>Your order will be sent to:</td></tr>\n<tr><td>Sam</td></tr>\n<tr><td>LEEDS</td></tr>\n<tr><td>United Kingdom</td></tr>\n<tr><td>Order Total:</td></tr>\n<tr><td>&pound;51.49</td></tr>\n<tr><td>Selected Payment Method(s):</td></tr>\n<tr><td>Gift Card (&pound;4.00)</td></tr>\n<tr><td>Visa (&pound;51.49)</td></tr>\n<tr><td>Northgate Microfibre Fitted Sheet, Double, Slate</td></tr>\n<tr><td>Sold by: Amazon EU S.a.r.L.</td></tr>\n<tr><td>&pound;12.50</td></tr>\n<tr><td>Arriving:</td></tr>\n<tr><td>Thursday, April 27</td></tr>\n<tr><td>Your order will be sent to:</td></tr>\n<tr><td>Sam</td></tr>\n<tr><td>LEEDS</td></tr>\n<tr><td>United Kingdom</td></tr>\n<tr><td>Order Total:</td></tr>\n<tr><td>&pound;51.49</td></tr>\n<tr><td>Selected Payment Method(s):</td></tr>\n<tr><td>Gift Card (&pound;4.00)</td></tr>\n<tr><td>Visa (&pound;51.49)</td></tr>\n<tr><td>Calderbrook Bluetooth Mini Speaker with Carry Strap, Teal</td></tr>\n<tr><td>Sold by: Amazon EU S.a.r.L.</td></tr>\n<tr><td>&pound;27.00</td></tr>\n<tr><td>Arriving:</td></tr>\n<tr><td>Thursday, April 28</td></tr>\n<tr><td>Your order will be sent to:</td></tr>\n<tr><td>Sam</td></tr>\n<tr><td>LEEDS</td></tr>\n<tr><td>United Kingdom</td></tr>\n<tr><td>Order Total:</td></tr>\n<tr><td>&pound;51.49</td></tr>\n<tr><td>Selected Payment Method(s):</td></tr>\n<tr><td>Gift Card (&pound;4.00)</td></tr>\n<tr><td>Visa (&pound;51.49)</td></tr>\n<tr><td>Willowmere Cotton Duvet Cover Set, Double, Oat</td></tr>\n<tr><td>Sold by: Willowmere Home</td></tr>\n<tr><td>&pound;15.99</td></tr>\n<tr><td>Fulfilled By Amazon (usually referred to as FBA) items are generally sold by third-party sellers but stored in an Amazon Fulfilment Centre and sent to you from there.</td></tr></table></body></html>",
+ "text": "",
+ "expected": {
+  "shop": "Amazon",
+  "date": "2023-04-23",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Northgate Microfibre Fitted Sheet, Double, Slate",
+    "qty": 1,
+    "linePence": 1250
+   },
+   {
+    "name": "Calderbrook Bluetooth Mini Speaker with Carry Strap, Teal",
+    "qty": 1,
+    "linePence": 2700
+   },
+   {
+    "name": "Willowmere Cotton Duvet Cover Set, Double, Oat",
+    "qty": 1,
+    "linePence": 1599
+   }
+  ],
+  "subtotalPence": 5549,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 5549,
+  "giftCardPence": 400
+ }
+}

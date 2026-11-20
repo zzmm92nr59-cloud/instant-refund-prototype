@@ -1,0 +1,31 @@
+{
+ "id": "holdout16a-apple-icloud-placeholder",
+ "sender": "Apple",
+ "layout": "the storage size an unfilled template word ('@@…@@'), 'Monthly Inclusive of VAT at 20% £0.13' under it, the payer's block under 'BILLED TO:'",
+ "headers": {
+  "from": "Apple <no_reply@email.apple.com>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your invoice from Apple.",
+  "date": "Thu, 24 Jun 2021 10:00:00 +0000"
+ },
+ "html": "",
+ "text": "Invoice\n\nAPPLE ID: sam@example.com\nBILLED TO:\nVisa .... 1234\nSam Jones\n1 Example Road\nLeeds, LS1 1AA\nGBR\n\nDATE: Jun 24, 2021\nORDER ID: MQKZYXW987\nDOCUMENT NO.: 123456789013\nTOTAL: £0.79\n\n\niCloud\n\niCloud: @@totalCurrentPaidAndFreeStorageWithUnit@@ Storage Plan £0.79\nMonthly Inclusive of VAT at 20% £0.13\nRenews Jul 23, 2021\n                                                              Subtotal £0.66\n                                                    VAT charged at 20% £0.13\n\n                                                                 TOTAL £0.79\n\nIf you have any questions about your bill, contact support. This email confirms payment for the iCloud storage plan listed above.",
+ "expected": {
+  "shop": "Apple",
+  "date": "2021-06-24",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "iCloud: Storage Plan",
+    "qty": 1,
+    "linePence": 79
+   }
+  ],
+  "subtotalPence": 79,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 79,
+  "merchant": ""
+ }
+}

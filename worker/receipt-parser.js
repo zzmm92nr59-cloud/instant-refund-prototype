@@ -718,7 +718,7 @@ const UK_POSTCODE = /\b[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}\b/i;
 
 function isoDate(d) { return d.toISOString().slice(0, 10); }
 
-function extractReturns(text, html, orderDate) {
+function extractReturns(text, html, orderDate, other = "") {
   const out = {
     windowDays: null, windowFrom: null, deadline: null, address: null,
     portalUrl: null, instructions: [], qrMentioned: false, labelMentioned: false,
@@ -767,6 +767,20 @@ function extractReturns(text, html, orderDate) {
       break;
     }
   }
+  // (A seller's own policy, "I gladly accept returns, exchanges, and cancellations" "Just contact me within: 7 days of
+  // delivery" "Ship returns back to me within: 30 days of delivery": the days to get in touch are the window that counts, over
+  // a marketplace's line under the item, "Returns accepted within 14 days of delivery". Round 15.)
+  const both = (flat.slice(0, 60000) + "\n" + String(other || "").slice(0, 60000)).replace(/[ \t\u00a0\u202f]+/g, " ");
+  const contact = !out.cancelWithin && /\bcontact (?:me|us)(?: within)?[ \t]*:?[ \t]*(\d{1,3}) days? (?:of|from|after) (delivery|purchase|receiving)/i.exec(both);
+  if (contact) {
+    out.windowDays = Number(contact[1]); out.windowFrom = /^purchase/i.test(contact[2]) ? "order" : "delivery";
+    out.instructions.unshift(("Contact the seller within " + contact[1] + " days of " + contact[2].toLowerCase() + " to return or exchange.").replace("of receiving", "of receiving it"));
+    out.sellerPolicy = true;
+  }
+  // (What the seller says can't go back, "The following items can't be returned" "- Custom or personalized orders": kept, so
+  // a personalised thing gets no return window. Round 15.)
+  const cant = /\b(?:items?|following)[^.\n]{0,40}\bcan(?:'|’|no)?t be returned\b[\s\S]{0,300}?^[ \t]*[-•*][ \t]*(custom (?:or|and) personali[sz]ed (?:orders|items)|personali[sz]ed (?:orders|items))/im.exec(both);
+  if (cant) out.excludes = ["personalised"];
   // Explicit date: "return by 14 November 2026".
   const byDate = flat.match(/return\w*[^.\n]{0,60}?\bby\s+(\d{1,2}(?:st|nd|rd|th)?\s+[A-Za-z]{3,9}\.?,?\s+\d{4}|\d{4}-\d{2}-\d{2})/i);
   if (byDate) out.deadline = parseDate(byDate[1]);
@@ -816,6 +830,8 @@ function extractReturns(text, html, orderDate) {
     if (!seen.has(key)) { seen.add(key); out.instructions.push(sent); }
   }
 
+  // (The seller's own days to get in touch, never a different window beside them. Round 15.)
+  if (out.sellerPolicy) out.instructions = out.instructions.filter((x, k) => k === 0 || !/\bwithin\s+\d{1,3}\s+days?\b/i.test(x));
   // A QR code for a return. Not one to download the shop's app, a ticket's or an eSIM's code, or the letters "qr" inside
   // a tracking link's picture address (round 12: a hotel booking, a train ticket, a phone plan and a gift receipt were all
   // flagged "QR code" for that).
@@ -961,10 +977,10 @@ const PRICE_WORDS = /^(?:(?:gbp|usd|eur|aud|cad|chf|sek|nok|dkk)|(?:promotions?|
 //  * digital (Prime Video, Kindle, music): the title, "Sold by:" (or "Sold by :"), the seller, then "£3.49".
 // Read from the HTML split at every tag, so each little box is its own line. Nothing is guessed: a price is kept only when
 // Amazon printed one next to the item.
-const AMZ_SKIP = /^(sold by\b|fulfill?ed by\b|condition:|quantity:|qty:|colou?r:|size:|style:|pattern:|edition:|format:|view or edit order|order #|placed on|order details|ordered|dispatched|out for delivery|delivered|£|total|item subtotal|\|)/i;
+const AMZ_SKIP = /^(sold by\b|fulfill?ed by\b|condition:|gift (?:wrap|message|note|receipt):|quantity:|qty:|colou?r:|size:|style:|pattern:|edition:|format:|view or edit order|order #|placed on|order details|ordered|dispatched|out for delivery|delivered|£|total|item subtotal|\|)/i;
 function amazonRows(html) {
-  const decode = (t) => t.replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&#39;|&rsquo;|&lsquo;/g, "'").replace(/&quot;|&ldquo;|&rdquo;/g, '"').replace(/&pound;/g, "£")
-    .replace(/&#(\d+);/g, (m, n) => String.fromCharCode(+n)).replace(/&#x([0-9a-f]+);/gi, (m, n) => String.fromCharCode(parseInt(n, 16)));
+  // (Every named character, "v&iacute;voactive" as "vívoactive", Round 15; quotes kept plain as before.)
+  const decode = (t) => decodeEntities(t.replace(/&#39;|&rsquo;|&lsquo;/g, "'").replace(/&quot;|&ldquo;|&rdquo;/g, '"'));
   return String(html || "").replace(/<(script|style)[\s\S]*?<\/\1>/gi, " ").split(/<[^>]+>/)
     .map((t) => decode(t).replace(/[\u034f\u200b-\u200f\u00ad\u2060\ufeff\u202a-\u202e]/g, "").replace(/\s+/g, " ").trim()).filter(Boolean);
 }
@@ -984,34 +1000,74 @@ export function amazonItems(html, given) {
   for (let i = 0; i < rows.length; i++) {
     const q = /^(?:Quantity|Qty):\s*(\d{1,3})$/i.exec(rows[i]);
     if (q) {
-      let name = null; const bits = [];
+      let name = null, author = null; const bits = [];
       for (let j = i - 1; j >= Math.max(0, i - 7); j--) {
         const b = /^(colou?r|size|style):\s*(.{1,40})$/i.exec(rows[j]);
         if (b) { bits.unshift(b[2]); continue; }
         if (AMZ_SKIP.test(rows[j]) || /^amazon(\.co\.uk)?$/i.test(rows[j]) || /^Sold by\s*:?$/i.test(rows[j - 1] || "") || (/^:$/.test(rows[j - 1] || "") && /^Sold by$/i.test(rows[j - 2] || "")) || /^[:|]$/.test(rows[j])) continue;   // the seller, under "Sold by:"
-        if (rows[j].length >= 3 && rows[j].length <= 220 && !/^£|^\d+$/.test(rows[j])) { name = rows[j]; break; }
+        if (rows[j].length >= 3 && rows[j].length <= 220 && !/^£|^\d+$/.test(rows[j])) {
+          name = rows[j];
+          // (A book's author on the row under its title and over "Condition: New", "Genki 1: An Integrated..." over "Eri
+          // Banno": the title is the row above, and the book is named as Amazon's text part names it, "Title of Author". Round 15.)
+          const over = rows[j - 1] || "";
+          if (j > 0 && over.length >= 20 && over.length <= 220 && !AMZ_SKIP.test(over) && !/^view (?:or edit )?order/i.test(over) && !/^£|^\d+$/.test(over) &&
+              /^\p{Lu}[\p{L}.'’-]{0,20}(?: \p{Lu}[\p{L}.'’-]{0,20}){1,3}$/u.test(name) && name.length <= 40 && !/(?:\.\.\.|…)$/.test(name) &&
+              /^condition\s*:/i.test(rows[j + 1] || "")) { author = name; name = over; }
+          break;
+        }
       }
       if (!name) continue;
       let price = null;
       for (let k = i + 1; k <= i + 3 && price == null; k++) price = priceAt(k);
-      items.push({ name: tidy(name), ...cut(name), ...(bits.length ? { variant: bits.join(", ") } : {}), qty: Number(q[1]), pricePence: price });
+      items.push({ name: tidy(name), ...cut(name), ...(author ? { author } : {}), ...(bits.length ? { variant: bits.join(", ") } : {}), qty: Number(q[1]), pricePence: price });
       continue;
     }
     if (/^Sold by\s*:?(?:\s+\S.{0,60})?$/i.test(rows[i]) && !rows.slice(i + 1, i + 8).some((t) => /^(?:Quantity|Qty):/i.test(t))) {   // digital: title, "Sold by:", seller, price
       // (An older layout puts "Condition: New" between the title and "Sold by:": the title is above it. Round 13.)
       let at = i - 1; const bits = [];
       while (at > 0 && at >= i - 4 && /^(condition|colou?r|size|style|pattern|edition|format):\s*\S/i.test(rows[at] || "")) { const b = /^(colou?r|size|style):\s*(.{1,40})$/i.exec(rows[at]); if (b) bits.unshift(b[2]); at--; }
-      const name = rows[at];
+      let name = rows[at];
       if (!name || AMZ_SKIP.test(name) || name.length > 220) continue;
+      // (The older layout's "3 x" on the row over the title, or before it on the same row: that many, at the price shown
+      // for one, "3 x Face Cream" "Sold by: …" "£2.30" in an order of £6.90. Round 15.)
+      let qty = 1;
+      const qOn = /^(\d{1,3})\s?[x×]\s+(\S.{2,})$/.exec(name), qOver = at > 0 ? /^(\d{1,3})\s?[x×]$/.exec(rows[at - 1] || "") : null;
+      if (qOn) { qty = Number(qOn[1]); name = qOn[2]; } else if (qOver) { qty = Number(qOver[1]); at--; }
+      if (!(qty >= 1)) qty = 1;
       let price = null;
       // (A video's "Review this item" and "Original Air Date:" over the day it first aired sit before its price. Round 13.)
       let reach = i + 3;
       for (let k = i + 1; k <= i + 4 && /^(?:review this item|original air date:?|release date:?|\p{L}{3,9}\.? \d{1,2},? \d{4})$/iu.test(rows[k] || ""); k++) reach++;
       for (let k = i + 1; k <= reach && price == null; k++) price = priceAt(k);
-      items.push({ name: tidy(name), ...cut(name), ...(at > 0 ? { above: rows[at - 1] } : {}), ...(bits.length ? { variant: bits.join(", ") } : {}), qty: 1, pricePence: price });
+      items.push({ name: tidy(name), ...cut(name), ...(at > 0 && !qOver ? { above: rows[at - 1] } : {}), ...(bits.length ? { variant: bits.join(", ") } : {}), qty, pricePence: price });
     }
   }
-  return given ? items : items.map(({ above, cut, ...i }) => i);
+  return given ? items : items.map(({ above, cut, author, ...i }) => (author && !i.name.endsWith(" of " + author) ? { ...i, name: i.name + " of " + author } : i));
+}
+
+// A marketplace's item block (Etsy's HTML): the thing's name over "Transaction ID: 3521722269", its options ("Colour: Pink"),
+// "Quantity: 1" and "Price:" over "£ 7.95" (the price of one). Round 15.
+function transactionBlockItems(text) {
+  const lines = String(text || "").split("\n").map((l) => l.replace(/\|/g, " ").replace(/\s+/g, " ").trim()).filter(Boolean).slice(0, 4000);
+  const out = [];
+  for (let i = 1; i < lines.length; i++) {
+    if (!/^Transaction ID:\s*\d{5,15}$/i.test(lines[i])) continue;
+    const name = lines[i - 1];
+    if (!name || name.length < 3 || name.length > 200 || /£|:$/.test(name)) continue;
+    const opts = []; let qty = null, price = null;
+    for (let k = i + 1; k < Math.min(lines.length, i + 10) && price == null; k++) {
+      const q = /^Quantity:\s*(\d{1,3})$/i.exec(lines[k]);
+      if (q) { qty = Number(q[1]); continue; }
+      const p = /^(?:Item )?Price:\s*(?:£\s?(\d{1,5}(?:,\d{3})*\.\d{2}))?$/i.exec(lines[k]);
+      if (p) { const v = p[1] || ((/^£\s?(\d{1,5}(?:,\d{3})*\.\d{2})$/.exec(lines[k + 1] || "") || [])[1]); if (v) price = money(v); continue; }
+      const o = /^([\p{L} ]{2,30}):\s*(.{1,60})$/u.exec(lines[k]);
+      if (o && qty == null) { opts.push(o[2]); continue; }
+      if (/^Transaction ID:/i.test(lines[k])) break;
+    }
+    if (price == null) continue;
+    out.push({ name, qty: qty || 1, pricePence: price, ...(opts.length ? { variant: opts.join(", ") } : {}) });
+  }
+  return out;
 }
 
 // A PayPal receipt lists each thing as its name, "Qty: 2", an optional "Product ID: …" line and its price in the payment's
@@ -1135,7 +1191,7 @@ export function amazonOrders(html, plain) {
   }
   if (!heads.length) return null;
   // (The newer layout gives each product picture the whole title as its alt text.)
-  const alts = [...String(html || "").matchAll(/<img\b[^>]{0,600}?\balt="([^"]{12,400})"/gi)].map((m) => m[1].replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#39;/g, "'")).filter((a) => !/(?:\.\.\.|…)$/.test(a));
+  const alts = [...String(html || "").matchAll(/<img\b[^>]{0,600}?\balt="([^"]{12,400})"/gi)].map((m) => decodeEntities(m[1].replace(/&#39;/g, "'"))).filter((a) => !/(?:\.\.\.|…)$/.test(a));
   const text = String(plain || "").replace(/\r/g, "") + (alts.length ? "\n" + alts.join("\n") : "");
   const flat = text.replace(/[ \t]+/g, " ");
   const whole = (it) => {
@@ -1149,15 +1205,21 @@ export function amazonOrders(html, plain) {
     }
     // (A book's author on the row under its title: the text part says "Title of Author". Round 13.)
     if (it.above && flat.includes(it.above + " of " + name)) name = it.above + " of " + name;
-    const { cut, above, ...rest } = it;
+    const stillCut = Boolean(it.cut && name === it.name);
+    // (A book's author, as the text part writes it: "Title of Author".)
+    if (it.author && !name.endsWith(" of " + it.author)) name = name + " of " + it.author;
+    const { cut, above, author, ...rest } = it;
     // (A title still cut short, when the email has no text part to take it whole from: flagged, never passed off as whole.)
-    return { ...rest, name, ...(cut && name === it.name ? { stillCut: true } : {}) };
+    return { ...rest, name, ...(stillCut ? { stillCut: true } : {}) };
   };
   const orders = new Map();
   heads.forEach((h, k) => {
     const seg = rows.slice(h.i + 2, k + 1 < heads.length ? heads[k + 1].i : rows.length);
     const o = orders.get(h.ref) || { orderRef: h.ref, items: [], totalPence: null, giftCardPence: 0 };
     o.items.push(...amazonItems(null, seg).filter((it) => it.pricePence != null).map(whole));
+    // (An order sent in parcels repeats its summary, "Gift Card (£5.99)" with it, over each parcel: the gift card paid once.
+    // Amazon gives the gift card's part as one line in each summary. Round 15.)
+    let gift = 0;
     for (let j = 0; j < seg.length; j++) {
       // ("Order Total:" over "£28.52"; the newer layout's "Total" over "£" "21" "84".)
       if (o.totalPence == null && /^(?:Order )?Total\s*:?$/i.test(seg[j])) {
@@ -1165,8 +1227,9 @@ export function amazonOrders(html, plain) {
         if (m) o.totalPence = money(m[1]);
         else if (seg[j + 1] === "£" && /^\d{1,5}$/.test(seg[j + 2] || "") && /^\d{2}$/.test(seg[j + 3] || "")) o.totalPence = Number(seg[j + 2]) * 100 + Number(seg[j + 3]);
       }
-      const g = /^Gift Card\s*\(£\s?([\d,]+\.\d{2})\)$/i.exec(seg[j]); if (g) o.giftCardPence += money(g[1]);
+      const g = /^Gift Card\s*\(£\s?([\d,]+\.\d{2})\)$/i.exec(seg[j]); if (g) gift = Math.max(gift, money(g[1]));
     }
+    o.giftCardPence = Math.max(o.giftCardPence, gift);
     orders.set(h.ref, o);
   });
   const out = [...orders.values()].filter((o) => o.totalPence != null);
@@ -1176,6 +1239,9 @@ export function amazonOrders(html, plain) {
     const expectedPence = o.totalPence + o.giftCardPence;
     const check = { complete: o.items.length > 0 && Math.abs(itemsPence - expectedPence) <= 1, itemsPence, expectedPence, missingPence: expectedPence - itemsPence, ...(o.giftCardPence ? { giftCardPence: o.giftCardPence } : {}) };
     const { giftCardPence, ...rest } = o;
+    // (What the order cost is what was bought, the gift card's part with the rest: Amazon's "Order Total" is only what was
+    // left for the card, £0.00 when a gift card paid it all. The gift card's part is kept beside it. Round 15.)
+    if (giftCardPence) rest.totalPence = o.totalPence + giftCardPence;
     const cutNames = o.items.filter((i) => i.stillCut).map((i) => ({ name: String(i.name).slice(0, 120), why: "cut" }));
     rest.items = o.items.map(({ stillCut, ...i }) => i);
     const names = namesCheck(rest.items, {});
@@ -1473,14 +1539,17 @@ function sameShopName(n, shop) {
 }
 function venueOf(text, shop) {
   const t = String(text || "").slice(0, 6000);
-  if (!/\btable (?:number|no\.?)\s*:?|\bthanks?\s+for\s+visiting\b|\byour\s+bill\b|\bbill\s+has\s+been\s+paid\b/i.test(t)) return null;
-  const ok = (n) => n && n.length >= 3 && n.length <= 40 && /^\p{Lu}/u.test(n) && !/\d{3}|@|\b(?:order|receipt|bill|table|thank|total|paid|date|time)\b/i.test(n) && !sameShopName(n, shop) ? n : null;
+  // ("If you have any questions about your bill", an invoice's line, is not a bill paid at a table. Round 15.)
+  if (!/\btable (?:number|no\.?)\s*:?|\bthanks?\s+for\s+visiting\b|(?<!questions about )\byour\s+bill\b|\bbill\s+has\s+been\s+paid\b/i.test(t)) return null;
+  // (Nor is a label, "BILLED TO", or anything in the payer's own block, "Billing and Payment" over their name and address.)
+  const ok = (n) => n && n.length >= 3 && n.length <= 40 && /^\p{Lu}/u.test(n) && !/\d{3}|@|\b(?:order|receipt|bill|billed|billing|table|thank|total|paid|date|time)\b|\b(?:ship(?:ped)?|deliver(?:ed)?|sent|sold)\s+to\b/i.test(n) && !sameShopName(n, shop) ? n : null;
+  const payerBlock = (ls, k) => [ls[k - 1], ls[k - 2]].some((x) => /\b(?:billing|billed to|bill to|payment|deliver(?:y|ed)? (?:to|address)|ship(?:ping)? (?:to|address)|invoice (?:to|address))\b/i.test(String(x || "")));
   const vis = /\bthanks?\s+for\s+visiting\s+(\p{Lu}[^\n|.!,]{1,40}?)\s+and\b/iu.exec(t.replace(/\s*\n\s*/g, " ").replace(/\s/g, " "));
   if (vis && ok(vis[1].trim())) return vis[1].trim();
   // (A name over a street, a town and a postcode: the venue's address block.)
   const ls = t.split("\n").map((x) => x.replace(/^[\s|]+|[\s|]+$/g, "")).filter(Boolean).slice(0, 120);
   for (let k = 0; k + 2 < ls.length; k++) {
-    if (!/^\p{Lu}[\p{L}'’&. -]{2,39}$/u.test(ls[k])) continue;
+    if (!/^\p{Lu}[\p{L}'’&. -]{2,39}$/u.test(ls[k]) || payerBlock(ls, k)) continue;
     const streety = /\d|\b(?:road|street|st|lane|avenue|way|place|square|row|hill|green|parade|terrace|walk|close|drive|court|yard|wharf)\b/i.test(ls[k + 1]);
     // (Or any address line, "After Security, Stansted Airport", when the block ends in the venue's telephone. Round 15.)
     for (let j = k + 2; j < Math.min(ls.length, k + 6); j++) if (UK_POSTCODE_LINE.test(ls[j]) && (streety || (ls[k + 1].length <= 60 && !/£/.test(ls[k + 1]) && /^tel(?:ephone)?\b/i.test(ls[j + 1] || ""))) && ok(ls[k])) return ok(ls[k]);
@@ -1668,8 +1737,13 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   collectParts(headers, body, parts);
   if (!parts.text.length && !parts.html.length && parts.attachedText.length) parts.text.push(...parts.attachedText);
   const html = parts.html.join("\n").slice(0, MAX_INPUT);
-  const plain = tillPounds(unquoted(fullWidthPounds(linksOverLines(plainAsWritten(parts.text.join("\n").trim())))));
-  const fromHtml = html ? tillPounds(unquoted(fullWidthPounds(htmlToText(html)))) : "";
+  // (A sender's template word it never filled in, Apple's "iCloud: @@totalCurrentPaidAndFreeStorageWithUnit@@ Storage
+  // Plan": left out, never read as something it isn't. Round 15.)
+  // ("iCloud+ with @@…@@ of storage": the words around it go with it, "iCloud+".)
+  // (Only where there is one, and with one space before "with", so a long run of spaces is never searched again and again.)
+  const unfilled = (t) => { t = String(t || ""); return t.includes("@@") ? t.replace(/(?:[ \t](?:with|for|of))?[ \t]?@@[A-Za-z]{3,80}@@(?:[ \t]of[ \t][A-Za-z][a-z]{2,11})?/g, "") : t; };
+  const plain = tillPounds(unquoted(fullWidthPounds(linksOverLines(plainAsWritten(unfilled(parts.text.join("\n").trim()))))));
+  const fromHtml = html ? tillPounds(unquoted(fullWidthPounds(htmlToText(unfilled(html))))) : "";
   const sender = retailerFromFrom(headers.from);
   const subject = headers.subject || null;
   // The sender's display name exactly as written (retailerFromFrom drops generic ones such as "Orders").
@@ -1731,7 +1805,11 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
 
   // A refund, a cancellation or a price adjustment is never a new purchase (a refund is read by parseReturnUpdateEmail, and
   // attaches to the order it belongs to). Said in the subject, or at the top of the email ("Your order has been cancelled").
-  if (NOT_A_PURCHASE_SUBJECT.test(String(subject || "").replace(/^\s*(?:(?:fwd?|fw)\s*:\s*)+/i, "")) || NOT_A_PURCHASE_TOP.test(text.slice(0, 1200).replace(/\s+/g, " "))) {
+  if (NOT_A_PURCHASE_SUBJECT.test(String(subject || "").replace(/^\s*(?:(?:fwd?|fw)\s*:\s*)+/i, "")) || NOT_A_PURCHASE_TOP.test(text.slice(0, 1200).replace(/\s+/g, " ")) ||
+      // (Amazon's "we have processed your refund for £2.49 for the above-referenced order" under a subject naming the order. Round 15.)
+      /\bwe (?:have|(?:'|’)ve) processed your refund (?:for|of) £\s?\d/i.test(text.slice(0, 1200).replace(/\s+/g, " ")) ||
+      // (Apple's credit note: a sale undone, read as the order's refund. Round 15.)
+      appleCreditNote(headers, text)) {
     return { ok: false, reason: "refund_or_cancellation", source: "shopper_email" };
   }
   // (A table booked at a restaurant, "Table for 2 on Friday, 29 July 2022 at 17:30", with the menu it was booked for and its
@@ -1977,6 +2055,7 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
     for (const t of [textR, otherR]) if (t) cands.push({ items: readable(readItems(t, { extraPrices: true })), money: moneyOf(t) });
     for (const t of [textR, otherR]) if (t) cands.push({ items: readable(readItems(t, { laterPrice: true })), money: moneyOf(t) });
     cands.push({ items: result.items, money: moneyOf(text) });
+    for (const t of [text, otherPart]) if (t && /^[ \t|]*Transaction ID:/im.test(t)) cands.push({ items: readable(transactionBlockItems(t)), money: moneyOf(t) });
     if (html && /(^|\.)amazon\.(co\.uk|com)$/i.test(result.retailer.domain || sender?.domain || "")) cands.push({ items: amazonItems(html), money: moneyOf(fromHtml || text) });
     if (/(^|\.)apple\.com$/i.test(result.retailer.domain || "")) for (const t of [text, otherPart]) if (t) cands.push({ items: appleItems(t), money: moneyOf(t) });
     // Prices printed above their names (round 3): tried after every other reading, so it is taken only when nothing else adds up.
@@ -2032,7 +2111,11 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   if (!result.orderRef && viaPayPal) { const oid = /^[ \t|]*(?:order id|order number|invoice id)[ \t]*[:|]?[ \t|]*\n?[ \t|]*((?=[A-Za-z0-9-]*\d)[A-Za-z0-9][A-Za-z0-9-]{3,63})[ \t]*\|?[ \t]*$/im.exec(text); if (oid) result.orderRef = oid[1]; }
   // (Amazon, read from its own layout: each order in the email with its own number, items and total, and every title
   // whole. Taken for this email's order when it adds up, or when the general reading didn't. Round 13.)
-  const isAmazon = /(^|\.)amazon\.(co\.uk|com)$/i.test(result.retailer.domain || sender?.domain || "");
+  // (Pasted with no address at all: an email that calls itself Amazon's near its top and names an order in Amazon's shape.
+  // Round 15.)
+  const amazonRefs = new Set([...text.slice(0, 60000).matchAll(/\b((?:\d{3}|D\d{2})-\d{7}-\d{7})\b/g)].map((m) => m[1]));
+  const amazonPasted = !(result.retailer.domain || sender?.domain) && (amazonRefs.size > 0 && /\bamazon(?:\.co\.uk)?\b/i.test(text.slice(0, 2000)) || /^[ \t]*Ordered item\(s\):/m.test(text.slice(0, 20000)));
+  const isAmazon = /(^|\.)amazon\.(co\.uk|com)$/i.test(result.retailer.domain || sender?.domain || "") || amazonPasted;
   // (From the HTML when it shows the orders; else from the text part alone.)
   const amazonSplit = isAmazon ? (html && amazonOrders(html, plain)) || amazonPlainOrders(plain || text) : null;
   if (amazonSplit) {
@@ -2049,6 +2132,14 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
       if (amazonSplit.length > 1 || mine.totalPence !== result.totalPence) { result.totalPence = mine.totalPence; result.currency = "GBP"; }
       if (mine.giftCardPence) result.giftCardPence = mine.giftCardPence;
     }
+  }
+  // (Apple's newer invoice sets the app, its plan and the renewal in one cell, "iCloud iCloud+ with 200 GB (Monthly) Renews
+  // 18 September 2025": the plan is what was bought, the renewal day not part of its name. Round 15.)
+  if (/(^|\.)apple\.com$/i.test(result.retailer.domain || sender?.domain || "")) for (const i of result.items) {
+    let n = String(i.name || "").replace(/\s+Renews\s+\d{1,2}\s+\p{L}{3,9}\.?\s+\d{4}$/u, "");
+    const rep = /^(\S{2,30})\s+(\1\S{0,3}\s.{3,})$/u.exec(n);
+    if (rep) n = rep[2];
+    if (n && n !== i.name) i.name = n;
   }
   // A row named only by its place in a table ("SIM 1 | ORDA… | eSIM | -- | National Plus | National | £5.00", Lycamobile):
   // the thing bought is the row's name-like cell, the plan, not "SIM 1". Round 10.
@@ -2217,7 +2308,12 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
     const to = /\b(?:payment (?:of [^\n]{1,30} )?to|sent (?:[^\n]{1,30} )?to|you paid [^\n]{1,30} to)\s+([^\n|.]{2,60}?)\s*(?:\||\.|\n|$)/i.exec(String(subject || "") + "\n" + text.slice(0, 3000));
     if (to && looksLikePerson(to[1].trim(), null)) return { ok: false, reason: "payment_to_person", source: "shopper_email" };
   }
-  result.returns = extractReturns(text, html, result.orderDate);
+  result.returns = extractReturns(text, html, result.orderDate, otherPart);
+  // (Every item personalised, and the seller says personalised orders can't be returned: no window, and why. Round 15.)
+  if (result.returns && result.returns.excludes && result.items.length && result.items.every((i) => /\b(?:personali[sz]ed|custom(?:i[sz]ed)?|engraved|monogrammed|bespoke|made to order)\b/i.test(String(i.name || "") + " " + String(i.variant || "")))) {
+    result.returns = { ...result.returns, windowDays: null, windowFrom: null, deadline: null, instructions: [], portalUrl: null, sellerNoReturn: "The seller says personalised orders can't be returned unless they arrive damaged or faulty." };
+  }
+  if (result.returns) delete result.returns.excludes;
   result.sentTo = sentToOf(headers, sender);
   result.shipment = shipmentOf(subject, text);
 
@@ -2268,6 +2364,45 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
         Math.abs(ck.itemsPence - shownOff + (mon.fees || 0) + (mon.tips || 0) - result.totalPence) > 1 && Math.abs(ck.itemsPence - result.totalPence) > 1)
       result.itemsCheck = { ...ck, complete: false, offNotShown: mon.discounts - shownOff };
     if (shownOff && result.itemsCheck) result.itemsCheck = { ...result.itemsCheck, discountsPence: shownOff };
+  }
+  // (Amazon's digital receipt, a film paid by gift card: "Total: £1.99" "Gift Card Amount: -£1.99" "Order Grand Total: £0.00".
+  // What it cost is the total before the gift card, the gift card's part kept beside it. Round 15.)
+  // (Pasted, with no sender's address: Amazon by the name the email gives itself.)
+  const amazonFamily = /(^|\.)(?:amazon\.(?:co\.uk|com)|primevideo\.com)$/i.test(result.retailer.domain || sender?.domain || "") || amazonPasted ||
+    (!(result.retailer.domain || sender?.domain) && /^amazon(?:\.co\.uk)?(?: prime video)?$/i.test(String(result.retailer.name || "")));
+  if (!result.giftCardPence && Number.isInteger(result.totalPence) && amazonFamily) {
+    const g = /^[ \t|]*Gift Card(?: Amount)?[ \t]*:?[ \t|]*(?:\n[ \t|]*){0,2}[-−]£\s?(\d{1,5}(?:,\d{3})*\.\d{2})/im.exec(text);
+    const before = /^[ \t|]*Total[ \t]*:[ \t|]*(?:\n[ \t|]*){0,2}£\s?(\d{1,5}(?:,\d{3})*\.\d{2})/im.exec(text);
+    // (Or the payment methods under "Order Total:", "Gift Card (£28.64)" "Visa (£0.00)", as a pasted page shows them; the
+    // summary repeated over each parcel gives the gift card once.)
+    let paidBy = 0;
+    for (const m of text.slice(0, 60000).matchAll(/^[ \t|]*Gift Card[ \t]*\(£\s?(\d{1,5}(?:,\d{3})*\.\d{2})\)[ \t|]*$/gim)) paidBy = Math.max(paidBy, money(m[1]));
+    if (g && before && money(before[1]) - money(g[1]) === result.totalPence) {
+      result.giftCardPence = money(g[1]); result.totalPence = money(before[1]);
+      if (result.itemsCheck) { const ip = result.itemsCheck.itemsPence; result.itemsCheck = { ...result.itemsCheck, expectedPence: result.totalPence, ...(Number.isInteger(ip) ? { complete: Math.abs(ip - result.totalPence) <= 1, missingPence: result.totalPence - ip } : {}), giftCardPence: result.giftCardPence }; }
+    } else if (!g && paidBy > 0 && amazonRefs.size <= 1) {
+      result.giftCardPence = paidBy; result.totalPence += paidBy;
+      if (result.itemsCheck) { const ip = result.itemsCheck.itemsPence; result.itemsCheck = { ...result.itemsCheck, expectedPence: result.totalPence, ...(Number.isInteger(ip) ? { complete: Math.abs(ip - result.totalPence) <= 1, missingPence: result.totalPence - ip } : {}), giftCardPence: result.giftCardPence }; }
+    }
+  }
+  // (Amazon's "Order Total: £0.00" over things bought, with nothing in the email saying what paid for them, a text part that
+  // leaves out the gift card: what the order cost isn't known from it, and it is never shown as £0.00. Round 15.)
+  const boughtSomething = result.items.some((i) => Number.isInteger(i.pricePence) && i.pricePence > 0) || /£\s?(?!0\.00\b)\d/.test(text.slice(0, 20000));
+  if (amazonFamily && result.totalPence === 0 && !result.giftCardPence && !(result.discounts && result.discounts.length) && boughtSomething) {
+    result.totalPence = null; result.totalFrom = "unknown_gift_card";
+    // (Items not read at all are still flagged as missing.)
+    result.itemsCheck = { ...(result.itemsCheck || {}), expectedPence: null, missingPence: null, complete: result.items.length ? null : false };
+  }
+  // (A summary written before VAT, "Item Subtotal: £4.16" "Promotions: -£4.16" "Total Before VAT: £0.00" "VAT: £0.00"
+  // "Order Grand Total: £0.00", under a film listed at £4.99 with its VAT: the promotion paid for all of it, so what it took
+  // off is the item's own price, and the items are complete. Round 15.)
+  if (result.totalPence === 0 && result.items.length && result.discounts && result.discounts.length === 1 && /^[ \t|]*Total Before VAT\s*:/im.test(text)) {
+    const sub = /^[ \t|]*Item\(?s?\)? Subtotal[ \t]*:?[ \t|]*(?:\n[ \t|]*){0,2}£\s?(\d{1,5}(?:,\d{3})*\.\d{2})/im.exec(text);
+    const itemsPence = result.items.reduce((n, i) => n + (Number.isInteger(i.pricePence) ? i.pricePence * (i.lineTotal ? 1 : i.qty || 1) : 0), 0);
+    if (sub && money(sub[1]) === result.discounts[0].pence && money(sub[1]) > 0 && itemsPence > 0 && Math.abs(itemsPence - Math.round(money(sub[1]) * 1.2)) <= 1) {
+      result.discounts = [{ ...result.discounts[0], pence: itemsPence }];
+      result.itemsCheck = { ...(result.itemsCheck || {}), complete: true, itemsPence, expectedPence: itemsPence, missingPence: 0, coveredBy: "promotion" };
+    }
   }
   return result;
 }
@@ -2362,7 +2497,8 @@ export function parseReturnEmail(rawEmail) {
   // Some senders ship an empty or skimpy text part beside the full HTML one: use whichever actually has the return details.
   const plainText = parts.text.join("\n").trim();
   const htmlText = html ? htmlToText(html).trim() : "";
-  const hasReturn = (t) => /\breturn id\b/i.test(t) || /(?:thanks for your|your) return request/i.test(t);
+  // (Or Amazon's "Your return is confirmed" with its pickup or drop-off booked and the refund it expects. Round 15.)
+  const hasReturn = (t) => /\breturn id\b/i.test(t) || /(?:thanks for your|your) return request/i.test(t) || /\byour return is confirmed\b/i.test(t);
   // (A text part that lost its pound signs, "for the value of L118.00", while the HTML has them: the HTML is read. Round 12.)
   const lostPounds = Boolean(plainText && htmlText && !/£/.test(plainText) && /\bL\d[\d,]*\.\d{2}\b/.test(plainText) && /£/.test(htmlText));
   const text = plainText && !lostPounds && (hasReturn(plainText) || !hasReturn(htmlText)) ? plainText : htmlText || plainText;
@@ -2370,7 +2506,7 @@ export function parseReturnEmail(rawEmail) {
   const sender = retailerFromFrom(headers.from);
   const refDate = headers.date ? new Date(headers.date) : null;
 
-  const isReturn = /\breturn id\b/i.test(text) || /(?:thanks for your|your) return request/i.test(text);
+  const isReturn = hasReturn(text);
   if (!isReturn) return { ok: false, reason: "not_a_return_email", source: "shopper_email" };
 
   // A real return ID has at least one digit and ends at a space or line break ("RETURN ID: nuk0400251601"),
@@ -2378,6 +2514,8 @@ export function parseReturnEmail(rawEmail) {
   const idm = text.match(/return id\s*[:#\s|]*((?=[A-Z0-9-]*\d)[A-Z0-9-]{5,30})(?![A-Za-z0-9\/:.])/i);
   const orderFromSubject = subject.match(/\border\s+#?((?=[A-Z0-9-]*\d)[A-Z0-9-]{3,24})/i);
   const orderFromBody = text.match(/\border\s*(?:number|no\.?|id)\s*[:#\s]*([A-Z0-9-]{4,24})/i);
+  // (Amazon names the order only in its links, "returns/prep?…&orderId=206-…": taken when it is in Amazon's own shape.)
+  const orderFromLink = !orderFromSubject && !orderFromBody ? /(?:[?&]|%26|%3F)(?:amp;)?orderId(?:=|%3D|=3D)((?:\d{3}|D\d{2})-\d{7}-\d{7})\b/i.exec(text.slice(0, 20000) + "\n" + html.slice(0, 200000)) : null;
 
   // Deadline: "send it back no later than Wednesday, December 24". The year, if absent,
   // comes from the email's own date and is never in the past relative to it.
@@ -2411,7 +2549,7 @@ export function parseReturnEmail(rawEmail) {
   }
 
   // (Or the return's own total, "TOTAL REFUND" over "£118.00", or "crediting you back … for the value of £118.00". Round 12.)
-  const refund = text.match(/estimated refund[\s\S]{0,20}?£\s*([0-9][0-9,]*\.[0-9]{2})/i) || text.match(/\btotal refund(?: amount)?\s*:?[\s|]{0,12}£\s*([0-9][0-9,]*\.[0-9]{2})/i) ||
+  const refund = text.match(/(?:estimated|total expected) refund[\s\S]{0,20}?£\s*([0-9][0-9,]*\.[0-9]{2})/i) || text.match(/\btotal refund(?: amount)?\s*:?[\s|]{0,12}£\s*([0-9][0-9,]*\.[0-9]{2})/i) ||
     text.match(/\bcredit(?:ing)? you back\b[^£]{0,60}\bvalue of £\s*([0-9][0-9,]*\.[0-9]{2})/i);
   let trackUrl = null;
   if (html) {
@@ -2428,9 +2566,9 @@ export function parseReturnEmail(rawEmail) {
     ok: true, kind: "return_instructions", source: "shopper_email", refundEligible: false,
     // The day the shop sent it: when the return was started, on the receipt's return timeline.
     at: refDate && !Number.isNaN(refDate.getTime()) ? isoDate(refDate) : null,
-    retailer: { name: sender?.name || null, domain: sender?.domain || null },
+    retailer: { name: sender?.name && !/@/.test(sender.name) ? sender.name : null, domain: sender?.domain || null },
     returnId: idm ? idm[1] : null,
-    orderRef: orderFromSubject ? orderFromSubject[1] : orderFromBody ? orderFromBody[1] : null,
+    orderRef: orderFromSubject ? orderFromSubject[1] : orderFromBody ? orderFromBody[1] : orderFromLink ? orderFromLink[1] : null,
     orderDate: od ? parseDate(od[1], refDate) : null,
     deadline, carrier, steps,
     qrMentioned: /\bqr\b/i.test(text) || /<img[^>]+(?:alt|src)=["'][^"']*qr/i.test(html || ""),
@@ -2457,18 +2595,47 @@ function shownText(parts, html) {
   const fromHtml = (htmlToText(html) || "").trim();
   return plain.replace(/\s+/g, " ").length * 2 < fromHtml.replace(/[\s|]+/g, " ").length ? fromHtml : plain;
 }
+// Apple's credit note, "Credit Note" at the top of an email sent as "Your invoice from Apple.", "ORDER ID MQKS…-1", the
+// thing cancelled ("Cancellation Date: …") and its amounts written as minus: the sale undone, its money given back, on the
+// order whose number it carries (without the "-1"). Round 15.
+const APPLE_CREDIT_TOP = /^[\s|]*(?:apple[ \t]+)?credit note[\s|]*$/im;
+function appleCreditNote(headers, text) {
+  // (Or forwarded from the shopper's mailbox: the forwarded message's own sender is Apple's, and the title is under it.)
+  const fwd = !/(^|\.)apple\.com$/i.test(retailerFromFrom(headers.from)?.domain || "");
+  const fwdFrom = fwd ? /^[ \t>*]*(?:from|von|de)[ \t*]*:[^\n]{0,80}@((?:[a-z0-9-]+\.)?apple\.com)\b/im.exec(String(text || "").slice(0, 4000)) : null;
+  if (fwd && !fwdFrom) return null;
+  const top = String(text || "").slice(0, fwd ? 4000 : 800);
+  if (!APPLE_CREDIT_TOP.test(top)) return null;
+  const t = String(text || "").slice(0, 20000);
+  const ref = /\border id[\s|:]*([A-Z0-9]{8,14})(?:-\d{1,2})?\b/i.exec(t);
+  const total = /\btotal\b[\s|:]*[-−]£\s?(\d{1,5}(?:,\d{3})*\.\d{2})/i.exec(t) || /[-−]£\s?(\d{1,5}(?:,\d{3})*\.\d{2})/.exec(t);
+  const d = headers.date ? new Date(headers.date) : null;
+  return { ok: true, kind: "return_update", stage: "refunded", creditNote: true, at: d && !Number.isNaN(d.getTime()) ? isoDate(d) : null,
+    amountPence: total ? money(total[1]) : null, currency: total ? "GBP" : null, orderRef: ref ? ref[1] : null, returnId: null,
+    retailer: { name: "Apple", domain: fwdFrom ? fwdFrom[1].toLowerCase() : retailerFromFrom(headers.from)?.domain || "apple.com" } };
+}
+
 export function parseReturnUpdateEmail(rawEmail) {
   const raw = String(rawEmail || "").slice(0, MAX_INPUT);
   const { headers, body } = splitMessage(raw);
   const subject = headers.subject || "";
   // A carrier's "we've received your return" means the carrier has it, not the shop: parseReturnParcelEmail reads those.
   if (returnCarrierOf(headers.from)) return { ok: false, reason: "not_a_return_update" };
-  if (!/\brefund|\breturn (?:has been )?(?:received|arrived|processed)|\breceived your return|\byour return (?:has|is)/i.test(subject) ||
-      /\breturn request|\breturn label|\bhow to return|\bstart (?:a|your) return/i.test(subject)) return { ok: false, reason: "not_a_return_update" };
+  if (/\breturn request|\breturn label|\bhow to return|\bstart (?:a|your) return/i.test(subject)) return { ok: false, reason: "not_a_return_update" };
+  if (/\bapple\b/i.test(headers.from || "") || /\binvoice from apple\b/i.test(subject)) {
+    const cp = { text: [], html: [] }; collectParts(headers, body, cp);
+    const credit = appleCreditNote(headers, shownText(cp, cp.html.join("\n")));
+    if (credit) return credit;
+  }
+  const subjectSays = /\brefund|\breturn (?:has been )?(?:received|arrived|processed)|\breceived your return|\byour return (?:has|is)/i.test(subject);
+  // (A subject that only names the order, Amazon's "Your Amazon.co.uk Order #D01-…", over "We're writing to confirm that we
+  // have processed your refund for £2.49 for the above-referenced order": the email's opening says it. Round 15.)
+  if (!subjectSays && !/\border\b/i.test(subject)) return { ok: false, reason: "not_a_return_update" };
   const parts = { text: [], html: [] };
   collectParts(headers, body, parts);
   const html = parts.html.join("\n");
   const text = shownText(parts, html);
+  if (!subjectSays && !/\b(?:we(?:'|’)?re writing to confirm that )?we (?:have|(?:'|’)ve) (?:processed|issued) (?:your|a) refund (?:for|of) £\s?\d/i.test(text.slice(0, 1500).replace(/\s+/g, " "))) return { ok: false, reason: "not_a_return_update" };
   const both = (subject + "\n" + text.slice(0, 6000)).replace(/￡/g, "£");
   // Money back for a price drop, or for an order the shop cancelled, is not a return: nothing was sent back, so Relay must
   // not show a return as refunded (round 3, 19 Nov 2026). The order's own card already says what was bought.
@@ -2490,7 +2657,8 @@ export function parseReturnUpdateEmail(rawEmail) {
   const sender = retailerFromFrom(headers.from);
   // A refund email the shopper forwarded from their own mailbox is the shop's: the shop is read from the forwarded
   // message, as for a receipt, so it still attaches to the order by its number. The shopper's own address is never the shop.
-  const fromName = ((headers.from || "").match(/^\s*"?([^"<]+?)"?\s*</) || [])[1] || null;
+  // (A name that is only an address, "return@amazon.co.uk" <return@amazon.co.uk>, is never the shop's name. Round 15.)
+  const fromName = ((headers.from || "").match(/^\s*"?([^"<@]+?)"?\s*</) || [])[1] || null;
   const shop = shopOf({ ld: null, sender, fromName, subject, text, html, otherText: html && parts.text.length ? htmlToText(html) : "" });
   if (shop.domain && PERSONAL_MAIL.test(shop.domain)) shop.domain = null;
   if (PERSONAL_MAIL.test(sender?.domain || "") && shop.name && !shop.domain && looksLikePerson(shop.name, null)) shop.name = null;
@@ -2503,6 +2671,9 @@ export function parseReturnUpdateEmail(rawEmail) {
   const ref = subject.match(/\border\s*#?\s*((?=[A-Z0-9-]*\d)[A-Z0-9-]{4,24})/i) || text.match(/\border\s*(?:number|no\.?|id|#)\s*[:#\s]*#?\s*((?=[A-Z0-9-]*\d)[A-Z0-9-]{4,24})/i) ||
     // ("Refund Initiated : #32297", "for your order 32297": the order's number. Round 15.)
     subject.match(/\brefund\b[^#\n]{0,30}#\s?(\d{3,12})\b/i) || text.match(/\bfor your order #?(\d{4,12})\b/i);
+  // (Amazon's "Your return is now complete" names its order only in the link to it, "order-details?orderID=206-…", in the
+  // text part or URL-encoded in the HTML's. Only an order number in Amazon's own shape is taken from a link. Round 15.)
+  const linkRef = !ref ? /[?&](?:%26)?orderID(?:=|%3D)((?:\d{3}|D\d{2})-\d{7}-\d{7})\b/i.exec(text.slice(0, 20000) + "\n" + html.slice(0, 200000)) : null;
   // (A payment service's refund names the shop's invoice, "Invoice ID: WB11050983-P001", which is that order's number. Round 12.)
   const inv = !ref ? text.match(/\binvoice\s*(?:id|number|no\.?)\s*[:#\s]*((?=[A-Z0-9-]*\d)[A-Z0-9-]{4,30})\b/i) ||
     // (A booking refunded by its "Transaction ID:" over the number, the number its booking email gave. Round 15.)
@@ -2517,7 +2688,7 @@ export function parseReturnUpdateEmail(rawEmail) {
     ok: true, kind: "return_update", stage,
     at: refDate && !Number.isNaN(refDate.getTime()) ? isoDate(refDate) : null,
     amountPence: amt ? money(amt[1]) : null, currency: amt ? "GBP" : null,
-    orderRef: ref ? ref[1] : inv ? inv[1] : null, returnId: rid ? rid[1] : null,
+    orderRef: ref ? ref[1] : inv ? inv[1] : linkRef ? linkRef[1] : null, returnId: rid ? rid[1] : null,
     ...(orig ? { paidPence: money(orig[2]), paidOn: parseDate(orig[3], refDate) } : {}),
     retailer: viaShop ? { name: viaShop.trim().replace(/\.{2,}$/, ""), domain: null, via: (fwdVia && fwdVia.domain) || sender.domain } : { name: shop.name || null, domain: shop.domain || null },
   };

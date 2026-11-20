@@ -1,0 +1,20 @@
+{
+ "id": "holdout16a-amazon-payments-refund",
+ "sender": "Amazon",
+ "layout": "'Refund on order 204-…': 'processing your refund in the amount of £849.00 for your Order …', the item and the reason",
+ "headers": {
+  "from": "\"Amazon.co.uk\" <payments-messages@amazon.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Refund on order 204-9998887-7776665",
+  "date": "Tue, 28 May 2024 11:54:13 +0000"
+ },
+ "html": "",
+ "text": "Dear Customer,\n\nGreetings from Amazon.co.uk.\n\nWe are writing to confirm that we are processing your refund in the amount of £849.00 for your Order 204-9998887-7776665.\n\nThis refund is for the following item(s):\n\nItem: Lumio 14-inch Laptop, 16GB RAM, 512GB SSD\nQuantity: 1\nReason for refund: Damaged during transit\n\nItem Refund: £707.50\nItem Tax Refund: £141.50\n\nMasterCard Credit Card [expiring on 3/2027]: £849.00\n",
+ "expected": {
+  "notPurchase": {
+   "kind": "refund",
+   "refundPence": 84900,
+   "orderRef": "204-9998887-7776665"
+  }
+ }
+}

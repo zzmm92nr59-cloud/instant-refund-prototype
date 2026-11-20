@@ -357,7 +357,7 @@ const joinWrong = [];
   if (!(wine[0].returnProgress && wine[0].returnProgress.refundPence === 3000) || wine[1].returnProgress) joinWrong.push("refund naming the shop's invoice not joined to that order");
 }
 // Round 13 (Connor's real inbox, made-up copies): an Amazon email holding two orders makes a card for each, with its own
-// number, items and total (a gift card's £0.00 kept); Apple's and Google Play's cancel and withdrawal windows are read, and an
+// number, items and total (round 15: what was bought, the gift card's part beside it, never Amazon's £0.00); Apple's and Google Play's cancel and withdrawal windows are read, and an
 // app store's two-hour rule is never given for a subscription; a subscription that won't renew says so on its latest payment
 // without cancelling it; PayPal's receipt for a game shop's purchase is the same purchase as the shop's own receipt.
 {
@@ -382,7 +382,7 @@ const joinWrong = [];
   const noText = parseReceiptEmail(rawEmail({ ...q, html: cutHtml, text: "" }));
   if (!noText.itemsCheck || noText.itemsCheck.complete !== false) joinWrong.push("Amazon's cut titles with no text part not flagged: " + JSON.stringify(noText.itemsCheck));
   const gift = det("holdout14a-amazon-qty-2024");
-  if (gift.giftCardPence !== 1475 || gift.totalPence !== 0 || !gift.itemsCheck.complete) joinWrong.push("a gift-card order read as " + JSON.stringify([gift.totalPence, gift.giftCardPence, gift.itemsCheck]));
+  if (gift.giftCardPence !== 1475 || gift.totalPence !== 1475 || !gift.itemsCheck.complete) joinWrong.push("a gift-card order read as " + JSON.stringify([gift.totalPence, gift.giftCardPence, gift.itemsCheck]));
   const apple = parseReceiptEmail(rawEmail(fx("holdout14a-apple-cancel-within")));
   if (!(apple.returns && apple.returns.windowDays === 14 && apple.returns.cancelWithin)) joinWrong.push("Apple's 'cancel within 14 days' not read: " + JSON.stringify(apple.returns));
   const play = parseReceiptEmail(rawEmail(fx("holdout14a-google-play-subscription")));
@@ -427,6 +427,31 @@ const joinWrong = [];
     const raw = rawEmail(app ? forwarded(TABLE_BOOKING, app) : TABLE_BOOKING);
     const r = parseReceiptEmail(raw), k = classifyEmail(raw).details.kind;
     if (!r.ok || r.orderRef !== "4410098812" || !r.tableBooking || k === "receipt") joinWrong.push(`table booking${app ? " (" + app + ")" : ""} read as ${k} ${r.orderRef} ${r.tableBooking}`);
+  }
+}
+// Round 15 (Connor's real inbox, made-up copies): a seller's own return policy beats a marketplace's line under the item, and a
+// personalised thing the seller says can't go back gets no return window at all, never one Relay made up.
+{
+  const { categorise } = await import("../worker/receipt-category.js");
+  const fx = (id) => JSON.parse(readFileSync(join(dir, id + ".json"), "utf8"));
+  for (const app of [null, "gmail"]) {
+    const days = parseReceiptEmail(rawEmail(app ? forwarded(fx("holdout16a-etsy-seller-days"), app) : fx("holdout16a-etsy-seller-days")));
+    const said = (days.returns && days.returns.instructions || []).join(" ");
+    if (!(days.returns && days.returns.windowDays === 7 && days.returns.windowFrom === "delivery") || /14 days/.test(said) || categorise(days).returnable !== true)
+      joinWrong.push(`a seller's 7 days${app ? " (" + app + ")" : ""} read as ` + JSON.stringify([days.returns && days.returns.windowDays, said]));
+    const pers = parseReceiptEmail(rawEmail(app ? forwarded(fx("holdout16a-etsy-personalised"), app) : fx("holdout16a-etsy-personalised")));
+    const g = categorise(pers);
+    if (!pers.returns || pers.returns.windowDays != null || pers.returns.deadline != null || (pers.returns.instructions || []).length || g.returnable !== false || !/personalised/i.test(g.notReturnableReason || ""))
+      joinWrong.push(`a personalised order the seller won't take back${app ? " (" + app + ")" : ""} read as ` + JSON.stringify([pers.returns, g.returnable]));
+  }
+  // (Amazon's "Your return is confirmed", a collection booked: the return started on its order, the refund only expected,
+  // never a refund.)
+  for (const app of [null, "gmail"]) {
+    const { RETURN_PICKUP } = await import("./fixtures/receipt-emails/holdout16a.mjs");
+    const raw = rawEmail(app ? forwarded(RETURN_PICKUP, app) : RETURN_PICKUP);
+    const r = parseReturnEmail(raw), u = parseReturnUpdateEmail(raw);
+    if (!r.ok || r.orderRef !== "206-5556667-7778889" || r.estimatedRefundPence !== 44900 || u.ok || /@/.test(String(r.retailer && r.retailer.name || "")))
+      joinWrong.push(`Amazon's return with a pickup booked${app ? " (" + app + ")" : ""} read as ` + JSON.stringify([r.ok, r.orderRef, r.estimatedRefundPence, u.ok && u.stage, r.retailer]));
   }
 }
 {
