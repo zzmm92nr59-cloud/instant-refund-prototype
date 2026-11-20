@@ -1,0 +1,23 @@
+{
+ "id": "holdout17-forwarded-someone-else",
+ "sender": "Northgate Arena",
+ "layout": "forwarded from the shopper's own other inbox: 'From:', 'Sent:', 'To: jo-…' then 'Hi Jo,'",
+ "headers": {
+  "from": "Sam Taylor <sam.taylor.88@outlook.com>",
+  "to": "Sam Taylor <sam.taylor@example.co.uk>",
+  "subject": "FW: Purchase confirmation - Northgate Arena",
+  "date": "Mon, 09 Nov 2026 20:00:00 +0000"
+ },
+ "html": "",
+ "text": "Get Outlook for Android\nFrom: confirmation@northgatearena.example <confirmation@northgatearena.example>\nSent: Tuesday, October 20, 2026 12:05:37 PM\nTo: jo-taylor90@hotmail.co.uk <jo-taylor90@hotmail.co.uk>\nSubject: Purchase confirmation - Northgate Arena\n\nALL BOOKED!\nHi Jo,\nORDER NUMBER 201020,1144\nDarts Night\nSection B12 Row P Seat 4\n£40.00\nTotal £80.00",
+ "expected": {
+  "notPurchase": {
+   "kind": "someone else's"
+  },
+  "items": [],
+  "shop": null,
+  "date": null,
+  "currency": null,
+  "totalPence": null
+ }
+}

@@ -18,13 +18,13 @@
    {
     "name": "Uber ride",
     "qty": 1,
-    "linePence": 1515
+    "linePence": 1240
    }
   ],
-  "subtotalPence": 1515,
-  "feesPence": 0,
+  "subtotalPence": 1240,
+  "feesPence": 175,
   "discountsPence": 0,
-  "tipsPence": 0,
+  "tipsPence": 100,
   "totalPence": 1515
  }
 }

@@ -28,13 +28,13 @@ export default function holdout11() {
     const lines = ["12 Nov 2026", "18:05", "12 Nov 2026 , 18:05", `Thanks for riding, ${SHOPPER.first}`, "We hope you enjoyed your ride this evening.", "Total | £27.85", "£1.39", "Uber One credits earned", "Trip fare", "£25.62",
       "Uber pet fee | £3.47", "Uber One credits | -£1.24", "Payments", "Visa •••• 4821 | £27.85", "This is not a tax invoice.", "Trip details", "6.10 miles, 31 minutes", "You rode with Alex | 4.91", "Rate or tip", "Report lost item"];
     add("holdout11-uber-pet-ride", "Uber", "ride: trip fare, pet fee, Uber One credits used and earned", { from: "Uber Receipts <noreply@uber.com>", subject: "Your Thursday evening trip with Uber", date: "Thu, 12 Nov 2026 18:50:00 +0000",
-      html: mail("Uber", "uber.com", lines) }, order([{ name: "Uber Pet ride", qty: 1, unit: 2785 }]), "Uber", "2026-11-12");
+      html: mail("Uber", "uber.com", lines) }, order([{ name: "Uber Pet ride", qty: 1, unit: 2562 }], { fees: [["Uber pet fee", 347]], discounts: [["Uber One credits", 124]] }), "Uber", "2026-11-12");
   }
   {
     const lines = ["9 Nov 2026", "07:12", "9 Nov 2026 , 07:12", `Thanks for riding, ${SHOPPER.first}`, "We hope you enjoyed your ride this morning.", "Total | £18.20", "£0.91", "Uber One credits earned", "Trip fare", "£17.84", "Wait Time", "£0.36",
       "Payments", "Visa •••• 4821 | £18.20", "A charge for wait time has been added to your payment.", "Trip details", "4.02 miles, 22 minutes"];
     add("holdout11-uber-ride-wait", "Uber", "ride: trip fare and wait time on rows of their own", { from: "Uber Receipts <noreply@uber.com>", subject: "Your Monday morning trip with Uber", date: "Mon, 09 Nov 2026 07:40:00 +0000",
-      html: mail("Uber", "uber.com", lines) }, order([{ name: "Uber ride", qty: 1, unit: 1820 }]), "Uber", "2026-11-09");
+      html: mail("Uber", "uber.com", lines) }, order([{ name: "Uber ride", qty: 1, unit: 1784 }], { fees: [["Wait Time", 36]] }), "Uber", "2026-11-09");
   }
   // ---- Uber Eats: a changed total for an earlier order (money back, never a purchase) -------------------------------------
   not("holdout11-ue-adjusted-total", "Uber Eats", "'We adjusted the total for your recent order', previous total, refund, new total", { from: "Uber Receipts <noreply@uber.com>", subject: "Your Saturday evening order with Uber Eats", date: "Mon, 16 Nov 2026 10:00:00 +0000",

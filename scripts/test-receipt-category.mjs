@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { categorise, storeKey, shopDisplayName, agreedShopNames, logoDomainFor, itemKind, itemCategories, categoryShares, returnableItems } from "../worker/receipt-category.js";
+import { categorise, storeKey, shopDisplayName, agreedShopNames, agreedNameFor, logoDomainFor, itemKind, itemCategories, categoryShares, returnableItems } from "../worker/receipt-category.js";
 import { squareShopName } from "../worker/square-env.js";
 const c = (name, domain, items = []) => categorise({ retailer: { name, domain }, items: items.map(n => ({ name: n })) });
 let n = 0; const t = (m, f) => { f(); n++; console.log("ok -", m); };
@@ -212,5 +212,15 @@ t("pub, restaurant and app-ordered bills are never returnable; Amazon digital or
   assert.equal(film.category, "digital"); assert.equal(film.returnable, false);
   // (A coffee shop's own coffee grinder still goes back.)
   assert.equal(categorise({ retailer: { name: "Costa Coffee", domain: "costa.co.uk" }, items: [{ name: "Costa coffee grinder" }] }).returnable, true);
+});
+t("one address, two services: Uber Eats keeps its own name beside Uber's rides, and is food (round 16)", () => {
+  const cards = [...Array(6)].map(() => ({ retailer: { name: "Uber", domain: "uber.com" } })).concat([{ retailer: { name: "Uber Eats", domain: "uber.com" } }, { retailer: { name: "Uber Eats", domain: "uber.com" } }]);
+  const a = agreedShopNames(cards);
+  assert.equal(agreedNameFor(a, { name: "Uber" }, "uber.com"), "Uber");
+  assert.equal(agreedNameFor(a, { name: "Uber Eats" }, "uber.com"), "Uber Eats");
+  assert.equal(categorise({ retailer: { name: "Uber Eats", domain: "uber.com", legalName: "Uber Eats" }, merchant: "Lantern Noodle Bar" }).category, "food");
+  // (Two spellings of one shop still agree on one name.)
+  const b = agreedShopNames([{ retailer: { name: "Example Shop", domain: "exampleshop.co.uk" } }, { retailer: { name: "Example Shop Ltd", domain: "exampleshop.co.uk" } }, { retailer: { name: "Example Shop", domain: "exampleshop.co.uk" } }]);
+  assert.equal(agreedNameFor(b, { name: "Example Shop Ltd" }, "exampleshop.co.uk"), "Example Shop");
 });
 console.log(`\n${n} category tests passed`);

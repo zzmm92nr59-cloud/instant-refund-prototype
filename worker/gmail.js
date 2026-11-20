@@ -30,7 +30,7 @@ import { REREADS_SQL, REREADS_PER_DAY, REREAD_AI_PER_DAY, REREAD_AI_ALL_DAY, ord
 import { PARCEL_TRACKS_SQL, PARCEL_USES_SQL, applyTracked, readTrackedRows, liveParcel } from "./parcel-tracking.js";
 import { RETURN_TRACKS_SQL, attachReturnTracking, readReturnTracks, saveReturnSent, liveReturnParcel, returnFacts } from "./return-tracking.js";
 import { aiTypesFor, learnItemKinds } from "./item-kinds.js";
-import { categorise, itemCategories, itemKinds, returnableItems, storeKey, legacyStoreKey, agreedShopNames, logoDomainFor, CATEGORIES, shopDisplayName, PERSONAL_MAIL } from "./receipt-category.js";
+import { categorise, itemCategories, itemKinds, returnableItems, storeKey, legacyStoreKey, agreedShopNames, agreedNameFor, logoDomainFor, CATEGORIES, shopDisplayName, PERSONAL_MAIL } from "./receipt-category.js";
 import { cleanItems, isVia, nameFitsDomain } from "./receipt-reader.js";
 // Instant email: Gmail and Outlook say when new mail arrives (mail-push.js), so it's read at once rather than on the next round.
 import { stopMailPush, gmailPushOn, outlookPushOn } from "./mail-push.js";
@@ -184,7 +184,7 @@ async function gmailGet(fetchImpl, url, headers) {
 // 42: codes to show or scan (scan-codes.js): a return barcode in a shipping email, a receipt's own barcode, a drop-off QR code,
 // a collection QR code and tickets' barcodes are kept with the order's receipt; an email that is only such a code for an order
 // it names is kept for it (kind "order_codes").
-export const PARSER_VERSION = 50;
+export const PARSER_VERSION = 51;
 // Which full read of every mailbox is due: version 33 of the reader was full read 14, and each reader version since is one
 // more, so a better reader always reaches old receipts too, without anyone having to remember to raise this.
 export const READER_FULL_REV = 14 + Math.max(0, PARSER_VERSION - 33);
@@ -1129,6 +1129,8 @@ function classify(rawText, ref, lenient = false) {
       ...(receipt.sentAt ? { sentAt: receipt.sentAt } : {}), ...(receipt.giftCardPence ? { giftCardPence: receipt.giftCardPence } : {}),
       // (A stay booked to be paid at the property: nothing was taken up front, the card only guaranteed it. Round 15.)
       ...(receipt.payAtProperty ? { payAtProperty: true } : {}),
+      // (A receipt sent again with a tip added: it replaces the first one for the same purchase. Round 16.)
+      ...(receipt.updatedReceipt ? { updatedReceipt: true } : {}), ...(receipt.collection ? { collection: receipt.collection } : {}),
       // The receipt is only in the email's attachment ("pdf" or "image"): the app says so and nothing is read from it.
       ...(receipt.detailsInAttachment ? { detailsInAttachment: receipt.detailsInAttachment } : {}),
       needsShopperConfirmation: receipt.needsShopperConfirmation, method: receipt.method, returns: receipt.returns, shipment: receipt.shipment || null,
@@ -2000,8 +2002,43 @@ export function mergeOrderEmails(orders, opts = {}) {
     const near = fits.filter((p) => Math.abs(Date.parse(o.orderDate) - Date.parse(p.orderDate)) <= 3 * 864e5);
     if (near.length === 1) folded.set(o, near[0]); else if (!near.length && fits.length === 1) folded.set(o, fits[0]);
   }
+  // (A receipt sent again after a tip was added, "Thanks for tipping", replaces the first receipt for the same purchase: the
+  // same shop and restaurant, the same day or the day before, the same fare when it shows one, and the first total plus the
+  // tip comes to the updated one. One card, the updated total, the tip as a line of its own. Only when exactly one first
+  // receipt fits. Round 16.)
+  const replacedBy = new Map();
+  const tipOf = (o) => ((o.fees || []).find((f) => f && /^tips?\b/i.test(String(f.label || ""))) || {}).pence;
+  const dayGap = (a, b) => (a.orderDate && b.orderDate ? (Date.parse(b.orderDate) - Date.parse(a.orderDate)) / 864e5 : NaN);
+  for (const u of orders) {
+    if (!u.updatedReceipt || u.totalPence == null || isForwarded(u)) continue;
+    const tip = tipOf(u);
+    const fits = orders.filter((o) => o !== u && !o.updatedReceipt && !replacedBy.has(o) && o.kind !== "order_update" && o.totalPence != null && !isForwarded(o) &&
+      joinStore(o) === joinStore(u) && (o.currency || "GBP") === (u.currency || "GBP") && String(o.merchant || "") === String(u.merchant || "") &&
+      (!o.orderRef || !u.orderRef || sameOrderRef(o.orderRef, u.orderRef)) && dayGap(o, u) >= 0 && dayGap(o, u) <= 1 &&
+      (Number.isInteger(tip) ? o.totalPence + tip === u.totalPence : o.totalPence < u.totalPence && u.totalPence - o.totalPence <= Math.max(500, o.totalPence / 2)) &&
+      (!(o.items || []).length || !(u.items || []).length || (o.items[0].pricePence === u.items[0].pricePence && o.items.length === u.items.length)));
+    if (fits.length === 1) replacedBy.set(fits[0], u);
+  }
+  // (A click-and-collect order's "ready to collect" email and its "You've collected your items" receipt, which can number the
+  // order differently, a collection reference "QX402117" against the order's "8812203345": one purchase when the shop, the
+  // things, how many and what they cost, and the total are the same, collected within ten days. The receipt leads. Round 16.)
+  const sameItems = (a, b) => (a.items || []).length > 0 && a.items.length === (b.items || []).length && a.items.every((x, k) => String(x.name || "").toLowerCase() === String(b.items[k].name || "").toLowerCase() && (x.qty || 1) === (b.items[k].qty || 1) && lineOf(x) === lineOf(b.items[k]));
+  for (const c of orders) {
+    if (c.collection !== "collected" || isForwarded(c)) continue;
+    const fits = orders.filter((r) => r !== c && r.collection === "ready" && !replacedBy.has(r) && !isForwarded(r) && joinStore(r) === joinStore(c) && r.totalPence != null && r.totalPence === c.totalPence &&
+      (r.currency || "GBP") === (c.currency || "GBP") && sameItems(r, c) && dayGap(r, c) >= -1 && dayGap(r, c) <= 10 && (!r.orderRef || !c.orderRef || !sameOrderRef(r.orderRef, c.orderRef)));
+    if (fits.length === 1) replacedBy.set(fits[0], c);
+  }
+  for (const [o, u] of replacedBy) {
+    if (u.collection === "collected") { const ids = [...(u.emailIds || [u.id]), o.id].filter(Boolean); Object.defineProperty(u, "emailIds", { value: ids, enumerable: false, configurable: true }); continue; }
+    if (!Number.isInteger(tipOf(u)) && u.totalPence > o.totalPence) u.fees = [...(u.fees || []), { label: "Tip", pence: u.totalPence - o.totalPence }];
+    if (!u.orderRef && o.orderRef) u.orderRef = o.orderRef;
+    const ids = [...(u.emailIds || [u.id]), o.id].filter(Boolean);
+    Object.defineProperty(u, "emailIds", { value: ids, enumerable: false, configurable: true });
+  }
   for (const o of orders) {
     const forced = opts.keyFor ? opts.keyFor(o) : undefined;
+    if (replacedBy.has(o) && forced === undefined) continue;
     if (folded.has(o) && forced === undefined) {
       const p = folded.get(o);
       if (!p.orderRef && o.orderRef) p.orderRef = o.orderRef;
@@ -2112,7 +2149,7 @@ export function mergeOrderEmails(orders, opts = {}) {
     if (paidBy && c.totalPence !== paidBy.totalPence && c.orderUpdate !== "paid") { if (c.totalPence != null) c.shopTotalPence = c.totalPence; c.totalPence = paidBy.totalPence; }
     // Which emails the card was made from, for choices the shopper made on an email that isn't the one shown (attachGifts).
     // Not enumerable, so it never goes to the app.
-    Object.defineProperty(c, "emailIds", { value: g.map(o => o.id), enumerable: false });
+    Object.defineProperty(c, "emailIds", { value: [...new Set(g.flatMap(o => o.emailIds || [o.id]))], enumerable: false });
     return c;
   });
 }
@@ -2679,7 +2716,7 @@ async function listReceipts(env, shopperId, timing, opts = {}) {
     const r0 = c.retailer || {};
     const domain = r0.domain ? String(r0.domain).toLowerCase().replace(/[^a-z0-9.-]/g, "") : null;
     // A shop name the shopper typed in is theirs, and isn't tidied away.
-    const shown = (c.fixed && c.fixed.shop && r0.name) || (domain && agreed.get(domain)) || shopDisplayName({ ...r0, domain });
+    const shown = (c.fixed && c.fixed.shop && r0.name) || agreedNameFor(agreed, r0, domain) || shopDisplayName({ ...r0, domain });
     const via = r0.via || (isVia(domain) ? domain : null);
     const retailer = { ...r0, domain: isVia(domain) ? null : domain, name: shown || r0.name || null, ...(shown && r0.name && shown !== r0.name ? { legalName: r0.name } : {}), ...(via ? { via } : {}) };
     // Where the app gets the shop's logo from (null: no logo to look for, so the app draws one from what was bought).

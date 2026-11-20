@@ -530,8 +530,26 @@ export function agreedShopNames(cards) {
     m.set(shown, (m.get(shown) || 0) + w); votes.set(d, m);
   }
   const out = new Map();
-  for (const [d, m] of votes) { let best = null, n = -1; for (const [name, v] of m) if (v > n) { best = name; n = v; } out.set(d, best); }
+  // (One address can send for two different services Relay knows apart: uber.com sends Uber's ride receipts and Uber Eats'
+  // food orders. A name that is a different known shop from the one agreed keeps its own name, so an Uber Eats order is never
+  // shown, or filed, as a ride. Round 16.)
+  out.own = new Map();
+  for (const [d, m] of votes) {
+    let best = null, n = -1; for (const [name, v] of m) if (v > n) { best = name; n = v; } out.set(d, best);
+    const bestShop = knownShop({ retailer: { name: best } });
+    for (const name of m.keys()) {
+      const k = name !== best && knownShop({ retailer: { name } });
+      if (k && bestShop && k.key !== bestShop.key && k.cat !== bestShop.cat) { if (!out.own.has(d)) out.own.set(d, new Set()); out.own.get(d).add(name); }
+    }
+  }
   return out;
+}
+// The one name a receipt's shop is shown by (agreedShopNames), unless its own name is a different service the address sends for.
+export function agreedNameFor(agreed, retailer, domain) {
+  if (!agreed || !domain) return null;
+  const own = agreed.own && agreed.own.get(domain);
+  if (own && own.size) { const shown = shopDisplayName({ ...(retailer || {}), domain }); if (shown && own.has(shown)) return shown; }
+  return agreed.get(domain) || null;
 }
 const nameFits = (name, domain) => { const n = letters(name), b = domainBase(domain); return Boolean(n && b && (n.includes(b) || b.includes(n))); };
 

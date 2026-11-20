@@ -1,0 +1,41 @@
+{
+ "id": "holdout17-rail-split-same-type",
+ "sender": "Trainline",
+ "layout": "'2 × Adult - Advance Single' '£6.20' for a way of two legs, each leg named 'A or B to C'",
+ "headers": {
+  "from": "Trainline <auto-confirm@info.thetrainline.com>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your booking confirmation for Elmford Central to Wrayton",
+  "date": "Sun, 22 Nov 2026 09:00:00 +0000"
+ },
+ "html": "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">\n<html xmlns=\"http://www.w3.org/1999/xhtml\"><head><meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\" /><meta name=\"viewport\" content=\"width=device-width\" />\n<title>Trainline</title><style type=\"text/css\">body{margin:0;padding:0}td{font-family:Helvetica,Arial,sans-serif;font-size:14px;color:#222}.muted{color:#777}@media only screen and (max-width:600px){.w600{width:100%!important}}</style></head>\n<body style=\"margin:0;padding:0;background-color:#f3f3f3\">\n<div style=\"display:none;max-height:0;overflow:hidden\">&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;</div>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#f3f3f3\"><tr><td align=\"center\">\n<table role=\"presentation\" class=\"w600\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#ffffff\">\n<tr><td style=\"padding:24px 24px 8px 24px\"><a href=\"https://www.thetrainline.com/?utm_source=email\"><img src=\"https://www.thetrainline.com/static/email/logo.png\" alt=\"Trainline\" width=\"140\" height=\"40\" border=\"0\" /></a></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"><tr><td>Your trip to Wrayton departing Monday, 23 November 2026 is confirmed</td></tr>\n<tr><td>Outbound Monday, 23 November</td></tr>\n<tr><td>31m, 0 changes</td></tr>\n<tr><td>16:30 Elmford Central</td></tr>\n<tr><td>Northern Rail</td></tr>\n<tr><td>Advance Single</td></tr>\n<tr><td>Elmford Castle or Central to Marsham</td></tr>\n<tr><td>Stay on the same train</td></tr>\n<tr><td>Advance Single</td></tr>\n<tr><td>Marsham to Wrayton</td></tr>\n<tr><td>17:01 Wrayton</td></tr>\n<tr><td>2x Advance Single</td></tr>\n<tr><td>1x Adult</td></tr>\n<tr><td>Payment information</td></tr>\n<tr><td>Transaction ID:</td></tr>\n<tr><td>866400112233</td></tr>\n<tr><td>Transaction Date:</td></tr>\n<tr><td>22 Nov 2026</td></tr>\n<tr><td>Order Details</td></tr>\n<tr><td>2 × Adult - Advance Single</td></tr>\n<tr><td>&pound;6.20</td></tr>\n<tr><td>Other costs*</td></tr>\n<tr><td>Booking Fee</td></tr>\n<tr><td>&pound;0.35</td></tr>\n<tr><td>Total amount:</td></tr>\n<tr><td>&pound;12.75</td></tr></table></td></tr>\n<tr><td style=\"padding:24px;font-size:12px\" class=\"muted\">&copy; 2026 Trainline. All rights reserved.<br /><a href=\"https://www.thetrainline.com/help\">Help</a> | <a href=\"https://www.thetrainline.com/privacy\">Privacy</a> | <a href=\"https://www.thetrainline.com/unsubscribe\">Unsubscribe</a></td></tr>\n</table></td></tr></table>\n<img src=\"https://click.thetrainline.com/open/abc123.gif\" width=\"1\" height=\"1\" alt=\"\" />\n</body></html>",
+ "text": "",
+ "expected": {
+  "shop": "Trainline",
+  "date": "2026-11-22",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Elmford Central to Marsham",
+    "qty": 1,
+    "linePence": 620
+   },
+   {
+    "name": "Marsham to Wrayton",
+    "qty": 1,
+    "linePence": 620
+   },
+   {
+    "name": "Booking Fee",
+    "qty": 1,
+    "linePence": 35
+   }
+  ],
+  "subtotalPence": 1275,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 1275,
+  "orderRef": "866400112233"
+ }
+}

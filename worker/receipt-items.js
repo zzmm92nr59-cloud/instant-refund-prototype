@@ -55,7 +55,11 @@ const BILINGUAL = /(^|\|\s*)[\p{L}'’-]{2,20}(?:[ -][\p{L}'’-]{2,20}){0,2}\s?
 // ("£ 13.5", a shop's price written with one figure of pence: £13.50. Round 15.)
 // ("No Choice" over "1" with no price under it: a till's empty choice for the item above, not a thing bought. Round 15.)
 const EMPTY_CHOICE = /^[ \t|]*(?:no choice|no selection|no thanks|none selected|no extras?|no options?)[ \t|]*\n(?:[ \t|]*\n){0,3}[ \t|]*\d{1,2}[ \t|]*$/gim;
-export const prepText = (text) => inPoundSigns(text).replace(EMPTY_CHOICE, "").replace(BILINGUAL, "$1").replace(/£([ \t]?)(\d{1,6})\.(\d)(?=[ \t]*(?:\||$))/gm, "£$1$2.$30");
+// (How many alone on a line, "1 x", with the thing's name on the next line with words in it: one line, "1 x Unlimited
+// Annual Pass Adult". Round 16.)
+export const prepText = (text) => inPoundSigns(text).replace(EMPTY_CHOICE, "").replace(BILINGUAL, "$1").replace(/^([ \t|]*\d{1,2}[ \t]?[x×])[ \t|]*\n(?:[ \t|]*\n){0,3}[ \t|]*(?=\p{Lu})/gmu, "$1 ")
+  // (A table's number under its label, "Table" over "095", is the table, never how many of the next thing. Round 16.)
+  .replace(/^([ \t|]*(?:table|table (?:number|no\.?)|covers)[ \t]*:?)[ \t|]*\n(?:[ \t|]*\n){0,4}[ \t|]*(\d{1,4})[ \t|]*$/gim, "$1 $2 |").replace(/£([ \t]?)(\d{1,6})\.(\d)(?=[ \t]*(?:\||$))/gm, "£$1$2.$30");
 const COLOUR_LINE = new RegExp("^" + COLOUR + "(?:\\s?[/&,]\\s?" + COLOUR + ")*$", "i");
 // Receipts in euros or dollars read the same way: their amounts are read as they are written (never converted; the
 // receipt's currency comes from its total, receipt-parser.js). Only for an email with no pound amounts at all.
@@ -84,10 +88,10 @@ const NAME_LABEL = /^(?:plan|product|item|description|subscription)\s*:?$/i;
 
 // Where the item list ends: subtotals, fees, discounts, tips, payment. (Only once an item has been read: some emails put
 // their total at the top.)
-const END = /^(?:retail price\b|sub-?\s?total|subtotal|order sub-?\s?total|items? sub-?\s?total|item\(s\) total|(?:order |grand |basket |estimated |trolley |items? |products? |goods |today(?:'|’)?s |your |net |bill |check )?total\b|trolley cost\b|total of items|item\(s\) subtotal|guide price|order value|items|products|(?:(?:order|standard|express|home|next[- ]day|premium|tracked) )?delivery\b|delivery\/shipping|shipping\b|postage\b|p\s?&\s?p\b|service\b|bag\b|bag (?:fee|charge|levy)|carrier bags?\b|small order|basket charge|minimum basket|booking fee|vat\b|tax\b|discount|voucher|promo|promotion|offers?\b|offer savings|multi-?buy|savings?\b|you(?:'|’)?ve saved|you saved|credit\b|credit applied|(?:rider |driver |courier )?tip\b|gratuity|payment\b|payments\b|paid\b|amount (?:paid|due)|total paid|nectar|clubcard|more card|mywaitrose|rollback|member offer|adiclub|subscribe\s?&\s?save|3 for 2|deal\b|buyer protection|click\s?&\s?collect|fast track|installation|collect in store|store delivery|delivery to store|standard delivery|express delivery|airport surcharge|shop discount|includes vat|including vat|incl\.? vat|tickets?\s*:?(?=\s*(?:£|$))|royal mail\b|parcelforce\b|evri\b|(?:1st|2nd|first|second) class\b|tracked (?:24|48)\b|removal of\b|(?:city|visitor|tourist) (?:levy|tax)\b)/i;
+const END = /^(?:retail price\b|item value\b|extras\s*:?\s*(?=£)|original sub-?\s?total|sub-?\s?total|subtotal|order sub-?\s?total|items? sub-?\s?total|item\(s\) total|(?:order |grand |basket |estimated |trolley |items? |products? |goods |today(?:'|’)?s |your |net |bill |check )?total\b|trolley cost\b|total of items|item\(s\) subtotal|guide price|order value|items|products|(?:(?:order|standard|express|home|next[- ]day|premium|tracked) )?delivery\b|delivery\/shipping|shipping\b|postage\b|p\s?&\s?p\b|service\b|bag\b|bag (?:fee|charge|levy)|carrier bags?\b|small order|basket charge|minimum basket|booking fee|vat\b|(?:food|drinks?|alcohol|standard(?:-rate)?|reduced(?:-rate)?) vat\b|tax\b|discount|voucher|promo|promotion|offers?\b|offer savings|multi-?buy|savings?\b|you(?:'|’)?ve saved|you saved|you(?:'|’)re saving|you are saving|which includes\b|credit\b|credit applied|(?:rider |driver |courier )?tip\b|gratuity|payment\b|payments\b|paid\b|amount (?:paid|due)|total paid|nectar|clubcard|more card|mywaitrose|rollback|member offer|adiclub|subscribe\s?&\s?save|3 for 2|deal\b|buyer protection|click\s?&\s?collect|fast track|installation|collect in store|store delivery|delivery to store|standard delivery|express delivery|airport surcharge|shop discount|includes vat|including vat|incl\.? vat|tickets?\s*:?(?=\s*(?:£|$))|royal mail\b|parcelforce\b|evri\b|(?:1st|2nd|first|second) class\b|tracked (?:24|48)\b|removal of\b|(?:city|visitor|tourist) (?:levy|tax)\b)/i;
 // Lines that are never part of an item: greetings, sentences, order details, dates, column and section headings.
 const LABELLED = /^(?:from|to|sent|subject|cc)\s*:|^(?:order|date|placed|ordered|booking|booked|transaction|receipt|invoice|deliver(?:y|ing)? (?:to|address|on|by)|delivering|collect(?:ion)? (?:from|on)|payment method|paid (?:with|by|using)|billed|apple (?:account|id)|account|document|reference|confirmation|merchant|seller|tracking|reservation|your (?:order|basket) (?:number|no))\b[^|]{0,60}?[:#]|^(?:order|booking|transaction|receipt) (?:no\.?|number|id|ref(?:erence)?)\b|^order #|^#\d|^(?:order|transaction|receipt|invoice|booking|ref(?:erence)?)\s+(?:no\.?\s*|number\s*)?#?\d[\d -]{2,}$/i;
-const HEADING = /^(?:shipping now|now shipping|on its way|shipped|items? shipped|in your parcel|track (?:package|parcel|order|delivery|your (?:order|parcel|package))|view (?:order|details|item|your order)|(?:download|view|print|redeem|activate|get) (?:your |my )?(?:e-?vouchers?|e-?tickets?|tickets?|vouchers?|gift ?cards?|receipt|invoice)|view or edit (?:your )?order|shop now|manage (?:your )?order|start a return|leave a review|buy again|your order|your items|(?:your )?order summary|order details|(?:items?|products?) ordered|items? in (?:your|this) order|delivered items|substitutions?|substituted items|(?:shipment|delivery|parcel|package) \d+ of \d+[^|]*|in this (?:shipment|parcel|delivery)|summary|basket|bundle|app store|apple services|itunes store|apple books|apple arcade|description|items?|products?|qty|quantity|price|unit price|amount|each|cost|total|line total|item details?|item cost|order|receipt|other costs|fare details|restaurant|table|venue|check number|\d{1,3} items?|product details|size|colou?r|style|sku|article|options?|variant|total price|item price|qty\.?|units?|(?:shipping|billing|delivery|invoice|postal) (?:address|details)|deliver(?:ed|ing)? to|ship(?:ped|ping)? to)$/i;
+const HEADING = /^(?:shipping now|now shipping|on its way|shipped|items? shipped|in your parcel|track (?:package|parcel|order|delivery|your (?:order|parcel|package))|view (?:order|details|item|your order)|(?:download|view|print|redeem|activate|get) (?:your |my )?(?:e-?vouchers?|e-?tickets?|tickets?|vouchers?|gift ?cards?|receipt|invoice)|view or edit (?:your )?order|rate (?:your |this )?(?:order|meal|food|delivery|driver|courier)|rate or tip|re-?order|order again|invoice receipt|what you(?:(?:'|’)ve| have)? (?:ordered|bought)|your purchases?|table(?: number| no\.?)?:? \d{1,4}|covers:? \d{1,3}|eat in|take ?away|dine in|(?:offline|online|card|cash) payment|item desc(?:ription)?|item value|shop now|manage (?:your )?order|start a return|leave a review|buy again|your order|your items|(?:your )?order summary|order details|(?:items?|products?) ordered|items? in (?:your|this) order|delivered items|substitutions?|substituted items|(?:shipment|delivery|parcel|package) \d+ of \d+[^|]*|in this (?:shipment|parcel|delivery)|summary|basket|bundle|app store|apple services|itunes store|apple books|apple arcade|description|items?|products?|qty|quantity|price|unit price|amount|each|cost|total|line total|item details?|item cost|order|receipt|other costs|fare details|restaurant|table|venue|check number|\d{1,3} items?|product details|size|colou?r|style|sku|article|options?|variant|total price|item price|qty\.?|units?|(?:shipping|billing|delivery|invoice|postal) (?:address|details)|deliver(?:ed|ing)? to|ship(?:ped|ping)? to)$/i;
 const SKIP_START = /^(?:unavailable(?: items)?|missing items?|items? (?:not available|unavailable|we couldn(?:'|’)?t (?:find|deliver))|out of stock|sorry,? we couldn(?:'|’)?t|not (?:available|delivered))\b/i;
 const SKIP_END = /^(?:substitutions?|substituted items|delivered items|your items|items delivered|shipment \d+)\b/i;
 // Details under an item that are not extras: codes, sellers, delivery notes, links, a substitution's note.
@@ -480,7 +484,9 @@ export function readItems(text, opts = {}) {
       const u = pend.unit ?? pend.unitLabelled;
       if ((pend.qty || 1) * u === l.labelledTotal) { pend.lineFromLabel = l.labelledTotal; pend.unit = u; emit(); continue; }
     }
-    if (l.lineTotal != null && !hasName && pend && pend.name) { pend.prices.push(l.lineTotal); pend.labelled = true; emit(); continue; }
+    // (A labelled line total that only says again the line's price just above it, "£12.00" then "Line Total: £12.00", is that
+    // price once. Round 16.)
+    if (l.lineTotal != null && !hasName && pend && pend.name) { if (pend.prices[pend.prices.length - 1] !== l.lineTotal) pend.prices.push(l.lineTotal); pend.labelled = true; emit(); continue; }
     // How many on the line under the price ("Bosch Cordless Drill 18V", "£99.00", "Qty: 1").
     if (pend && pend.name && pend.prices.length && pend.qty == null && !pend.head && !hasName && l.qty != null && !l.prices.length && l.unit == null && !l.endWord) { pend.qty = l.qty; emit(); continue; }
     // (A size or colour on the line under an item's price, "£35.99" then "XS | BLACK", is still that item's. Round 8.)
@@ -504,7 +510,8 @@ export function readItems(text, opts = {}) {
     if (l.noise && !hasName && !l.prices.length) { pend = null; last = null; continue; }
     // ("Apple Arcade" under a game's name is what it came with, not a new section.)
     if (l.heading && !hasName && !l.prices.length && pend && pend.name && /^(?:apple arcade|apple music|apple tv\+?|apple one|icloud\+?)$/i.test(l.cells[0] || "")) { pend.detail = true; continue; }
-    if (l.heading && !hasName && !l.prices.length) { pend = null; continue; }
+    // (A heading starts afresh: a number above it, "4" over "Table", is never how many of the first thing under it. Round 16.)
+    if (l.heading && !hasName && !l.prices.length) { pend = null; qtyBefore = null; continue; }
     if (l.notCharged) { pend = null; continue; }
     const priced = l.prices.length > 0 || (l.free && (hasName || pend));
     if (hasName && priced) {
@@ -713,7 +720,7 @@ function addExtras(item, extras) {
 
 // ---- What the email says the items came to ---------------------------------------------------------------------------------
 const SUBTOTAL_LABEL = /^(?:sub-?\s?total|items? (?:sub-?)?total|item\(s\) subtotal|items?|products?(?: total)?|goods total|total of items|order value|basket total|trolley (?:cost|total)|merchandise(?: total)?|guide price|item total|tickets?)(?:\s*\([^)]{0,30}\))?\s*:?\s*$/i;
-const FEE_LABEL = /\bfees?\b|^(?:city|tourist|local|resort|accommodation|visitor) tax\b|\b(?:levy|royal mail|parcelforce|evri|hermes|dpd|dhl|ups|yodel|inpost|courier|(?:1st|2nd|first|second) class|tracked(?: 24| 48)?|next[- ]day|named day|removal|disposal|recycling|delivery|shipping|postage|p\s?&\s?p|service|bag|carrier bags?|booking|small order|basket charge|minimum basket|packaging|installation|surcharge|buyer protection|click\s?&\s?collect|collection|gift ?wrap\w*|card fee|admin fee|fast track)\b/i;
+const FEE_LABEL = /\bfees?\b|^(?:city|tourist|local|resort|accommodation|visitor) tax\b|\b(?:levy|royal mail|parcelforce|evri|hermes|dpd|dhl|ups|yodel|inpost|courier|(?:1st|2nd|first|second) class|tracked(?: 24| 48)?|next[- ]day|named day|removal|disposal|recycling|delivery|shipping|postage|p\s?&\s?p|service|bag|carrier bags?|booking|small order|basket charge|minimum basket|packaging|pick(?:,|ing)?\s*(?:pack|and pack)\b|installation|surcharge|buyer protection|click\s?&\s?collect|collection|gift ?wrap\w*|card fee|admin fee|fast track)\b/i;
 const TIP_LABEL = /\btip\b|\bgratuity\b/i;
 const DISCOUNT_LABEL = /\b(?:discount|voucher|promo\w*|offers?|savings?|saved|credit|coupon|deal|3 for 2|multi-?buy|rollback|clubcard|nectar|subscribe\s?&\s?save|member|adiclub|reward)\b/i;
 const NOT_MONEY_LINE = /\b(?:vat|tax|paid today|next payment|instal+ment|pay in \d|due\b|was\b|rrp)\b/i;
@@ -752,7 +759,7 @@ export function moneyOf(text) {
     // ("1 | Promotion Applied | -£1.99": money off set out as a row of the item list, with how many first. Round 13.)
     else if (cells.length === 3 && /^\d{1,2}$/.test(cells[0]) && !amountOf(cells[1]) && /\p{L}/u.test(cells[1]) && amountOf(cells[2]) && amountOf(cells[2]).neg) { label = cells[1]; amt = amountOf(cells[2]); itemRow = true; }
     else if (cells.length === 1) {
-      const m = new RegExp("^([^\\p{L}\\n\\r\\u2028\\u2029]*\\p{L}.*?)[\\s:]+((?:[-−–]\\s?)?" + MONEY + "|free)$", "iu").exec(cells[0]);
+      const m = new RegExp("^([^\\p{L}\\n\\r\\u2028\\u2029]*\\p{L}.*?)[\\s:]+((?:[-−–]\\s?)?" + MONEY + "|free)$", "iu").exec(cells[0].replace(/£\s?[-−–]\s?(?=\d)/, "-£"));
       if (m) { label = m[1]; amt = amountOf(m[2]); }
       else if (/\p{L}/u.test(cells[0]) && (cells[0].length <= 40 || (cells[0].length <= 90 && (amountOf((lines[i + 1] || "").replace(/\|/g, "").trim()) || {}).neg)) && lines[i + 1] && amountOf(lines[i + 1].replace(/\|/g, "").trim())) { label = cells[0]; amt = amountOf(lines[i + 1].replace(/\|/g, "").trim()); }
       // ("DELIVERY" over "(Standard)" over "£4.99": the label, a note in brackets, then the amount. Round 13.)
@@ -777,9 +784,13 @@ export function moneyOf(text) {
       }
     }
     if (/^(?:qty|quantity)\b/i.test(label)) continue;
+    // (What the items came to before their savings, "Original subtotal | £20.00", "Basket value before offers | £44.10", is
+    // neither the subtotal nor money. Round 16.)
+    if (/^(?:original|before savings?) sub-?\s?total\b|^sub-?\s?total before savings?\b|\bbefore (?:offers|savings|discounts?|promotions?)\b|^(?:total )?basket value\b/i.test(label)) continue;
     // (An item's own line in a text part, "1x    The C.L.T  - £11.95": the dash sets the price apart, it is no minus, and an
     // item is never money off. Round 15.)
-    if (cells.length === 1 && /^\d{1,3}\s?x\s+\S/i.test(label) && !DISCOUNT_LABEL.test(label)) continue;
+    // (Nor a deal bought as a line of its own, "1x Family Box Deal for £24.99": a thing at its price. Round 16.)
+    if (cells.length === 1 && /^\d{1,3}\s?x\s+\S/i.test(label) && (!DISCOUNT_LABEL.test(label) || (!amt.neg && !/\b(?:discount|voucher|promo\w*|coupon|off|saving|saved)\b/i.test(label)))) continue;
     // The VAT added on top of a subtotal ("VAT charged at 20% | £1.83", "VAT - United Kingdom (20%) | £12.78"): kept apart, so
     // the check can tell prices that include it (Apple) from prices that don't (a software invoice). Round 10.
     // (A dash set apart by spaces between the VAT and its amount, "VAT 20% - £2.20", is no minus. Round 15e.)
@@ -796,6 +807,9 @@ export function moneyOf(text) {
     if (TIP_LABEL.test(label)) { out.tips += amt.p; out.found.push(["tip", label, amt.p]); continue; }
     // (The card the bill was paid with, "mastercard - 7613 | -£57.09": the payment, never money off. Round 14.)
     if (amt.neg && /^(?:visa|master ?card|maestro|amex|american express|debit card|credit card|card)\b[^|]{0,24}?\d{4}$/i.test(label)) continue;
+    // (Nor a payment set out by when it was taken, "Payment (Card)" over "2 Mar 2026 - 10:05" over "- £31.00". Round 16.)
+    if (amt.neg && /^(?:outstanding |remaining )?balance\b|\bbalance (?:due|outstanding|remaining|to pay)\b|^amount (?:due|outstanding|remaining|left to pay)\b/i.test(label)) continue;
+    if (amt.neg && (/^(?:\d{1,2}(?:st|nd|rd|th)? [A-Za-z]{3,9},? \d{4}|\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4})\b[^|\p{L}]{0,12}(?:\d{1,2}:\d{2}(?::\d{2})?)?$/u.test(label) || /^payments?\b/i.test(lines[i - 1] || ""))) continue;
     if (amt.neg || DISCOUNT_LABEL.test(label)) { out.discounts += amt.p; out.found.push(["discount", label, amt.p, amt.neg]); continue; }
     if (FEE_LABEL.test(label)) { out.fees += amt.p; out.found.push(["fee", label, amt.p]); continue; }
   }
@@ -854,6 +868,17 @@ export function checkItems(items, money, totalPence) {
   // (With VAT on top, what the items should come to depends on whether their prices include it: the nearer of the two.)
   const want = expectedPence ?? (vatOnTop ? targets.slice(-2).sort((a, b) => Math.abs(a - itemsPence) - Math.abs(b - itemsPence))[0] : null);
   return { complete: hit, itemsPence, expectedPence: hit && (vatOnTop || waived.some((t) => Math.abs(t - itemsPence) <= 1)) ? itemsPence : want, missingPence: hit ? 0 : want == null ? null : want - itemsPence };
+}
+
+// (Items that come to the subtotal, when the subtotal and what the email adds and takes off don't come to the total:
+// "Subtotal £50.00", "Bag fee £0.10", "Service fee £0.99", "Total £31.09", and no money off shown. Something the email doesn't
+// set out was taken off, so the receipt can't say the lines are all there is. Round 16.) What is missing, or null.
+export function unexplainedGap(check, money, totalPence) {
+  const m = money || {}, S = m.subtotal ?? null, T = totalPence ?? null;
+  if (!check || check.complete !== true || S == null || T == null || m.vat != null || (m.offAboveSubtotal || 0) > 0) return null;
+  if (m.discounts > 0 || (m.found || []).some((f) => f[0] === "discount") || T >= S || Math.abs(S - check.itemsPence) > 1) return null;
+  const rest = (m.fees || 0) + (m.tips || 0);
+  return Math.abs(S + rest - T) > 1 && Math.abs(T - rest - check.itemsPence) > 1 ? S + rest - T : null;
 }
 
 // An item with a quantity over one and a single price could be priced for the line or for one: whichever reading makes

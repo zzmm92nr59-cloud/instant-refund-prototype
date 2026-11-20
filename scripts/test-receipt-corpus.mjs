@@ -630,6 +630,28 @@ const joinWrong = [];
   const c1 = det("holdout16c-grocer-c1-apostrophe");
   if (!(c1.items || []).some((i) => i.name === "By Hartley’s Ripe Avocado")) joinWrong.push("a U+0092 apostrophe read as " + JSON.stringify((c1.items || []).map((i) => i.name)));
 }
+{
+  // Round 16 (a real Outlook inbox, made up again): a ride's receipt sent again after a tip replaces the first, one card with
+  // the tip as its own line; a click-and-collect order's "ready to collect" and "You've collected your items" emails, numbered
+  // differently, are one card with the order's own number; Amazon's dispatch email ("Order: # …") joins its confirmation.
+  const fx = (id) => JSON.parse(readFileSync(join(dir, id + ".json"), "utf8"));
+  for (const app of [null, "gmail", "outlook", "apple"]) {
+    const read = (id, n) => ({ ...classifyEmail(rawEmail(app ? forwarded(fx(id), app) : fx(id))).details, id, createdAt: n });
+    const at = app ? " (" + app + ")" : "";
+    const rides = mergeOrderEmails([read("holdout17-uber-ride-first", 1), read("holdout17-uber-ride-tip-updated", 2)]);
+    if (rides.length !== 1 || rides[0].totalPence !== 1720 || !(rides[0].fees || []).some((f) => /^tip$/i.test(f.label) && f.pence === 200) || (rides[0].items || [])[0].pricePence !== 1430)
+      joinWrong.push(`a ride's tip-updated receipt${at} made ${JSON.stringify(rides.map((c) => [c.totalPence, c.fees, (c.items || []).map((i) => i.pricePence)]))}`);
+    const collect = mergeOrderEmails([read("holdout17-collect-ready", 1), read("holdout17-collect-collected", 2)]);
+    if (collect.length !== 1 || collect[0].orderRef !== "8812203345" || collect[0].totalPence !== 2200)
+      joinWrong.push(`click and collect's two emails${at} made ${JSON.stringify(collect.map((c) => [c.orderRef, c.totalPence]))}`);
+    const amz = mergeOrderEmails([read("holdout17-amazon-subject-only-picks", 1), read("holdout17-amazon-dispatch-order-colon", 2)]);
+    if (amz.length !== 1 || amz[0].orderRef !== "202-4455667-1122334") joinWrong.push(`Amazon's confirmation and dispatch${at} made ${JSON.stringify(amz.map((c) => [c.orderRef, c.totalPence]))}`);
+  }
+  // Two different rides on one day, the second dearer, neither sent again after a tip: two cards.
+  const read0 = (id, n) => ({ ...classifyEmail(rawEmail(fx(id))).details, id, createdAt: n });
+  const two = mergeOrderEmails([read0("holdout17-uber-ride-first", 1), { ...read0("holdout17-uber-ride-fees", 2), orderDate: "2026-11-08" }]);
+  if (two.length !== 2) joinWrong.push("two rides on one day were made one card");
+}
 console.log(`  Orders joined by later emails: ${joinWrong.length ? joinWrong.join("; ") : "a delivery-day payment and an Uber Eats adjustment join their orders; round 11: cancellations by number or by the items named, a PayPal receipt, a PDF-only invoice and a numbered parcel join their order; replies and someone else's forwarded booking are not purchases; round 12: a changed order shows its latest list and the day's substitutions, money back joins its order, and a booking's deposit and instalments join it; round 13: two Amazon orders in one email are two cards, cancel and withdrawal windows are read, a subscription's end shows on its payment, a PayPal receipt joins the game shop's"}`);
 
 let failed = 0;

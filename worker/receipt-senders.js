@@ -40,11 +40,56 @@ export function uberEmail(domain, subject, text) {
     const pet = /\buber pet\b|\bpet fee\b/i.test(t);
     return { kind: "ride", item: pet ? "Uber Pet ride" : "Uber ride" };
   }
+  // (A trip cancelled after the grace period: "Here's the receipt for your canceled trip", "Cancellation fee £5.00". What was
+  // paid is the fee. And Uber One's own payment, "Your Uber One payment was successful", "Total charged £5.99": the
+  // membership. Round 16.)
+  if (/\b(?:here(?:'|’)s )?(?:the|your) receipt for your cancel+ed trip\b/i.test(top + "\n" + (subject || "")) && /^cancellation fee\b/im.test(t)) return { kind: "ride", item: "Cancellation fee", cancelled: true };
+  if (/\byour uber one payment was successful\b/i.test(top + "\n" + (subject || "")) && /\btotal charged\b/i.test(t)) return { kind: "ride", item: "Uber One membership", membership: true };
   const rest = /\bhere(?:'|’)s your receipt for ([^\n|]{2,80}?)\s*\.?\s*(?:\||\n|$)/i.exec(top);
   if (rest || /\bto view your full receipt go to uber eats\b/i.test(t)) {
     return { kind: "eats", merchant: rest ? tidyName(rest[1]) : null, noItemList: /\bto view your full receipt\b/i.test(t) };
   }
   return null;
+}
+// What a ride's receipt sets out between its total and its payments: the trip's fare, then each fee, tip or credit on a row
+// of its own, its amount beside it or on the row under it ("Trip fare | £20.00", "Uber pet fee", "£3.00", "Wait Time", "£0.40",
+// "UberX Priority £2.00", "Tip £2.00", "Uber One credits -£1.00", "Promotion -£3.00"). The ride is the fare; the rest are what
+// was added or taken off, so nothing is counted twice. Only when every amount is in pounds and fare, plus fees and tips,
+// less money off, comes to the total; otherwise null (and the ride stays one line for what was paid). Round 16.
+const RIDE_SKIP = /^(?:subtotal|total|fare total|uber one credits earned|credits? earned|estimated fare\b.*|conversion\b.*|payments?)$/i;
+export function uberRideMoney(text, totalPence) {
+  if (!Number.isInteger(totalPence) || totalPence <= 0) return null;
+  const list = rows(String(text || "").slice(0, 20000));
+  // (A ride abroad paid in pounds: its fare lines are in euros, and under the payments "Fare total £15.00" and "Currency
+  // conversion fee £0.30" make up the £15.30 paid.)
+  const fareTotal = labelled(list, /fare total/), conv = labelled(list, /currency conversion fee/);
+  if (fareTotal != null && conv != null && fareTotal + conv === totalPence && list.some((r) => /^trip fare\b/i.test(r)) && list.some((r) => /€|\b(?:EUR|USD|MXN|PLN)\b/.test(r)))
+    return { farePence: fareTotal, fees: [{ label: "Currency conversion fee", pence: conv }], discounts: [] };
+  const at = list.findIndex((r) => /^trip fare\b/i.test(r));
+  if (at < 0) return null;
+  const AMT = /^([-−–]?)\s*[£€$]\s?(\d{1,3}(?:,\d{3})+|\d+)\.(\d{2})$/;
+  let fare = null, sym = null; const fees = [], off = [];
+  for (let i = at; i < list.length && i < at + 40; i++) {
+    const r = list[i];
+    if (/^(?:payments?|trip details|switch|download)\b/i.test(r) || /•{2,}|\*{4}/.test(r)) break;
+    let label = null, amt = null;
+    const one = /^([^|£€$\d−–-][^|£€$]{1,60}?)\s*(?:\|\s*)?([-−–]?\s*[£€$]\s?(?:\d{1,3}(?:,\d{3})+|\d+)\.\d{2})$/.exec(r);
+    if (one) { label = one[1].trim(); amt = AMT.exec(one[2].replace(/\s+/g, "")); }
+    else if (!AMT.test(r) && list[i + 1] && AMT.test(list[i + 1])) { label = r; amt = AMT.exec(list[i + 1]); i++; }
+    if (!label || !amt || RIDE_SKIP.test(label)) continue;
+    if (label.length > 50 || /[.!?]$/.test(label)) continue;
+    const p = Number(amt[2].replace(/,/g, "")) * 100 + Number(amt[3]);
+    // (Every amount in the one currency: a fare in euros with fees in pounds is not added up.)
+    const cur = (/[£€$]/.exec(one ? one[2] : list[i]) || [""])[0];
+    if (sym == null) sym = cur; else if (cur !== sym) return null;
+    if (/^trip fare\b/i.test(label)) { if (fare == null) fare = p; continue; }
+    if (fare == null) continue;
+    if (amt[1] || /\b(?:credits?|promotions?|discount|savings?)\b/i.test(label)) off.push({ label, pence: p }); else fees.push({ label, pence: p });
+    if (fees.length + off.length > 10) return null;
+  }
+  if (fare == null) return null;
+  const sum = fare + fees.reduce((a, f) => a + f.pence, 0) - off.reduce((a, f) => a + f.pence, 0);
+  return Math.abs(sum - totalPence) <= 1 ? { farePence: fare, fees, discounts: off } : null;
 }
 // Amounts Uber prints with a line that says what they are, under the total: savings and credits, never items.
 export const UBER_MONEY_NOTE = /^(?:uber one (?:savings|credits?)|savings and other promotions|[^|]{0,30}\bpromotions? applied\b|uber one credits earned|credits? earned)/i;
