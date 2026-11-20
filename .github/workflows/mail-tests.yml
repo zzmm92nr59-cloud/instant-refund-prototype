@@ -26,6 +26,7 @@ on:
       - 'scripts/test-more-inboxes.mjs'
       - 'scripts/test-return-policies.mjs'
       - 'scripts/test-gifts.mjs'
+      - 'scripts/test-order-joins.mjs'
       - 'scripts/test-mail-push.mjs'
       - 'scripts/test-scan-codes.mjs'
       - 'scripts/fixtures/scan-codes.mjs'
@@ -55,6 +56,7 @@ on:
       - 'scripts/test-more-inboxes.mjs'
       - 'scripts/test-return-policies.mjs'
       - 'scripts/test-gifts.mjs'
+      - 'scripts/test-order-joins.mjs'
       - 'scripts/test-mail-push.mjs'
       - 'scripts/test-scan-codes.mjs'
       - 'scripts/fixtures/scan-codes.mjs'
@@ -111,6 +113,8 @@ jobs:
         run: node scripts/test-return-policies.mjs
       - name: Gifts (tagging receipts, who for, Wrapped, own receipts only)
         run: node scripts/test-gifts.mjs
+      - name: Same order / different orders (own receipts only, kept through every re-read, undo; likely reading problems on Relay health)
+        run: node scripts/test-order-joins.mjs
       - name: Codes to show or scan (a return barcode, a drop-off QR code, a collection, tickets; look-alikes never; as sent and forwarded)
         run: node scripts/test-scan-codes.mjs
       - name: Fix this receipt (shop, total, date, items; own receipts only; counted for Relay health)
