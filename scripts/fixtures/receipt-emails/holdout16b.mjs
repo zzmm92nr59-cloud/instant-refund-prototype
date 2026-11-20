@@ -128,5 +128,14 @@ export default function holdout16b() {
         "Other costs |", "Booking Fee", "£1.99", "Total amount: | £54.14 |"]) }, o, "Railwise", "2026-11-17", { orderRef: "730118355120" });
     f.expected.nonRefundable = true;
   }
+  // ---- A takeaway platform's order: "1 | Name" with the price on the row under it, money off above the subtotal --------
+  {
+    const o = order([{ name: "Crispy Duck Rolls", qty: 1, unit: 650 }, { name: "House Special Noodles", qty: 1, unit: 825 }, { name: "Egg Fried Rice", qty: 1, unit: 350 }, { name: "Prawn Toast", qty: 1, unit: 420 }],
+      { discounts: [["Multi-buy discount", 420], ["Voucher", 500]], fees: [["Service fee", 99], ["Delivery", 249]] });
+    add("holdout16b-takeaway-price-under-name-off-above-subtotal", "Dish Dash", "'1 | Name |' then '| £6.50 |' under it; 'Multi-buy discount: | -£4.20' above 'Subtotal: | £18.25' (the subtotal is after it); voucher, service fee and delivery after", {
+      from: "Dish Dash <noreply@dishdash.example>", subject: "Sam, order confirmed", date: "Wed, 18 Nov 2026 20:15:00 +0000",
+      html: mail("Dish Dash", "dishdash.example", ["Order number: 990412233", "Golden Lotus", "1 | Crispy Duck Rolls |", "| £6.50 |", "1 | House Special Noodles |", "| £8.25 |", "1 | Egg Fried Rice |", "| £3.50 |", "1 | Prawn Toast |", "| £4.20 |",
+        "Multi-buy discount: | -£4.20 |", "Subtotal: | £18.25 |", "Voucher: | -£5.00 |", "Service fee: | £0.99 |", "Delivery: | £2.49 |", "Total: | £16.73 |"]) }, o, "Dish Dash", "2026-11-18", { orderRef: "990412233" });
+  }
   return out;
 }

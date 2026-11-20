@@ -670,7 +670,7 @@ const TIP_LABEL = /\btip\b|\bgratuity\b/i;
 const DISCOUNT_LABEL = /\b(?:discount|voucher|promo\w*|offers?|savings?|saved|credit|coupon|deal|3 for 2|multi-?buy|rollback|clubcard|nectar|subscribe\s?&\s?save|member|adiclub|reward)\b/i;
 const NOT_MONEY_LINE = /\b(?:vat|tax|paid today|next payment|instal+ment|pay in \d|due\b|was\b|rrp)\b/i;
 export function moneyOf(text) {
-  const out = { subtotal: null, fees: 0, tips: 0, discounts: 0, vat: null, found: [] };
+  const out = { subtotal: null, fees: 0, tips: 0, discounts: 0, vat: null, found: [], offAboveSubtotal: 0 };
   // (Blank lines between an HTML email's rows say nothing: "Subtotal" and its amount can have one between them. Round 10.)
   const lines = prepText(text).replace(/\r\n?/g, "\n").split("\n").map((x) => x.replace(/\s+/g, " ").trim()).filter((x) => x && !/^[|\s]+$/.test(x));
   // ("£-27.24": Domino's writes the minus after the pound sign. Round 10.)
@@ -706,7 +706,7 @@ export function moneyOf(text) {
     if (seen.has(key)) continue;
     seen.add(key);
     if (/\btotal\b/i.test(label) && !SUBTOTAL_LABEL.test(label)) continue;
-    if (SUBTOTAL_LABEL.test(label)) { if (out.subtotal == null) out.subtotal = amt.p; continue; }
+    if (SUBTOTAL_LABEL.test(label)) { if (out.subtotal == null) { out.subtotal = amt.p; out.offAboveSubtotal = out.discounts; } continue; }
     if (TIP_LABEL.test(label)) { out.tips += amt.p; out.found.push(["tip", label, amt.p]); continue; }
     // (The card the bill was paid with, "mastercard - 7613 | -£57.09": the payment, never money off. Round 14.)
     if (amt.neg && /^(?:visa|master ?card|maestro|amex|american express|debit card|credit card|card)\b[^|]{0,24}?\d{4}$/i.test(label)) continue;
@@ -728,6 +728,10 @@ export function checkItems(items, money, totalPence) {
   const targets = [];
   // (Never the subtotal plus or minus the discounts: a discount read as an item would then look complete.)
   if (S != null) targets.push(S);
+  // (Money off set out above the subtotal, "Multi-buy discount: -£3.10" then "Subtotal: £33.65": the subtotal is after it,
+  // so the items come to the subtotal plus it. Round 15.)
+  const above = S != null && (m.offAboveSubtotal || 0) > 0 ? m.offAboveSubtotal : 0;
+  if (above) targets.push(S + above);
   // (When the email gives its items' subtotal, the items must come to it, or to the total less what was added and plus what
   // was taken off: never to the bare total, which a fee read as an item can make up. Round 3, 19 Nov 2026.)
   if (T != null) targets.push(...(S != null ? [T - (m.fees || 0) - (m.tips || 0) + (m.discounts || 0)] : [T - (m.fees || 0) - (m.tips || 0) + (m.discounts || 0), T - (m.fees || 0) - (m.tips || 0), T]));
@@ -739,7 +743,7 @@ export function checkItems(items, money, totalPence) {
   // "VAT € 9.73", "City tax € 8.13", "Total price € 115.13". Round 12.)
   const vatAdded = S == null && T != null && m.vat != null && m.vat > 0;
   if (vatAdded) targets.push(T - m.vat - (m.fees || 0) - (m.tips || 0) + (m.discounts || 0));
-  const expectedPence = vatOnTop ? null : S ?? (T != null ? T - (m.fees || 0) - (m.tips || 0) + (m.discounts || 0) : null);
+  const expectedPence = vatOnTop ? null : S != null ? S + above : (T != null ? T - (m.fees || 0) - (m.tips || 0) + (m.discounts || 0) : null);
   const unpriced = list.some((i) => i.pricePence == null);
   // A money line read as an item ("Retail price", "Item Subtotal") can make the items look complete: they aren't.
   const moneyNamed = list.some((i) => SUBTOTAL_LABEL.test(String(i.name || "")) || /^(?:[\p{L}()]+\s){0,2}(?:sub-?\s?total|total|price)\s*:?$/iu.test(String(i.name || "")) || FEE_NAME.test(String(i.name || "")));
