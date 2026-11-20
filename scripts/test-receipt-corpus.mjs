@@ -652,6 +652,27 @@ const joinWrong = [];
   const two = mergeOrderEmails([read0("holdout17-uber-ride-first", 1), { ...read0("holdout17-uber-ride-fees", 2), orderDate: "2026-11-08" }]);
   if (two.length !== 2) joinWrong.push("two rides on one day were made one card");
 }
+{
+  // Round 16b: a fee is only what the email added: never an amount paired with the wrong label in a column of labels over a
+  // column of amounts, never a price from the "also bought" block, and never fees that come to more than was paid. Every
+  // receipt in the corpus whose answer key gives its fees (expected.fees) must read exactly those, and no receipt may show a
+  // fee bigger than its total or a fee that is its items' whole price.
+  const feeWrong = [];
+  for (const f of everything.filter((x) => !x.expected.notPurchase)) {
+    for (const app of [null, "gmail", "outlook", "apple"]) {
+      const d = classifyEmail(rawEmail(app ? forwarded(f, app) : f)).details;
+      if (d.kind !== "receipt") continue;
+      const fees = (d.fees || []).map((x) => [x.label, x.pence]);
+      const at = f.id + (app ? "~" + app : "");
+      if (Array.isArray(f.expected.fees) && JSON.stringify(fees) !== JSON.stringify(f.expected.fees)) feeWrong.push(`${at}: fees ${JSON.stringify(fees)} for ${JSON.stringify(f.expected.fees)}`);
+      const off = (d.discounts || []).reduce((a, x) => a + (x.pence || 0), 0);
+      const items = (d.items || []).reduce((a, i) => a + (i.pricePence == null ? 0 : i.lineTotal ? i.pricePence : i.pricePence * (i.qty || 1)), 0);
+      if (Number.isInteger(d.totalPence) && fees.some(([, p]) => p > d.totalPence + off)) feeWrong.push(`${at}: a fee over the total ${d.totalPence}: ${JSON.stringify(fees)}`);
+      if (items > 0 && fees.some(([, p]) => p === items && p === d.totalPence)) feeWrong.push(`${at}: a fee that is the whole bill: ${JSON.stringify(fees)}`);
+    }
+  }
+  if (feeWrong.length) joinWrong.push(...feeWrong.slice(0, 10));
+}
 console.log(`  Orders joined by later emails: ${joinWrong.length ? joinWrong.join("; ") : "a delivery-day payment and an Uber Eats adjustment join their orders; round 11: cancellations by number or by the items named, a PayPal receipt, a PDF-only invoice and a numbered parcel join their order; replies and someone else's forwarded booking are not purchases; round 12: a changed order shows its latest list and the day's substitutions, money back joins its order, and a booking's deposit and instalments join it; round 13: two Amazon orders in one email are two cards, cancel and withdrawal windows are read, a subscription's end shows on its payment, a PayPal receipt joins the game shop's"}`);
 
 let failed = 0;

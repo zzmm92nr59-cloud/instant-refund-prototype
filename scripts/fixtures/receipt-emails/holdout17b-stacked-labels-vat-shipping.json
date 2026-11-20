@@ -1,0 +1,32 @@
+{
+ "id": "holdout17b-stacked-labels-vat-shipping",
+ "sender": "Strideway",
+ "layout": "'Subtotal (1 item)', 'VAT Included', 'Shipping', 'Total' on lines of their own, then '£84.00', '£14.00', '£0.00', '£84.00'",
+ "headers": {
+  "from": "Strideway <orders@strideway.example>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Thanks for your order SW00412207",
+  "date": "Mon, 16 Nov 2026 10:00:00 +0000"
+ },
+ "html": "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">\n<html xmlns=\"http://www.w3.org/1999/xhtml\"><head><meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\" /><meta name=\"viewport\" content=\"width=device-width\" />\n<title>Strideway</title><style type=\"text/css\">body{margin:0;padding:0}td{font-family:Helvetica,Arial,sans-serif;font-size:14px;color:#222}.muted{color:#777}@media only screen and (max-width:600px){.w600{width:100%!important}}</style></head>\n<body style=\"margin:0;padding:0;background-color:#f3f3f3\">\n<div style=\"display:none;max-height:0;overflow:hidden\">&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;</div>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#f3f3f3\"><tr><td align=\"center\">\n<table role=\"presentation\" class=\"w600\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#ffffff\">\n<tr><td style=\"padding:24px 24px 8px 24px\"><a href=\"https://www.strideway.example/?utm_source=email\"><img src=\"https://www.strideway.example/static/email/logo.png\" alt=\"Strideway\" width=\"140\" height=\"40\" border=\"0\" /></a></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"><tr><td>Thanks for your order</td></tr>\n<tr><td>Order number: SW00412207</td></tr>\n<tr><td>Trail Glide 3 Running Shoes</td><td>&pound;84.00</td></tr>\n<tr><td>Size: UK 9</td></tr>\n<tr><td>Qty: 1</td></tr>\n<tr><td>Order summary</td></tr>\n<tr><td>Subtotal (1 item)</td></tr>\n<tr><td>VAT Included</td></tr>\n<tr><td>Shipping</td></tr>\n<tr><td>Total</td></tr>\n<tr><td>&pound;84.00</td></tr>\n<tr><td>&pound;14.00</td></tr>\n<tr><td>&pound;0.00</td></tr>\n<tr><td>&pound;84.00</td></tr>\n<tr><td>Have a question?</td></tr></table></td></tr>\n<tr><td style=\"padding:24px;font-size:12px\" class=\"muted\">&copy; 2026 Strideway. All rights reserved.<br /><a href=\"https://www.strideway.example/help\">Help</a> | <a href=\"https://www.strideway.example/privacy\">Privacy</a> | <a href=\"https://www.strideway.example/unsubscribe\">Unsubscribe</a></td></tr>\n</table></td></tr></table>\n<img src=\"https://click.strideway.example/open/abc123.gif\" width=\"1\" height=\"1\" alt=\"\" />\n</body></html>",
+ "text": "",
+ "expected": {
+  "shop": "Strideway",
+  "date": "2026-11-16",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Trail Glide 3 Running Shoes",
+    "qty": 1,
+    "linePence": 8400
+   }
+  ],
+  "subtotalPence": 8400,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 8400,
+  "orderRef": "SW00412207",
+  "fees": []
+ }
+}
