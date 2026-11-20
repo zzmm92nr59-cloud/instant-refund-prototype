@@ -2349,6 +2349,25 @@ function refundFits(u, o, orders) {
   if (!fit(o)) return false;
   return orders.filter(fit).length === 1;
 }
+// A return the shop has accepted that gives no order number, only what it will refund ("we will be crediting you … for the
+// value of £118.00"): it goes on the one order from that shop, bought in the 120 days before, that cost exactly that
+// (in all, or one of its lines). Two such orders, or none, and it goes nowhere: never a guess. Round 15e.
+export function attachUnnumberedPlans(orders, plans) {
+  for (const p of plans) {
+    if (!Number.isInteger(p.estimatedRefundPence) || p.estimatedRefundPence <= 0 || !p.at) continue;
+    let key; try { key = storeKey(p); } catch { continue; }
+    const at = Date.parse(p.at);
+    const fits = orders.filter((o) => {
+      if (o.returnPlan || !o.orderDate) return false;
+      let k; try { k = storeKey(o); } catch { return false; }
+      const d = Date.parse(o.orderDate);
+      if (k !== key || !(d <= at) || at - d > 120 * 864e5) return false;
+      return o.totalPence === p.estimatedRefundPence || (o.items || []).some((i) => lineOf(i) === p.estimatedRefundPence);
+    });
+    if (fits.length === 1) fits[0].returnPlan = { ...p, joinedBy: "amount" };
+  }
+}
+
 export function attachReturnProgress(orders, deliveries, updates) {
   for (const o of orders) {
     const plan = o.returnPlan || null;
@@ -2521,6 +2540,7 @@ async function listReceipts(env, shopperId, timing, opts = {}) {
     // Only purchase emails get a card. A return email just adds its return details to the purchase it belongs to.
     if (o) o.returnPlan = p;
   }
+  attachUnnumberedPlans(orders, plans.filter((p) => !p.orderRef));
   attachReturnProgress(orders, deliveries, updates);
   // Where each return has got to, step by step, and who said so (return-tracking.js).
   attachReturnTracking(orders, { updates, deliveries, typed: typedReturns, tracked, marks: (marks && marks.results) || [], today: new Date(opts.now || Date.now()).toISOString().slice(0, 10) });

@@ -2131,7 +2131,7 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   // ("Merchant Reference: a82d1340-3ad7-4d8d-9352-1c48ea195b90", a card payment page's receipt: the shop's own number for the
   // payment, whole. Round 15.)
   // (The order's number in brackets as a heading, "Your Order (#4F786F5CD2BB):", a ticket seller's order. Round 15e.)
-  if (!result.orderRef) { const br = /\byour order\s*\(\s*#\s?((?=[A-Za-z0-9]*\d)[A-Za-z0-9]{5,20})\s*\)\s*:?[ \t|]*$/im.exec(text) || /\byour order\s*\(\s*#\s?((?=[A-Za-z0-9]*\d)[A-Za-z0-9]{5,20})\s*\)\s*:?[ \t|]*$/im.exec(otherText0(text, plain, fromHtml)); if (br) result.orderRef = br[1]; }
+  if (!result.orderRef) { const br = /\b(?:your order|order summary|order details)\s*\(\s*#\s?((?=[A-Za-z0-9]*\d)[A-Za-z0-9]{5,20})\s*\)\s*:?[ \t|]*$/im.exec(text) || /\b(?:your order|order summary|order details)\s*\(\s*#\s?((?=[A-Za-z0-9]*\d)[A-Za-z0-9]{5,20})\s*\)\s*:?[ \t|]*$/im.exec(otherText0(text, plain, fromHtml)); if (br) result.orderRef = br[1]; }
   // (A booking named by its number at the end of the subject, "Your booking with Nottingham Winter Wonderland! - 3142790".)
   if (!result.orderRef) { const sb = /\byour booking\b[^?\n]{0,80}?\s[-–:#]\s*#?(\d{5,12})\s*$/i.exec(String(subject || "")); if (sb) result.orderRef = sb[1]; }
   // (A booking's own reference, "Reservation ID: 949926". Round 15e.)

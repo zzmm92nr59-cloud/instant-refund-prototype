@@ -205,5 +205,16 @@ export default function holdout16e() {
       from: "Rivermode <noreply@rivermode.example>", subject: "Despatch Confirmation", date: "Tue, 17 Nov 2026 08:00:00 +0000", ...body("Get excited because your order has been despatched.") },
       expected("Rivermode", "2026-11-17", o, { orderRef: "55120378" })));
   }
+  // ---- A gift experience shop's order: "Order Summary (#…)", each experience its name, its code in brackets and its price,
+  // then a "download your evoucher" button --------------------------------------------------------------------------------
+  {
+    const o = order([{ name: "One Night Woodland Cabin Break, Peak District", qty: 1, unit: 6200 }, { name: "Jazz Brunch for Two", qty: 1, unit: 3450 }]);
+    add("holdout16e-experience-code-voucher-button", "Daysout Gifts", "'Order Summary (#7712093)'; each experience its name, '( WCAB12 )' its code, '£62.00', then 'download your evoucher'; 'Sub Total | £96.50', 'Email Delivery with E-Voucher | £0.00', 'Total | £96.50'", {
+      from: "Daysout Gifts <orders@daysoutgifts.example>", subject: "Thanks for your order!", date: "Sun, 15 Nov 2026 10:00:00 +0000",
+      html: nested("Daysout Gifts", "daysoutgifts.example", ["Thanks for your order Your Daysout Gifts purchase was a success", "your order!", "Order Summary (#7712093)", "Ordered: 15/11/2026",
+        "One Night Woodland Cabin Break, Peak District", "( WCAB12 )", "£62.00", "download your evoucher", "Jazz Brunch for Two", "( PJAZ2 SP1 )", "£34.50", "download your evoucher",
+        "Sub Total || £96.50", "Email Delivery with E-Voucher || £0.00", "Total || £96.50"]) },
+      o, "Daysout Gifts", "2026-11-15", { orderRef: "7712093" });
+  }
   return out;
 }

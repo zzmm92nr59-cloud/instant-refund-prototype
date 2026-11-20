@@ -15,7 +15,7 @@ import { fileURLToPath } from "node:url";
 import { parseReceiptEmail, parseReturnUpdateEmail, parseReturnEmail, parseReturnParcelEmail, parseCancellationEmail, parseOrderAdjustmentEmail } from "../worker/receipt-parser.js";
 import { matchReturnNews } from "../worker/return-tracking.js";
 import { storeKey } from "../worker/receipt-category.js";
-import { mergeOrderEmails, attachCancellations, attachAdjustments, attachReturnProgress, attachDeliveries, classifyEmail } from "../worker/gmail.js";
+import { mergeOrderEmails, attachCancellations, attachAdjustments, attachReturnProgress, attachDeliveries, classifyEmail, attachUnnumberedPlans } from "../worker/gmail.js";
 import { rawEmail, forwarded, SHOPPER } from "./fixtures/receipt-emails/lib.mjs";
 
 const dir = join(dirname(fileURLToPath(import.meta.url)), "fixtures", "receipt-emails");
@@ -462,6 +462,15 @@ const joinWrong = [];
   const det = (id) => ({ ...classifyEmail(rawEmail(fx(id))).details, id });
   const cards = mergeOrderEmails([det("holdout16b-shop-order-one-figure-pence"), det("holdout16b-shop-order-completed-resend")]);
   if (cards.length !== 1 || cards[0].orderRef !== "61822" || cards[0].totalPence !== 2100) joinWrong.push("a shop's order email re-sent with a new status made " + cards.length + " cards");
+  // (Round 15e: a return the shop accepted with no order number, only what it will refund, goes on the one order from that
+  // shop that cost exactly that; with two such orders it goes on neither.)
+  { const shop = { name: "Stretchwell", domain: "stretchwell.example" };
+    const ord = (id, ref, date, total) => ({ id, kind: "receipt", retailer: { name: "Stretchwell", domain: "stretchwell.example" }, orderRef: ref, orderDate: date, totalPence: total, currency: "GBP", items: [{ name: "Define Jacket", qty: 1, pricePence: total }] });
+    const plan = { kind: "return_instructions", retailer: shop, orderRef: null, at: "2026-11-18", returnId: "ret1", estimatedRefundPence: 9800, currency: "GBP" };
+    const one = [ord("a", "SW1", "2026-10-30", 9800), ord("b", "SW2", "2026-10-12", 4500)]; attachUnnumberedPlans(one, [plan]);
+    if (!(one[0].returnPlan && one[0].returnPlan.returnId === "ret1") || one[1].returnPlan) joinWrong.push("a return with no order number didn't join the one order that cost what it refunds");
+    const two = [ord("a", "SW1", "2026-10-30", 9800), ord("c", "SW3", "2026-11-02", 9800)]; attachUnnumberedPlans(two, [plan]);
+    if (two.some((o) => o.returnPlan)) joinWrong.push("a return with no order number was joined by guessing between two orders of the same price"); }
   // (Round 15e: a despatch email that repeats the order's whole layout, items and total joins the order by its number.)
   { const c2 = mergeOrderEmails([det("holdout16e-bold-number-runon-money"), det("holdout16e-bold-number-despatch")]);
     if (c2.length !== 1 || c2[0].orderRef !== "55120378" || c2[0].totalPence !== 5000 || !(c2[0].fees || []).some((f) => f.pence === 500)) joinWrong.push("a despatch email repeating its order made " + c2.length + " cards (" + JSON.stringify(c2.map((c) => [c.orderRef, c.totalPence, c.fees])) + ")"); }
