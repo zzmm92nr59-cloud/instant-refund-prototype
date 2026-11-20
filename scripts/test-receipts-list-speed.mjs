@@ -5,7 +5,8 @@
 // and reminders) is listed by this version of the worker and by an earlier one taken from git, and every receipt must be
 // the same, field for field, for the Receipts page (?all=1), Home, Wrapped and the style list. The health page's "Likely
 // reading problems" is compared the same way. Timings are printed (and kept under a generous limit).
-// Run: node scripts/test-receipts-list-speed.mjs [git-ref-before]   (default: the commit before the list was made quicker)
+// Run: node scripts/test-receipts-list-speed.mjs [git-ref-before]   (default: where this branch left origin/main; the list
+// was made quicker after f05b454)
 // Without git history (a shallow copy), the comparison with the earlier version is skipped and only the timings run.
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
@@ -15,13 +16,16 @@ import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { world } from "./fixtures/receipts-world.mjs";
 
-const BEFORE = process.argv[2] || process.env.RECEIPTS_BEFORE || "f05b454";
+// The earlier version: as given, or where this branch left main (nothing to compare once it is part of main).
+const mergeBase = () => { try { const b = execFileSync("git", ["merge-base", "HEAD", "origin/main"], { encoding: "utf8" }).trim(), h = execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim(); return b && b !== h ? b.slice(0, 12) : null; } catch { return null; } };
+const BEFORE = process.argv[2] || process.env.RECEIPTS_BEFORE || mergeBase();
 const SIZES = (process.env.RECEIPTS_SIZES || "3000,10000").split(",").map(Number);
 const SLACK = process.env.CI ? 2 : 1;
 
 // The earlier worker, from git, in a folder of its own.
 let before = null, dir = null;
-try {
+if (!BEFORE) console.log("note - no earlier version to compare with (give one: node scripts/test-receipts-list-speed.mjs <git ref>)");
+else try {
   const files = execFileSync("git", ["ls-tree", "-r", "--name-only", BEFORE, "worker/"], { encoding: "utf8" }).split("\n").filter(Boolean);
   dir = mkdtempSync(join(tmpdir(), "relay-before-"));
   for (const f of files) {
