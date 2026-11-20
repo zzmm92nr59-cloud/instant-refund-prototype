@@ -1,0 +1,29 @@
+{
+ "id": "holdout16d-booking-terms-not-items",
+ "sender": "Booking.com",
+ "layout": "older layout: 'Price details', '1' over the room's name, 'VAT is included.', '€ 4.90 City tax per person per night is included.', 'Total price € 614.48', a non-refundable booking",
+ "headers": {
+  "from": "Booking.com <noreply@booking.com>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your booking is confirmed at Hotel Mirador",
+  "date": "Mon, 21 Aug 2023 20:14:00 +0000"
+ },
+ "html": "<html><head><title>Booking.com</title></head><body><table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"><tr><td>Thanks! Your booking is confirmed at Hotel Mirador</td></tr>\n<tr><td>Check-in</td><td>Thursday 7 September 2023</td></tr>\n<tr><td>Check-out</td><td>Monday 11 September 2023</td></tr>\n<tr><td>Your reservation</td><td>4 nights, 1 room</td></tr>\n<tr><td>Confirmation number: 5550002222</td></tr>\n<tr><td>This booking is non-refundable. Changing the dates of your stay is not possible.</td></tr>\n<tr><td>Price details</td></tr>\n<tr><td>1</td></tr>\n<tr><td>Double or Twin Room</td></tr>\n<tr><td>10 % VAT is included.</td></tr>\n<tr><td>€ 4.90 City tax per person per night is included.</td></tr>\n<tr><td>Total price</td><td>€ 614.48</td></tr>\n<tr><td>Double or Twin Room</td></tr>\n<tr><td>This twin/double room comes with 2 single beds.</td></tr>\n<tr><td>Copyright © 1996–2023 Booking.com. All rights reserved.</td></tr></table></body></html>",
+ "text": "",
+ "expected": {
+  "shop": "Booking.com",
+  "date": "2023-08-21",
+  "currency": "EUR",
+  "totalPence": 61448,
+  "items": [
+   {
+    "name": "Double or Twin Room",
+    "qty": 1,
+    "linePence": 61448,
+    "extras": [
+     "4 nights"
+    ]
+   }
+  ]
+ }
+}

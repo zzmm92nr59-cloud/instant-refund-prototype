@@ -1,0 +1,33 @@
+{
+ "id": "holdout16d-home-window-heading",
+ "sender": "Homary",
+ "layout": "'30-Day Return' heading over 'Within 30-Day Of Delivery'",
+ "headers": {
+  "from": "\"Homary.com\" <service@homary.com>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "We've received your payment and your order is under processing.",
+  "date": "Wed, 30 Jul 2025 12:03:00 +0000"
+ },
+ "html": "<html><head><title>Homary</title></head><body><table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"><tr><td>Free Shipping</td></tr>\n<tr><td>On All Orders</td></tr>\n<tr><td>30-Day Return</td></tr>\n<tr><td>Within 30-Day Of Delivery</td></tr>\n<tr><td>Order No.: UKA2507300000000000001</td></tr>\n<tr><td>Rattan Floor Lamp</td><td>1</td><td>&pound;79.99</td></tr>\n<tr><td>Subtotal</td><td>&pound;79.99</td></tr>\n<tr><td>Total</td><td>&pound;79.99</td></tr></table></body></html>",
+ "text": "",
+ "expected": {
+  "shop": "Homary.com",
+  "date": "2025-07-30",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Rattan Floor Lamp",
+    "qty": 1,
+    "linePence": 7999
+   }
+  ],
+  "subtotalPence": 7999,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 7999,
+  "shopAlso": [
+   "Homary"
+  ]
+ }
+}

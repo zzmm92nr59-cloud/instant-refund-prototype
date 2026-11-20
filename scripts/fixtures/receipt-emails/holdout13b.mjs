@@ -28,7 +28,7 @@ export default function holdout13b() {
   }
   // ---- A game's web shop: its heading misspelt, the game's name in capitals, the pack's parts with "x 5" -----------------------
   {
-    const o = order([{ name: "1,200 Gems, 5 Spin token", qty: 1, unit: 599 }]);
+    const o = { ...{ ...order([]), bought: [{ name: "1,200 Gems", qty: 1, line: null }, { name: "Spin token", qty: 5, line: null }] }, total: 599 };
     add("holdout13b-game-shop-reciept", "Appcharge", "'… Reciept' heading, 'GAME-STUDIO' title, 'Gems | 1,200', 'Spin token | x 5'", { from: "Appcharge inc. <no-reply@appcharge.com>", subject: "Your BUBBLE QUEST-STUDIOX receipt #120-450-781", date: "Sat, 7 Nov 2026 13:05:00 +0000",
       html: mail("BUBBLE QUEST-STUDIOX", "appcharge.com", ["Appcharge Reciept", "Purchase Confirmation", "BUBBLE QUEST-STUDIOX", "Receipt number | 120-450-781", "Payment method | Apple Pay", "Payment date | November 7, 2026 1:05 PM UTC",
         "Order ID | 6a1b2c3d4e5f60718293a4b5", "Items", "Gems | 1,200", "Spin token | x 5", "Subtotal | £4.99", "VAT (20%) | £1.00", "Total | £5.99"]) }, o, "Bubble Quest", "2026-11-07");

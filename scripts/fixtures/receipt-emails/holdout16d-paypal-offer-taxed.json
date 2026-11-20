@@ -1,0 +1,33 @@
+{
+ "id": "holdout16d-paypal-offer-taxed",
+ "sender": "PayPal",
+ "layout": "'Special Offer', 'Qty: 1', '£2.66', 'Subtotal £2.66', 'Tax £0.53', 'Total £3.19 GBP'",
+ "headers": {
+  "from": "PayPal <service@paypal.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Receipt for your payment to Appcharge ltd",
+  "date": "Thu, 30 Apr 2026 02:21:20 +0000"
+ },
+ "html": "<html><head><title>PayPal</title></head><body><table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"><tr><td>Receipt for your payment to Appcharge ltd</td></tr>\n<tr><td>Sam Taylor, you've successfully sent a payment.</td></tr>\n<tr><td>Hi Sam Taylor,</td></tr>\n<tr><td>You paid &pound;3.19 GBP to Appcharge ltd</td></tr>\n<tr><td>Merchant</td><td>Appcharge ltd help@appcharge.com</td></tr>\n<tr><td>Transaction date</td><td>30 Apr 2026</td></tr>\n<tr><td>Special Offer</td></tr>\n<tr><td>Qty: 1</td></tr>\n<tr><td>Product ID: home_screen_offer_9</td></tr>\n<tr><td>&pound;2.66</td></tr>\n<tr><td>Subtotal</td><td>&pound;2.66</td></tr>\n<tr><td>Tax</td><td>&pound;0.53</td></tr>\n<tr><td>Total</td><td>&pound;3.19 GBP</td></tr>\n<tr><td>Paid Appcharge ltd with</td></tr>\n<tr><td>PayPal Credit</td><td>&pound;3.19 GBP</td></tr>\n<tr><td>Transaction ID: 8XY11111AB2223334</td></tr></table><p>Copyright © 1999-2026 PayPal. All rights reserved.</p></body></html>",
+ "text": "",
+ "expected": {
+  "shop": "Appcharge ltd",
+  "date": "2026-04-30",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Special Offer",
+    "qty": 1,
+    "linePence": 319
+   }
+  ],
+  "subtotalPence": 319,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 319,
+  "shopAlso": [
+   "Appcharge"
+  ]
+ }
+}

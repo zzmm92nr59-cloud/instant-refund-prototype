@@ -1,0 +1,33 @@
+{
+ "id": "holdout16d-airline-total-code-first",
+ "sender": "Lufthansa",
+ "layout": "'Booking details | Departure: …' subject, 'booking code: | ABCDEF', 'Total Price for all Passengers | GBP 1201.72' (no thousands comma)",
+ "headers": {
+  "from": "lufthansa.com <online@booking.lufthansa.com>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Booking details | Departure: 14 December 2021 | LHR-WDH",
+  "date": "Wed, 10 Nov 2021 13:02:53 +0000"
+ },
+ "html": "<html><head><title>Lufthansa</title></head><body><table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"><tr><td>Ticket details &amp; travel information</td></tr>\n<tr><td>Lufthansa booking code:</td><td>ABCDEF</td></tr>\n<tr><td>Passenger information</td></tr>\n<tr><td>TAYLOR/SAM MR</td></tr>\n<tr><td>Tue. 14 December 2021: London – Frankfurt</td></tr>\n<tr><td>LH 909</td></tr>\n<tr><td>Total Price of your Ticket</td></tr>\n<tr><td>Passenger Type</td><td>Price</td><td>Taxes, fees &amp; surcharges</td><td>Passengers</td><td>Total Price of your Ticket</td></tr>\n<tr><td>Adult</td><td>GBP 771.00</td><td>GBP 430.72</td><td>1</td><td>GBP 1201.72</td></tr>\n<tr><td>Total Price for all Passengers</td><td>GBP 1201.72</td></tr></table></body></html>",
+ "text": "",
+ "expected": {
+  "shop": "Lufthansa",
+  "date": "2021-11-10",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Adult",
+    "qty": 1,
+    "linePence": 120172
+   }
+  ],
+  "subtotalPence": 0,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 120172,
+  "shopAlso": [
+   "lufthansa.com"
+  ]
+ }
+}

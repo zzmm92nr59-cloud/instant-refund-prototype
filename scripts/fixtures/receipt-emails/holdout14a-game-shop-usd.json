@@ -16,12 +16,17 @@
   "currency": "USD",
   "items": [
    {
-    "name": "Storm Lantern, 600 Pearls",
+    "name": "Storm Lantern",
     "qty": 1,
-    "linePence": 647
+    "linePence": null
+   },
+   {
+    "name": "600 Pearls",
+    "qty": 1,
+    "linePence": null
    }
   ],
-  "subtotalPence": 647,
+  "subtotalPence": 0,
   "feesPence": 0,
   "discountsPence": 0,
   "tipsPence": 0,

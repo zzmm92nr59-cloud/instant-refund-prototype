@@ -1,0 +1,31 @@
+{
+ "id": "holdout16d-game-two-boxes",
+ "sender": "Appcharge",
+ "layout": "one line 'Golden SE box | x 2': two of one thing",
+ "headers": {
+  "from": "no-reply <no-reply@appcharge.com>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your HARBOUR HEROES-TIDEWORKS receipt #411-090-215",
+  "date": "Sun, 10 May 2026 09:02:40 +0000"
+ },
+ "html": "<html><head><title>Appcharge Reciept</title></head><body><table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"><tr><td>Purchase Confirmation</td></tr>\n<tr><td>HARBOUR HEROES-TIDEWORKS</td></tr>\n<tr><td>Receipt number</td><td>411-090-215</td></tr>\n<tr><td>Payment method</td><td>Apple Pay</td></tr>\n<tr><td>Payment date</td><td>May 10, 2026 9:02 AM UTC</td></tr>\n<tr><td>Country</td><td>United Kingdom</td></tr>\n<tr><td>Order ID</td><td>6a9f01c2b3d4e5f6071829aa</td></tr>\n<tr><td>Items</td></tr>\n<tr><td>Golden SE box</td><td>x 2</td></tr>\n<tr><td>Subtotal</td><td>&pound;1.66</td></tr>\n<tr><td>VAT (20%)</td><td>&pound;0.33</td></tr>\n<tr><td>Total</td><td>&pound;1.99</td></tr></table><p>For questions or assistance, contact <a href=\"https://appchargehelp.zendesk.com/hc/en-us/requests/new?tf_1=6a9f01c2b3d4e5f6071829aa\">Appcharge support</a></p></body></html>",
+ "text": "",
+ "expected": {
+  "shop": "Harbour Heroes",
+  "date": "2026-05-10",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Golden SE box",
+    "qty": 2,
+    "linePence": 199
+   }
+  ],
+  "subtotalPence": 199,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 199,
+  "orderRef": "6a9f01c2b3d4e5f6071829aa"
+ }
+}

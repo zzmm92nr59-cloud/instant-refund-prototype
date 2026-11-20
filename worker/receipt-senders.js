@@ -152,16 +152,89 @@ export function gameBundle(text) {
     const r = list[k];
     if (/^(?:sub-?\s?total|total|tax|vat)\b/i.test(r)) break;
     // (How many, as "6,000" or "x 15". Round 12.)
-    let m = /^(\p{L}[\p{L}\d '’&.-]{1,40}?) \| (?:x\s?)?(\d{1,3}(?:,\d{3})*|\d{1,7})$/u.exec(r);
-    const next = /^(?:x\s?)?(\d{1,3}(?:,\d{3})*|\d{1,7})$/i.exec(list[k + 1] || "");
-    if (!m && /^\p{L}[\p{L}\d '’&.-]{1,40}$/u.test(r) && next) { m = [null, r, next[1]]; k++; }
+    let m = /^(\p{L}[\p{L}\d '’&.-]{1,40}?) \| (x\s?)?(\d{1,3}(?:,\d{3})*|\d{1,7})$/u.exec(r);
+    const next = /^(x\s?)?(\d{1,3}(?:,\d{3})*|\d{1,7})$/i.exec(list[k + 1] || "");
+    if (!m && /^\p{L}[\p{L}\d '’&.-]{1,40}$/u.test(r) && next) { m = [null, r, next[1], next[2]]; k++; }
     // (Whatever follows the list ends it: the pack is what was read so far. A list of objects was once returned here, and
     // read as an item named "[object Object]". Round 12.)
     if (!m) break;
-    parts.push({ name: m[1].trim(), amount: m[2] });
+    parts.push({ name: m[1].trim(), amount: m[3], times: Boolean(m[2]) && Number(m[3].replace(/,/g, "")) <= 99 });
   }
   if (!parts.length) return null;
-  return parts.map((p) => (p.amount === "1" ? p.name : p.amount + " " + p.name)).join(", ");
+  // (Each thing in the pack is a line of its own: "Coins | 2,200" is 2,200 Coins, game money counted out; "Big SE box | x 2"
+  // is two boxes; "Mixy Meow | 1" is one. The pack has one price, so no line is priced on its own. Round 15.)
+  return parts.map((p) => (p.times ? { name: p.name, qty: Number(p.amount.replace(/,/g, "")) } : p.amount === "1" ? { name: p.name, qty: 1 } : { name: p.amount + " " + p.name, qty: 1 }));
+}
+
+// ---- Booking.com's booking confirmation ----------------------------------------------------------------------------------
+// "Price details" sets out the stay: "2 rooms | US$1,152" (or, in its older layout, "1" over the room's name with no price of
+// its own), then the taxes and charges on rows of their own ("Goods & services tax | US$215.42", "Property service charge |
+// US$115.20"), then "Total price". What the email says under the price details ("This booking is non-refundable…", "City tax
+// … is included") is its terms, never something bought. The room is named under "Room 1:" or in the price details; how many
+// nights is "8 nights, 2 rooms". "You'll pay when you stay at …" / "You'll pay the property" means nothing was taken up front:
+// the card was only a guarantee. Round 15.
+const STAY_MONEY = /^(?:US\$|CA\$|A\$|€|£|\$)\s?(\d{1,3}(?:,\d{3})+|\d+)(?:\.(\d{2}))?(?:\s*[A-Z]{3})?$/;
+const stayPence = (s) => { const m = STAY_MONEY.exec(String(s || "").trim()); return m ? Number(m[1].replace(/,/g, "")) * 100 + Number(m[2] || 0) : null; };
+export function bookingStay(text) {
+  const list = rows(String(text || "").slice(0, 60000)).map((r) => r.replace(/\s*\|\s*/g, " | "));
+  const head = list.findIndex((r) => /^price details$/i.test(r));
+  if (head < 0) return null;
+  const end = list.findIndex((r, i) => i > head && /^total price\b/i.test(r));
+  if (end < 0 || end - head > 40) return null;
+  const block = list.slice(head + 1, end);
+  let rooms = null, roomPence = null, roomName = null;
+  const fees = [];
+  for (let i = 0; i < block.length; i++) {
+    // (A label and its amount on one line, as pasted text gives them: "2 rooms US$900".)
+    const one = r0 => /^(.{1,60}?)\s+((?:US\$|CA\$|A\$|€|£|\$)\s?\d[\d,]{0,9}(?:\.\d{2})?)$/.exec(r0);
+    const r = block[i].includes(" | ") || !one(block[i]) ? block[i] : one(block[i]).slice(1, 3).join(" | "), [label, amount] = r.split(" | ");
+    const m = /^(\d{1,2})(?: rooms?)?$/i.exec(label);
+    const money = amount != null ? stayPence(amount) : stayPence(block[i + 1]);
+    if (m && rooms == null) {
+      rooms = Number(m[1]);
+      if (money != null) { roomPence = money; if (amount == null) i++; }
+      continue;
+    }
+    // (A name with no money of its own, in the older layout: the room.)
+    if (rooms != null && !roomName && money == null && stayPence(label) == null && /^\p{Lu}[\p{L}\d &'’,-]{2,60}$/u.test(label) && !/\b(?:included|includes|per person|per night|tax)\b/i.test(label)) { roomName = label; continue; }
+    if (money != null && stayPence(label) == null && /^\p{L}[\p{L}\d &'’()%.-]{2,50}$/u.test(label) && !/\bincluded\b/i.test(label)) { fees.push({ label, pence: money }); if (amount == null) i++; }
+  }
+  if (rooms == null) return null;
+  if (!roomName) {
+    // ("Room" over "1:" over "King Room with Sea View", for each room: one name when they are all the same.)
+    const names = [];
+    for (let k = end + 1; k < list.length - 2 && names.length < 9; k++) if (/^room$/i.test(list[k]) && /^\d{1,2}:$/.test(list[k + 1]) && /^\p{Lu}[\p{L}\d &'’,–-]{2,80}$/u.test(list[k + 2])) names.push(list[k + 2]);
+    if (names.length) roomName = [...new Set(names)].join(" and ");
+  }
+  const n = /\b(\d{1,2}) nights?\s*,\s*\d{1,2} rooms?\b/i.exec(list.join("\n"));
+  const payAtProperty = /\byou(?:'|’)ll pay (?:when you stay|the property|at the property)\b|\bpayment will be (?:made|taken) (?:at|by) the property\b|\byou(?:'|’)ll pay at the property\b/i.test(list.join(" ").slice(0, 20000));
+  return { rooms, roomName, roomPence, nights: n ? Number(n[1]) : null, fees, payAtProperty };
+}
+
+// ---- Expedia's hotel booking confirmation -------------------------------------------------------------------------------
+// "Itinerary # 73006597247609", "You booked 1 room." over the room's name, "Price summary" with each line's name over its
+// amount ("Accommodation 1" over the rooms' price with their taxes, "Nights: 7 (avg./night)" and "Taxes" breaking it down,
+// "Locally collected mandatory fees/taxes*"), then "Total", and "Collected at the property" when nothing is taken up front.
+// Round 15.
+export function expediaStay(text) {
+  const list = rows(String(text || "").slice(0, 60000));
+  const head = list.findIndex((r) => /^price summary$/i.test(r));
+  if (head < 0) return null;
+  const end = list.findIndex((r, i) => i > head && /^total$/i.test(r));
+  if (end < 0 || end - head > 30) return null;
+  const lines = [];
+  for (let i = head + 1; i < end - 1; i++) { const p = stayPence(list[i + 1]); if (p != null && stayPence(list[i]) == null) { lines.push({ label: list[i], pence: p }); i++; } }
+  const room = lines.find((l) => /^accommodation\b/i.test(l.label));
+  if (!room) return null;
+  const breakdown = (l) => /^(?:nights?\b|taxes$|taxes and fees$)/i.test(l.label);
+  const fees = lines.filter((l) => l !== room && !breakdown(l));
+  const booked = list.findIndex((r) => /^you booked \d{1,2} rooms?\s*\.?$/i.test(r));
+  const roomName = booked >= 0 && /^\p{Lu}[\p{L}\d &'’,–-]{2,80}$/u.test(list[booked + 1] || "") ? list[booked + 1] : null;
+  const rooms = booked >= 0 ? Number(/\d{1,2}/.exec(list[booked])[0]) : 1;
+  const n = /^nights?:\s*(\d{1,2})\b/i.exec((lines.find((l) => /^nights?:/i.test(l.label)) || {}).label || "");
+  const ref = /\bitinerary\s*#\s*(\d{8,16})\b/i.exec(list.slice(0, 40).join("\n"));
+  const payAtProperty = /^collected at the property$/i.test(list[end + 2] || "") || /^collected at the property$/i.test(list[end + 1] || "");
+  return { rooms, roomName, roomPence: room.pence, nights: n ? Number(n[1]) : null, fees, payAtProperty, orderRef: ref ? ref[1] : null };
 }
 
 // ---- A ticket seller's payment summary (round 15) ------------------------------------------------------------------------

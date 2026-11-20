@@ -1,0 +1,31 @@
+{
+ "id": "holdout16d-game-comma-dollars",
+ "sender": "Appcharge",
+ "layout": "bought in Tunisia: 'Subtotal | $1,68', 'Tax (19%) | $0,32', 'Total | $2,00' (a decimal comma, no currency code)",
+ "headers": {
+  "from": "no-reply <no-reply@appcharge.com>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your HARBOUR HEROES-TIDEWORKS receipt #774-930-120",
+  "date": "Wed, 4 Mar 2026 18:01:30 +0000"
+ },
+ "html": "<html><head><title>Appcharge Reciept</title></head><body><table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"><tr><td>Purchase Confirmation</td></tr>\n<tr><td>HARBOUR HEROES-TIDEWORKS</td></tr>\n<tr><td>Receipt number</td><td>774-930-120</td></tr>\n<tr><td>Payment method</td><td>Apple Pay</td></tr>\n<tr><td>Payment date</td><td>March 04, 2026 6:01 PM UTC</td></tr>\n<tr><td>Country</td><td>Tunisia</td></tr>\n<tr><td>Order ID</td><td>69a873747398ede69c05b5ff</td></tr>\n<tr><td>Items</td></tr>\n<tr><td>Powerup Tokens</td><td>1,000</td></tr>\n<tr><td>Subtotal</td><td>$1,68</td></tr>\n<tr><td>Tax (19%)</td><td>$0,32</td></tr>\n<tr><td>Total</td><td>$2,00</td></tr></table><p>For questions or assistance, contact <a href=\"https://appchargehelp.zendesk.com/hc/en-us/requests/new?tf_1=69a873747398ede69c05b5ff\">Appcharge support</a></p></body></html>",
+ "text": "",
+ "expected": {
+  "shop": "Harbour Heroes",
+  "date": "2026-03-04",
+  "currency": "USD",
+  "items": [
+   {
+    "name": "1,000 Powerup Tokens",
+    "qty": 1,
+    "linePence": 200
+   }
+  ],
+  "subtotalPence": 200,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 200,
+  "orderRef": "69a873747398ede69c05b5ff"
+ }
+}

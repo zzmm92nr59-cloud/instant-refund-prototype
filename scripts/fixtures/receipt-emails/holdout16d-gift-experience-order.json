@@ -1,0 +1,30 @@
+{
+ "id": "holdout16d-gift-experience-order",
+ "sender": "Buyagift",
+ "layout": "'Your order reference number is BUY10000001 .', name over 'Product Code:' 'Quantity:' 'Price:', 'Discount Code Applied: | £36.00', 'Total: |' cells apart from '£143.99', offers after",
+ "headers": {
+  "from": "Buyagift <noreply@buyagift.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your Buyagift Order Confirmation",
+  "date": "Tue, 10 Feb 2026 20:00:00 +0000"
+ },
+ "html": "<html><head><title>Buyagift</title></head><body><table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"><tr><td>Thank you for ordering from Buyagift!</td></tr>\n<tr><td>Your Order Confirmation</td></tr>\n<tr><td>Hello Sam ,</td></tr>\n<tr><td>Your order reference number is BUY10000001 . Please use this reference number if you need to talk to us about your order.</td></tr>\n<tr><td>Two Night Hotel Break for Two</td></tr>\n<tr><td>Please click on the link below to download your E-voucher.</td></tr>\n<tr><td>DOWNLOAD YOUR E-VOUCHER</td></tr>\n<tr><td>Product Code:</td></tr>\n<tr><td>10900001</td></tr>\n<tr><td>Quantity:</td></tr>\n<tr><td>1</td></tr>\n<tr><td>Price:</td></tr>\n<tr><td>&pound;179.99</td></tr>\n<tr><td>Gift Box Price:</td></tr>\n<tr><td>&pound;0</td></tr>\n<tr><td>Order Confirmation Summary</td></tr>\n<tr><td>Subtotal:</td></tr>\n<tr><td>&pound;179.99</td></tr>\n<tr><td>Promotion Discount:</td></tr>\n<tr><td>&pound;0.00</td></tr>\n<tr><td>Discount Code Applied:</td></tr>\n<tr><td>&pound;36.00</td></tr>\n<tr><td>Delivery Charges:</td></tr>\n<tr><td>&pound;0.00</td></tr>\n<tr><td>Total:</td><td>| |</td></tr>\n<tr><td>&pound;143.99</td></tr>\n<tr><td>WE THINK YOU MAY ALSO LIKE</td></tr>\n<tr><td>Afternoon Tea for Two</td><td>&pound;49.00</td></tr>\n<tr><td>Spa Day for Two</td><td>&pound;99.00</td></tr></table></body></html>",
+ "text": "",
+ "expected": {
+  "shop": "Buyagift",
+  "date": "2026-02-10",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Two Night Hotel Break for Two",
+    "qty": 1,
+    "linePence": 17999
+   }
+  ],
+  "subtotalPence": 17999,
+  "feesPence": 0,
+  "discountsPence": 3600,
+  "tipsPence": 0,
+  "totalPence": 14399
+ }
+}

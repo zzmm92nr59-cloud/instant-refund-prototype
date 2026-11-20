@@ -1,0 +1,33 @@
+{
+ "id": "holdout16d-stripe-invoice-paid",
+ "sender": "Stripe",
+ "layout": "'Your Northgate Advisers Limited receipt [#1800-1234]'; '- - Payment for invoice(s) 250001 : £250.00'",
+ "headers": {
+  "from": "Northgate Advisers Limited <receipts+acct_1AB@stripe.com>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your Northgate Advisers Limited receipt [#1800-1234]",
+  "date": "Wed, 19 Feb 2025 10:28:00 +0000"
+ },
+ "html": "",
+ "text": "Receipt from Northgate Advisers Limited Receipt #1800-1234\nAmount paid\n£250.00\nDate paid\nFeb 19, 2025, 10:27:54 AM\nPayment method\n- - Apple Pay\nSummary\n- - Payment for invoice(s) 250001 : £250.00\n- Amount paid : £250.00\nYou're receiving this email because you made a purchase at Northgate Advisers Limited, which partners with Stripe to provide invoicing and payment processing.\n",
+ "expected": {
+  "shop": "Northgate Advisers Limited",
+  "date": "2025-02-19",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Payment for invoice(s) 250001",
+    "qty": 1,
+    "linePence": 25000
+   }
+  ],
+  "subtotalPence": 25000,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 25000,
+  "shopAlso": [
+   "Northgate Advisers"
+  ]
+ }
+}

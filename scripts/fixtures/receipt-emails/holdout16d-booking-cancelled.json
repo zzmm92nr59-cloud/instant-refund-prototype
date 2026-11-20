@@ -1,0 +1,19 @@
+{
+ "id": "holdout16d-booking-cancelled",
+ "sender": "Booking.com",
+ "layout": "'Booking cancelled for Palm Reef Lodge', 'Your booking has been successfully cancelled for free', 'Confirmation number: 5550001111'",
+ "headers": {
+  "from": "Booking.com <noreply@booking.com>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Booking cancelled for Palm Reef Lodge",
+  "date": "Sat, 20 Sep 2025 10:00:00 +0000"
+ },
+ "html": "<html><head><title>Booking.com</title></head><body><table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"><tr><td>Booking cancelled for Palm Reef Lodge</td></tr>\n<tr><td>Confirmation number: 5550001111</td></tr>\n<tr><td>PIN code: 1234</td></tr>\n<tr><td>Your booking has been successfully cancelled for free</td></tr>\n<tr><td>We can confirm that your reservation at Palm Reef Lodge has been cancelled.</td></tr>\n<tr><td>Booking number</td><td>5550001111</td></tr>\n<tr><td>Cancellation cost</td><td>US$ 0</td></tr></table></body></html>",
+ "text": "",
+ "expected": {
+  "notPurchase": {
+   "kind": "cancelled",
+   "orderRef": "5550001111"
+  }
+ }
+}

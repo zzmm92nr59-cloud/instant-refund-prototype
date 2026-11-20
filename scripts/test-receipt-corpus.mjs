@@ -317,7 +317,10 @@ const joinWrong = [];
   if (no.kind === "order_update") joinWrong.push("a refused refund read as money back");
   attachAdjustments(orders, [a1, a2].filter((x) => x.kind === "order_update"));
   const adj = orders[0].adjusted;
-  if (!(adj && adj.refundPence === 499 && adj.creditPence === 399) || orders[1].adjusted) joinWrong.push("support refund and credit not joined to the order they name: " + JSON.stringify(adj || null));
+  // (Round 15, changed: a1's own words name order 552658111, so its refund is that order's, never 664851790's, which only the
+  // thread's subject names (Connor's real Just Eat refund for 652658294 was put on 664851791 this way). Relay doesn't have
+  // 552658111, so the refund joins nothing; the credit, named for 664851790, still joins it.)
+  if (!(adj && adj.refundPence === 0 && adj.creditPence === 399) || orders[1].adjusted) joinWrong.push("support refund and credit not joined to the order they name: " + JSON.stringify(adj || null));
   const ride = (n, total, day) => ({ id: "u" + n, createdAt: n, kind: "receipt", retailer: { name: "Uber", domain: "uber.com" }, orderRef: null, orderDate: day, totalPence: total, currency: "GBP", items: [] });
   const pp = classifyEmail(mail("\"service@paypal.co.uk\" <service@paypal.co.uk>", "You've got a refund from UBER PAYMENTS UK LIMITED", "Wed, 18 Mar 2026 09:00:00 +0000",
     "You've got a refund from UBER PAYMENTS UK LIMITED\nYour refund of £3.06 GBP from UBER PAYMENTS UK LIMITED\nRefund complete! Available now in your balance.\nYou originally paid UBER PAYMENTS UK LIMITED £4.99 GBP on 5 March 2026. View receipt\nRefund total\n£3.06 GBP")).details;
@@ -393,7 +396,88 @@ const joinWrong = [];
   attachCancellations(sub, [det("holdout14a-google-play-sub-ending")]);
   if (!sub[0].subscriptionEnds || sub[0].subscriptionEnds.on !== "2019-08-13" || sub[0].subscriptionEnds.refund !== false || sub[0].cancelled) joinWrong.push("a subscription ending read on its payment as " + JSON.stringify([sub[0].subscriptionEnds, sub[0].cancelled]));
   const paid = mergeOrderEmails([det("holdout14a-game-shop-usd"), det("holdout14a-paypal-to-game-shop"), det("holdout14a-game-shop-mxn")]);
-  if (paid.length !== 2 || !paid.some((c) => c.orderRef === "612-904-337" && c.totalPence === 647 && c.currency === "USD")) joinWrong.push("PayPal's receipt for a game shop purchase made " + JSON.stringify(paid.map((c) => [c.retailer && c.retailer.name, c.orderRef, c.totalPence])));
+  if (paid.length !== 2 || !paid.some((c) => c.orderRef === "6b0c1d2e3f405162738495a6" && c.totalPence === 647 && c.currency === "USD")) joinWrong.push("PayPal's receipt for a game shop purchase made " + JSON.stringify(paid.map((c) => [c.retailer && c.retailer.name, c.orderRef, c.totalPence])));
+}
+{
+  // Round 15d (made-up copies of Connor's real layouts): the same game-shop offer bought twice four minutes apart, each with
+  // PayPal's receipt seconds after the shop's: two cards, each the shop's receipt with its own PayPal receipt, never four,
+  // and the shop's own name and Order ID on each.
+  const { gameReceipt, payPalToAppcharge } = await import("./fixtures/receipt-emails/holdout16d.mjs");
+  const fx = (id) => JSON.parse(readFileSync(join(dir, id + ".json"), "utf8"));
+  const read = (m, id) => ({ ...classifyEmail(rawEmail(fixture16(id, m))).details, id, createdAt: 0 });
+  const fixture16 = (id, m) => ({ id, headers: { from: m.from, to: SHOPPER.email, subject: m.subject, date: m.date }, html: m.html, text: "" });
+  const g1 = read(gameReceipt("100-200-301", "6aaa00000000000000000001", "United Kingdom", ["Coins | 2,200", "Minigame token | x 15"], ["Subtotal | £2.66", "VAT (20%) | £0.53"], "£3.19", "Thu, 30 Apr 2026 02:21:03 +0000", "April 30, 2026 2:21 AM UTC", "PayPal"), "g1");
+  const p1 = read(payPalToAppcharge("Special Offer", "£2.66", "£0.53", "£3.19", "Thu, 30 Apr 2026 02:21:31 +0000", "1AA11111AA1111111"), "p1");
+  const g2 = read(gameReceipt("100-200-302", "6aaa00000000000000000002", "United Kingdom", ["Coins | 2,200", "Minigame token | x 15"], ["Subtotal | £2.66", "VAT (20%) | £0.53"], "£3.19", "Thu, 30 Apr 2026 02:24:40 +0000", "April 30, 2026 2:24 AM UTC", "PayPal"), "g2");
+  const p2 = read(payPalToAppcharge("Special Offer", "£2.66", "£0.53", "£3.19", "Thu, 30 Apr 2026 02:24:58 +0000", "2BB22222BB2222222"), "p2");
+  const cards = mergeOrderEmails([g1, p1, g2, p2]);
+  const ids = cards.map((c) => (c.emailIds || [c.id]).slice().sort().join("+")).sort();
+  if (ids.join(" ") !== "g1+p1 g2+p2" || !cards.every((c) => /^6aaa0+\d$/.test(c.orderRef) && c.totalPence === 319 && c.retailer && !c.retailer.via))
+    joinWrong.push("two same-money game purchases minutes apart, each with PayPal's receipt, made " + JSON.stringify(cards.map((c) => [c.emailIds, c.orderRef, c.retailer && c.retailer.name])));
+  // PayPal's receipt numbering the purchase its own way ("Order ID hbf-1201"), the shop's name cut short ("Hopfield Beer
+  // Fe..."), eight seconds after the festival's ticket email (its own number, no total): one card, the festival's, with the
+  // money PayPal says was paid.
+  const { payPalTo, festivalTickets, shopOrder } = await import("./fixtures/receipt-emails/holdout16d.mjs");
+  const t1 = read(festivalTickets("770104", 3, "Sun, 19 Apr 2026 17:43:37 +0000"), "t1");
+  const pp1 = read(payPalTo({ cut: "Hopfield Beer Fe", email: "tickets@hopfield.example", orderId: "hbf-1201", lines: ["Hopfield Beer Fe...", "Qty: 3", "Product ID: HBF-18-07-2026-EVE", "£40.00", "Booking Fee", "Qty: 1", "£3.00"],
+    money: ["Subtotal | £123.00", "Tax | £24.60"], total: "£147.60", date: "Sun, 19 Apr 2026 17:43:45 +0000", txn: "1AH37318AA3110638" }), "pp1");
+  const fest = mergeOrderEmails([t1, pp1]);
+  if (fest.length !== 1 || fest[0].orderRef !== "770104" || fest[0].totalPence !== 14760 || fest[0].items.length !== 3 || !/^Hopfield Beer Festival$/.test(fest[0].retailer && fest[0].retailer.name))
+    joinWrong.push("a festival's tickets and PayPal's receipt for them made " + JSON.stringify(fest.map((c) => [c.emailIds, c.orderRef, c.totalPence, c.items.length, c.retailer])));
+  // PayPal's receipt for an order the shop's own email (read from another inbox) prices before VAT: one card, PayPal's money.
+  const so = { ...read(shopOrder("106000001", "Sun, 21 Dec 2025 19:05:00 +0000", "Trail Running Jacket", "£66.65"), "so"), mailbox: 2 };
+  const pp2 = read(payPalTo({ cut: "Trailpoint Ltd", full: "Trailpoint Ltd", email: "team@trailpoint.co.uk", orderId: "106000001", lines: [], money: [], total: "£79.98", date: "Sun, 21 Dec 2025 19:02:59 +0000", txn: "9ZZ11111ZZ2223334" }), "pp2");
+  const sp = mergeOrderEmails([so, pp2]);
+  if (sp.length !== 1 || sp[0].totalPence !== 7998 || sp[0].orderRef !== "106000001") joinWrong.push("a shop's order and PayPal's receipt with the same number made " + JSON.stringify(sp.map((c) => [c.emailIds, c.orderRef, c.totalPence])));
+  // A PayPal Debit Card purchase keeps PayPal's transaction ID as its reference; PayPal's older receipt keeps its Invoice ID.
+  const debit = parseReceiptEmail(rawEmail(fx("holdout14a-paypal-debit-card")));
+  if (debit.orderRef !== "4AB12345CD6789012") joinWrong.push("a PayPal Debit Card purchase's reference read as " + debit.orderRef);
+  const older = parseReceiptEmail(rawEmail(fx("holdout16d-paypal-older-receipt")));
+  if (older.orderRef !== "WC-31002") joinWrong.push("PayPal's older receipt's Invoice ID read as " + older.orderRef);
+  // A parcel's news for one order of a shop (it names V-5550001AA) never joins the same shop's other card by its name alone
+  // (a monthly top-up paid through PayPal, numbered WB-…).
+  const topUp = { id: "wb", kind: "receipt", retailer: { name: "Cellar Club Online L", domain: null, via: "paypal.co.uk" }, orderRef: "WB10000001-P001", orderDate: "2025-07-14", totalPence: 2500, items: [{ name: "Wine Plan recurring p", qty: 1, pricePence: 2500 }] };
+  const delivery = { kind: "delivery_update", status: "delivered", at: "2025-07-20", merchant: "Cellar Club", orderRef: "V5550001AA", trackingNumber: null, retailer: { name: "Cellar Club", domain: "cellarclub.example" } };
+  attachDeliveries([topUp], [delivery]);
+  if (topUp.delivery || topUp.returnBy) joinWrong.push("another order's delivery joined a top-up by the shop's name: " + JSON.stringify([topUp.delivery, topUp.returnBy]));
+  // Booking.com: a stay paid at the property says so; its cancellation joins it by the confirmation number.
+  const stayCard = [{ ...classifyEmail(rawEmail(fx("holdout16d-booking-pay-at-stay"))).details, id: "st" }];
+  const gone = classifyEmail(rawEmail(fx("holdout16d-booking-cancelled"))).details;
+  attachCancellations(stayCard, [gone]);
+  if (!stayCard[0].payAtProperty || !stayCard[0].cancelled || stayCard[0].cancelled.partial || gone.orderRef !== "5550001111" || !gone.free)
+    joinWrong.push("a Booking.com stay paid at the property and its cancellation read as " + JSON.stringify([stayCard[0].payAtProperty, stayCard[0].cancelled, gone.orderRef, gone.free]));
+  const exp = classifyEmail(rawEmail(fx("holdout16d-expedia-dollars-at-property"))).details;
+  if (exp.orderRef !== "73000000000001" || !exp.payAtProperty) joinWrong.push("Expedia's itinerary read as " + JSON.stringify([exp.orderRef, exp.payAtProperty]));
+  // Not purchases: someone else's booking forwarded from their own Gmail (written "@googlemail.com" inside); money deposited to play poker; things someone else bought and had sent to the shopper. The shopper's own
+  // forward from another of their addresses, with no name on the "To:" line, is still theirs.
+  const mail = (lines) => lines.join("\r\n");
+  const theirs = mail(["From: Robin Ashdown <robin.ashdown@gmail.com>", "To: Sam Taylor <sam.taylor99@gmail.com>", "Subject: Fwd: Booking Confirmation For Minster Hotel", "Date: Mon, 4 Dec 2023 10:00:00 +0000", "Content-Type: text/plain; charset=utf-8", "",
+    "Sent from my iPhone", "Begin forwarded message:", "> From: The Giftbox Team <team@giftbox.example>", "> Date: 3 December 2023 at 22:25:24 GMT", "> To: robin.ashdown@googlemail.com", "> Subject: Booking Confirmation For Minster Hotel",
+    ">", "> Thank you for your booking, your reservation details are below.", "> Booking reference: RSV10000000001", "> Check in", "> 22/12/23", "> TOTAL:", "> £207"]);
+  if (parseReceiptEmail(theirs).ok) joinWrong.push("someone else's booking forwarded from their Gmail read as the shopper's purchase");
+  const ownFwd = theirs.replace("To: Sam Taylor <sam.taylor99@gmail.com>", "To: sam.taylor99@gmail.com").replace("From: Robin Ashdown <robin.ashdown@gmail.com>", "From: Sam Taylor <sam.taylor@outlook.com>").replace("> To: robin.ashdown@googlemail.com", "> To: sam.taylor@outlook.com");
+  if (!parseReceiptEmail(ownFwd).ok) joinWrong.push("the shopper's own forward from another address not read");
+  const poker = mail(["From: \"Cardroom\" <info@emails.cardroom.example>", "To: " + SHOPPER.email, "Subject: Your deposit receipt", "Date: Tue, 29 Dec 2020 18:20:00 +0000", "Content-Type: text/plain; charset=utf-8", "",
+    "Your deposit receipt", "Hi,", "Thanks for depositing with Cardroom. You’ll find your deposit receipt below.", "Deposit Option: VISA", "Amount: GBP 10.00", "Transaction ID: 16090000000000001", "Status: CREDITED"]);
+  if (parseReceiptEmail(poker).ok) joinWrong.push("money deposited to play read as a purchase");
+  const sentToMe = mail(["From: Apple Store <shipping_notification@orders.apple.com>", "To: " + SHOPPER.email, "Subject: Your shipment is on its way. Order No. W1000000001", "Date: Wed, 25 Mar 2026 18:00:00 +0000", "Content-Type: text/plain; charset=utf-8", "",
+    "Your items have shipped.", "Jo Rivers has sent you the following items.", "Order Number: W1000000001", "Ordered on: 25/03/2026", "Personalised AirPods Pro 3", "Qty 1", "Engravings", "FREE"]);
+  if (parseReceiptEmail(sentToMe).ok) joinWrong.push("things someone else sent the shopper read as the shopper's purchase");
+  const deal = parseReceiptEmail(rawEmail(fx("holdout16d-deals-order-cancel-right")));
+  if (deal.orderRef !== "1200-000001-000001" || !(deal.returns && deal.returns.windowDays === 14 && deal.returns.windowFrom === "delivery")) joinWrong.push("a deals site's order and right to cancel read as " + JSON.stringify([deal.orderRef, deal.returns && deal.returns.windowDays, deal.returns && deal.returns.windowFrom]));
+  const lamp = parseReceiptEmail(rawEmail(fx("holdout16d-home-window-heading")));
+  if (!(lamp.returns && lamp.returns.windowDays === 30 && lamp.returns.windowFrom === "delivery")) joinWrong.push("'30-Day Return' over 'Within 30-Day Of Delivery' read as " + JSON.stringify(lamp.returns));
+  const credit = parseReceiptEmail(rawEmail(fx("holdout16d-stripe-unused-time")));
+  if (!(credit.discounts || []).some((d) => d.pence === 1000 && /^Unused time/.test(d.label))) joinWrong.push("Stripe's unused-time credit (−£10.00) not kept as money off: " + JSON.stringify(credit.discounts));
+  const usd = parseReceiptEmail(rawEmail(fx("holdout16d-stripe-dollar-discount")));
+  if (!(usd.discounts || []).some((d) => d.pence === 1153)) joinWrong.push("a dollar receipt's 51% discount not kept: " + JSON.stringify(usd.discounts));
+  const twice = parseReceiptEmail(rawEmail(fx("holdout16d-apple-two-copies")));
+  if (!(twice.returns && twice.returns.windowDays === 14 && twice.returns.cancelWithin)) joinWrong.push("Apple's two-copy invoice's 14 days to cancel read as " + JSON.stringify(twice.returns));
+  const gp = parseReceiptEmail(rawEmail(fx("holdout16d-google-play-links")));
+  if (!(gp.returns && /AFnwnKc3$/.test(gp.returns.portalUrl || "") && gp.returns.windowDays === 14 && !/two hours/i.test((gp.returns.instructions || []).join(" ")))) joinWrong.push("Google Play's refund link and 14 days read as " + JSON.stringify(gp.returns));
+  // (Further apart than two minutes, or two shop receipts as near as each other: no guess, each stays its own card.)
+  const p3 = { ...p1, id: "p3", sentAt: "2026-04-30T02:30:00.000Z" };
+  if (mergeOrderEmails([g1, g2, p3]).length !== 3) joinWrong.push("a PayPal receipt five minutes from either game purchase was joined to one");
 }
 {
   // Round 14: a reference only the bill or the counter gives ("Order Number:" over "042", "Bill ID: 71200455") is the order's
@@ -537,6 +621,7 @@ console.log(`  Orders joined by later emails: ${joinWrong.length ? joinWrong.joi
 
 let failed = 0;
 const need = (cond, msg) => { if (!cond) { failed++; console.log("FAIL - " + msg); } };
+if (joinWrong.length) console.log(joinWrong.join("\n"));
 need(joinWrong.length === 0, "a delivery-day payment and a changed total join the order they belong to (round 10)");
 need(!moreWrong.length, "the restaurant, the 'lists no items' state and a delivery-day payment read right (round 10)");
 need(cancelWrong.length === 0, "a part-cancelled order marks the item its email names as cancelled, and only that");

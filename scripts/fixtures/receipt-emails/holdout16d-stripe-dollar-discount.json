@@ -1,0 +1,34 @@
+{
+ "id": "holdout16d-stripe-dollar-discount",
+ "sender": "Stripe",
+ "layout": "'Paladin Pro Subscription | Qty 1 | $22.61', 'Pro Subscription 51% Discount (51% off) | -$11.53', 'Total | $11.08'",
+ "headers": {
+  "from": "Brainwave, Inc. <invoice+statements+acct_2@stripe.com>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your receipt from Brainwave, Inc. #2700-0001",
+  "date": "Sun, 1 Mar 2026 10:00:00 +0000"
+ },
+ "html": "<html><head><title>Stripe</title></head><body><table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"><tr><td>Receipt from Brainwave, Inc.</td></tr>\n<tr><td>$11.08</td></tr>\n<tr><td>Paid March 1, 2026</td></tr>\n<tr><td>Receipt number 2700-0001</td></tr>\n<tr><td>Receipt #2700-0001</td></tr>\n<tr><td>Mar 1–Apr 2, 2026</td></tr>\n<tr><td>Thinker Pro Subscription</td></tr>\n<tr><td>Qty 1</td><td>$22.61</td></tr>\n<tr><td>Subtotal</td><td>$22.61</td></tr>\n<tr><td>Pro Subscription 51% Discount (51% off)</td><td>-$11.53</td></tr>\n<tr><td>Total</td><td>$11.08</td></tr>\n<tr><td>Amount paid</td><td>$11.08</td></tr></table></body></html>",
+ "text": "",
+ "expected": {
+  "shop": "Brainwave, Inc",
+  "date": "2026-03-01",
+  "currency": "USD",
+  "items": [
+   {
+    "name": "Thinker Pro Subscription",
+    "qty": 1,
+    "linePence": 2261
+   }
+  ],
+  "subtotalPence": 2261,
+  "feesPence": 0,
+  "discountsPence": 1153,
+  "tipsPence": 0,
+  "totalPence": 1108,
+  "shopAlso": [
+   "Brainwave",
+   "Brainwave, Inc."
+  ]
+ }
+}
