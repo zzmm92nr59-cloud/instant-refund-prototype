@@ -12,7 +12,7 @@ const AMZ_FOOT = "Fulfilled By Amazon (usually referred to as FBA) items are gen
 // The second order inside the email that holds two (each its own card): checked by test-receipt-corpus.mjs.
 export const TWO_ORDERS = {
   "holdout14a-amazon-divided-2023": { orderRef: "206-5550123-7781204", totalPence: 1249, items: [["The Allotment Year: A Grower's Diary of Seasons of Hartley, Rowan", 1, 1249]] },
-  "holdout14a-amazon-qty-2024": { orderRef: "204-7714420-3310986", totalPence: 0, giftCardPence: 6145, items: [["Brightline 3 Pack Microfibre Kitchen Cloths, Lint Free and Quick Drying, Grey", 2, 650], ["Oakmoor Stoneware Pasta Bowls Set of 4, Speckled Sand, Dishwasher Safe", 1, 2899], ["Pebblefield Bamboo Utensil Holder with Drainage, Natural", 1, 1946]] },
+  "holdout14a-amazon-qty-2024": { orderRef: "204-7714420-3310986", totalPence: 6145, giftCardPence: 6145, items: [["Brightline 3 Pack Microfibre Kitchen Cloths, Lint Free and Quick Drying, Grey", 2, 650], ["Oakmoor Stoneware Pasta Bowls Set of 4, Speckled Sand, Dishwasher Safe", 1, 2899], ["Pebblefield Bamboo Utensil Holder with Drainage, Natural", 1, 1946]] },
 };
 
 export default function holdout14a() {
@@ -70,9 +70,9 @@ export default function holdout14a() {
       "Ordered item(s):" + a + "£14.75", "Condition: NewSold by: Fernhill Home", "Order Total:              £0.00", "=======================================================================================",
       "Ordered item(s):" + b[0] + "£6.50", "Sold by: Amazon EU S.a.r.L." + b[1] + "£28.99", "Sold by: Amazon EU S.a.r.L." + b[2] + "£19.46", "Condition: NewSold by: Pebblefield LtdFulfilled by Amazon",
       "Order Total:              £0.00", "======================================================================================="].join("\n");
-    add("holdout14a-amazon-qty-2024", "Amazon", "'Qty: 2' rows, titles cut with '...' in the HTML and whole in the text part, two orders each paid by gift card ('Order Total: £0.00')",
+    add("holdout14a-amazon-qty-2024", "Amazon", "'Qty: 2' rows, titles cut with '...' in the HTML and whole in the text part, two orders each paid by gift card ('Order Total: £0.00'; the total is what was bought, round 15)",
       { from: '"Amazon.co.uk" <auto-confirm@amazon.co.uk>', subject: 'Your Amazon.co.uk order of "Fernhill Ceramic Hand Soap..." and 3 more item(s)', date: "Mon, 16 Dec 2024 10:12:00 +0000", html, text },
-      o, "Amazon", "2024-12-16", { totalPence: 0 });
+      o, "Amazon", "2024-12-16", { totalPence: 1475 });
   }
   // ---- Amazon, 2025: "Ordered: 'Wireless…'", the title cut in the HTML, "Quantity: 1", "Total" over "£" "21" "84"; the text
   // part has the whole title after "* " ---------------------------------------------------------------------------------------------

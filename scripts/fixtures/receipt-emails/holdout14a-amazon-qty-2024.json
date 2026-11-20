@@ -1,7 +1,7 @@
 {
  "id": "holdout14a-amazon-qty-2024",
  "sender": "Amazon",
- "layout": "'Qty: 2' rows, titles cut with '...' in the HTML and whole in the text part, two orders each paid by gift card ('Order Total: £0.00')",
+ "layout": "'Qty: 2' rows, titles cut with '...' in the HTML and whole in the text part, two orders each paid by gift card ('Order Total: £0.00'; the total is what was bought, round 15)",
  "headers": {
   "from": "\"Amazon.co.uk\" <auto-confirm@amazon.co.uk>",
   "to": "sam.taylor@example.co.uk",
@@ -25,6 +25,6 @@
   "feesPence": 0,
   "discountsPence": 0,
   "tipsPence": 0,
-  "totalPence": 0
+  "totalPence": 1475
  }
 }

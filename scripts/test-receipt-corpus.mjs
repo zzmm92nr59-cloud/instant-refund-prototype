@@ -357,7 +357,7 @@ const joinWrong = [];
   if (!(wine[0].returnProgress && wine[0].returnProgress.refundPence === 3000) || wine[1].returnProgress) joinWrong.push("refund naming the shop's invoice not joined to that order");
 }
 // Round 13 (Connor's real inbox, made-up copies): an Amazon email holding two orders makes a card for each, with its own
-// number, items and total (a gift card's £0.00 kept); Apple's and Google Play's cancel and withdrawal windows are read, and an
+// number, items and total (round 15: what was bought, the gift card's part beside it, never Amazon's £0.00); Apple's and Google Play's cancel and withdrawal windows are read, and an
 // app store's two-hour rule is never given for a subscription; a subscription that won't renew says so on its latest payment
 // without cancelling it; PayPal's receipt for a game shop's purchase is the same purchase as the shop's own receipt.
 {
@@ -382,7 +382,7 @@ const joinWrong = [];
   const noText = parseReceiptEmail(rawEmail({ ...q, html: cutHtml, text: "" }));
   if (!noText.itemsCheck || noText.itemsCheck.complete !== false) joinWrong.push("Amazon's cut titles with no text part not flagged: " + JSON.stringify(noText.itemsCheck));
   const gift = det("holdout14a-amazon-qty-2024");
-  if (gift.giftCardPence !== 1475 || gift.totalPence !== 0 || !gift.itemsCheck.complete) joinWrong.push("a gift-card order read as " + JSON.stringify([gift.totalPence, gift.giftCardPence, gift.itemsCheck]));
+  if (gift.giftCardPence !== 1475 || gift.totalPence !== 1475 || !gift.itemsCheck.complete) joinWrong.push("a gift-card order read as " + JSON.stringify([gift.totalPence, gift.giftCardPence, gift.itemsCheck]));
   const apple = parseReceiptEmail(rawEmail(fx("holdout14a-apple-cancel-within")));
   if (!(apple.returns && apple.returns.windowDays === 14 && apple.returns.cancelWithin)) joinWrong.push("Apple's 'cancel within 14 days' not read: " + JSON.stringify(apple.returns));
   const play = parseReceiptEmail(rawEmail(fx("holdout14a-google-play-subscription")));

@@ -954,10 +954,10 @@ const PRICE_WORDS = /^(?:(?:gbp|usd|eur|aud|cad|chf|sek|nok|dkk)|(?:promotions?|
 //  * digital (Prime Video, Kindle, music): the title, "Sold by:" (or "Sold by :"), the seller, then "£3.49".
 // Read from the HTML split at every tag, so each little box is its own line. Nothing is guessed: a price is kept only when
 // Amazon printed one next to the item.
-const AMZ_SKIP = /^(sold by\b|fulfill?ed by\b|condition:|quantity:|qty:|colou?r:|size:|style:|pattern:|edition:|format:|view or edit order|order #|placed on|order details|ordered|dispatched|out for delivery|delivered|£|total|item subtotal|\|)/i;
+const AMZ_SKIP = /^(sold by\b|fulfill?ed by\b|condition:|gift (?:wrap|message|note|receipt):|quantity:|qty:|colou?r:|size:|style:|pattern:|edition:|format:|view or edit order|order #|placed on|order details|ordered|dispatched|out for delivery|delivered|£|total|item subtotal|\|)/i;
 function amazonRows(html) {
-  const decode = (t) => t.replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&#39;|&rsquo;|&lsquo;/g, "'").replace(/&quot;|&ldquo;|&rdquo;/g, '"').replace(/&pound;/g, "£")
-    .replace(/&#(\d+);/g, (m, n) => String.fromCharCode(+n)).replace(/&#x([0-9a-f]+);/gi, (m, n) => String.fromCharCode(parseInt(n, 16)));
+  // (Every named character, "v&iacute;voactive" as "vívoactive", Round 15; quotes kept plain as before.)
+  const decode = (t) => decodeEntities(t.replace(/&#39;|&rsquo;|&lsquo;/g, "'").replace(/&quot;|&ldquo;|&rdquo;/g, '"'));
   return String(html || "").replace(/<(script|style)[\s\S]*?<\/\1>/gi, " ").split(/<[^>]+>/)
     .map((t) => decode(t).replace(/[\u034f\u200b-\u200f\u00ad\u2060\ufeff\u202a-\u202e]/g, "").replace(/\s+/g, " ").trim()).filter(Boolean);
 }
@@ -982,7 +982,14 @@ export function amazonItems(html, given) {
         const b = /^(colou?r|size|style):\s*(.{1,40})$/i.exec(rows[j]);
         if (b) { bits.unshift(b[2]); continue; }
         if (AMZ_SKIP.test(rows[j]) || /^amazon(\.co\.uk)?$/i.test(rows[j]) || /^Sold by\s*:?$/i.test(rows[j - 1] || "") || (/^:$/.test(rows[j - 1] || "") && /^Sold by$/i.test(rows[j - 2] || "")) || /^[:|]$/.test(rows[j])) continue;   // the seller, under "Sold by:"
-        if (rows[j].length >= 3 && rows[j].length <= 220 && !/^£|^\d+$/.test(rows[j])) { name = rows[j]; break; }
+        if (rows[j].length >= 3 && rows[j].length <= 220 && !/^£|^\d+$/.test(rows[j])) {
+          name = rows[j];
+          // (A book's author on the row under its title Amazon cut short, "Genki 1: An Integrated..." over "Eri Banno": the
+          // title, taken whole from the text part's "Title of Author". Round 15.)
+          const over = rows[j - 1] || "";
+          if (j > 0 && /(?:\.\.\.|…)$/.test(over) && over.length >= 12 && !/(?:\.\.\.|…)$/.test(name) && name.length <= 60 && !AMZ_SKIP.test(over)) name = over;
+          break;
+        }
       }
       if (!name) continue;
       let price = null;
@@ -994,14 +1001,20 @@ export function amazonItems(html, given) {
       // (An older layout puts "Condition: New" between the title and "Sold by:": the title is above it. Round 13.)
       let at = i - 1; const bits = [];
       while (at > 0 && at >= i - 4 && /^(condition|colou?r|size|style|pattern|edition|format):\s*\S/i.test(rows[at] || "")) { const b = /^(colou?r|size|style):\s*(.{1,40})$/i.exec(rows[at]); if (b) bits.unshift(b[2]); at--; }
-      const name = rows[at];
+      let name = rows[at];
       if (!name || AMZ_SKIP.test(name) || name.length > 220) continue;
+      // (The older layout's "3 x" on the row over the title, or before it on the same row: that many, at the price shown
+      // for one, "3 x Face Cream" "Sold by: …" "£2.30" in an order of £6.90. Round 15.)
+      let qty = 1;
+      const qOn = /^(\d{1,3})\s?[x×]\s+(\S.{2,})$/.exec(name), qOver = at > 0 ? /^(\d{1,3})\s?[x×]$/.exec(rows[at - 1] || "") : null;
+      if (qOn) { qty = Number(qOn[1]); name = qOn[2]; } else if (qOver) { qty = Number(qOver[1]); at--; }
+      if (!(qty >= 1)) qty = 1;
       let price = null;
       // (A video's "Review this item" and "Original Air Date:" over the day it first aired sit before its price. Round 13.)
       let reach = i + 3;
       for (let k = i + 1; k <= i + 4 && /^(?:review this item|original air date:?|release date:?|\p{L}{3,9}\.? \d{1,2},? \d{4})$/iu.test(rows[k] || ""); k++) reach++;
       for (let k = i + 1; k <= reach && price == null; k++) price = priceAt(k);
-      items.push({ name: tidy(name), ...cut(name), ...(at > 0 ? { above: rows[at - 1] } : {}), ...(bits.length ? { variant: bits.join(", ") } : {}), qty: 1, pricePence: price });
+      items.push({ name: tidy(name), ...cut(name), ...(at > 0 && !qOver ? { above: rows[at - 1] } : {}), ...(bits.length ? { variant: bits.join(", ") } : {}), qty, pricePence: price });
     }
   }
   return given ? items : items.map(({ above, cut, ...i }) => i);
@@ -1128,7 +1141,7 @@ export function amazonOrders(html, plain) {
   }
   if (!heads.length) return null;
   // (The newer layout gives each product picture the whole title as its alt text.)
-  const alts = [...String(html || "").matchAll(/<img\b[^>]{0,600}?\balt="([^"]{12,400})"/gi)].map((m) => m[1].replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#39;/g, "'")).filter((a) => !/(?:\.\.\.|…)$/.test(a));
+  const alts = [...String(html || "").matchAll(/<img\b[^>]{0,600}?\balt="([^"]{12,400})"/gi)].map((m) => decodeEntities(m[1].replace(/&#39;/g, "'"))).filter((a) => !/(?:\.\.\.|…)$/.test(a));
   const text = String(plain || "").replace(/\r/g, "") + (alts.length ? "\n" + alts.join("\n") : "");
   const flat = text.replace(/[ \t]+/g, " ");
   const whole = (it) => {
@@ -1151,6 +1164,9 @@ export function amazonOrders(html, plain) {
     const seg = rows.slice(h.i + 2, k + 1 < heads.length ? heads[k + 1].i : rows.length);
     const o = orders.get(h.ref) || { orderRef: h.ref, items: [], totalPence: null, giftCardPence: 0 };
     o.items.push(...amazonItems(null, seg).filter((it) => it.pricePence != null).map(whole));
+    // (An order sent in parcels repeats its summary, "Gift Card (£5.99)" with it, over each parcel: the gift card paid once.
+    // Amazon gives the gift card's part as one line in each summary. Round 15.)
+    let gift = 0;
     for (let j = 0; j < seg.length; j++) {
       // ("Order Total:" over "£28.52"; the newer layout's "Total" over "£" "21" "84".)
       if (o.totalPence == null && /^(?:Order )?Total\s*:?$/i.test(seg[j])) {
@@ -1158,8 +1174,9 @@ export function amazonOrders(html, plain) {
         if (m) o.totalPence = money(m[1]);
         else if (seg[j + 1] === "£" && /^\d{1,5}$/.test(seg[j + 2] || "") && /^\d{2}$/.test(seg[j + 3] || "")) o.totalPence = Number(seg[j + 2]) * 100 + Number(seg[j + 3]);
       }
-      const g = /^Gift Card\s*\(£\s?([\d,]+\.\d{2})\)$/i.exec(seg[j]); if (g) o.giftCardPence += money(g[1]);
+      const g = /^Gift Card\s*\(£\s?([\d,]+\.\d{2})\)$/i.exec(seg[j]); if (g) gift = Math.max(gift, money(g[1]));
     }
+    o.giftCardPence = Math.max(o.giftCardPence, gift);
     orders.set(h.ref, o);
   });
   const out = [...orders.values()].filter((o) => o.totalPence != null);
@@ -1169,6 +1186,9 @@ export function amazonOrders(html, plain) {
     const expectedPence = o.totalPence + o.giftCardPence;
     const check = { complete: o.items.length > 0 && Math.abs(itemsPence - expectedPence) <= 1, itemsPence, expectedPence, missingPence: expectedPence - itemsPence, ...(o.giftCardPence ? { giftCardPence: o.giftCardPence } : {}) };
     const { giftCardPence, ...rest } = o;
+    // (What the order cost is what was bought, the gift card's part with the rest: Amazon's "Order Total" is only what was
+    // left for the card, £0.00 when a gift card paid it all. The gift card's part is kept beside it. Round 15.)
+    if (giftCardPence) rest.totalPence = o.totalPence + giftCardPence;
     const cutNames = o.items.filter((i) => i.stillCut).map((i) => ({ name: String(i.name).slice(0, 120), why: "cut" }));
     rest.items = o.items.map(({ stillCut, ...i }) => i);
     const names = namesCheck(rest.items, {});
@@ -2140,6 +2160,27 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   if (result.items.length && (result.currency || "GBP") === "GBP") {
     const off = (moneyOf(text).found || []).filter((f) => f[0] === "discount" && f[2] > 0 && /\b(?:discounts?|promo(?:tion)?s?|offers?|vouchers?|coupons?|credit|savings?|saved|deals?|rewards?|loyalty|multi-?buy|money off|\d{1,3}% off)\b|\bapplied\b/i.test(String(f[1])) && !/\b(?:card|payment|paid|pay)\b|\d{4}|\*{2,}|•/i.test(String(f[1]))).slice(0, 8).map((f) => ({ label: String(f[1]).replace(/[:\s]+$/, "").slice(0, 60), pence: f[2] }));
     if (off.length) result.discounts = off;
+  }
+  // (Amazon's digital receipt, a film paid by gift card: "Total: £1.99" "Gift Card Amount: -£1.99" "Order Grand Total: £0.00".
+  // What it cost is the total before the gift card, the gift card's part kept beside it. Round 15.)
+  if (!result.giftCardPence && Number.isInteger(result.totalPence) && /(^|\.)(?:amazon\.(?:co\.uk|com)|primevideo\.com)$/i.test(result.retailer.domain || sender?.domain || "")) {
+    const g = /^[ \t|]*Gift Card(?: Amount)?[ \t]*:?[ \t|]*(?:\n[ \t|]*){0,2}[-−]£\s?(\d{1,5}(?:,\d{3})*\.\d{2})/im.exec(text);
+    const before = /^[ \t|]*Total[ \t]*:[ \t|]*(?:\n[ \t|]*){0,2}£\s?(\d{1,5}(?:,\d{3})*\.\d{2})/im.exec(text);
+    if (g && before && money(before[1]) - money(g[1]) === result.totalPence) {
+      result.giftCardPence = money(g[1]); result.totalPence = money(before[1]);
+      if (result.itemsCheck) { const ip = result.itemsCheck.itemsPence; result.itemsCheck = { ...result.itemsCheck, expectedPence: result.totalPence, ...(Number.isInteger(ip) ? { complete: Math.abs(ip - result.totalPence) <= 1, missingPence: result.totalPence - ip } : {}), giftCardPence: result.giftCardPence }; }
+    }
+  }
+  // (A summary written before VAT, "Item Subtotal: £4.16" "Promotions: -£4.16" "Total Before VAT: £0.00" "VAT: £0.00"
+  // "Order Grand Total: £0.00", under a film listed at £4.99 with its VAT: the promotion paid for all of it, so what it took
+  // off is the item's own price, and the items are complete. Round 15.)
+  if (result.totalPence === 0 && result.items.length && result.discounts && result.discounts.length === 1 && /^[ \t|]*Total Before VAT\s*:/im.test(text)) {
+    const sub = /^[ \t|]*Item\(?s?\)? Subtotal[ \t]*:?[ \t|]*(?:\n[ \t|]*){0,2}£\s?(\d{1,5}(?:,\d{3})*\.\d{2})/im.exec(text);
+    const itemsPence = result.items.reduce((n, i) => n + (Number.isInteger(i.pricePence) ? i.pricePence * (i.lineTotal ? 1 : i.qty || 1) : 0), 0);
+    if (sub && money(sub[1]) === result.discounts[0].pence && money(sub[1]) > 0 && itemsPence > 0 && Math.abs(itemsPence - Math.round(money(sub[1]) * 1.2)) <= 1) {
+      result.discounts = [{ ...result.discounts[0], pence: itemsPence }];
+      result.itemsCheck = { ...(result.itemsCheck || {}), complete: true, itemsPence, expectedPence: itemsPence, missingPence: 0, coveredBy: "promotion" };
+    }
   }
   return result;
 }

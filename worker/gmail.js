@@ -1806,7 +1806,7 @@ export function mergeOrderEmails(orders) {
   // (One email confirming two orders: a card for each, the second named by its own number, total and items. Its id says
   // which email it came from. Round 12.)
   orders = orders.flatMap((o) => !Array.isArray(o.moreOrders) || !o.moreOrders.length ? [o] : [{ ...o, moreOrders: undefined },
-    ...o.moreOrders.map((m, k) => ({ ...o, moreOrders: undefined, id: o.id + "-" + (k + 2), fromEmail: o.id, orderRef: m.orderRef, totalPence: m.totalPence, currency: m.currency || o.currency, items: m.items, itemsCheck: m.itemsCheck, itemCount: undefined }))]);
+    ...o.moreOrders.map((m, k) => ({ ...o, moreOrders: undefined, id: o.id + "-" + (k + 2), fromEmail: o.id, orderRef: m.orderRef, totalPence: m.totalPence, currency: m.currency || o.currency, items: m.items, itemsCheck: m.itemsCheck, itemCount: undefined, giftCardPence: m.giftCardPence || undefined }))]);
   const out = [], groups = new Map();
   const shopFor = new Map(); // order number -> the shop it belongs to, when exactly one shop used it
   for (const o of orders) {

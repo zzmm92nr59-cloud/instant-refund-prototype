@@ -1,0 +1,30 @@
+{
+ "id": "holdout16a-amazon-free-film",
+ "sender": "Amazon",
+ "layout": "a film listed at £3.99 with VAT, the summary before VAT: 'Item Subtotal: £3.33', 'Promotions: -£3.33', 'Order Grand Total: £0.00'",
+ "headers": {
+  "from": "\"Amazon.co.uk\" <digital-no-reply@amazon.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Amazon.co.uk order of Midsummer on Hollow Lane",
+  "date": "Sun, 4 Jun 2023 21:02:00 +0100"
+ },
+ "html": "<html><head><title>Amazon.co.uk order confirmation</title></head><body><table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"><tr><td>Thank you for your order</td></tr>\n<tr><td>Order #</td></tr>\n<tr><td>D01-1414213-5623730</td></tr>\n<tr><td>Placed on Sunday, June 4, 2023</td></tr>\n<tr><td>Midsummer on Hollow Lane</td></tr>\n<tr><td>Sold by Amazon Digital UK Limited.</td></tr>\n<tr><td>Review this item</td></tr>\n<tr><td>&pound;3.99</td></tr>\n<tr><td>Item Subtotal:</td></tr>\n<tr><td>&pound;3.33</td></tr>\n<tr><td>Promotions:</td></tr>\n<tr><td>-&pound;3.33</td></tr>\n<tr><td>Total Before VAT:</td></tr>\n<tr><td>&pound;0.00</td></tr>\n<tr><td>VAT:</td></tr>\n<tr><td>&pound;0.00</td></tr>\n<tr><td>Order Grand Total:</td></tr>\n<tr><td>&pound;0.00</td></tr></table></body></html>",
+ "text": "",
+ "expected": {
+  "shop": "Amazon",
+  "date": "2023-06-04",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Midsummer on Hollow Lane",
+    "qty": 1,
+    "linePence": 399
+   }
+  ],
+  "subtotalPence": 399,
+  "feesPence": 0,
+  "discountsPence": 399,
+  "tipsPence": 0,
+  "totalPence": 0
+ }
+}
