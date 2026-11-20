@@ -2722,6 +2722,12 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
     }
     if (pp.length) { result.items = pp; const sum = pp.reduce((n, i) => n + (i.pricePence ?? 0) * (i.qty || 1), 0); result.itemsCheck = result.currency === "GBP" ? checkItems(pp, moneyOf(text), result.totalPence) : { complete: null, itemsPence: sum, expectedPence: result.totalPence ?? null, missingPence: null, foreignItems: true }; }
   }
+  // (The same "Description | Unit price | Qty | Amount" table pasted with no sender to say it was PayPal's: read the same
+  // way when nothing else was. Round 17.)
+  if (!viaPayPal && !result.items.length && /^[ \t|]*description[ \t|]*\n(?:[ \t|]*\n)?[ \t|]*unit price[ \t|]*$/im.test(text.slice(0, 30000))) {
+    const pp = payPalItems(text);
+    if (pp.length) { result.items = pp; result.itemsCheck = result.currency === "GBP" ? checkItems(pp, moneyOf(text), result.totalPence) : { complete: null, itemsPence: pp.reduce((n, i) => n + (i.pricePence ?? 0), 0), expectedPence: result.totalPence ?? null, missingPence: null, foreignItems: true }; }
+  }
   // (An order number PayPal gives under its label, "Order ID |" over "58d0cf0e-7b50-4c34-a8bd-ebc59dd2d0b8", however long.)
   // (Booking.com: the stay, read from its price details: the room or rooms for the nights booked, at the rooms' price, the
   // taxes and charges apart from it, never its terms as things bought; and whether it is paid at the property. Round 15.)

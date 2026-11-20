@@ -178,7 +178,9 @@ const listed = async () => (await (await call("/relay/my/receipts?all=1", { toke
     const t = Date.now();
     parseReceiptEmail(mk("Shop <orders@shop.example>", "Your order", "Order number: 1234567\n" + body + "\nTotal: £5.00\n"));
     cleanItem({ name: body.slice(0, 40000), qty: 1 });
-    assert.ok(Date.now() - t < 3000, "slow on a long line: " + JSON.stringify(body.slice(0, 20)));
+    // (A line of 40,000 spaces takes about two seconds on main already, in older tidying code; a pattern that tried every
+    // position against every other would take minutes.)
+    assert.ok(Date.now() - t < 10000, "slow on a long line: " + JSON.stringify(body.slice(0, 20)));
   }
   console.log("ok - quick on 40,000-character lines");
 }

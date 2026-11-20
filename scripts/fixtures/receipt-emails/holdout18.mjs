@@ -33,7 +33,11 @@ export default function holdout18() {
         html: mail("Railwise", "railwise.example", ["You have successfully changed your journey", "Your trip to Marston Central departing Friday, 13 November 2026 is confirmed",
           "Outbound Friday, 13 November", "08:05 Oakford Parkway", "09:12 Marston Central", "1x Off-Peak Day Single", "1x Adult", "Payment information", "Transaction ID:", "", "731204558812",
           "Transaction Date:", "12 November 2026", "Order Details |", "Pay The Difference: Adult - Off-Peak Day Single - [16-25 Railcard]", "Other costs |", "Admin Fee", "£7.50",
-          "Booking Fee", "No booking fee", "Total amount: | £9.95 |", "Need a refund or want to change your ticket?", "Your Transaction ID:", "", "731204558812"]) },
+          "Booking Fee", "No booking fee", "Total amount: | £9.95 |", "Need a refund or want to change your ticket?", "Your Transaction ID:", "", "731204558812"]),
+        // (Its text part, as the shop sends it with the HTML.)
+        text: ["You have successfully changed your journey", "Your trip to Marston Central departing Friday, 13 November 2026 is confirmed", "", "Outbound Friday, 13 November",
+          "08:05 Oakford Parkway", "09:12 Marston Central", "1x Off-Peak Day Single", "1x Adult", "", "Payment information", "Transaction ID:", "", "731204558812", "Transaction Date: 12 November 2026", "",
+          "Order Details", "Pay The Difference: Adult - Off-Peak Day Single - [16-25 Railcard]", "Other costs", "Admin Fee", "£7.50", "Booking Fee", "No booking fee", "Total amount:", "£9.95"].join("\n") },
       o, "Railwise", "2026-11-12", { orderRef: "731204558812" });
   }
   // ---- A film paid by gift certificate, text only: no "Total:" line, the gift certificate takes all of it ----------------
