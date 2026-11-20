@@ -123,8 +123,21 @@ const TIE_ORDER = ["electronics", "fashion", "home", "beauty", "food", "digital"
 
 // A stable key for a store, so what the app learns about "Zara" applies to every Zara email.
 // A payment or ordering company's address (Shopify, Stripe, Square…) is shared by many shops, so there the shop's name is used.
+// (Kept for each shop's domain, name and payment company: the receipts list asks for the same few keys thousands of times.)
+const STORE_KEYS = new Map();
 export function storeKey(card) {
   const r = card && card.retailer || {};
+  const plain = (v) => v == null || typeof v === "string";
+  if (!plain(r.domain) || !plain(r.name) || !plain(r.via)) return storeKeyOf(r);
+  const memo = JSON.stringify([r.domain, r.name, r.via]);
+  const known = STORE_KEYS.get(memo);
+  if (known !== undefined) return known;
+  const key = storeKeyOf(r);
+  if (STORE_KEYS.size > 20000) STORE_KEYS.clear();
+  STORE_KEYS.set(memo, key);
+  return key;
+}
+function storeKeyOf(r) {
   const raw = ((isVia(r.domain) || isVia(r.via)) && r.name ? r.name : r.domain || r.name || "").toLowerCase().replace(/^www\./, "").replace(/["']/g, "").replace(/\.(co\.uk|com|uk|net|org|io|eu)$/, "");
   return raw.replace(/[^a-z0-9]+/g, "").slice(0, 60);
 }
@@ -207,7 +220,23 @@ function itemWeights(items) {
 // "GreatBeanBags" → "Great Bean Bags", so the words in a shop's name can be read.
 const spaced = (s) => String(s || "").replace(/([a-z])([A-Z])/g, "$1 $2");
 // The shop Relay recognises, and the group the words in its own name point to (for shops it doesn't know).
+// (Kept for each shop's name, address and kind: every receipt asks several times, and a shopper's receipts come from far
+// fewer shops than there are receipts.)
+const SHOP_CLUES = new Map();
 function shopClues(card) {
+  const r = card.retailer || {};
+  const plain = (v) => v == null || typeof v === "string";
+  if (!plain(r.name) || !plain(r.domain) || !plain(r.legalName) || !plain(card.shopKindAi)) return shopCluesOf(card);
+  const memo = JSON.stringify([r.name, r.domain, r.legalName, card.shopKindAi]);
+  const known = SHOP_CLUES.get(memo);
+  if (known) return { shop: known.shop, nameGroup: known.nameGroup };
+  const out = shopCluesOf(card);
+  if (out.shop) Object.freeze(out.shop);
+  if (SHOP_CLUES.size > 20000) SHOP_CLUES.clear();
+  SHOP_CLUES.set(memo, out);
+  return { shop: out.shop, nameGroup: out.nameGroup };
+}
+function shopCluesOf(card) {
   const r = card.retailer || {};
   const shown = shopDisplayName(r);
   const named = shown && shown !== "Forwarded receipt" ? shown : null;

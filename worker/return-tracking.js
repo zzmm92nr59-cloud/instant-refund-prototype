@@ -28,6 +28,7 @@
 // Kept with the shopper (return_tracks: what they typed), shown in Download my data, deleted with the receipt's inbox, the
 // email permission or the account.
 import { storeKey } from "./receipt-category.js";
+import { indexBy, among } from "./list-index.js";
 import { trackingLink } from "./receipt-parser.js";
 import { TRACKING_NUMBER, trackingAvailable, trackNumber } from "./parcel-tracking.js";
 
@@ -104,15 +105,20 @@ export function matchReturnNews(orders, news, known, opened) {
   const add = (o, n) => { out.get(o).push(n); if (n.tn && !known.has(n.tn)) known.set(n.tn, o); };
   const within = (n, o) => n.at && o.orderDate && n.at >= o.orderDate && daysBetween(o.orderDate, n.at) <= MATCH_DAYS;
   const shopFits = (n, o) => (n.shopKey ? n.shopKey === storeKey(o) : n.shopNamed ? nameFits(n.shopNamed, o) : false);
+  // (Only the receipts that could fit are checked, by the same rules: those with the number the news names, or of the shop
+  // it names. A shopper with thousands of receipts waited while each email was checked against all of them, 20 Nov 2026.)
+  let byRef = null, byShop = null;
+  const withRef = (ref) => { byRef = byRef || indexBy(orders, (o) => (o.orderRef ? [String(o.orderRef).toUpperCase()] : [])); return among(byRef, [ref]); };
+  const ofShop = (n) => { if (!n.shopKey) return orders; byShop = byShop || indexBy(orders, (o) => [storeKey(o)]); return among(byShop, [n.shopKey]); };
   const pick = (n) => {
     if (n.tn && known.has(n.tn)) return known.get(n.tn);
     if (n.onlyByNumber) return undefined;     // wait: a later pass may learn the number
     if (n.ref) {
-      const same = orders.filter((o) => o.orderRef && String(o.orderRef).toUpperCase() === n.ref && (n.shopKey || n.shopNamed ? shopFits(n, o) : true));
+      const same = withRef(n.ref).filter((o) => o.orderRef && String(o.orderRef).toUpperCase() === n.ref && (n.shopKey || n.shopNamed ? shopFits(n, o) : true));
       if (same.length === 1) return same[0];
       if (same.length > 1) return null;
     }
-    const pool = orders.filter((o) => shopFits(n, o) && within(n, o));
+    const pool = ofShop(n).filter((o) => shopFits(n, o) && within(n, o));
     const fit = n.amountPence != null ? pool.filter((o) => amountFits(n.amountPence, o)) : pool.filter((o) => opened.has(o));
     return fit.length === 1 ? fit[0] : n.tn ? undefined : null;
   };
