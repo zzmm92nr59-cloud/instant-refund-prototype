@@ -1,0 +1,18 @@
+{
+ "id": "holdout23-takeaway-accepted",
+ "sender": "Dinedash",
+ "layout": "'Your order #… was accepted': 'Thank you for ordering from Lagoon Grill.' (no money: the order's news)",
+ "headers": {
+  "from": "Dinedash - NoReply <hello@updates.dinedash.example>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your order #4400112 was accepted",
+  "date": "Fri, 08 Nov 2024 19:38:52 +0000"
+ },
+ "html": "<html><head><title></title></head><body><table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"><tr><td>Order No.</td><td>#4400112</td></tr>\n<tr><td>Hi Sam Taylor , your order was accepted !</td></tr>\n<tr><td>Thank you for ordering from Lagoon Grill. This email is to let you know that we have accepted your order.</td></tr>\n<tr><td>Your order number: 4400112</td></tr>\n<tr><td>Estimated time is: 2024-11-08 20:25</td></tr>\n<tr><td>Want to make last minute changes to your order?</td></tr></table></body></html>",
+ "text": "",
+ "expected": {
+  "notPurchase": {
+   "kind": "order_update"
+  }
+ }
+}

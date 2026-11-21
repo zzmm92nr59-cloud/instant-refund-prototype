@@ -193,6 +193,7 @@ function splitCell(raw) {
 }
 
 // Each line of the text, as cells, read for what it is.
+const SAVED_BANNER = /^(?:\p{L}{2,15}[!,.]\s{1,3})?(?:you(?:'|’)?ve|you have|you)\s{1,3}(?:just\s{1,3})?saved\s{1,3}(?:at least\s{1,3}|over\s{1,3}|a total of\s{1,3}|up to\s{1,3})?£\s?\d[\d,]{0,8}(?:\.\d{2})?[!.]?$/iu;
 function readLine(raw) {
   const line = { indent: /^[ \t]{2,}\S/.test(raw), cells: [], names: [], extras: [], prices: [], qty: null, unit: null, notCharged: false, plus: false, end: false, noise: false, skipStart: false, skipEnd: false, variant: [], negative: false };
   const parts = raw.split("|").map((x) => x.replace(/\t/g, "  ").replace(/ {3,}/g, "  ").replace(/[\u00a0\r]/g, " ").trim()
@@ -207,6 +208,9 @@ function readLine(raw) {
   line.cells = cells;
   for (let i = 0; i < cells.length; i++) {
     const c = cells[i], next = cells[i + 1];
+    // (A banner saying what was saved, "Congrats! You've saved at least £21.50" at the top of an order: never a thing bought.
+    // Round 22.)
+    if (i === 0 && cells.length <= 2 && SAVED_BANNER.test(cells.join(" "))) { line.noise = true; break; }
     if (QTY_LABEL.test(c) && next && /^\d{1,3}$/.test(next)) { line.qty = Number(next); i++; continue; }
     // ("2 x Adults", "2 x Games" on a line of their own under a booking: who it was for, never a thing bought. Round 15e.)
     if (cells.length === 1 && WHO_FOR.test(c.trim())) { line.variant.push(c.trim()); continue; }
@@ -330,6 +334,13 @@ const finish = (b, opts = {}) => {
   // never the brand with its name as a detail. Round 15e.)
   if (b.name && b.extras.length && b.name.length <= 30 && String(b.extras[0]).toLowerCase().startsWith(String(b.name).toLowerCase() + " ") && b.extras[0].length <= 120) {
     b = { ...b, name: b.extras[0], extras: b.extras.slice(1) };
+  }
+  // (A brand on its own line over the product's name, then its size, "Harbour & Hide" over "Tan Leather Weekend Holdall"
+  // over "Size: One Size": the product is the name, the brand goes with its details. Only one such line under a short name, and
+  // a labelled size. Round 22.)
+  else if (b.name && b.extras.length === 1 && !b.plus && b.name.split(/\s+/).length <= 3 && b.name.length <= 30 && b.variant.some((v) => /^size\s*:/i.test(String(v))) &&
+    String(b.extras[0]).split(/\s+/).length >= 3 && String(b.extras[0]).length > b.name.length && String(b.extras[0]).length <= 120 && !/[£+]|\d{5,}/.test(b.extras[0]) && /^\p{Lu}/u.test(b.extras[0])) {
+    b = { ...b, name: b.extras[0], extras: [], variant: [b.name, ...b.variant] };
   }
   const name = b.name;
   // ("Cloud Runner Trainers × 0": none of it, a line taken off a changed order. Round 10.)
