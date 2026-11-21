@@ -810,6 +810,17 @@ function extractReturns(text, html, orderDate, other = "") {
     for (const r of sentences) if (out.instructions.length < 3 && r.length <= 300 && /\brefund\b[^.]{0,40}\bwithin\s+\d{1,3}\s+days?\b/i.test(r)) out.instructions.push(r.replace(/\s+([.,;:!?])/g, "$1"));
     break;
   }
+  // (A booking that can be cancelled for a refund in its first hours, an airline's "you may cancel your flight booking and
+  // claim a refund without penalty, up to 24 hours from when you made the original booking": that window, in hours, from when
+  // it was booked, and the email's words. A cancellation, never a parcel to send back. Round 23.)
+  if (!out.cancelWithin) for (const sent of sentences) {
+    if (sent.length > 500) continue;
+    const h = /\bcancel (?:your |the |this )?(?:flight |hotel |holiday )?(?:booking|order|reservation|purchase)\b[^.]{0,80}?\b(?:refund|without (?:penalty|charge))\b[^.]{0,60}?\b(?:up to|within)\s+(\d{1,3})\s+hours?\s+(?:from|of|after)\s+(?:when\s+)?(?:you\s+)?(?:made|make|placed|place|making|placing)?\s*(?:the|your)?\s*(?:original\s+)?(?:booking|order|purchase|reservation)\b/i.exec(sent);
+    if (!h || Number(h[1]) < 1 || Number(h[1]) > 168) continue;
+    out.windowHours = Number(h[1]); out.windowFrom = "order"; out.cancelWithin = true;
+    out.instructions.push(sent.replace(/\s+([.,;:!?])/g, "$1"));
+    break;
+  }
   for (const sent of sentences) {
     if (out.cancelWithin) break;
     if (!/return|refund|exchange/i.test(sent) || sent.length > 400) continue;
@@ -957,7 +968,7 @@ function extractReturns(text, html, orderDate, other = "") {
     const day = fc ? parseDate(fc[1]) : null;
     if (day) out.freeCancellationUntil = day;
   }
-  const any = out.windowDays || out.deadline || out.address || out.portalUrl || out.instructions.length || out.qrMentioned || out.labelMentioned || out.nonRefundable || out.freeCancellationUntil;
+  const any = out.windowDays || out.windowHours || out.deadline || out.address || out.portalUrl || out.instructions.length || out.qrMentioned || out.labelMentioned || out.nonRefundable || out.freeCancellationUntil;
   return any ? out : null;
 }
 
@@ -1557,7 +1568,7 @@ function shopOf({ ld, sender, fromName, subject, text, html, otherText }) {
       /^\s*[Rr]eceipt from\s+(\p{L}[^\n|]{1,58}?)\s+for your\b/u.exec(subject) || text.match(/\byou authori[sz]ed a payment of [^\n|]{1,30}? to ([^\n|]{2,60}?)\s?\.?[ \t]*(?:\n|\||$)/i) || [])[1] || "").replace(/\s+\S+@\S+$/, "").replace(/^(\p{L}[^\n]{1,50}?)\s+\d{5,10}$/u, "$1") || null) : null,
     linkDomain: mainLinkDomain(html),
     // (The game's name is a heading in the HTML; a plain-text part may not carry it at all.)
-    titleName: GAME_SHOP.test(sentDomain || "") ? (html && gameTitle(htmlToText(html))) || gameTitle(text) : null,
+    titleName: GAME_SHOP.test(sentDomain || "") ? (html && gameTitle(htmlToText(html))) || gameTitle(text, subject) : null,
   });
   // (A payment service cuts a long shop name short, "London Craft Beer Fe...", "ON THAT ASS Internat...": when the email
   // writes it whole somewhere else, its subject "Receipt for your payment to Cellar Club Online Limited", the whole name is
@@ -1570,6 +1581,13 @@ function shopOf({ ld, sender, fromName, subject, text, html, otherText }) {
         .map((m) => m[0].replace(/[\s.,-]+$/, "").replace(/\s+(?:and|of|the|de|&)$/i, "")).filter((n) => n.length > ranked.name.length && !/(?:\.\.\.|…)$/.test(n));
       if (whole.length) ranked.name = whole.sort((a, b) => b.length - a.length)[0];
     }
+  }
+  // (A reseller that sells a maker's software on its behalf sends the receipt under the maker's name, "Photo Tidy (via
+  // Paddle.com)" <help@paddle.com>: the maker is the shop, the reseller only how it was sold. Only when the name in brackets
+  // is the sending address's own. Round 23.)
+  {
+    const vm = /^\s*"?(\p{L}[\p{L}\d&'’. -]{1,40}?)\s+\(via\s+([A-Za-z0-9-]+(?:\.[A-Za-z]{2,10}){0,2})\)"?\s*$/u.exec(String(sender?.name || ""));
+    if (vm && sentDomain && !asSent && vm[2].toLowerCase().split(".")[0] === domainBase(sentDomain).replace(/-/g, "") && !/^(?:orders?|no-?reply|support|team|billing|receipts?)$/i.test(vm[1])) ranked.name = vm[1].trim();
   }
   // Uber sends rides and Uber Eats orders from the same address and name: a food order is Uber Eats.
   if (/(^|\.)uber\.com$/i.test(sentDomain || "") && /^uber$/i.test(ranked.name || "") && (/\buber eats\b/i.test(subject) || (/\border\b/i.test(subject) && /\buber eats\b/i.test(text.slice(0, 4000))))) ranked.name = "Uber Eats";
@@ -2036,6 +2054,24 @@ function bookingOverCost(text, total) {
     }
     if (!who.length || k < 0 || !/^\p{Lu}[\p{L}\d '’&+-]{2,60}$/u.test(rows[k]) || /\b(?:total|order|booking|time|date)\b/i.test(rows[k])) return null;
     return { name: rows[k], qty: 1, pricePence: total, variant: who.join(", ") };
+  }
+  return null;
+}
+// One thing over its price, then the VAT over its amount, then the total's label over the total, each on a line of its own,
+// "Photo Tidy Pro - 1 seat" / "£24.99" / "VAT (20%)" / "£5.00" / "Amount Paid" / "£29.99": the thing at its
+// price before VAT, when it and the VAT come to the total. Round 23.
+const ONE_AMT = /^£\s?(\d{1,3}(?:,\d{3})*|\d{1,7})\.(\d{2})$/;
+function stackedTaxedOne(text, total) {
+  if (total == null) return null;
+  const rows = String(text || "").slice(0, 60000).split("\n").map((x) => x.replace(/^[\s|]+|[\s|]+$/g, "")).filter(Boolean);
+  const amt = (r) => { const m = ONE_AMT.exec(r || ""); return m ? Number(m[1].replace(/,/g, "")) * 100 + Number(m[2]) : null; };
+  for (let i = 0; i + 5 < rows.length; i++) {
+    if (!/^(?:vat|tax)(?: \(\d{1,2}(?:\.\d)?%\))?$/i.test(rows[i + 2]) || !/^(?:total|amount paid|total paid|order total|grand total)$/i.test(rows[i + 4])) continue;
+    const p = amt(rows[i + 1]), v = amt(rows[i + 3]), t = amt(rows[i + 5]);
+    if (p == null || v == null || t !== total || p + v !== total || p <= 0) continue;
+    const name = rows[i];
+    if (name.length < 3 || name.length > 100 || !/\p{L}{3}/u.test(name) || /£|\b(?:sub-?total|total|amount|vat|tax|discount|delivery|shipping|payment|paid|receipt|date|method)\b/i.test(name)) continue;
+    return { name, qty: 1, pricePence: p };
   }
   return null;
 }
@@ -2809,6 +2845,7 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
     const one = soleBulletOverTotal(fromHtml || text, moneyOf(fromHtml || text), result.totalPence) || (plain ? soleBulletOverTotal(plain, moneyOf(plain), result.totalPence) : null) ||
       bookingOverCost(fromHtml || text, result.totalPence) || (plain ? bookingOverCost(plain, result.totalPence) : null) ||
       stackedInvoiceRow(fromHtml || text, result.totalPence) || (plain ? stackedInvoiceRow(plain, result.totalPence) : null) ||
+      stackedTaxedOne(fromHtml || text, result.totalPence) || (plain ? stackedTaxedOne(plain, result.totalPence) : null) ||
       tripOfVehicle(fromHtml || text, result.totalPence);
     if (one) { result.items = [one]; result.itemsCheck = checkItems(result.items, moneyOf(fromHtml || text), result.totalPence); }
     else {
@@ -2864,6 +2901,13 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
       // (Not any more: the thing at its price and the tax as its own line, as the email sets them out, "Coins £4.16", "Tax
       // £0.83". Round 21.)
       if (m.vat > 0 && m.subtotal === pp[0].pricePence && Math.abs(m.subtotal + m.vat + (m.fees || 0) - (m.discounts || 0) - result.totalPence) <= 1 && !m.fees && !m.discounts) ppTax = m.vat;
+    }
+    // (Several lines, the tax added once under a subtotal that is after the discount, "Qty: 6 £12.50", "Booking Fee £2.00",
+    // "Subtotal £64.00", "Discount -£13.00", "Tax £12.80", "Total £76.80": the lines less the discount, and the tax, come to
+    // what was paid, so the tax is shown as its own line. Round 23.)
+    if (!ppTax && pp.length > 1 && result.totalPence != null && pp.every((i) => Number.isInteger(i.pricePence))) {
+      const m = moneyOf(text), sum = pp.reduce((n, i) => n + i.pricePence * (i.qty || 1), 0);
+      if (m.vat > 0 && !m.fees && m.subtotal != null && m.subtotal === sum - (m.discounts || 0) && m.subtotal + m.vat === result.totalPence) ppTax = m.vat;
     }
     if (pp.length) { result.items = pp; if (ppTax) result.fees = [...(result.fees || []).filter((f) => !/\b(?:vat|tax)\b/i.test(String(f.label || ""))), { label: "Tax", pence: ppTax }]; const sum = pp.reduce((n, i) => n + (i.pricePence ?? 0) * (i.qty || 1), 0); result.itemsCheck = result.currency === "GBP" ? checkItems(pp, moneyOf(text), result.totalPence) : { complete: null, itemsPence: sum, expectedPence: result.totalPence ?? null, missingPence: null, foreignItems: true }; }
   }
@@ -2993,6 +3037,14 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   if (!result.orderRef && viaPayPal && (/\bsubmitted an order\b/i.test(String(subject || "")) || /\byou placed an? (?:£|\$|€)\s?[\d,]+(?:\.\d{2})?(?: [A-Z]{3})? order with\b/i.test(text.slice(0, 4000)))) {
     const tid = /\btransaction id[ \t|:]*(?:\n[ \t|]*){0,3}((?:O-)?[A-Z0-9]{17})(?![A-Z0-9-])/i.exec(text) || /\btransaction id[ \t|:]*(?:\n[ \t|]*){0,3}((?:O-)?[A-Z0-9]{17})(?![A-Z0-9-])/i.exec(otherText0(text, plain, fromHtml));
     if (tid) { result.orderRef = tid[1].toUpperCase(); result.refIsPayment = true; }
+  }
+  // (PayPal's receipt for a payment, "You paid £6.49 GBP to Appcharge ltd", paid from a PayPal balance or PayPal Credit and
+  // not only a PayPal Debit Card, names no order of the shop's: its "Transaction ID: 1AB23456CD7890123" is the reference.
+  // Marked as PayPal's own, so the shop's own receipt for the same money still joins it and keeps its own number. Never an
+  // authorisation, which is not a payment yet. Round 23.)
+  if (!result.orderRef && viaPayPal && !/\bauthori[sz]ed\b/i.test(String(subject || "")) && /\byou(?:'|’)?ve (?:successfully )?sent a payment\b|\byou paid (?:£|\$|€|[A-Z]{2}\$)\s?[\d,]+\.\d{2}\b/i.test(text.slice(0, 4000))) {
+    const tid = /\b[Tt]ransaction (?:ID|id|Id)[ \t|:]*(?:\n[ \t|]*){0,3}([A-Z0-9]{17})(?![A-Z0-9-])/.exec(text.slice(0, 20000));
+    if (tid && /\d/.test(tid[1]) && /[A-Z]/.test(tid[1])) { result.orderRef = tid[1]; result.refIsPayment = true; }
   }
   // (Amazon, read from its own layout: each order in the email with its own number, items and total, and every title
   // whole. Taken for this email's order when it adds up, or when the general reading didn't. Round 13.)

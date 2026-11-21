@@ -2224,6 +2224,37 @@ export function mergeOrderEmails(orders, opts = {}) {
     // number: the shop's before VAT or before delivery. Round 15.)
     const paidBy = !(c.retailer && c.retailer.via) && rest.find((o) => o.retailer && o.retailer.via && o.totalPence != null && (o.currency || "GBP") === (c.currency || "GBP") && o.orderRef && c.orderRef && refCore(o.orderRef) === refCore(c.orderRef));
     if (paidBy && c.totalPence !== paidBy.totalPence && c.orderUpdate !== "paid") { if (c.totalPence != null) c.shopTotalPence = c.totalPence; c.totalPence = paidBy.totalPence; }
+    // (The shop's own list doesn't come to what was paid, its six tickets at their price and nothing else, while the payment
+    // service's receipt of the same purchase sets out the money whole and adds up, "Qty: 6" at the price before tax, a
+    // booking fee, the discount and the tax: the card shows the payment service's fees, discount and tax with the shop's own
+    // names for the things, at the payment service's price when its one line is the shop's lines counted together. Never
+    // when the card already has fees or money off of its own. Round 23.)
+    // (Whichever of the two leads: the shop's own email's things, the payment service's money.)
+    {
+      const viaLed = Boolean(lead.retailer && lead.retailer.via);
+      const shopE = viaLed ? rest.find((o) => o.retailer && !o.retailer.via && !isForwarded(o) && (o.items || []).length) : lead;
+      const pay = viaLed ? lead : rest.find((o) => o.retailer && o.retailer.via && o.totalPence === c.totalPence && (o.currency || "GBP") === (c.currency || "GBP"));
+      const shopItems = shopE && shopE !== lead ? shopE.items : c.items;
+      const plain = shopE && (!viaLed ? !(c.fees || []).length && !(c.discounts || []).length && !(c.itemsCheck && c.itemsCheck.complete === true) : !(shopE.fees || []).length && !(shopE.discounts || []).length && !(shopE.itemsCheck && shopE.itemsCheck.complete === true));
+      if (shopE && pay && plain && c.totalPence != null && pay.totalPence === c.totalPence && (shopItems || []).length && pay.itemsCheck && pay.itemsCheck.complete === true && ((pay.fees || []).length || (pay.discounts || []).length) && (pay.items || []).length) {
+        const extra = (pay.fees || []).reduce((n, f) => n + (f.pence || 0), 0) - (pay.discounts || []).reduce((n, d) => n + (d.pence || 0), 0);
+        const lines = shopItems.map((i) => lineOf(i));
+        const own = lines.every((x) => Number.isInteger(x)) ? lines.reduce((x, y) => x + y, 0) : null;
+        const count = shopItems.reduce((n, i) => n + (i.qty || 1), 0);
+        const one = pay.items.length === 1 && Number.isInteger(pay.items[0].pricePence) && (pay.items[0].qty || 1) === count && count > 1 && shopItems.every((i) => !i.lineTotal && Number.isInteger(i.pricePence) && i.pricePence === shopItems[0].pricePence);
+        let items = null;
+        if (own != null && own + extra === c.totalPence) items = shopItems.map((i) => ({ ...i }));
+        else if (one && pay.items[0].pricePence * count + extra === c.totalPence) items = shopItems.map((i) => ({ ...i, pricePence: pay.items[0].pricePence }));
+        if (items) {
+          c.items = items;
+          if ((pay.fees || []).length) c.fees = pay.fees.map((f) => ({ ...f })); else delete c.fees;
+          if ((pay.discounts || []).length) c.discounts = pay.discounts.map((d) => ({ ...d })); else delete c.discounts;
+          if (viaLed && shopE.orderRef) { c.orderRef = shopE.orderRef; delete c.refIsPayment; }
+          const sum = items.reduce((n, i) => n + lineOf(i), 0);
+          c.itemsCheck = { ...(pay.itemsCheck || {}), complete: true, itemsPence: sum, expectedPence: c.totalPence - extra, missingPence: 0, fromPayment: true };
+        }
+      }
+    }
     // Which emails the card was made from, for choices the shopper made on an email that isn't the one shown (attachGifts).
     // Not enumerable, so it never goes to the app.
     Object.defineProperty(c, "emailIds", { value: [...new Set(g.flatMap(o => o.emailIds || [o.id]))], enumerable: false });
