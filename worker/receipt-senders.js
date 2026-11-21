@@ -5,7 +5,7 @@
 
 const MONEY = /£\s?(\d{1,3}(?:,\d{3})+|\d+)\.(\d{2})/;
 const pence = (m) => (m ? Number(m[1].replace(/,/g, "")) * 100 + Number(m[2]) : null);
-const rows = (text) => String(text || "").split("\n").map((x) => x.replace(/^[\s|]+|[\s|]+$/g, "").replace(/\s*\|\s*/g, " | ").trim()).filter(Boolean);
+const rows = (text) => String(text || "").split("\n").map((x) => x.replace(/^[\s|]+|[\s|]+$/g, "").replace(/[\s|]+/g, (run) => { const k = run.split("|").length - 1; return k ? " | ".repeat(k) : run; }).trim()).filter(Boolean);
 // The amount on a labelled row, "Refund | -£8.76", or on the row under the label.
 function labelled(list, re) {
   for (let i = 0; i < list.length; i++) {
@@ -291,7 +291,7 @@ export function gameBundle(text) {
 const STAY_MONEY = /^(?:US\$|CA\$|A\$|€|£|\$)\s?(\d{1,3}(?:,\d{3})+|\d+)(?:\.(\d{2}))?(?:\s*[A-Z]{3})?$/;
 const stayPence = (s) => { const m = STAY_MONEY.exec(String(s || "").trim()); return m ? Number(m[1].replace(/,/g, "")) * 100 + Number(m[2] || 0) : null; };
 export function bookingStay(text) {
-  const list = rows(String(text || "").slice(0, 60000)).map((r) => r.replace(/\s*\|\s*/g, " | "));
+  const list = rows(String(text || "").slice(0, 60000)).map((r) => r.replace(/[\s|]+/g, (run) => { const k = run.split("|").length - 1; return k ? " | ".repeat(k) : run; }));
   const head = list.findIndex((r) => /^price details$/i.test(r));
   if (head < 0) return null;
   const end = list.findIndex((r, i) => i > head && /^total price\b/i.test(r));
@@ -414,7 +414,7 @@ export function ticketSummary(text, totalPence) {
 // "Item: Xbox One S Console, 1TB", "Category: …", "Quantity: 1", "Unit Price: £135.00" (a plain-text order email), each item
 // its own block; and a booking's "4 x Make a pot like Grayson Perry @ £40.00". Only what the email says, nothing worked out.
 export function labelledItems(text) {
-  const list0 = rows(String(text || "").slice(0, 40000)).map((l) => l.replace(/\s*\|\s*/g, " ").trim()).filter(Boolean);
+  const list0 = rows(String(text || "").slice(0, 40000)).map((l) => l.replace(/[\s|]+/g, (run) => { const k = run.split("|").length - 1; return k ? " ".repeat(k) : run; }).trim()).filter(Boolean);
   // (Each label on its own line over its value, "Item:" over "Especially For You Letterbox", "Price:" over "£24.0": one line
   // each. Round 15e.)
   const list = [];
@@ -448,7 +448,7 @@ export function labelledItems(text) {
 // null. Round 20.
 export function tillEReceipt(text) {
   // (Copied from the page, its cells come apart with tabs.)
-  const list = rows(String(text || "").slice(0, 40000).replace(/[ ]*\t[\t ]*/g, " | "));
+  const list = rows(String(text || "").slice(0, 40000).replace(/[ \t]+/g, (run) => (run.includes("\t") ? " | " : run)));
   const head = list.findIndex((r) => /^(?:item|description|product)s? \| (?:price|amount|value|£)$/i.test(r));
   if (head < 0) return null;
   const items = [];

@@ -80,6 +80,13 @@ const CP1252_HIGH = "€\u0081‚ƒ„…†‡ˆ‰Š‹Œ\u008dŽ\u008f\u0090�
 // characters are never text. Round 15.
 const C1_CONTROL = /[\u0080-\u009f]/g;
 const withoutC1 = (t) => (/[\u0080-\u009f]/.test(t) ? t.replace(C1_CONTROL, (c) => { const r = CP1252_HIGH[c.charCodeAt(0) - 0x80]; return r === c ? "" : r; }) : t);
+
+// "a  |  b" with each "|" and the spaces around it swapped for `to`, the same as .replace(/\s*\|\s*/g, to) but in one
+// pass: that pattern starts again at every space of a long blank run and so took seconds on a line of 40,000 spaces.
+export function swapPipes(s, to) {
+  return String(s).replace(/[\s|]+/g, (run) => { const k = run.split("|").length - 1; return k ? to.repeat(k) : run; });
+}
+
 export function mailText(bytes) {
   const b = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes || []);
   try { return new TextDecoder("utf-8", { fatal: true }).decode(b); } catch { /* some bytes aren't UTF-8 */ }
@@ -869,7 +876,7 @@ function extractReturns(text, html, orderDate, other = "") {
       if (!lines[j] || lines[j].length > 90) break;
       block.push(lines[j]);
     }
-    const joined = block.join(", ").replace(/\s*\|\s*/g, " ").replace(/,\s*,/g, ",");
+    const joined = swapPipes(block.join(", "), " ").replace(/,\s*,/g, ",");
     if (UK_POSTCODE.test(joined)) { out.address = joined.slice(0, 250); break; }
   }
 
@@ -1280,7 +1287,7 @@ function googlePlayItems(text) {
   // (Paragraphs in the text part; in the HTML's text, one row a line, the cells apart by "|".)
   const paras = body.split(/\n[ \t|]*\n/);
   const pieces = paras.length > 1 ? paras : body.split("\n");
-  const flat = (x) => x.replace(/[ \t|]*\n[ \t|]*/g, " ").replace(/\s*\|\s*/g, " ").replace(/\s+/g, " ").trim();
+  const flat = (x) => x.replace(/[\s|]+/g, " ").trim(); // (every run of spaces, pipes and line breaks becomes one space, in one pass)
   const row = (x) => /^(.{3,300}?)\s*£\s?(\d{1,5}(?:,\d{3})*\.\d{2})(?:\s*\/\s*(?:month|year|week|day))?$/i.exec(flat(x));
   for (const para of pieces) {
     // (In the HTML's text a row's note sits on the line under it, "Monthly Subscription ‐ Next payment …": the row is its
@@ -1669,7 +1676,7 @@ function legOf(text, type, nth = 0) {
 // the email has no such list. Round 15.
 const DETAILS_HEAD = /^order details$/i, COSTS_HEAD = /^other costs\s*\*?$/i, DETAILS_END = /^(?:total(?: amount| paid| price| cost)?)\s*:?(?:\s*£\s?[\d,]+\.\d{2})?$/i;
 function detailsList(text) {
-  const rows = String(text || "").split("\n").map((x) => x.replace(/\s*\|\s*/g, " ").replace(/\s+/g, " ").trim()).filter(Boolean);
+  const rows = String(text || "").split("\n").map((x) => x.replace(/[\s|]+/g, " ").trim()).filter(Boolean);
   const start = rows.findIndex((r) => DETAILS_HEAD.test(r));
   if (start < 0) return null;
   const lines = [], costs = [];
