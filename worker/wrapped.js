@@ -79,6 +79,13 @@ export function buildWrapped(cards, year, now = Date.now(), opts = {}) {
   // back for it is taken off (round 6). Without an amount, the order is counted as it was (nothing is guessed).
   if (!opts.cancelsDone) {
     cards = (cards || []).filter(c => !(c && c.cancelled && !c.cancelled.partial)).map(c => {
+      // A stay paid at the hotel (payAtProperty): nothing was taken when it was booked, so it is money spent only as far as
+      // the payment emails say it was paid (paidSoFarPence), never its whole price before then. Its room's price isn't
+      // counted either. The same rule as account.js spentOf.
+      if (c && c.payAtProperty === true && Number.isInteger(c.totalPence)) {
+        const paid = Number.isInteger(c.paidSoFarPence) && c.paidSoFarPence > 0 ? Math.min(c.paidSoFarPence, c.totalPence) : null;
+        return { ...c, totalPence: paid, ...(paid == null && Array.isArray(c.items) ? { items: c.items.map(it => (it && Number.isInteger(it.pricePence) ? { ...it, pricePence: null } : it)) } : {}) };
+      }
       const x = c && c.cancelled;
       return x && x.partial && Number.isInteger(x.amountPence) && Number.isInteger(c.totalPence) && (x.currency || "GBP") === (c.currency || "GBP") && x.amountPence <= c.totalPence
         ? { ...c, totalPence: c.totalPence - x.amountPence } : c;

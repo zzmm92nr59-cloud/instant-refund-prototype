@@ -1378,7 +1378,7 @@
     // Home's parts (Settings, Home layout, What Home shows first): a heading over each, a calm line when there's nothing.
     ".h2-feed>.h2-sec{margin:10px 2px 0}.h2-feed>.h2-sec:first-child{margin-top:4px}.h2-feed>.h2-sec:not(:first-child){scroll-snap-align:none}.h2-feed.hl>.h2-sec{margin:14px 2px 10px}.h2-feed.hl>.h2-sec:first-child{margin-top:4px}" +
     ".h2-calm{margin:0;padding:16px 18px;border-radius:22px;background:var(--rl-card);font-size:16px;line-height:22px;color:var(--rl-text2)}.h2-feed.hl>.h2-item.small{margin-bottom:10px}.h2-feed.hl>.h2-start{margin-bottom:10px!important}" +
-    ".h2-shops{margin:0 -16px 6px;padding:4px 16px 8px;scroll-padding-inline:16px}.h2-shop-dot:not(.rl-has-logo){background:#C9D8FF!important;color:#101828!important}.h2-shops-all{background:var(--rl-fill);color:var(--rl-text)}.rl-po-now{margin:0 0 10px;font-size:16px;line-height:22px;font-weight:600;color:var(--rl-text)}" +
+    ".h2-shops{margin:0 -16px 6px;padding:4px 16px 8px;scroll-padding-inline:16px}.h2-shop-dot:not(.rl-has-logo){background:#C9D8FF!important;color:#101828!important}.h2-shops-all{background:var(--rl-fill);color:var(--rl-text)}.rl-po-now{margin:0 0 10px;font-size:16px;line-height:22px;font-weight:600;color:var(--rl-text)}.rl-po-now.rl-po-said{font-weight:400;padding-left:12px;border-left:3px solid var(--rl-line)}" +
     ".hl-sum{background:var(--rl-card);border-radius:22px;padding:6px 18px;margin:10px 0 22px}.hl-sum-h{font-size:22px;line-height:28px;font-weight:700;margin:12px 0 4px;color:var(--rl-text)}" +
     ".hl-sum-r{all:unset;box-sizing:border-box;cursor:pointer;width:100%;display:flex;align-items:center;gap:12px;min-height:52px;border-top:1px solid var(--rl-line);color:var(--rl-text);font-size:17px}.hl-sum-r:first-of-type{border-top:0}.hl-sum-r:active{opacity:.6}.hl-sum-r .hl-n{flex:none;min-width:30px;height:30px;padding:0 8px;box-sizing:border-box;border-radius:15px;display:grid;place-items:center;font-weight:700;font-size:15px;background:var(--rl-fill)}.hl-sum-r .hl-n.urgent{background:#d92d20;color:#fff}.hl-sum-r .hl-n.soon{background:#f5a524;color:#3b2500}.hl-sum-r span.t{flex:1}.hl-sum-ok{margin:10px 0 14px;font-size:16px;color:var(--rl-text2)}" +
     ".hl-h{font-size:20px;line-height:25px;font-weight:700;margin:4px 2px 10px;color:var(--rl-text)}" +
@@ -3482,9 +3482,44 @@
   // order the shop cancelled part of, what it says came back is taken off (the same rule as Wrapped, worker/wrapped.js).
   function spentOf(r) {
     if (!r || !Number.isInteger(r.totalPence) || notPounds(r)) return 0;
+    // A stay paid at the hotel (payAtProperty): nothing was taken when it was booked, so only what the payment emails say
+    // has been paid counts (the same rule as Wrapped).
+    if (r.payAtProperty === true) return Number.isInteger(r.paidSoFarPence) && r.paidSoFarPence > 0 ? Math.min(r.paidSoFarPence, r.totalPence) : 0;
     var c = r.cancelled;
     if (c && !c.partial) return 0;
     return c && c.partial && Number.isInteger(c.amountPence) && (!c.currency || c.currency === "GBP") && c.amountPence <= r.totalPence ? r.totalPence - c.amountPence : r.totalPence;
+  }
+  // A stay booked to be paid at the hotel (worker/receipt-parser.js payAtProperty) that no payment email has been seen for:
+  // nothing has been paid yet, so its card never reads like a purchase already paid.
+  function payLater(r) { return Boolean(r && r.payAtProperty === true && !(Number.isInteger(r.paidSoFarPence) && r.paidSoFarPence > 0)); }
+  // A receipt's total as its card shows it: "£240.00 to pay" for a stay paid at the hotel.
+  function totalText(r) { return !r || r.totalPence == null ? "" : money(r.totalPence, r.currency) + (payLater(r) ? " to pay" : ""); }
+  // The payment service that took the money when the shop's own total was different (worker/gmail.js shopTotalPence).
+  var PAY_NAMES = [[/paypal\./i, "PayPal"], [/klarna\./i, "Klarna"], [/clearpay\./i, "Clearpay"], [/stripe\./i, "Stripe"], [/squareup\.|square\.com/i, "Square"]];
+  function payServiceName(dom) { for (var i = 0; i < PAY_NAMES.length; i++) if (PAY_NAMES[i][0].test(String(dom || ""))) return PAY_NAMES[i][1]; return null; }
+  // A booking that can be cancelled for a refund within hours or days of being made (an airline's "up to 24 hours from when
+  // you made the original booking", Apple's "within 14 days of receiving this invoice"): when that ends, counted from when the
+  // email was sent (to the minute) for hours, or from the order day for days. { end, open, at } where `at` says whether the
+  // time is known to the minute; null when Relay can't tell. Never a return date.
+  function cancelWindow(x) {
+    var r = x && x.returns;
+    if (!r || r.cancelWithin !== true) return null;
+    var now = Date.now(), hours = Number(r.windowHours), days = Number(r.windowDays);
+    if (hours > 0) {
+      var sent = Date.parse(x.sentAt || "");
+      if (Number.isFinite(sent)) { var end = sent + hours * 36e5; return { end: end, open: now < end, at: true }; }
+      // No time to the minute: only the order day. Once even the latest it could end has gone, it has passed; before then
+      // Relay doesn't say until when.
+      var d = /^\d{4}-\d{2}-\d{2}$/.test(x.orderDate || "") ? Date.parse(x.orderDate + "T00:00:00Z") : NaN;
+      if (!Number.isFinite(d)) return null;
+      return now > d + 864e5 + hours * 36e5 ? { end: null, open: false } : { end: null, open: true };
+    }
+    if (days > 0 && /^\d{4}-\d{2}-\d{2}$/.test(x.orderDate || "")) { var e = Date.parse(x.orderDate + "T00:00:00Z") + (days + 1) * 864e5; return { end: e, open: now < e, at: false }; }
+    return null;
+  }
+  function cancelUntilWords(ms) {
+    var d = new Date(ms), z = { timeZone: "Europe/London" };
+    return d.toLocaleTimeString("en-GB", Object.assign({ hour: "2-digit", minute: "2-digit" }, z)) + " on " + d.toLocaleDateString("en-GB", Object.assign({ weekday: "long", day: "numeric", month: "long" }, z));
   }
   function cancelWords(r) {
     var c = r && r.cancelled;
@@ -3494,7 +3529,8 @@
   function moneySign(cur) { return !cur ? "£" : MONEY_SIGN[cur] || cur + " "; }
   function money(minor, cur) { var n = (minor / 100).toFixed(2).split("."); return (minor < 0 ? "−" : "") + moneySign(cur) + n[0].replace("-", "").replace(/\B(?=(\d{3})+(?!\d))/g, ",") + "." + n[1]; }
   // What a receipt's item line cost, in its own currency (a line total as the email gave it, or its price times how many).
-  function lineMoney(i, cur) { return Number.isInteger(i.pricePence) ? money(i.pricePence * (Number(i.qty) > 1 && !i.lineTotal ? Number(i.qty) : 1), cur || "GBP") : null; }
+  // (A free gift or trial set the shop added at £0.00, worker/receipt-parser.js `free`: "Free gift", never "£0.00".)
+  function lineMoney(i, cur) { if (i && i.free === true && i.pricePence === 0) return "Free gift"; return Number.isInteger(i.pricePence) ? money(i.pricePence * (Number(i.qty) > 1 && !i.lineTotal ? Number(i.qty) : 1), cur || "GBP") : null; }
   // One item on its own line: how many ("2 × "), its name and size or colour, and what the line cost (round 7: a receipt's
   // page listed names only, with no quantities or prices).
   // (An item the shop's email says it cancelled says so in place of its price, round 8: only when the email named it.)
@@ -3638,7 +3674,7 @@
     var who = (x.retailer && (x.retailer.name || x.retailer.domain)) || "Unknown store";
     var names = (x.items || []).map(function (i) { return i.qty + " × " + i.name + (i.variant ? " (" + i.variant + ")" : ""); }).join(", ");
     var card = el("div", { className: "rl-order" }, [el("b", { text: who + (x.orderRef ? ", order " + String(x.orderRef).replace(/^#/, "") : "") }),
-      el("span", { text: [names, x.totalPence == null ? "No total in the email" : money(x.totalPence, x.currency), /^\d{4}-\d{2}-\d{2}$/.test(x.orderDate || "") ? shortDate(x.orderDate + "T12:00:00Z") : null].filter(Boolean).join(". ") })]);
+      el("span", { text: [names, x.totalPence == null ? "No total in the email" : totalText(x), /^\d{4}-\d{2}-\d{2}$/.test(x.orderDate || "") ? shortDate(x.orderDate + "T12:00:00Z") : null].filter(Boolean).join(". ") })]);
     if (slim) { card.removeChild(card.firstChild); card.removeChild(card.firstChild); card.style.margin = "0"; card.style.padding = "0"; card.style.border = "0"; card.style.boxShadow = "none"; card.style.background = "none"; }
     if (!slim && x.hasImage && x.id) {
       var ph = el("img", { alt: "", style: "float:right;width:64px;height:64px;object-fit:cover;border-radius:12px;margin:0 0 8px 10px;background:var(--rl-fill)" });
@@ -3659,6 +3695,16 @@
     // A booking paid in parts (a deposit, then instalments): what's been paid so far, from the payment emails.
     if (Number.isInteger(x.paidSoFarPence) && x.paidSoFarPence > 0 && Array.isArray(x.payments) && x.payments.length)
       card.appendChild(el("p", { className: "rl-po-now", text: "Paid so far: " + money(x.paidSoFarPence, x.currency) + (x.payments.length > 1 ? " in " + x.payments.length + " payments." : ".") }));
+    // A stay paid at the hotel: nothing was taken when it was booked (the card only held it), so nothing is paid yet.
+    if (payLater(x)) card.appendChild(el("p", { className: "rl-po-now", text: "Nothing has been paid yet. " + (Number.isInteger(x.totalPence) ? "You pay " + money(x.totalPence, x.currency) + " at the hotel" : "You pay at the hotel") + ", as the booking email says." }));
+    // The shop's own total when the payment service took a different amount for the same order (worker/gmail.js).
+    if (Number.isInteger(x.shopTotalPence) && Number.isInteger(x.totalPence) && x.shopTotalPence !== x.totalPence) {
+      var payer = payServiceName(x.shopTotalPaidVia);
+      card.appendChild(el("p", { className: "rl-po-now", text: "The shop's total was " + money(x.shopTotalPence, x.currency) + "; " + (payer ? payer + " took " : "you paid ") + money(x.totalPence, x.currency) + "." }));
+    }
+    // A pack of several things with one price for all of them (itemsCheck.pack): its lines have no price of their own.
+    var packNamed = (x.items || []).filter(function (i) { return i && i.name; });
+    if (x.itemsCheck && x.itemsCheck.pack === true && packNamed.length > 1 && Number.isInteger(x.totalPence)) card.appendChild(el("p", { className: "rl-po-now", text: "One price for all " + packNamed.length + " of these: " + money(x.totalPence, x.currency) + "." }));
     // Swapped by the shop (a supermarket's substitutions), said once per item, whichever way the items are shown.
     (x.items || []).forEach(function (i) { if (i && i.name && typeof i.substitutedFor === "string" && i.substitutedFor) card.appendChild(el("p", { className: "rl-po-now", text: i.name + " was sent instead of " + i.substitutedFor + "." })); });
     // The shop's email says it can't be refunded (a non-refundable hotel rate): said plainly, no return window.
@@ -3667,8 +3713,17 @@
     else if (x.returns && /^\d{4}-\d{2}-\d{2}$/.test(String(x.returns.freeCancellationUntil || ""))) card.appendChild(el("p", { className: "rl-po-now", text: "Free cancellation until " + longDate(x.returns.freeCancellationUntil) + " " + x.returns.freeCancellationUntil.slice(0, 4) + ", as the booking email says." }));
     // Something digital that can be cancelled within days (Apple's "cancel within 14 days of receiving this invoice"), not a parcel to send back.
     // (No countdown: it's no return date. The email's own link to ask, when it has one: Apple's "report a problem".)
-    if (x.returns && x.returns.cancelWithin === true && Number(x.returns.windowDays) > 0) {
-      card.appendChild(el("p", { className: "rl-po-now", text: "You can cancel within " + Number(x.returns.windowDays) + " days of the invoice, as the email says." }));
+    // (Once the time to cancel has passed, none of this is said.)
+    var cw = cancelWindow(x);
+    if (x.returns && x.returns.cancelWithin === true && Number(x.returns.windowHours) > 0 && cw && cw.open) {
+      // A booking that can be cancelled for a refund within hours of being made (an airline's 24 hours): the email's own
+      // sentence, then until when, while it's still open.
+      var said = (x.returns.instructions || []).filter(function (t) { return typeof t === "string" && t; })[0];
+      if (said) card.appendChild(el("p", { className: "rl-po-now rl-po-said", text: said }));
+      card.appendChild(el("p", { className: "rl-po-now", text: cw.end ? "You can cancel for a refund until " + cancelUntilWords(cw.end) + "." : "You can cancel for a refund within " + Number(x.returns.windowHours) + " hours of booking, as the email says." }));
+    }
+    if (x.returns && x.returns.cancelWithin === true && Number(x.returns.windowDays) > 0 && !(cw && !cw.open)) {
+      card.appendChild(el("p", { className: "rl-po-now", text: "You can cancel within " + Number(x.returns.windowDays) + " days of the invoice, as the email says." + (cw && cw.end ? " That's until " + new Date(cw.end - 1).toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", timeZone: "UTC" }) + "." : "") }));
       if (/^https:\/\//.test(x.returns.cancelUrl || "")) card.appendChild(el("a", { className: "rl-ret-go", href: x.returns.cancelUrl, target: "_blank", rel: "noopener noreferrer" }, [el("span", { text: "Ask " + who + " to cancel" }), jIc("ext", 18)]));
     }
     // A subscription that ends (Google Play "your subscription will be cancelled"): when, and that nothing comes back.
@@ -4173,7 +4228,7 @@
         var named = (row.items || []).filter(function (i) { return i.name; });
         var ref = row.orderRef && /^[#A-Za-z0-9-]{3,14}$/.test(row.orderRef) ? "Order " + (row.orderRef.charAt(0) === "#" ? "" : "#") + row.orderRef : null;
         var title = who;
-        var subOf = function () { return [biz.via, boughtWords(row) || ref, row.cancelled ? (row.cancelled.partial ? "Part cancelled" : "Cancelled") : null, refundOf(row) ? "Refunded " + money(refundOf(row), "GBP") : null, row.gift ? (row.gift.for ? "Gift for " + row.gift.for : "Gift") : null,
+        var subOf = function () { return [biz.via, boughtWords(row) || ref, row.cancelled ? (row.cancelled.partial ? "Part cancelled" : "Cancelled") : null, refundOf(row) ? "Refunded " + money(refundOf(row), "GBP") : null, payLater(row) ? "pay at the hotel" : null, row.gift ? (row.gift.for ? "Gift for " + row.gift.for : "Gift") : null,
           row.orderDate ? shortDate(row.orderDate + "T12:00:00Z") : null].filter(Boolean).join(", ") || "Receipt"; };
         var sub = subOf();
         // The line in three parts: the platform, what was bought (the part that gives way), and the rest.
@@ -4182,10 +4237,11 @@
         var drawSub = function (box, step) {
           step = step || 0;
           var multi = named.length > 1, gift = row.gift ? (row.gift.for ? "Gift for " + row.gift.for : "Gift") : null;
-          var back = [row.cancelled ? (row.cancelled.partial ? "Part cancelled" : "Cancelled") : null, refundOf(row) ? "Refunded " + money(refundOf(row), "GBP") : null].filter(Boolean);
+          var back = [row.cancelled ? (row.cancelled.partial ? "Part cancelled" : "Cancelled") : null, refundOf(row) ? "Refunded " + money(refundOf(row), "GBP") : null, payLater(row) ? "pay at the hotel" : null].filter(Boolean);
           var steps = [multi ? "count" : null, back.length || gift ? "what" : null].filter(Boolean), done = steps.slice(0, step);
           var what = done.indexOf("what") >= 0 ? null : done.indexOf("count") >= 0 ? named.length + " items" : boughtWords(row) || ref;
-          var rest = back.concat(gift ? [gift] : [], row.orderDate ? [shortDate(row.orderDate + "T12:00:00Z")] : []);
+          // (A stay paid at the hotel: "pay at the hotel" keeps the room its day would take; the day is on its page.)
+          var rest = back.concat(gift ? [gift] : [], row.orderDate && !payLater(row) ? [shortDate(row.orderDate + "T12:00:00Z")] : []);
           box.textContent = "";
           box.over = box.next = null; box.tries = 0; box.redraw = function () { drawSub(box, 0); };
           if (!biz.via && !what && !rest.length) { box.appendChild(el("span", { text: "Receipt" })); return; }
@@ -4215,6 +4271,7 @@
           else if (!row.gift && had) had.remove();
         };
         giftMark();
+        // (A stay paid at the hotel says so in the line under its name, "pay at the hotel", so its amount keeps its room.)
         var end = el("span", { className: "rl-rr-end" }, [el("b", { text: row.totalPence == null ? "" : money(row.totalPence, row.currency) })]);
         var left = daysLeft(statedDeadline(row));
         if (left !== null && left >= 0) end.appendChild(el("span", { className: "rl-rr-chip " + (left <= 2 ? "red" : left <= 7 ? "amber" : "green"), text: left === 0 ? "Return today" : left + " day" + (left === 1 ? "" : "s") + " left" }));
@@ -5235,7 +5292,7 @@
       });
     }
     function sellCard(i) {
-      var paidAt = (i.pricePence != null ? "Paid " + money(i.pricePence, i.currency) : "Bought") + (i.store ? " at " + i.store : "") + (dayOf(i.orderDate) ? " on " + dayOf(i.orderDate) : "");
+      var paidAt = (i.free === true && i.pricePence === 0 ? "A free gift" : i.pricePence != null ? "Paid " + money(i.pricePence, i.currency) : "Bought") + (i.store ? " at " + i.store : "") + (dayOf(i.orderDate) ? " on " + dayOf(i.orderDate) : "");
       var card = el("div", { className: "rl-order" }, [el("b", { text: cleanName(i.title, i.store) || i.title }), el("span", { text: paidAt })]);
       if (i.returnWindowOpen === true) card.appendChild(el("span", { className: "rl-mk-warn", text: "You can still return this to the shop for a refund" + (dayOf(i.returnDeadline) ? " until " + dayOf(i.returnDeadline) : "") + "." }));
       var start = el("button", { type: "button", className: "rl-btn", text: "List this", onclick: function () {
@@ -9802,7 +9859,7 @@
     var one = opts.item != null ? (x.items || [])[opts.item] : null;
     var first = one || headlineItem(x) || {};
     var date = x.orderDate ? new Date(x.orderDate + "T00:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" }) : null;
-    var price = one ? (Number.isInteger(one.pricePence) ? money(one.pricePence * (Number(one.qty) > 1 && !one.lineTotal ? Number(one.qty) : 1), x.currency) : "") : x.totalPence == null ? "" : money(x.totalPence, x.currency);
+    var price = one ? lineMoney(one, x.currency) || "" : totalText(x);
     var named = (x.items || []).filter(function (i) { return i && i.name; });
     var itemName = one ? one.name : named.length ? boughtWords(x) : null;
     var count = one && (x.items || []).length > 1 ? x.items.length : 0;
@@ -9876,7 +9933,7 @@
         // The order's details, one to a line.
         var facts = el("div", { className: "rl-dt-facts" });
         var fact = function (k, v) { if (v) facts.appendChild(el("div", { className: "rl-dt-fact" }, [el("span", { text: k }), el("b", { text: v })])); };
-        fact("Price", price);
+        if (payLater(x) && !one) fact("To pay at the hotel", Number.isInteger(x.totalPence) ? money(x.totalPence, x.currency) : null); else fact("Price", price);
         // Not in pounds: shown as it was charged, and left out of anything Relay adds up.
         if (price && notPounds(x)) { var cn = moneyName(x.currency); fact("Currency", cn.charAt(0).toUpperCase() + cn.slice(1) + " (not added to your totals in pounds)"); }
         if (first.variant) fact("Size or colour", first.variant);
@@ -10939,6 +10996,9 @@
       // An order where only some things can go back (a kettle in a food shop): those lead the card, and its line names them.
       var keep = x.returnable === false ? (x.returnableItems || []).map(function (i) { return (x.items || [])[i]; }).filter(function (i) { return i && i.name; }) : [];
       if (keep.length) named = keep.concat(named.filter(function (i) { return keep.indexOf(i) < 0; }));
+      // (A free gift the shop added never leads the card: what was bought does.)
+      var gift = function (i) { return i.free === true && i.pricePence === 0; };
+      if (named.some(gift) && !named.every(gift)) named = named.filter(function (i) { return !gift(i); }).concat(named.filter(gift));
       var dl = deadlineOf(x), stated = statedDeadline(x), dv = x.delivery, p = x.returnProgress, rt = retOf(x);
       var canGoBack = (x.returnable !== false || Boolean((x.returnableItems || []).length)) && Boolean(dl) && dl >= today && !p && !rt;
       var e = { key: "r" + x.id, shop: who, via: biz.via || "", at: x.orderDate, cat: x.category || "other", dom: logoDom(x), when: (canGoBack && stated) || "", toReturn: canGoBack, rank: 2,
@@ -10946,11 +11006,11 @@
         title: named.length ? named[0].name + (named.length > 1 ? " + " + (named.length - 1) + " more" : "") : noItemsTitle(x),
         // What the whole receipt came to, and how many things: a card shows these, never the first item's own price
         // (Connor, 19 Nov 2026: a £28.13 takeaway of 7 dishes showed as "Sweet and Sour Chicken… £6.99").
-        price: x.adjusted && Number.isInteger(x.adjusted.newTotalPence) ? money(x.adjusted.newTotalPence, x.adjusted.currency || x.currency) : x.totalPence == null ? "" : money(x.totalPence, x.currency), count: named.length };
+        price: x.adjusted && Number.isInteger(x.adjusted.newTotalPence) ? money(x.adjusted.newTotalPence, x.adjusted.currency || x.currency) : totalText(x), count: named.length };
       e.tiles = named.length > 1 ? named.slice(0, 6).map(function (i) { return { name: i.name,
-          price: Number.isInteger(i.pricePence) ? money(i.pricePence * (Number(i.qty) > 1 && !i.lineTotal ? Number(i.qty) : 1), x.currency) : "",
+          price: lineMoney(i, x.currency) || "",
           draw: function (box) { illustrate(box, { items: [{ name: i.name }], retailer: x.retailer || {}, category: x.category }, 96); } }; })
-        : [{ name: named.length ? named[0].name : noItemsTitle(x), price: x.totalPence == null ? "" : money(x.totalPence, x.currency), draw: function (box) { receiptPic(box, x, 96, 104); } }];
+        : [{ name: named.length ? named[0].name : noItemsTitle(x), price: totalText(x), draw: function (box) { receiptPic(box, x, 96, 104); } }];
       // The shop cancelled it (all of it: nothing to send back), said before anything else.
       if (x.cancelled && !x.cancelled.partial) e.line = cancelWords(x);
       // A return Relay is following (return tracking): where it has got to, and "Refund not seen yet" when it's due.

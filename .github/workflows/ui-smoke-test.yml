@@ -114,6 +114,8 @@ jobs:
         run: node --import ./scripts/record-app-requests.mjs scripts/test-receipt-photo-ui.mjs
       - name: Receipt items (+ N more on Home, item counts, "may have missed some items" with Read it again once per tap and See the email)
         run: node --import ./scripts/record-app-requests.mjs scripts/test-receipt-items-ui.mjs
+      - name: Receipt fields (paid at the hotel and not counted as spent, a 24-hour cancel window, the shop's own total beside PayPal's, Free gift, a pack's one price)
+        run: node --import ./scripts/record-app-requests.mjs scripts/test-receipt-fields-ui.mjs
       - name: Same order / different orders (the short list, joined once per tap, Undo, Split it), fee lines, Relay health's likely reading problems
         run: node --import ./scripts/record-app-requests.mjs scripts/test-order-joins-ui.mjs
       - name: Thousands of receipts kept on the phone (shown at once every time, before Relay answers; gone on sign-out)

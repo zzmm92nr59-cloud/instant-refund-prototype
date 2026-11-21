@@ -130,4 +130,17 @@ assert.equal(foodW.returnsStarted, 1, "the Amazon return stays with the order's 
 assert.equal(buildWrapped(mixed, 2026, Date.UTC(2026, 11, 31), { industry: "electronics" }).returnsStarted, 0);
 assert.equal(buildWrapped(mixed, 2026, Date.UTC(2026, 11, 31), { industry: "electronics" }).spentPence, 1500);
 assert.ok(y.things.some(x => x.name === "Wool jumper") && !y.things.some(x => x.name === "Bananas Loose"), "the style slide gets things, not the bananas");
+// A stay paid at the hotel (payAtProperty) is no money spent until a payment for it is seen; then only what was paid.
+{
+  const stay = { id: "s1", kind: "receipt", retailer: R("Booking.com", "booking.com"), merchant: "Harbour View Hotel", orderDate: "2026-04-02", totalPence: 24000, currency: "GBP", category: "travel", categoryLabel: "Travel", payAtProperty: true,
+    items: [{ name: "Double Room", qty: 1, pricePence: 24000, lineTotal: true }], createdAt: Date.parse("2026-04-02") };
+  const book = { id: "s2", kind: "receipt", retailer: R("Page Turner", "pageturner.example"), orderDate: "2026-04-03", totalPence: 1200, currency: "GBP", category: "other", categoryLabel: "Other", items: [{ name: "Novel", qty: 1, pricePence: 1200 }], createdAt: Date.parse("2026-04-03") };
+  const unpaid = buildWrapped([stay, book], 2026, Date.UTC(2026, 11, 31));
+  assert.equal(unpaid.spentPence, 1200, "a stay paid at the hotel isn't money spent yet");
+  assert.equal(unpaid.receipts, 2, "it is still counted as a receipt");
+  assert.equal(unpaid.byMonth[3].spentPence, 1200, "nor in its month");
+  assert.ok(!(unpaid.topShops || []).some((s) => s.spentPence >= 24000), "nor at its shop");
+  const deposit = buildWrapped([{ ...stay, paidSoFarPence: 5000, payments: [{ pence: 5000 }] }, book], 2026, Date.UTC(2026, 11, 31));
+  assert.equal(deposit.spentPence, 6200, "once a payment is seen, only what was paid counts");
+}
 console.log("PASS wrapped: totals, duplicates, other years, unreadable amounts and returns are handled honestly; one Wrapped per kind of shopping");

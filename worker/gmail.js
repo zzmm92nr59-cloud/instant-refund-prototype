@@ -2246,7 +2246,7 @@ export function mergeOrderEmails(orders, opts = {}) {
     // (What was paid, as the payment service says it, when the shop's own email gave another amount for the same order
     // number: the shop's before VAT or before delivery. Round 15.)
     const paidBy = !(c.retailer && c.retailer.via) && rest.find((o) => o.retailer && o.retailer.via && o.totalPence != null && (o.currency || "GBP") === (c.currency || "GBP") && o.orderRef && c.orderRef && refCore(o.orderRef) === refCore(c.orderRef));
-    if (paidBy && c.totalPence !== paidBy.totalPence && c.orderUpdate !== "paid") { if (c.totalPence != null) c.shopTotalPence = c.totalPence; c.totalPence = paidBy.totalPence; }
+    if (paidBy && c.totalPence !== paidBy.totalPence && c.orderUpdate !== "paid") { if (c.totalPence != null) { c.shopTotalPence = c.totalPence; c.shopTotalPaidVia = paidBy.retailer.via; } c.totalPence = paidBy.totalPence; }
     // (The shop's own list doesn't come to what was paid, its six tickets at their price and nothing else, while the payment
     // service's receipt of the same purchase sets out the money whole and adds up, "Qty: 6" at the price before tax, a
     // booking fee, the discount and the tax: the card shows the payment service's fees, discount and tax with the shop's own
