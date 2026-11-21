@@ -121,7 +121,10 @@ await who.press("Enter");
 await vase.getByText("Saved. It's a gift for Sam.").waitFor();
 assert.deepEqual(posts[1], [ID.vase, { gift: true, for: "Sam" }]);
 assert.equal(await save.isDisabled(), true, "saved, so nothing new to save");
-assert.match(await vase.locator(".rl-rr-mid").innerText(), /Larkspur Home, Gift for Sam/, "the row says who it's for");
+// (Shop first since 21 Nov 2026: the shop is the row's title, and who it's for is on the line under it.)
+assert.equal(await vase.locator(".rl-rr-mid > b").innerText(), "Larkspur Home");
+assert.match(await vase.locator(".rl-rr-sub").textContent(), /Gift for Sam/, "the row says who it's for");
+assert.match(await vase.locator(".rl-rr-mid .rl-sr").textContent(), /^Hand-thrown Ceramic Vase, Gift for Sam, /, "and reads out what it was");
 assert.equal(await vase.locator(".rl-rr-gift").count(), 1, "and has a small present on its picture");
 assert.equal(await page.locator(".rl-rr").filter({ hasText: "Brass Table Lamp" }).locator(".rl-rr-gift").count(), 1, "the lamp (for Dad) has one too");
 console.log("ok - 'Bought as a gift' saves once for a double tap, then who it's for; the row shows it straight away");
