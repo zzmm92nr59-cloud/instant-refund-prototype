@@ -51,6 +51,7 @@ jobs:
           node scripts/test-receipt-real-20.mjs
           node scripts/test-receipt-real-21.mjs
           node scripts/test-receipt-real-22.mjs
+          node scripts/test-receipt-real-23.mjs
           node scripts/test-receipt-coverage.mjs
           node scripts/test-item-names.mjs
           node scripts/test-inbox-simulation.mjs

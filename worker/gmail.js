@@ -16,7 +16,7 @@
 import { decodePhoto, RECEIPT_PHOTOS_SQL } from "./photos.js";
 import { receiptsToAdd } from "./bank.js";
 import { recordReceiptShops } from "./shop-directory.js";
-import { mailText, parseReceiptEmail, parseReturnEmail, parseReturnUpdateEmail, parseReturnParcelEmail, parseDeliveryEmail, parseDispatchEmail, parseCancellationEmail, parseOrderAdjustmentEmail, trackingLink, extractProductImageUrls, photoShowsItem } from "./receipt-parser.js";
+import { mailText, parseReceiptEmail, parseReturnEmail, parseReturnUpdateEmail, parseReturnParcelEmail, parseDeliveryEmail, parseDispatchEmail, parseCancellationEmail, parseOrderAdjustmentEmail, parseOrderAcceptedEmail, trackingLink, extractProductImageUrls, photoShowsItem } from "./receipt-parser.js";
 import { ensureOnce, runAll } from "./once.js";
 import { buildWrapped } from "./wrapped.js";
 import { readShopKinds, learnShopKinds } from "./shop-kind-ai.js";
@@ -185,7 +185,7 @@ async function gmailGet(fetchImpl, url, headers) {
 // 42: codes to show or scan (scan-codes.js): a return barcode in a shipping email, a receipt's own barcode, a drop-off QR code,
 // a collection QR code and tickets' barcodes are kept with the order's receipt; an email that is only such a code for an order
 // it names is kept for it (kind "order_codes").
-export const PARSER_VERSION = 58;
+export const PARSER_VERSION = 59;
 // Which full read of every mailbox is due: version 33 of the reader was full read 14, and each reader version since is one
 // more, so a better reader always reaches old receipts too, without anyone having to remember to raise this.
 export const READER_FULL_REV = 14 + Math.max(0, PARSER_VERSION - 33);
@@ -1157,7 +1157,13 @@ function classify(rawText, ref, lenient = false) {
     const adj = parseOrderAdjustmentEmail(rawText);
     const can = adj.ok ? { ok: false } : parseCancellationEmail(rawText);
     const dis = adj.ok || can.ok ? { ok: false } : parseDispatchEmail(rawText);
-    if (adj.ok) {
+    const acc = adj.ok || can.ok || dis.ok ? { ok: false } : parseOrderAcceptedEmail(rawText);
+    if (acc.ok) {
+      // (A takeaway app's "Your order #… was accepted" naming the restaurant: joined to the app's payment receipt for it by
+      // attachAccepted. Never a purchase of its own. Round 22.)
+      details = { kind: "order_update", ...ref, stage: "accepted", at: acc.at, orderRef: acc.orderRef, merchant: acc.merchant, sentAt: acc.sentAt,
+        retailer: acc.retailer, source: "shopper_email", refundEligible: false, parserVersion: PARSER_VERSION };
+    } else if (adj.ok) {
       // A takeaway app's changed total for an order it already charged (money back for part of it): never a purchase, joined
       // to that order by attachAdjustments. Round 10.
       details = { kind: "order_update", ...ref, stage: adj.stage || "adjusted", at: adj.at, ...(adj.paymentRef ? { paymentRef: adj.paymentRef } : {}), orderRef: adj.orderRef, merchant: adj.merchant, amountPence: adj.amountPence,
@@ -2501,6 +2507,22 @@ export function ukLocalMs(local) {
   const bst = asUtc - 3600e3 >= lastSunday(2) && asUtc - 3600e3 < lastSunday(9);
   return bst ? asUtc - 3600e3 : asUtc;
 }
+// A takeaway app's "Your order #4400112 was accepted" from the app's own domain (updates.dinedash.example), naming the
+// restaurant, and the app's payment receipt for it (receipts@dinedash.example, "Receipt #3301-7720"), sent within ten minutes, that names no
+// restaurant: the receipt shows the restaurant beside the app's name. Only when exactly one receipt fits each way. Round 22.
+const siteOfAny = (d) => { const p = String(d || "").toLowerCase().split(".").filter(Boolean); const n = p.length >= 3 && /^(?:co|org|ac|gov|ltd|me|net|com)$/.test(p[p.length - 2]) && p[p.length - 1].length === 2 ? 3 : 2; return p.slice(-n).join("."); };
+export function attachAccepted(orders, accepted) {
+  const ms = (x) => Date.parse(x && x.sentAt || "");
+  const fits = (u, o) => o.kind !== "order_update" && !o.merchant && o.retailer && o.retailer.domain && !o.retailer.via && u.retailer && u.retailer.domain &&
+    siteOfAny(o.retailer.domain) === siteOfAny(u.retailer.domain) && Number.isFinite(ms(o)) && Number.isFinite(ms(u)) && Math.abs(ms(o) - ms(u)) <= 10 * 60000;
+  for (const u of accepted) {
+    if (!u.merchant) continue;
+    const mine = orders.filter((o) => fits(u, o) || (o.orderRef && u.orderRef && sameOrderRef(o.orderRef, u.orderRef) && o.retailer && u.retailer && siteOfAny(o.retailer.domain) === siteOfAny(u.retailer.domain) && !o.merchant && o.kind !== "order_update"));
+    if (mine.length !== 1) continue;
+    if (accepted.filter((v) => v !== u && v.merchant && fits(v, mine[0])).length) continue;
+    mine[0].merchant = u.merchant;
+  }
+}
 export function attachAdjustments(orders, adjusts) {
   const low = (x) => String(x || "").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
   // (The orders each could be about, by number or by shop name, made once: the rules below are checked on those alone.)
@@ -2799,8 +2821,9 @@ async function listReceipts(env, shopperId, timing, opts = {}) {
   attachDeliveries(orders, deliveries);
   // Each code goes on the receipt of its order (its own email's, or the one order with that number from that shop).
   attachCodes(orders, all, codeRows, sameOrderRef);
-  attachCancellations(orders, cancels.filter(u => u.stage !== "adjusted"));
+  attachCancellations(orders, cancels.filter(u => u.stage !== "adjusted" && u.stage !== "accepted"));
   attachAdjustments(orders, cancels.filter(u => u.stage === "adjusted"));
+  attachAccepted(orders, cancels.filter(u => u.stage === "accepted"));
   // What the carrier itself said, where the shopper opened a parcel Relay could track live (parcel-tracking.js).
   applyTracked(orders, tracked);
   for (const p of plans) {
@@ -2882,7 +2905,11 @@ async function listReceipts(env, shopperId, timing, opts = {}) {
     // A whole order the shop cancelled was never sent, so there is nothing to send back (round 6).
     if (c.cancelled && !c.cancelled.partial) return { ...c, items, hasImage: Boolean(c.hasImage && c.photoIsItem === true), ...group, categoryLearned: Boolean(learned), storeKey: k,
       returnable: false, returns: c.returns ? { ...c.returns, deadline: null, windowDays: null } : null };
-    const policy = (group.returnable || keep.length) && !said ? policyFor(retailer, c.currency) : null;
+    // (A window the email gives without saying from when, "You have 28 days to return any unwanted items to us": the shop's
+    // published policy of the same days still says from when. Round 22.)
+    const bare = Boolean(c.returns && c.returns.windowDays && !c.returns.windowFrom && !c.returns.deadline && !c.returns.cancelWithin);
+    const policy0 = (group.returnable || keep.length) && (!said || bare) ? policyFor(retailer, c.currency) : null;
+    const policy = policy0 && (!said || policy0.days === c.returns.windowDays) ? policy0 : null;
     const byPolicy = policy ? policyReturnBy(c, policy, today) : null;
     const guess = byPolicy || (group.returnable || keep.length ? estimateReturnBy({ ...c, category: group.returnable ? group.category : "other", items: keep.length && !group.returnable ? keep.map((i) => items[i]) : items }, today) : null);
     // Something digital (an app's coins, a subscription, a download) is never sent back: a window its email gives is to

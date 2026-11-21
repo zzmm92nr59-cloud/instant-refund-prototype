@@ -94,7 +94,8 @@ const placeIn = (s) => {
   const code = codeIn(s);
   if (code) return code;
   for (const part of s.split(/\s[-–|]\s|,\s/)) {
-    const p = part.trim(), m = /^(.+?)\s*\(([^)]{2,30})\)$/.exec(p);
+    // (A state's letters in brackets before the city's, "Newark Liberty (NJ) (Newark)": read without them. Round 22.)
+    const p = part.trim().replace(/^([^()]{3,40}?)\s\([A-Z]{2,3}\)(?=\s\([^()]{2,30}\)$)/, "$1"), m = /^(.+?)\s*\(([^)]{2,30})\)$/.exec(p);
     for (const name of m ? [m[1], m[2] + " " + m[1]] : [p]) {
       if (!/^\p{L}[\p{L} .'’-]{2,40}$/u.test(name) || /^terminal\b/i.test(name)) continue;
       const a = airportByName(name);
@@ -164,6 +165,25 @@ export function flightLegs(text, refDate) {
       if (to && timed && fno) {
         legs.push({ from: own[2], to: to.c, date: dayAbove(lines, i, prevAt, refDate), flight: fno, dir, at: i });
         i = to.k;
+        continue;
+      }
+    }
+    // (A flight number alone on its line, then each end's day, time and airport by name on lines of their own, BA's e-ticket
+    // receipt: "XY0123", "Economy", "12 Jun 2025", "09:40", "Gatwick (London)", "North Terminal", "12 Jun 2025", "12:55",
+    // "Newark Liberty (NJ) (Newark)". Round 22.)
+    const alone = /^[\s|]*[A-Z0-9]{2}\s?\d{1,4}[\s|]*$/.test(l) ? flightNo(l) : null;
+    if (alone) {
+      const ends = [];
+      for (let k = i + 1; k <= i + 14 && k + 1 < lines.length && ends.length < 2; k++) {
+        if (/^[\s|]*[A-Z0-9]{2}\s?\d{1,4}[\s|]*$/.test(lines[k]) && flightNo(lines[k])) break;
+        if (!/^[\s|]*\d{1,2}[:.]\d{2}[\s|]*$/.test(lines[k])) continue;
+        const raw = lines[k + 1].replace(/^[\s|]+|[\s|]+$/g, "");
+        const p = /\d/.test(raw) ? null : placeIn(raw);
+        if (p) ends.push({ c: p, k: k + 1, day: legDay(lines[k - 1] || "", refDate) });
+      }
+      if (ends.length === 2 && ends[0].c !== ends[1].c) {
+        legs.push({ from: ends[0].c, to: ends[1].c, date: ends[0].day || null, flight: alone, dir, at: i });
+        i = ends[1].k;
         continue;
       }
     }

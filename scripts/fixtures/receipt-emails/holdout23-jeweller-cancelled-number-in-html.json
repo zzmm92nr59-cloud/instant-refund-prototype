@@ -1,0 +1,18 @@
+{
+ "id": "holdout23-jeweller-cancelled-number-in-html",
+ "sender": "Silverline",
+ "layout": "'Order Cancellation': 'your order is now cancelled', the order number only in the HTML",
+ "headers": {
+  "from": "Silverline <info@delivery.silverline.example>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Order Cancellation - Silverline",
+  "date": "Thu, 12 Dec 2024 09:12:00 +0000"
+ },
+ "html": "<html><head><title>Silverline</title></head><body><table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"><tr><td>ORDER CANCELLATION</td></tr>\n<tr><td>Order Number: SLX4400917</td></tr>\n<tr><td>Hello Sam Taylor,</td></tr>\n<tr><td>We&rsquo;re emailing you to confirm that your order is now cancelled.</td></tr>\n<tr><td>Any payments made will be returned within 5 working days.</td></tr>\n<tr><td>ITEM(S) CANCELLED</td></tr>\n<tr><td>Item</td><td>Quantity</td><td>Price</td></tr>\n<tr><td>Twisted Rope Silver Bangle</td><td>Quantity:</td><td>1</td></tr>\n<tr><td>GBP240.00</td></tr></table></body></html>",
+ "text": "Hello Sam Taylor,\n\nWe’re emailing you to confirm that your order is now cancelled.\n\nAny payments made will be returned within 5 working days.\n\nITEM(S) CANCELLED\n\nTwisted Rope Silver Bangle\nQuantity: 1\nGBP240.00\n\nOrder Total (Inc VAT) £200.00\n\nSilverline is part of Example Jewellery Group Ltd. Registered Number: 000000.",
+ "expected": {
+  "notPurchase": {
+   "kind": "cancellation"
+  }
+ }
+}

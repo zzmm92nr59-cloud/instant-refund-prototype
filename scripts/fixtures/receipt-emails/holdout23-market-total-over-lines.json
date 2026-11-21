@@ -1,0 +1,31 @@
+{
+ "id": "holdout23-market-total-over-lines",
+ "sender": "Craftly",
+ "layout": "'Total ( 1 item' over ')' over '£16.20'; the item's name runs on into '- Transaction ID: …'",
+ "headers": {
+  "from": "Craftly Transactions <transaction@craftly.example>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your Craftly Purchase from ClayHouseStudio (4100223344)",
+  "date": "Wed, 20 Nov 2024 17:20:00 +0000"
+ },
+ "html": "<html><head><title>Craftly</title></head><body><table><tr><td>Yay! Your order is confirmed.</td></tr><tr><td>Order details</td></tr><tr><td>Confirmation number:</td></tr><tr><td>4100223344</td></tr>\n<tr><td>Speckled Stoneware Mug (300ml) Handmade Coffee Cup - Transaction ID: 5512340987</td></tr><tr><td>Colour: Sea Foam</td></tr><tr><td>Quantity: 1</td></tr><tr><td>&pound; 16.20</td></tr>\n<tr><td>Subtotal:</td></tr><tr><td>&pound;16.20</td></tr><tr><td>Delivery</td></tr><tr><td>&pound;0.00</td></tr><tr><td>Total ( 1 item<br>)</td></tr><tr><td>&pound;16.20</td></tr></table></body></html>",
+ "text": "",
+ "expected": {
+  "shop": "Craftly",
+  "date": "2024-11-20",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Speckled Stoneware Mug (300ml) Handmade Coffee Cup",
+    "qty": 1,
+    "linePence": 1620
+   }
+  ],
+  "subtotalPence": 1620,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 1620,
+  "orderRef": "4100223344"
+ }
+}

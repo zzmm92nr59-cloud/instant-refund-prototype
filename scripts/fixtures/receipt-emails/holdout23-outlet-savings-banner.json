@@ -1,0 +1,36 @@
+{
+ "id": "holdout23-outlet-savings-banner",
+ "sender": "Bargain Barn",
+ "layout": "'Congrats! You've saved at least £21.50' at the top, each thing's brand over its name, 'Size:', its price, '✕ 1', 'RRP' and 'Save'",
+ "headers": {
+  "from": "Bargain Barn <donotreply@tr.bargainbarn.example>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Order confirmation",
+  "date": "Tue, 03 Dec 2024 19:30:00 +0000"
+ },
+ "html": "<html><head><title>Bargain Barn</title></head><body><table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"><tr><td>Here are your order details, Sam</td></tr>\n<tr><td>Congrats! You've saved at least &pound;21.50</td></tr>\n<tr><td>-45%</td></tr>\n<tr><td>Order number</td></tr>\n<tr><td>55120934</td></tr>\n<tr><td>Expected delivery</td></tr>\n<tr><td>Standard Delivery</td></tr>\n<tr><td>Order summary</td></tr>\n<tr><td>Harbour &amp; Hide</td></tr>\n<tr><td>Tan Leather Weekend Holdall</td></tr>\n<tr><td>Size: One Size</td></tr>\n<tr><td>&pound;34.99</td></tr>\n<tr><td>✕ 1</td></tr>\n<tr><td>RRP &pound;56.49</td></tr>\n<tr><td>Save &pound;21.50</td></tr>\n<tr><td>-38%</td></tr>\n<tr><td>Northfield</td></tr>\n<tr><td>Grey Marl Merino Crew Jumper</td></tr>\n<tr><td>Size: M</td></tr>\n<tr><td>&pound;19.99</td></tr>\n<tr><td>✕ 1</td></tr>\n<tr><td>Payment Method</td></tr>\n<tr><td>Visa</td></tr>\n<tr><td>&pound;58.97</td></tr>\n<tr><td>Subtotal</td></tr>\n<tr><td>&pound;54.98</td></tr>\n<tr><td>Standard Delivery</td></tr>\n<tr><td>&pound;3.99</td></tr>\n<tr><td>Total Paid</td></tr>\n<tr><td>&pound;58.97</td></tr>\n<tr><td>You saved at least</td></tr>\n<tr><td>&pound;21.50</td></tr></table></body></html>",
+ "text": "",
+ "expected": {
+  "shop": "Bargain Barn",
+  "date": "2024-12-03",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Tan Leather Weekend Holdall",
+    "qty": 1,
+    "linePence": 3499
+   },
+   {
+    "name": "Grey Marl Merino Crew Jumper",
+    "qty": 1,
+    "linePence": 1999
+   }
+  ],
+  "subtotalPence": 5498,
+  "feesPence": 399,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 5897,
+  "orderRef": "55120934"
+ }
+}
