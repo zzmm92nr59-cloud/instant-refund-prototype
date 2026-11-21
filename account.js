@@ -3936,15 +3936,29 @@
     return apps.length && apps[0] && apps[0].length <= 60 && apps.every(function (a) { return a === apps[0]; }) ? apps[0] : null;
   }
   // A receipt's line that has to fit (receiptRow): checked once it's on screen, and again when the screen or text size changes.
-  var subFits = [];
+  // All of them are measured together, once a frame: every line is read first, then the ones that don't fit are drawn
+  // again (one layout for a list of thousands, never one per line).
+  var subFits = [], subWait = [];
   function subFit(box) {
-    if (subFits.indexOf(box) < 0) subFits.push(box);
+    if (!box.fitOn) { box.fitOn = true; subFits.push(box); }
     if (!subFit.on) {
       subFit.on = true;
-      var again = function () { subFits = subFits.filter(function (b) { return b.isConnected; }); subFits.forEach(function (b) { if (b.redraw) b.redraw(); }); };
+      var again = function () { subFits = subFits.filter(function (b) { if (b.isConnected) return true; b.fitOn = false; return false; }); subFits.forEach(function (b) { if (b.redraw) b.redraw(); }); };
       window.addEventListener("resize", function () { clearTimeout(subFit.t); subFit.t = setTimeout(again, 150); });
     }
-    (window.requestAnimationFrame || setTimeout)(function () { if (box.fit) box.fit(); });
+    subWait.push(box);
+    if (subWait.length === 1) (window.requestAnimationFrame || setTimeout)(subFitAll);
+  }
+  function subFitAll() {
+    var now = subWait; subWait = [];
+    var later = [], over = [];
+    now.forEach(function (b) {
+      if (!b.over) return;
+      if (!b.isConnected) { if ((b.tries = (b.tries || 0) + 1) < 5) later.push(b); return; }
+      if (b.over()) over.push(b);
+    });
+    over.forEach(function (b) { if (b.next) b.next(); });
+    if (later.length) setTimeout(function () { later.forEach(function (b) { subWait.push(b); }); if (subWait.length === later.length) subFitAll(); }, 300);
   }
   // What was bought, in a few words: "Stack of Coins", "2 × Flat White", "Hennessy VS Cognac and 40 more", or how many
   // things the email says it has. null when the email names nothing.
@@ -4173,7 +4187,7 @@
           var what = done.indexOf("what") >= 0 ? null : done.indexOf("count") >= 0 ? named.length + " items" : boughtWords(row) || ref;
           var rest = back.concat(gift ? [gift] : [], row.orderDate ? [shortDate(row.orderDate + "T12:00:00Z")] : []);
           box.textContent = "";
-          box.fit = null; box.redraw = function () { drawSub(box, 0); };
+          box.over = box.next = null; box.tries = 0; box.redraw = function () { drawSub(box, 0); };
           if (!biz.via && !what && !rest.length) { box.appendChild(el("span", { text: "Receipt" })); return; }
           if (biz.via) box.appendChild(el("span", { text: biz.via + (what || rest.length ? ", " : "") }));
           // (Its comma goes with it, so a name cut short reads "Apple Music Individu… 16 Nov", never "… , 16 Nov".)
@@ -4181,11 +4195,9 @@
           if (whatEl) box.appendChild(whatEl);
           if (rest.length) box.appendChild(el("span", { text: (what ? " " : "") + rest.join(", ") }));
           if (!whatEl) return;
-          box.fit = function () {
-            if (!whatEl.isConnected) { if ((box.tries = (box.tries || 0) + 1) < 5) setTimeout(function () { if (box.fit) box.fit(); }, 300); return; }
-            if (whatEl.scrollWidth <= whatEl.clientWidth + 1) return;
-            if (step < steps.length) drawSub(box, step + 1);
-          };
+          if (step >= steps.length) return;
+          box.over = function () { return whatEl.scrollWidth > whatEl.clientWidth + 1; };
+          box.next = function () { drawSub(box, step + 1); };
           subFit(box);
         };
         var wrap = el("div", { className: "rl-rr" });
