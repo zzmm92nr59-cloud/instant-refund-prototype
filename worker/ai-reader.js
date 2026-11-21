@@ -17,10 +17,12 @@ export const AI_READ_VERSION = 1;
 export const AI_SETTING_SQL = `CREATE TABLE IF NOT EXISTS ai_reading (shopper_id TEXT PRIMARY KEY, on_since INTEGER NOT NULL)`;
 // For each part (shop, total, date, number, items): 0 neither found it, 1 the AI filled a gap, 2 both found the same,
 // 3 they differ, 4 only the rules found it. failed: why there's no reading ("email_not_found", "unreadable").
+// ai_version: the AI_READ_VERSION it was read at; email_key: the email it was read from (ai-runner.js emailKeyOf). A
+// receipt is sent to the AI again only when one of those changes, never because Relay's own reader version did.
 export const AI_READS_SQL = `CREATE TABLE IF NOT EXISTS receipt_ai_reads (
   shopper_id TEXT NOT NULL, receipt_id TEXT NOT NULL, fields TEXT, failed TEXT, not_purchase INTEGER NOT NULL DEFAULT 0,
   shop INTEGER NOT NULL DEFAULT 0, total INTEGER NOT NULL DEFAULT 0, date INTEGER NOT NULL DEFAULT 0, number INTEGER NOT NULL DEFAULT 0,
-  items INTEGER NOT NULL DEFAULT 0, reader INTEGER, model TEXT, created_at INTEGER NOT NULL, PRIMARY KEY (shopper_id, receipt_id))`;
+  items INTEGER NOT NULL DEFAULT 0, reader INTEGER, model TEXT, created_at INTEGER NOT NULL, ai_version INTEGER, email_key TEXT, PRIMARY KEY (shopper_id, receipt_id))`;
 // AI for picks (worker/item-kinds.js): who switched it on, and what the AI made of each item name on their receipts.
 export const PICKS_AI_SQL = `CREATE TABLE IF NOT EXISTS picks_ai (shopper_id TEXT PRIMARY KEY, on_since INTEGER NOT NULL)`;
 export const ITEM_KINDS_SQL = `CREATE TABLE IF NOT EXISTS item_kinds (shopper_id TEXT NOT NULL, name_key TEXT NOT NULL, data TEXT NOT NULL,

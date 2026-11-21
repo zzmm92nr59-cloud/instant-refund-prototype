@@ -12,6 +12,7 @@
 import { shopifyShopsForDisplay } from "./shopify-connect.js";
 import { ensureImageTable } from "./shopify.js";
 import { aiModel } from "./ai-runner.js";
+import { claudeFetch, isCapped } from "./ai-spend.js";
 import { webShopProducts } from "./web-shops.js";
 
 export const PHOTO_SEARCHES_PER_DAY = 30;
@@ -149,13 +150,15 @@ export async function handlePhotoSearchRoute(request, env, url, cors, shopper, o
     : "(No items on Relay yet.)";
   let r;
   try {
-    r = await f("https://api.anthropic.com/v1/messages", { method: "POST", signal: AbortSignal.timeout(30000),
+    r = await claudeFetch(env, "photo_search", f, { method: "POST", signal: AbortSignal.timeout(30000),
       headers: { "x-api-key": env.ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json" },
       // Room for a model that thinks a little before it answers; the answer itself is a few dozen tokens.
       body: JSON.stringify({ model: env.PHOTO_SEARCH_MODEL || aiModel(env), max_tokens: 1024, system: PHOTO_SYSTEM, messages: [{ role: "user", content: [
         { type: "image", source: { type: "base64", media_type: "image/" + pic[1], data: pic[2] } },
         { type: "text", text: "Items shops on Relay sell:\n" + list } ] }] }) });
   } catch (e) { console.error("photo_search_failed", String(e && e.name || "error")); return json({ error: "busy" }, 503, cors); }
+  // Relay's AI spending limit for the month is reached: photo search is off until next month, as without the key.
+  if (isCapped(r)) return json({ error: "ai_off" }, 503, cors);
   if (r.status === 429 || r.status >= 500) { console.error("photo_search_busy", r.status); return json({ error: "busy" }, 503, cors); }
   // Anthropic refused: the picture itself only when it says so (a 400 about the image). No credit left, a key that doesn't
   // work and anything else mean photo search isn't available right now, never "couldn't read that picture".

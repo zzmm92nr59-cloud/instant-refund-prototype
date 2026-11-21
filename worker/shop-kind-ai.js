@@ -12,6 +12,7 @@
 //    all win over it.
 import { aiAvailable } from "./ai-reader.js";
 import { aiModel } from "./ai-runner.js";
+import { claudeFetch, isCapped, noThinking } from "./ai-spend.js";
 import { CATEGORIES, knownShop, storeKey, shopDisplayName, PERSONAL_MAIL } from "./receipt-category.js";
 import { shopKind } from "./shop-kind.js";
 import { isVia, looksLikePerson } from "./receipt-reader.js";
@@ -83,12 +84,13 @@ export async function learnShopKinds(env, cards, o = {}) {
   if (!list.length) return 0;
   let r;
   try {
-    r = await fetchImpl("https://api.anthropic.com/v1/messages", { method: "POST", signal: AbortSignal.timeout(15000),
+    r = await claudeFetch(env, "shop_kinds", fetchImpl, { method: "POST", signal: AbortSignal.timeout(15000),
       headers: { "x-api-key": env.ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json" },
-      body: JSON.stringify({ model: aiModel(env), max_tokens: 800, system: SHOP_KIND_SYSTEM,
+      body: JSON.stringify({ model: aiModel(env), max_tokens: 800, ...noThinking(env), system: SHOP_KIND_SYSTEM,
         messages: [{ role: "user", content: JSON.stringify(list.map((s) => (s.domain ? { id: s.id, name: s.name, web: s.domain } : { id: s.id, name: s.name }))) }] }) });
   } catch { return 0; }
-  if (!r || !r.ok) return 0;
+  // (Over Relay's AI spending limit: the name's own words decide, as without the key.)
+  if (isCapped(r) || !r || !r.ok) return 0;
   const body = await r.json().catch(() => null);
   const text = body && Array.isArray(body.content) ? body.content.filter((c) => c && c.type === "text").map((c) => c.text).join("") : "";
   const got = cleanShopKinds(text, new Set(list.map((s) => s.id)));

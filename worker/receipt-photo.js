@@ -10,6 +10,7 @@
 //    it couldn't read clearly stays empty.
 //  * It never decides anything: a total that differs from the bank's is shown as it is, beside what the bank paid.
 import { aiAvailable, cleanAiReading } from "./ai-reader.js";
+import { DEFAULT_MODEL, claudeFetch, isCapped, noThinking } from "./ai-spend.js";
 
 export const RECEIPT_PHOTO_SYSTEM = [
   "You read one photo of a paper shop receipt for Relay, a UK app that keeps people's receipts, and reply with one JSON object and nothing else.",
@@ -21,21 +22,23 @@ export const RECEIPT_PHOTO_SYSTEM = [
   "Leave out card numbers, names, loyalty or membership numbers, addresses, phone numbers and anything else about the person."
 ].join(" ");
 // As ai-runner.js aiModel (not imported from there, which would load the inbox reader too).
-const model = (env) => env.AI_READER_MODEL || "claude-haiku-5-5";
+const model = (env) => env.AI_READER_MODEL || DEFAULT_MODEL;
 
 // Asks Claude to read one photo ({ type, data } from photos.js decodePhoto). Returns { reading, confidence } or { error }:
-// "ai_off", "ai_unreachable", "ai_busy", "ai_refused" or "unreadable".
-export async function readReceiptPhoto(env, photo, latestDay, fetchImpl) {
+// "ai_off", "ai_unreachable", "ai_busy", "ai_refused" or "unreadable". Over Relay's AI spending limit (the month's, or
+// this shopper's for the day: o.shopperId) it is "ai_off", and the photo is kept as it is without the key.
+export async function readReceiptPhoto(env, photo, latestDay, fetchImpl, o = {}) {
   if (!aiAvailable(env)) return { error: "ai_off" };
   let r;
   try {
-    r = await fetchImpl("https://api.anthropic.com/v1/messages", { method: "POST",
+    r = await claudeFetch(env, "receipt_photo", fetchImpl, { method: "POST",
       headers: { "x-api-key": env.ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json" },
-      body: JSON.stringify({ model: model(env), max_tokens: 1500, system: RECEIPT_PHOTO_SYSTEM, messages: [{ role: "user", content: [
+      body: JSON.stringify({ model: model(env), max_tokens: 1500, ...noThinking(env), system: RECEIPT_PHOTO_SYSTEM, messages: [{ role: "user", content: [
         { type: "image", source: { type: "base64", media_type: photo.type, data: photo.data } },
         { type: "text", text: "Read this receipt." }] }] }),
-      signal: AbortSignal.timeout(40000) });
+      signal: AbortSignal.timeout(40000) }, o);
   } catch { return { error: "ai_unreachable" }; }
+  if (isCapped(r)) return { error: "ai_off", capped: r.capped };
   if (r.status === 429 || r.status >= 500) return { error: "ai_busy" };
   if (!r.ok) return { error: "ai_refused" };
   const body = await r.json().catch(() => null);

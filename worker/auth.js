@@ -25,6 +25,7 @@ import { handleReturnRoute } from "./returns.js";
 import { handleCrossSwapRoute, attachCrossSwaps, crossSwapDeleteStatements } from "./cross-swap.js";
 import { handleShopifyTestRoute, shopifyTestOrderDeleteStatements } from "./shopify-test-orders.js";
 import { handlePhotoSearchRoute, photoSearchDeleteStatements } from "./photo-search.js";
+import { ensureSpendTables, spendDeleteStatements } from "./ai-spend.js";
 import { handleOutlookSearchRoute, outlookSearchDeleteStatements } from "./outlook-search.js";
 import { handleSquareTestRoute, enrichSquarePurchases, squareOrderDeleteStatements } from "./square-orders.js";
 import { handleInstoreRoute, instoreDeleteStatements } from "./square-instore.js";
@@ -634,6 +635,8 @@ async function deleteShopper(env, shopper, o) {
     ...(await crossSwapDeleteStatements(env.RELAY_DB, shopper.id)),
     ...(await shopifyTestOrderDeleteStatements(env.RELAY_DB, shopper.id)),
     ...(await photoSearchDeleteStatements(env.RELAY_DB, shopper.id)),
+    // What their receipt reading cost today, for their daily AI limit (ai-spend.js).
+    ...(await ensureSpendTables(env.RELAY_DB).then(() => spendDeleteStatements(env.RELAY_DB, shopper.id))),
     ...(await outlookSearchDeleteStatements(env.RELAY_DB, shopper.id)),
     // Which orders at shops connected to Relay were placed with this email address (the orders themselves stay with the shop).
     env.RELAY_DB.prepare("DELETE FROM retailer_order_emails WHERE email_hash = ?").bind(shopper.emailHash),

@@ -74,6 +74,7 @@ jobs:
           node scripts/test-answer-key.mjs
           node scripts/test-shared-emails.mjs
           node scripts/test-ai-reader.mjs
+          node scripts/test-ai-spend.mjs
           node scripts/test-item-kinds.mjs
           node scripts/test-item-kinds-accuracy.mjs
           node scripts/test-item-kinds-corpus.mjs

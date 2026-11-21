@@ -22,6 +22,7 @@
 //   names not read yet are read first (up to 40). POST { on }: switches it.
 import { aiAvailable, PICKS_AI_SQL, ITEM_KINDS_SQL, ITEM_KIND_CACHE_SQL } from "./ai-reader.js";
 import { aiModel } from "./ai-runner.js";
+import { claudeFetch, isCapped, noThinking } from "./ai-spend.js";
 import { hideDetails, namesToHide } from "./shared-emails.js";
 import { boughtNames } from "./gmail.js";
 import KindCore from "./item-kind-core.js";
@@ -73,10 +74,12 @@ async function askKinds(env, list, fetchImpl) {
   const content = JSON.stringify(list.map((x) => ({ id: x.id, name: x.name, shop: x.shop })));
   let r;
   try {
-    r = await fetchImpl("https://api.anthropic.com/v1/messages", { method: "POST", signal: AbortSignal.timeout(25000),
+    // (Relay's AI spending limit reached: nothing is asked, and the rules decide until next month.)
+    r = await claudeFetch(env, "item_kinds", fetchImpl, { method: "POST", signal: AbortSignal.timeout(25000),
       headers: { "x-api-key": env.ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json" },
-      body: JSON.stringify({ model: aiModel(env), max_tokens: 4000, system: KINDS_SYSTEM, messages: [{ role: "user", content }] }) });
+      body: JSON.stringify({ model: aiModel(env), max_tokens: 4000, ...noThinking(env), system: KINDS_SYSTEM, messages: [{ role: "user", content }] }) });
   } catch { return null; }
+  if (isCapped(r)) return null;
   if (!r.ok) return null;
   const body = await r.json().catch(() => null);
   const text = body && Array.isArray(body.content) ? body.content.filter((c) => c && c.type === "text").map((c) => c.text).join("") : "";

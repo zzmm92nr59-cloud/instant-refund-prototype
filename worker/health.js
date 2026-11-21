@@ -19,6 +19,7 @@ import { chatAvailable } from "./support-chat.js";
 import { answerKey } from "./answer-key.js";
 import { SHARE_DAYS } from "./shared-emails.js";
 import { aiAvailable } from "./ai-reader.js";
+import { spendSummary } from "./ai-spend.js";
 
 export const MIN_SHOPPERS_PER_SHOP = 3;
 // Whether Relay sends its emails (sign-in codes, a shop's return and swap emails) from an address of its own. Until it
@@ -250,6 +251,11 @@ export async function relayHealth(env, me, now = Date.now()) {
     sharedEmails: { kept: n(shared.kept), waiting: n(shared.waiting), thisWeek: n(shared.week), people: n(shared.people), keptDays: SHARE_DAYS },
     aiReader: { on: aiAvailable(env), shoppersOn: n(aiOn.n), reads: n(ai.n), thisWeek: n(ai.week), failed: n(ai.failed), notPurchase: n(ai.notPurchase),
       parts: Object.fromEntries(["shop", "total", "date", "number", "items"].map((k) => [k, { filled: n(ai[k + "1"]), agreed: n(ai[k + "2"]), differed: n(ai[k + "3"]) }])) },
+    // What the AI cost this month (estimated), against the monthly limit, by feature; and for the AI reader, how often it
+    // filled a gap, agreed with the rules or differed from them (the same counts as aiReader.parts, added up).
+    aiSpend: await spendSummary(env, now).then((sp) => ({ ...sp,
+      reader: ["filled", "agreed", "differed"].reduce((o, k, i) => ({ ...o, [k]: ["shop", "total", "date", "number", "items"].reduce((t, p) => t + n(ai[p + (i + 1)]), 0) }), {}) }))
+      .catch((e) => { console.error("AI spend failed", String(e && e.message || e).slice(0, 160)); return null; }),
     checkedByShops,
     readingProblems: problemsAll ? (() => {
       const nameable = (r) => r.people >= MIN_SHOPPERS_PER_SHOP && !PERSONAL_MAIL.test(r.domain);

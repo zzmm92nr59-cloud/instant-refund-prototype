@@ -34,6 +34,8 @@ jobs:
         run: node scripts/test-shared-emails.mjs
       - name: AI help (off until the key and the shopper's switch, personal details hidden, answers checked, gaps only, deleted when off)
         run: node scripts/test-ai-reader.mjs
+      - name: AI spending (a monthly and a daily limit checked before every call, every feature falls back, nothing sent twice)
+        run: node scripts/test-ai-spend.mjs
       - name: AI for picks (item names only, opt-in)
         run: node scripts/test-item-kinds.mjs
       - name: Open banking (read-only, team and testers on test banks)

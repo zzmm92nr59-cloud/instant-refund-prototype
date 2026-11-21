@@ -519,8 +519,8 @@ async function addReceiptPhoto(env, request, cors, shopper, o) {
   if (Number((mine && mine.n) || 0) >= RECEIPT_PHOTOS_PER_DAY) return json({ error: "too_many_requests" }, 429, cors);
   const all = await db.prepare("SELECT COUNT(*) AS n FROM receipt_photos WHERE ai = 1 AND created_at > ?").bind(now - DAY).first();
   const full = Number((all && all.n) || 0) >= RECEIPT_PHOTO_AI_ALL_DAY;
-  const got = full ? { error: "ai_busy" } : await readReceiptPhoto(env, photo, new Date(now + DAY).toISOString().slice(0, 10), o.fetchImpl || fetch);
-  const asked = !full && got.error !== "ai_off";   // a read was asked of Anthropic (counted for the limit across Relay)
+  const got = full ? { error: "ai_busy" } : await readReceiptPhoto(env, photo, new Date(now + DAY).toISOString().slice(0, 10), o.fetchImpl || fetch, { shopperId: shopper.id, now });
+  const asked = !full && got.error !== "ai_off";   // (over the spending limit counts as off: nothing was asked)   // a read was asked of Anthropic (counted for the limit across Relay)
   const read = got.reading && got.reading.isPurchase ? got.reading : null;
   const bankCurrency = p.currency || "GBP";
   const bankPaid = { amountPence: p.amount_minor, currency: bankCurrency, date: p.paid_on, account: p.account || null };
