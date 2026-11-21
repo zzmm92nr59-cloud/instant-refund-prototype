@@ -594,6 +594,31 @@ delete gmailBox.m5; delete gmailBox.m6;
 await post(`/relay/my/receipts/${eoOne.id}/remind`, alice, { on: false });
 clock = Date.parse("2026-11-22T08:00:00Z"); await post(`/relay/my/receipts/${eoOne.id}/remind`, alice, { on: true }); clock = keepClock;
 
+// 7f. Something digital is never sent back (round 21): Apple's "cancel within 14 days of receiving this invoice" on game
+// coins is no return deadline in the list, can't have a reminder, and a reminder asked for before is dropped, never sent.
+{
+  const src = sqlite.prepare("SELECT * FROM captured_receipts WHERE details LIKE '%EO-1%' AND status != 'not_receipt' LIMIT 1").get();
+  const d = JSON.parse(src.details);
+  const coins = { ...d, orderRef: "MQCOINS01", orderDate: "2026-11-20", totalPence: 159, returnPlan: null, delivery: null, retailer: { name: "Apple", domain: "email.apple.com" },
+    items: [{ name: "Stack of Coins", variant: "Puzzle Pals", qty: 1, pricePence: 159 }],
+    returns: { windowDays: 14, windowFrom: "order", deadline: "2026-12-04", cancelWithin: true, cancelUrl: "https://reportaproblem.apple.com/", address: null, portalUrl: null, instructions: ["To cancel your purchase within 14 days of receiving this invoice, report a problem or contact us."] } };
+  sqlite.prepare("INSERT INTO captured_receipts (id, shopper_id, message_ref, status, details, created_at) VALUES (?,?,?,?,?,?)").run("apple-coins-1", src.shopper_id, "apple-coins-msg", src.status, JSON.stringify(coins), src.created_at + 4);
+  const keep = clock; clock = Date.parse("2026-11-29T08:00:00Z");
+  const c = (await (await call("/relay/my/receipts", { token: alice })).json()).receipts.find(x => x.id === "apple-coins-1");
+  assert.equal(c.category, "digital");
+  assert.deepEqual([c.returns.deadline, c.returns.windowDays, c.returns.cancelWithin, c.returns.cancelUrl, c.returnBy || null], [null, 14, true, "https://reportaproblem.apple.com/", null], "no return deadline, the window to cancel kept: " + JSON.stringify(c.returns));
+  const rr = await post("/relay/my/receipts/apple-coins-1/remind", alice, { on: true });
+  assert.equal(rr.status, 400, "no reminder for game coins");
+  sqlite.prepare("INSERT INTO return_reminders (receipt_id,shopper_id,deadline,remind_at,title,sent_at) VALUES (?,?,?,?,?,NULL)").run("apple-coins-1", src.shopper_id, "2026-12-04", Date.parse("2026-12-01T09:00:00Z"), "Apple: Stack of Coins");
+  clock = Date.parse("2026-12-01T10:00:00Z"); emails = [];
+  assert.equal((await sendReturnReminders(env, clock, fetchImpl)).sent, 0, "a reminder asked for before is not sent");
+  assert.equal(emails.length, 0);
+  assert.equal(sqlite.prepare("SELECT COUNT(*) n FROM return_reminders WHERE receipt_id = 'apple-coins-1'").get().n, 0, "and is dropped");
+  clock = keep;
+  sqlite.prepare("DELETE FROM captured_receipts WHERE id = 'apple-coins-1'").run();
+  console.log("ok - game coins have no return deadline or reminder; the 14 days to cancel are kept for their page");
+}
+
 // 8. Captured receipts: private to the shopper, never refund-eligible, can be confirmed or dismissed.
 const mine = (await (await call("/relay/my/receipts", { token: alice })).json()).receipts;
 assert.equal(mine.length, 2);

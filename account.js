@@ -250,7 +250,14 @@
     if (add) logoMisses[path] = 1;
     return Boolean(logoMisses[path]);
   }
+  // Something digital (an app's coins, a subscription, a download) is never sent back. A window its email gives (Apple's
+  // "cancel within 14 days of receiving this invoice") is to cancel or ask for a refund, said on its page in the email's
+  // words, and never a return date: no countdown, no "Return today", no reminder, no red number.
+  function noReturnClock(x) {
+    return Boolean(x && ((x.returns && x.returns.cancelWithin === true) || (x.category === "digital" && !(x.returnableItems && x.returnableItems.length))));
+  }
   function deadlineOf(x) {
+    if (noReturnClock(x)) return null;
     // A food order can still hold something that goes back on its own (a kettle in the weekly shop): its date counts too.
     var open = x.returnable !== false || Boolean(x.returnableItems && x.returnableItems.length);
     var by = open && x.returnBy && x.returnBy.date;
@@ -1042,6 +1049,8 @@
     "@media(prefers-reduced-motion:reduce){.rl-ill svg *{animation:none!important;stroke-dashoffset:0}}" +
     ".rl-rr-pic{flex:none;width:48px;height:48px;border-radius:14px;background:var(--rl-fill);display:grid;place-items:center;overflow:hidden;font-weight:800;font-size:15px;color:var(--rl-accent)}.rl-rr-pic.rl-has-photo img{width:100%;height:100%;object-fit:cover}" +
     ".rl-rr-mid{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}.rl-rr-mid b{font-size:15.5px;color:var(--rl-text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.rl-rr-mid span{font-size:13.5px;color:var(--rl-text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}" +
+    // A receipt's line under the business: what was bought gives way (to "41 items", or goes) before the date or a refund does.
+    ".rl-rr-mid .rl-rr-sub{display:flex;min-width:0}.rl-rr-sub>span{flex:0 0 auto;overflow:visible;white-space:pre}.rl-rr-sub>.rl-rr-what{flex:0 1 auto;min-width:0;overflow:hidden}" +
     ".rl-rr-end{flex:none;display:flex;flex-direction:column;align-items:flex-end;gap:4px;text-align:right}.rl-rr-end b{font-size:15.5px;color:var(--rl-text)}" +
     ".rl-rr-chip{font-size:13px;font-weight:800;padding:3px 8px;border-radius:999px}.rl-rr-chip.green{background:var(--rl-accent-bg);color:var(--rl-accent)}.rl-rr-chip.amber{background:#ffefc9;color:#77520a}.rl-rr-chip.red{background:#fde0dd;color:#b3261e}" +
     // An opened receipt: when to return it and why, the shop's returns page, small buttons in a row, one question, its group.
@@ -3609,7 +3618,7 @@
         var d = /^\d{4}-\d{2}-\d{2}$/.test(c.orderDate || "") ? shortDate(c.orderDate + "T12:00:00Z") : null;
         var pic = el("span", { className: "rl-rr-pic" }); pic.setAttribute("aria-hidden", "true"); receiptPic(pic, c, 28, 32);
         var b = el("button", { type: "button", className: "rl-rr-main rl-jn-cand" }, [pic,
-          el("span", { className: "rl-rr-mid" }, [el("b", { text: named.length ? named[0].name + (named.length > 1 ? " + " + (named.length - 1) + " more" : "") : shop }), el("span", { text: (named.length ? shop + (d ? ", " : "") : "") + (d || "") })]),
+          el("span", { className: "rl-rr-mid" }, [el("b", { text: bizOf(c).name }), el("span", { text: [boughtWords(c), d].filter(Boolean).join(", ") })]),
           el("span", { className: "rl-rr-end" }, [el("b", { text: c.totalPence == null ? "" : money(c.totalPence, c.currency) })])]);
         b.onclick = function () {
           if (busy) return;
@@ -3657,7 +3666,11 @@
     // A booking that can be cancelled for free until a day the email states (Booking.com). Round 13.
     else if (x.returns && /^\d{4}-\d{2}-\d{2}$/.test(String(x.returns.freeCancellationUntil || ""))) card.appendChild(el("p", { className: "rl-po-now", text: "Free cancellation until " + longDate(x.returns.freeCancellationUntil) + " " + x.returns.freeCancellationUntil.slice(0, 4) + ", as the booking email says." }));
     // Something digital that can be cancelled within days (Apple's "cancel within 14 days of receiving this invoice"), not a parcel to send back.
-    if (x.returns && x.returns.cancelWithin === true && Number(x.returns.windowDays) > 0) card.appendChild(el("p", { className: "rl-po-now", text: "You can cancel within " + Number(x.returns.windowDays) + " days of the invoice, as the email says." }));
+    // (No countdown: it's no return date. The email's own link to ask, when it has one: Apple's "report a problem".)
+    if (x.returns && x.returns.cancelWithin === true && Number(x.returns.windowDays) > 0) {
+      card.appendChild(el("p", { className: "rl-po-now", text: "You can cancel within " + Number(x.returns.windowDays) + " days of the invoice, as the email says." }));
+      if (/^https:\/\//.test(x.returns.cancelUrl || "")) card.appendChild(el("a", { className: "rl-ret-go", href: x.returns.cancelUrl, target: "_blank", rel: "noopener noreferrer" }, [el("span", { text: "Ask " + who + " to cancel" }), jIc("ext", 18)]));
+    }
     // A subscription that ends (Google Play "your subscription will be cancelled"): when, and that nothing comes back.
     if (x.subscriptionEnds && x.subscriptionEnds.on) card.appendChild(el("p", { className: "rl-po-now", text: "This subscription ends on " + longDate(x.subscriptionEnds.on) + " " + String(x.subscriptionEnds.on).slice(0, 4) + (x.subscriptionEnds.refund === false ? ", with no refund." : ".") }));
     // Paid with a gift card (Amazon): the total is what was left to pay.
@@ -3684,7 +3697,8 @@
     // When to return it, in two lines: the date to go by, then why that date (and whose words they are).
     var by = x.returnBy && deadlineOf(x) === x.returnBy.date ? x.returnBy : null;
     var legal = by && by.basis === "uk_law" ? by.date : null;
-    var rt = x.returns || (legal ? {} : null) || {};
+    // (Nothing digital goes back: no return date, window or returns page for it here.)
+    var rt = noReturnClock(x) ? {} : x.returns || (legal ? {} : null) || {};
     var day = function (d) { var t = new Date(d + "T00:00:00Z"), f = function (o) { return t.toLocaleDateString("en-GB", Object.assign({ timeZone: "UTC" }, o)); }; return f({ weekday: "short" }) + " " + f({ day: "numeric", month: "short" }); };
     var head = null, why = null, policyLink = null;
     // The shop's published returns policy, when its emails say nothing and Relay has read it (worker/return-policies.js).
@@ -3902,6 +3916,59 @@
     // A takeaway through an app is "Order from Chapati Man", the restaurant (x.merchant), not the app.
     return n > 1 ? n + " items" : n === 1 ? "1 item" : "Order from " + ((x && typeof x.merchant === "string" && x.merchant.trim()) || (x && x.retailer && (x.retailer.name || x.retailer.domain)) || "this shop");
   }
+  // Who a receipt is from, as the shopper knows it: the business, not the platform that sold for it. A takeaway through an
+  // app is the restaurant (x.merchant: "Golden Lantern", with the app as the platform); an in-app purchase from Apple is the
+  // game, which Apple's invoice names over the thing bought (the item's variant: "Puzzle Pals" over "Stack of Coins").
+  // Otherwise the shop. { name, via }: via is the platform when it isn't the business.
+  function bizOf(x) {
+    var shop = (x && x.retailer && (x.retailer.name || x.retailer.domain)) || "";
+    var m = x && typeof x.merchant === "string" ? x.merchant.trim() : "";
+    var same = function (a, b) { return String(a).toLowerCase().replace(/[^a-z0-9]+/g, "") === String(b).toLowerCase().replace(/[^a-z0-9]+/g, ""); };
+    if (m) return { name: m, via: shop && !same(shop, m) ? shop : null };
+    var app = appOf(x);
+    if (app) return { name: app, via: shop || null };
+    return { name: shop || "Unknown store", via: null };
+  }
+  function appOf(x) {
+    var r = (x && x.retailer) || {};
+    if (!x || x.category !== "digital" || !(/(^|\.)apple\.com$/i.test(r.domain || "") || /^apple$/i.test(String(r.name || "").trim()))) return null;
+    var apps = (x.items || []).filter(function (i) { return i && i.name; }).map(function (i) { return typeof i.variant === "string" ? i.variant.trim() : ""; });
+    return apps.length && apps[0] && apps[0].length <= 60 && apps.every(function (a) { return a === apps[0]; }) ? apps[0] : null;
+  }
+  // A receipt's line that has to fit (receiptRow): checked once it's on screen, and again when the screen or text size changes.
+  // All of them are measured together, once a frame: every line is read first, then the ones that don't fit are drawn
+  // again (one layout for a list of thousands, never one per line).
+  var subFits = [], subWait = [];
+  function subFit(box) {
+    if (!box.fitOn) { box.fitOn = true; subFits.push(box); }
+    if (!subFit.on) {
+      subFit.on = true;
+      var again = function () { subFits = subFits.filter(function (b) { if (b.isConnected) return true; b.fitOn = false; return false; }); subFits.forEach(function (b) { if (b.redraw) b.redraw(); }); };
+      window.addEventListener("resize", function () { clearTimeout(subFit.t); subFit.t = setTimeout(again, 150); });
+    }
+    subWait.push(box);
+    if (subWait.length === 1) (window.requestAnimationFrame || setTimeout)(subFitAll);
+  }
+  function subFitAll() {
+    var now = subWait; subWait = [];
+    var later = [], over = [];
+    now.forEach(function (b) {
+      if (!b.over) return;
+      if (!b.isConnected) { if ((b.tries = (b.tries || 0) + 1) < 5) later.push(b); return; }
+      if (b.over()) over.push(b);
+    });
+    over.forEach(function (b) { if (b.next) b.next(); });
+    if (later.length) setTimeout(function () { later.forEach(function (b) { subWait.push(b); }); if (subWait.length === later.length) subFitAll(); }, 300);
+  }
+  // What was bought, in a few words: "Stack of Coins", "2 × Flat White", "Hennessy VS Cognac and 40 more", or how many
+  // things the email says it has. null when the email names nothing.
+  function boughtWords(x) {
+    var named = (x && x.items || []).filter(function (i) { return i && i.name; });
+    if (named.length === 1) return (Number(named[0].qty) > 1 ? named[0].qty + " × " : "") + named[0].name;
+    if (named.length > 1) return headlineItem(x).name + " and " + (named.length - 1) + " more";
+    var n = Number(x && x.itemCount);
+    return n > 1 ? n + " items" : n === 1 ? "1 item" : null;
+  }
   // A parcel's latest news, in a line with a small drawing: on its way (with whom), due, or delivered.
   function shipWords(dv, short) {
     var day = function (d) { return new Date(d + "T00:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" }); };
@@ -4097,14 +4164,42 @@
       function pill(text, bg, fg) { return el("span", { text: text, style: "display:inline-block;margin-top:4px;padding:3px 9px;border-radius:999px;font-weight:700;font-size:12px;background:" + bg + ";color:" + fg }); }
       // One tidy line per receipt: picture (the item's photo, or the shop's logo), what was bought, the shop and date,
       // and the price. The whole line opens the details underneath; nothing in it looks like a link.
+      // Shop first, as on Home (Connor, 21 Nov 2026): the title is the business (the shop, the restaurant for a takeaway, the
+      // game for an in-app purchase), and the line under it says what was bought and when, then anything that happened to
+      // it (cancelled, refunded, a gift). When that line is too long, what was bought gives way first: to how many things,
+      // and when a refund or the like needs the room, it goes.
       function receiptRow(row) {
-        var who = (row.retailer && (row.retailer.name || row.retailer.domain)) || "Unknown store";
+        var biz = bizOf(row), who = biz.name;
         var named = (row.items || []).filter(function (i) { return i.name; });
         var ref = row.orderRef && /^[#A-Za-z0-9-]{3,14}$/.test(row.orderRef) ? "Order " + (row.orderRef.charAt(0) === "#" ? "" : "#") + row.orderRef : null;
-        var title = named.length ? (named.length === 1 && Number(named[0].qty) > 1 ? named[0].qty + " × " : "") + headlineItem(row).name + (named.length > 1 ? " + " + (named.length - 1) + " more" : "") : who;
-        var subOf = function () { return [named.length ? who : ref, row.cancelled ? (row.cancelled.partial ? "Part cancelled" : "Cancelled") : null, refundOf(row) ? "Refunded " + money(refundOf(row), "GBP") : null, row.gift ? (row.gift.for ? "Gift for " + row.gift.for : "Gift") : null,
+        var title = who;
+        var subOf = function () { return [biz.via, boughtWords(row) || ref, row.cancelled ? (row.cancelled.partial ? "Part cancelled" : "Cancelled") : null, refundOf(row) ? "Refunded " + money(refundOf(row), "GBP") : null, row.gift ? (row.gift.for ? "Gift for " + row.gift.for : "Gift") : null,
           row.orderDate ? shortDate(row.orderDate + "T12:00:00Z") : null].filter(Boolean).join(", ") || "Receipt"; };
         var sub = subOf();
+        // The line in three parts: the platform, what was bought (the part that gives way), and the rest.
+        // (What gives way, in turn: a long order's list to how many things, then what was bought, when a cancellation, a
+        // refund or who a gift was for needs the room. A name still too long ends in "…".)
+        var drawSub = function (box, step) {
+          step = step || 0;
+          var multi = named.length > 1, gift = row.gift ? (row.gift.for ? "Gift for " + row.gift.for : "Gift") : null;
+          var back = [row.cancelled ? (row.cancelled.partial ? "Part cancelled" : "Cancelled") : null, refundOf(row) ? "Refunded " + money(refundOf(row), "GBP") : null].filter(Boolean);
+          var steps = [multi ? "count" : null, back.length || gift ? "what" : null].filter(Boolean), done = steps.slice(0, step);
+          var what = done.indexOf("what") >= 0 ? null : done.indexOf("count") >= 0 ? named.length + " items" : boughtWords(row) || ref;
+          var rest = back.concat(gift ? [gift] : [], row.orderDate ? [shortDate(row.orderDate + "T12:00:00Z")] : []);
+          box.textContent = "";
+          box.over = box.next = null; box.tries = 0; box.redraw = function () { drawSub(box, 0); };
+          if (!biz.via && !what && !rest.length) { box.appendChild(el("span", { text: "Receipt" })); return; }
+          if (biz.via) box.appendChild(el("span", { text: biz.via + (what || rest.length ? ", " : "") }));
+          // (Its comma goes with it, so a name cut short reads "Apple Music Individu… 16 Nov", never "… , 16 Nov".)
+          var whatEl = what ? el("span", { className: "rl-rr-what", text: what + (rest.length ? "," : "") }) : null;
+          if (whatEl) box.appendChild(whatEl);
+          if (rest.length) box.appendChild(el("span", { text: (what ? " " : "") + rest.join(", ") }));
+          if (!whatEl) return;
+          if (step >= steps.length) return;
+          box.over = function () { return whatEl.scrollWidth > whatEl.clientWidth + 1; };
+          box.next = function () { drawSub(box, step + 1); };
+          subFit(box);
+        };
         var wrap = el("div", { className: "rl-rr" });
         var btn = el("button", { type: "button", className: "rl-rr-main" });
         btn.setAttribute("aria-expanded", "false");
@@ -4124,8 +4219,11 @@
         var left = daysLeft(statedDeadline(row));
         if (left !== null && left >= 0) end.appendChild(el("span", { className: "rl-rr-chip " + (left <= 2 ? "red" : left <= 7 ? "amber" : "green"), text: left === 0 ? "Return today" : left + " day" + (left === 1 ? "" : "s") + " left" }));
         btn.appendChild(picw);
-        var subEl = el("span", { text: sub });
-        btn.appendChild(el("span", { className: "rl-rr-mid" }, [el("b", { text: title }), subEl]));
+        // (The line as drawn can leave things out to fit; the whole of it is read out, and found, from a copy kept apart.)
+        var subEl = el("span", { className: "rl-rr-sub" }), subAll = el("span", { className: "rl-sr", text: sub });
+        subEl.setAttribute("aria-hidden", "true");
+        drawSub(subEl);
+        btn.appendChild(el("span", { className: "rl-rr-mid" }, [el("b", { text: title }), subEl, subAll]));
         btn.appendChild(end);
         wrap.appendChild(btn);
         var detail = null;
@@ -4167,7 +4265,7 @@
             pick.disabled = true;
             api("/relay/my/receipts/" + row.id + "/category", { method: "POST", body: { category: pick.value } }).then(function () { say(status, "Thanks, Relay will remember this for " + who + "."); loadList(); }); };
           detail.appendChild(el("label", { className: "rl-rc-group" }, [el("span", { text: row.categoryLearned ? "Group (as you taught Relay)" : "Group" }), el("span", { className: "rl-rc-pickw" }, [pick, jIc("down", 16)])]));
-          detail.appendChild(giftControl(row, function () { subEl.textContent = subOf(); giftMark(); find(); }));
+          detail.appendChild(giftControl(row, function () { subAll.textContent = subOf(); drawSub(subEl); giftMark(); find(); }));
           // Anything read wrong: fix it here (and say what was fixed, once it has been).
           var fx = row.fixed || null, fixedParts = fx ? [fx.shop && "shop", fx.total && "total", fx.date && "date", fx.items && "items"].filter(Boolean) : [];
           var fixText = fixedParts.length ? "You corrected the " + (fixedParts.length > 1 ? fixedParts.slice(0, -1).join(", ") + " and " + fixedParts[fixedParts.length - 1] : fixedParts[0]) + "." : "Something read wrong?";
@@ -4206,7 +4304,7 @@
         };
         // What the search box matches: the shop, the order number, what was bought, and who a gift was for.
         var find = function () {
-          wrap.setAttribute("data-find", [row.retailer && row.retailer.name, row.retailer && row.retailer.domain, row.orderRef, named.map(function (i) { return i.name + (i.variant ? " " + i.variant : ""); }).join(", "),
+          wrap.setAttribute("data-find", [row.retailer && row.retailer.name, row.retailer && row.retailer.domain, typeof row.merchant === "string" ? row.merchant : null, row.orderRef, named.map(function (i) { return i.name + (i.variant ? " " + i.variant : ""); }).join(", "),
             row.gift ? "gift " + (row.gift.for || "") : null].filter(Boolean).join(" ").toLowerCase());
         };
         find();
@@ -4320,8 +4418,8 @@
             if (/^\d{4}$/.test(f) && String(r.orderDate || "").slice(0, 4) !== f) return false;
             if (f.indexOf("for:") === 0 && String((r.gift && r.gift.for) || "").toLowerCase() !== f.slice(4)) return false;
             if (!q) return true;
-            var names = (r.items || []).map(function (i) { return i.name; }).join(" ");
-            return [r.retailer && r.retailer.name, r.retailer && r.retailer.domain, r.orderRef, names, r.gift && r.gift.for].filter(Boolean).join(" ").toLowerCase().indexOf(q) !== -1;
+            var names = (r.items || []).map(function (i) { return i.name + (i.variant ? " " + i.variant : ""); }).join(" ");
+            return [r.retailer && r.retailer.name, r.retailer && r.retailer.domain, typeof r.merchant === "string" ? r.merchant : null, r.orderRef, names, r.gift && r.gift.for].filter(Boolean).join(" ").toLowerCase().indexOf(q) !== -1;
           });
           body.textContent = "";
           if (!pick.length) { body.appendChild(el("div", { className: "rl-empty" }, [el("h3", { text: q ? "Nothing matches that search" : "Nothing here" }), el("p", { text: q ? "Try a shop name, an item or an order number." : "Try another filter." })])); return; }
@@ -9386,11 +9484,6 @@
     var pool = own.length ? own : items;
     return pool.reduce(function (best, i) { return cost(i) > cost(best) ? i : best; }, pool[0]);
   }
-  function receiptTitle(x) {
-    var items = (x.items || []).filter(function (i) { return i.name; });
-    if (!items.length) return noItemsTitle(x);
-    return headlineItem(x).name + (items.length > 1 ? " + " + (items.length - 1) + " more" : "");
-  }
   // ---- Return tracking (worker/return-tracking.js) ----
   // Where a return has got to: Return started, Sent back, Received by the shop, Refund issued. Each step has the day and who
   // said so (a carrier, the shop's email, or "you said"); Relay shows only what it was told.
@@ -9711,11 +9804,13 @@
     var date = x.orderDate ? new Date(x.orderDate + "T00:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" }) : null;
     var price = one ? (Number.isInteger(one.pricePence) ? money(one.pricePence * (Number(one.qty) > 1 && !one.lineTotal ? Number(one.qty) : 1), x.currency) : "") : x.totalPence == null ? "" : money(x.totalPence, x.currency);
     var named = (x.items || []).filter(function (i) { return i && i.name; });
-    var itemName = one ? one.name : named.length ? receiptTitle(x) : null;
+    var itemName = one ? one.name : named.length ? boughtWords(x) : null;
     var count = one && (x.items || []).length > 1 ? x.items.length : 0;
-    // What it is, with the price; under it the shop. Without an item name, the shop is the title and the order day goes under.
-    var title = itemName || who;
-    var under = itemName ? who + (count ? ", 1 of " + count + " in this order" : "") : x.itemCount ? noItemsTitle(x) + (date ? ", ordered " + date : "") : date ? "Ordered " + date : "";
+    // Shop first, as on Home and in Receipts: the business is the title (the restaurant for a takeaway, the game for an
+    // in-app purchase), with the price; under it what was bought (and the platform it came through), or the order day.
+    var biz = bizOf(x);
+    var title = biz.name;
+    var under = (biz.via ? biz.via + (itemName || x.itemCount || date ? ", " : "") : "") + (itemName ? itemName + (count ? ", 1 of " + count + " in this order" : "") : x.itemCount ? noItemsTitle(x) + (date ? ", ordered " + date : "") : date ? (biz.via ? "ordered " : "Ordered ") + date : "");
     var info = el("div", { className: "rl-po-info" }, [
       el("div", { className: "rl-po-head" }, [el("h3", { className: "rl-po-brand", text: title }), el("div", { className: "rl-po-price", text: price })]),
       el("div", { className: "rl-po-meta", text: under })]);
@@ -9735,12 +9830,12 @@
     var dlDay = dl ? new Date(dl + "T00:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "long", timeZone: "UTC" }) : "";
     card.setAttribute("role", "button");
     card.setAttribute("tabindex", "0");
-    card.setAttribute("aria-label", [title, itemName ? who : null, price, opts.deadline !== false && dl ? "return by " + dlDay : null].filter(Boolean).join(", "));
+    card.setAttribute("aria-label", [title, under, price, opts.deadline !== false && dl ? "return by " + dlDay : null].filter(Boolean).join(", "));
     // Its page: the picture and what it is, what you can do, then the return date, the receipt and the order's details.
     var details = function () {
       open(function (sheet) {
         var pic = el("div", { className: "rl-po-img rl-dt-pic" }); pic.setAttribute("aria-hidden", "true"); receiptPic(pic, x, 40, 48);
-        sheet.appendChild(el("div", { className: "rl-dt-head" }, [pic, el("div", { className: "rl-dt-name" }, [el("h2", { text: title }), el("p", { className: "rl-dt-sub", text: itemName ? who : date ? "Ordered " + date : "" })])]));
+        sheet.appendChild(el("div", { className: "rl-dt-head" }, [pic, el("div", { className: "rl-dt-name" }, [el("h2", { text: title }), el("p", { className: "rl-dt-sub", text: under })])]));
         var shipSpot = el("div", { className: "rl-dt-ship" });
         if (showShip) shipSpot.appendChild(shipLine(dv));
         sheet.appendChild(shipSpot);
@@ -10838,7 +10933,8 @@
     orderRows(receipts).filter(notConfirmed(purchases)).forEach(function (x) {
       if (isCarrier(x) || !/^\d{4}-\d{2}-\d{2}$/.test(x.orderDate || "")) return;
       // A takeaway ordered through an app (Just Eat, Uber Eats, Deliveroo) is named after the restaurant (x.merchant).
-      var who = (typeof x.merchant === "string" && x.merchant.trim()) || (x.retailer && (x.retailer.name || x.retailer.domain)) || "Shop";
+      // (And an in-app purchase after its game, bizOf: the same business as Receipts shows.)
+      var who = bizOf(x).name || "Shop";
       var named = (x.items || []).filter(function (i) { return i && i.name; });
       // An order where only some things can go back (a kettle in a food shop): those lead the card, and its line names them.
       var keep = x.returnable === false ? (x.returnableItems || []).map(function (i) { return (x.items || [])[i]; }).filter(function (i) { return i && i.name; }) : [];

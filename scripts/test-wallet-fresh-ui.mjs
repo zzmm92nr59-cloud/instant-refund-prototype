@@ -89,8 +89,9 @@ await page.waitForTimeout(800);
 const r = await page.locator("#view").innerText();
 assert.ok(!/On its way with Royal Mail[\s\S]*Red Dragon|Red Dragon[\s\S]{0,200}On its way/.test(r), "no stale delivery line in Receipts");
 await openReceiptKind(page, "Fashion");
-await page.locator("#view").getByText("F&F Denim Jacket + 1 more").waitFor();
-assert.ok(!/Finest Sourdough \+ 1 more/.test(await page.locator("#view").innerText()), "a card is named after the costliest thing of the receipt's own kind, not the first line");
+// (Shop first since 21 Nov 2026: what was bought is on the line under the shop, "… and 1 more", read out whole.)
+await page.locator("#view .rl-rr-mid .rl-sr", { hasText: "F&F Denim Jacket and 1 more" }).first().waitFor({ state: "attached" });
+assert.ok(!/Finest Sourdough and 1 more/.test(await page.locator("#view").textContent()), "a receipt is described by the costliest thing of its own kind, not the first line");
 console.log("ok - receipts keep old orders without an out-of-date delivery line; each card is named after its main thing");
 assert.deepEqual(errors, [], "no page errors");
 console.log("PASS Home freshness: nothing shown as on its way that isn't, no delivery companies as shops, logos when there's no photo");

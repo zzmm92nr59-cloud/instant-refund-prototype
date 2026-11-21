@@ -185,7 +185,7 @@ async function gmailGet(fetchImpl, url, headers) {
 // 42: codes to show or scan (scan-codes.js): a return barcode in a shipping email, a receipt's own barcode, a drop-off QR code,
 // a collection QR code and tickets' barcodes are kept with the order's receipt; an email that is only such a code for an order
 // it names is kept for it (kind "order_codes").
-export const PARSER_VERSION = 56;
+export const PARSER_VERSION = 57;
 // Which full read of every mailbox is due: version 33 of the reader was full read 14, and each reader version since is one
 // more, so a better reader always reaches old receipts too, without anyone having to remember to raise this.
 export const READER_FULL_REV = 14 + Math.max(0, PARSER_VERSION - 33);
@@ -2860,8 +2860,13 @@ async function listReceipts(env, shopperId, timing, opts = {}) {
     const policy = (group.returnable || keep.length) && !said ? policyFor(retailer, c.currency) : null;
     const byPolicy = policy ? policyReturnBy(c, policy, today) : null;
     const guess = byPolicy || (group.returnable || keep.length ? estimateReturnBy({ ...c, category: group.returnable ? group.category : "other", items: keep.length && !group.returnable ? keep.map((i) => items[i]) : items }, today) : null);
+    // Something digital (an app's coins, a subscription, a download) is never sent back: a window its email gives is to
+    // cancel or ask for a refund (Apple's "cancel within 14 days of receiving this invoice"), so it is no return deadline
+    // anywhere (cards, Home, reminders, the help chat). The window and the email's words stay for its page. Round 21.
+    const noReturn = (c.returns && c.returns.cancelWithin === true) || (group.category === "digital" && !keep.length);
+    const returns = noReturn && c.returns && c.returns.deadline ? { ...c.returns, deadline: null } : c.returns;
     // A photo is only shown when it is of the item bought (not the shop's logo or an advert in the email).
-    return { ...c, items, hasImage: Boolean(c.hasImage && c.photoIsItem === true), ...group, categoryLearned: Boolean(learned), storeKey: k,
+    return { ...c, ...(returns !== c.returns ? { returns } : {}), items, hasImage: Boolean(c.hasImage && c.photoIsItem === true), ...group, categoryLearned: Boolean(learned), storeKey: k,
       ...(keep.length ? { returnableItems: keep } : {}), ...(guess ? { returnBy: guess } : {}), ...(policy ? { returnPolicy: policyForApp(policy) } : {}) };
   });
 }
@@ -3574,6 +3579,8 @@ async function setReminder(env, shopperId, receiptId, on, now) {
     .bind(receiptId, shopperId).first();
   if (!row) return { status: 404, body: { error: "not_found" } };
   const d = JSON.parse(row.details);
+  // (Nothing digital is sent back: its email's window is to cancel, not a return deadline. Round 21.)
+  if ((d.returns && d.returns.cancelWithin === true) || categorise(d).category === "digital") return { status: 400, body: { error: "no_deadline" } };
   let deadline = d.kind === "return_instructions" ? d.deadline : null;
   if (!deadline && d.orderRef) {
     // A return email for the same order carries the exact date, so prefer it.
@@ -3603,7 +3610,7 @@ export async function sendReturnReminders(env, now = Date.now(), fetchImpl = fet
   if (!env.RELAY_DB || !env.RESEND_API_KEY) return { sent: 0 };
   await ensureGmailTables(env.RELAY_DB);
   const due = await env.RELAY_DB.prepare(
-    `SELECT r.receipt_id AS id, r.deadline AS deadline, r.title AS title, s.email AS email
+    `SELECT r.receipt_id AS id, r.deadline AS deadline, r.title AS title, s.email AS email, c.details AS details
      FROM return_reminders r
      JOIN shoppers s ON s.id = r.shopper_id
      JOIN captured_receipts c ON c.id = r.receipt_id AND c.status NOT IN ('dismissed','not_receipt')
@@ -3613,6 +3620,12 @@ export async function sendReturnReminders(env, now = Date.now(), fetchImpl = fet
   let sent = 0;
   const appUrl = String(env.RELAY_APP_URL || "https://zzmm92nr59-cloud.github.io/instant-refund-prototype/").split("#")[0];
   for (const r of due.results || []) {
+    // (A reminder asked for before Relay knew something digital is never sent back: dropped, not sent. Round 21.)
+    let d = null; try { d = JSON.parse(r.details || "null"); } catch { d = null; }
+    if (d && ((d.returns && d.returns.cancelWithin === true) || categorise(d).category === "digital")) {
+      await env.RELAY_DB.prepare("DELETE FROM return_reminders WHERE receipt_id = ? AND sent_at IS NULL").bind(r.id).run();
+      continue;
+    }
     const claimed = await env.RELAY_DB.prepare(
       "UPDATE return_reminders SET sent_at = ? WHERE receipt_id = ? AND sent_at IS NULL RETURNING receipt_id").bind(now, r.id).first();
     if (!claimed) continue;

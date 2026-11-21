@@ -89,7 +89,8 @@ await page.evaluate(() => window.scrollTo(0, 0));
 const m = await measure(); assert.deepEqual(m, { small: [], tiny: [] }, "polish rules on the group page");
 await page.screenshot({ path: "/tmp/shots/cat-food.png" });
 // A whole row opens its details.
-const row = page.locator(".rl-rr").filter({ hasText: "+ 11 more" });
+// (Shop first since 21 Nov 2026: what was bought is under the shop, "… and 11 more", or "12 items" when that doesn't fit.)
+const row = page.locator(".rl-rr").filter({ hasText: "and 11 more" });
 await row.locator(".rl-rr-main").click();
 assert.equal(await row.locator(".rl-rr-main").getAttribute("aria-expanded"), "true");
 await row.locator("select").waitFor();

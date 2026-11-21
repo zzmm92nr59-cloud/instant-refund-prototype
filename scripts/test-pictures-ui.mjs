@@ -73,8 +73,9 @@ for (let g = 0; g < groups.length; g++) {
   await page.locator(".rl-rr").first().waitFor();
   await page.waitForTimeout(700);
   for (const row of await page.locator(".rl-rr").all()) {
-    const shop = (await row.locator(".rl-rr-mid span").innerText()).split(/ · |, /)[0];
-    const title = await row.locator(".rl-rr-mid b").innerText();
+    // (Shop first since 21 Nov 2026: the row's title is the shop, and what was bought is on the line under it.)
+    const shop = await row.locator(".rl-rr-mid > b").innerText();
+    const title = ((await row.locator(".rl-rr-mid .rl-sr").textContent()) || "").split(", ")[0];
     const pic = row.locator(".rl-rr-pic");
     const info = { ill: await pic.getAttribute("data-ill"), logo: await pic.locator("img.rl-logo-img").count(), photo: await pic.evaluate(n => n.classList.contains("rl-has-photo")), text: (await pic.innerText()).trim(),
       src: (await pic.locator("img.rl-logo-img").count()) ? await pic.locator("img.rl-logo-img").first().getAttribute("src") : null };

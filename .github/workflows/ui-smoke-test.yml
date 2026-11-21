@@ -144,6 +144,8 @@ jobs:
         run: node --import ./scripts/record-app-requests.mjs scripts/test-phone-signin-ui.mjs
       - name: Test Home cards (a takeaway shows the restaurant, how many things and the total; View receipt after Profile)
         run: node --import ./scripts/record-app-requests.mjs scripts/test-home-cards-ui.mjs
+      - name: Test receipt titles (shop first; the restaurant or the game as the title; no return countdown on digital purchases; refunds shown whole; search by item)
+        run: node --import ./scripts/record-app-requests.mjs scripts/test-receipt-titles-ui.mjs
       - name: Test the help chat (an AI that says so, answers, once per tap, plain errors, a person by email)
         run: node --import ./scripts/record-app-requests.mjs scripts/test-support-chat-ui.mjs
       - name: Test delivery details and Buy filling in a shop's checkout (what goes to the shop, once per tap, plain words, without details)
