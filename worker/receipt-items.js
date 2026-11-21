@@ -708,7 +708,10 @@ function priceAbove(lines) {
     // (Never the total's own amount, "Order Total" over "£310.00" over "The Tiffany Blue Box®": what is under a total is not
     // what it paid for. Round 14.)
     const afterTotal = k > 0 && /\b(?:order|grand|basket|bag|invoice|final)?\s*total\b|\b(?:amount|balance)\s+(?:paid|due)\b/i.test(String(lines[k - 1] || "")) && !/\bsub-?\s?total\b/i.test(String(lines[k - 1] || ""));
-    if (b && !afterTotal && !a.names.length && a.prices.length === 1 && a.cells.length === 1 && !a.endWord && !a.negative && a.qty == null &&
+    // (Nor, in a list whose every item starts with "* ", a price straight under how many, "Quantity: 1" over "7.49 GBP" over
+    // "* Next thing": it is the item above's. Round 21b.)
+    const afterQty = k > 0 && /^[\s|]*(?:qty|quantity)\s*:?\s*\d{1,3}[\s|]*$/i.test(String(lines[k - 1] || "")) && /^[ \t]*\*[ \t]+\S/.test(String(lines[k + 1] || ""));
+    if (b && !afterTotal && !afterQty && !a.names.length && a.prices.length === 1 && a.cells.length === 1 && !a.endWord && !a.negative && a.qty == null &&
         b.names.length && !b.prices.length && !b.noise && !b.heading && !b.endWord && b.unit == null &&
         // (Never a money line's label: "£1.59" over "Inclusive of VAT at 20%" is a total and its VAT, not an item.)
         !END.test(b.cells[0] || "") && !FEE_NAME.test(b.cells[0] || "") && !/\b(?:vat|tax|total|subtotal|paid|balance|payment)\b/i.test(b.cells[0] || "") &&

@@ -64,7 +64,8 @@ export default function holdout16d() {
   // ---- PayPal's receipt for a game shop: one thing, its price before the tax PayPal adds: the thing cost what was paid --------
   add("holdout16d-paypal-offer-taxed", "PayPal", "'Special Offer', 'Qty: 1', '£2.66', 'Subtotal £2.66', 'Tax £0.53', 'Total £3.19 GBP'",
     payPalToAppcharge("Special Offer", "£2.66", "£0.53", "£3.19", "Thu, 30 Apr 2026 02:21:20 +0000", "8XY11111AB2223334"),
-    order([{ name: "Special Offer", qty: 1, unit: 319 }]), "Appcharge ltd", "2026-04-30", { shopAlso: ["Appcharge"] });
+    // (Round 21b: the offer at its price and the tax as its own line, as PayPal sets them out; it used to be the offer at £3.19.)
+    order([{ name: "Special Offer", qty: 1, unit: 266 }], { fees: [["Tax", 53]] }), "Appcharge ltd", "2026-04-30", { shopAlso: ["Appcharge"], fees: [["Tax", 53]] });
   // ---- PayPal's older receipt (guest checkout, 2023): "Payment to: <shop> <email>", the thing on labelled rows ----------------
   add("holdout16d-paypal-older-receipt", "PayPal", "'Your PayPal receipt', 'Payment to: The Riverside Herald Ltd accounts@…', 'Quantity | 1', 'Item | …', 'Price | €80.00 EUR', 'Invoice ID: WC-31002'",
     { from: "service@paypal.co.uk", subject: "Your PayPal receipt", date: "Mon, 25 Sep 2023 10:12:00 +0000",

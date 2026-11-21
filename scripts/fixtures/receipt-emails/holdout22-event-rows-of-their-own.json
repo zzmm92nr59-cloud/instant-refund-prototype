@@ -28,10 +28,10 @@
   "totalPence": 0,
   "orderRef": "5f1a2b3c4d5e6f7a8b9c0d1e",
   "fees": [
-   {
-    "label": "Riverside 10K 2025 — 1x Booking Fee",
-    "pence": 325
-   }
+   [
+    "Riverside 10K 2025 — 1x Booking Fee",
+    325
+   ]
   ]
  }
 }

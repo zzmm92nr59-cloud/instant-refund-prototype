@@ -3048,7 +3048,25 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   // (A name the email itself cut short, "Harbourline Insulated Lunch Bag f...", read without its dots: the list is flagged, so
   // the app never passes a cut name off as whole. Round 13.)
   // (Not a payment service's receipt: PayPal cuts every long name and never gives it whole, so its name is said as given.)
-  const cutShort = viaPayPal ? [] : result.items.filter((i) => i.name && String(i.name).length >= 8 && [text, otherPart].some((t) => t && (t.includes(i.name + "...") || t.includes(i.name + "…"))));
+  // (A book's author written surname first, "Lane, Robin", read as the thing bought from the lines of a pasted page: the title
+  // on the line above it is, named as Amazon's text part names it, "Title of Lane, Robin". Round 21b.)
+  for (const i of result.items) {
+    const nm = String(i.name || "");
+    if (!/^\p{Lu}[\p{L}'’-]{1,24}, \p{Lu}[\p{L}.'’-]{0,20}(?: \p{Lu}[\p{L}.'’-]{0,20}){0,2}$/u.test(nm)) continue;
+    for (const t of [text, otherPart]) {
+      const ls = String(t || "").split("\n").map((l) => l.replace(/^[\s|]+|[\s|]+$/g, "")).filter(Boolean);
+      const k = ls.indexOf(nm);
+      if (k < 1 || !/^(?:sold by\b|condition\s*:)/i.test(ls[k + 1] || "")) continue;
+      const over = ls[k - 1];
+      if (over.length < 20 || over.length > 220 || /£|^(?:view|order|placed|qty|quantity)\b|:$/i.test(over)) continue;
+      i.name = over.replace(/\s*(?:\.\.\.|…)$/, "") + " of " + nm;
+      break;
+    }
+  }
+  // (Or a book's title cut short with its author put after it, "Plain Speaking: Revised of Lane, Robin". Round 21b.)
+  const cutForms = (n) => { const s = String(n || ""), k = s.lastIndexOf(" of "); return k >= 8 ? [s, s.slice(0, k)] : [s]; };
+  const cutShort = viaPayPal ? [] : result.items.filter((i) => i.name && String(i.name).length >= 8 && [text, otherPart].some((t) => t && cutForms(i.name).some((n) => n.length >= 8 && ["...", "…"].some((dots) => t.includes(n + dots)))));
+  if (cutShort.length) result.cutShortNames = true;
   if (cutShort.length && result.itemsCheck) result.itemsCheck = { ...result.itemsCheck, complete: false, namesCut: true, namesOk: false, suspectNames: [...(result.itemsCheck.suspectNames || []), ...cutShort.map((i) => ({ name: String(i.name).slice(0, 120), why: "cut" }))].slice(0, 10) };
   // (A product named by its model above its style code, "608" over "Style #:" over "WX608RG1", then its size and colour: the
   // thing bought is the model, its colour a detail. Only when the email labels the code. Round 14.)
@@ -3683,6 +3701,9 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
     const kept = result.fees.filter((f) => { const lab = low(String(f.label || "").split(/[:(]/)[0]); return !(lab && result.items.some((i) => low(i.name) === lab && lineP(i) === f.pence)); });
     if (kept.length !== result.fees.length) { if (kept.length) result.fees = kept; else delete result.fees; }
   }
+  // (Names found cut short stay flagged when the email gives no total to check them against, Amazon's "Total £0.00" for
+  // priced items. Round 21b.)
+  if (result.cutShortNames) { if (result.itemsCheck && result.itemsCheck.namesCut && result.itemsCheck.complete == null) result.itemsCheck = { ...result.itemsCheck, complete: false, namesOk: false }; delete result.cutShortNames; }
   return result;
 }
 

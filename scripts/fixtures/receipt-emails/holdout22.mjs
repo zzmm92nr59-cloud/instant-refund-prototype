@@ -16,7 +16,7 @@
 import { order, expected, fixture, h, SHOPPER } from "./lib.mjs";
 
 const cells = (lines) => `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">${lines.map((l) => `<tr>${String(l).split(" | ").map((c) => `<td>${h(c).replace(/\n/g, "<br>")}</td>`).join("")}</tr>`).join("\n")}</table>`;
-const htmlPage = (title, lines) => `<html><head><title>${h(title)}</title></head><body>${cells(lines)}</body></html>`;
+const htmlPage = (title, lines, foot = "") => `<html><head><title>${h(title)}</title></head><body>${cells(lines)}${foot}</body></html>`;
 const AMZ = '"Amazon.co.uk" <auto-confirm@amazon.co.uk>';
 
 // ---- Amazon, 2025: "Ordered: 2 items", the items priced, "Total" over "£0.00"; then "Dispatched: 2 items", "Total £15.98" ----
@@ -26,10 +26,12 @@ const amzLines = (head, total) => [head, "Your Orders", `Thanks for your order, 
   vit[1].slice(0, 33) + "...", "Sold by Brightleaf Health", "Condition: New", "Quantity: 1", "£", "8", "49", "£ 8 49", "Total", total,
   "Amazon.co.uk is a trading name for Amazon EU Sarl, for Amazon Europe Core Sarl and for Amazon Media EU Sarl."];
 const amzText = (total) => [`Thanks for your order, ${SHOPPER.first}!`, "Order #", "204-1112223-3334445", "View or edit order", "", `* ${vit[0]}`, "  Quantity: 1", "  7.49 GBP", "", `* ${vit[1]}`, "  Quantity: 1", "  8.49 GBP", "", "Total", total].join("\n");
+// (The product pictures carry the whole titles as their alt text, as Amazon's do.)
+const amzAlts = vit.map((n) => `<p><img src="https://m.media-amazon.com/images/I/item.jpg" alt="${h(n)}" width="64" height="64"></p>`).join("");
 export const AMAZON = {
-  ordered: { from: AMZ, subject: "Ordered: 2 items", date: "Tue, 11 Mar 2025 09:12:00 +0000", html: htmlPage("Amazon.co.uk", amzLines("Ordered: 2 items", "£0.00")), text: amzText("0 GBP") },
+  ordered: { from: AMZ, subject: "Ordered: 2 items", date: "Tue, 11 Mar 2025 09:12:00 +0000", html: htmlPage("Amazon.co.uk", amzLines("Ordered: 2 items", "£0.00"), amzAlts), text: amzText("0 GBP") },
   dispatched: { from: '"Amazon.co.uk" <shipment-tracking@amazon.co.uk>', subject: "Dispatched: 2 items", date: "Wed, 12 Mar 2025 16:40:00 +0000",
-    html: htmlPage("Amazon.co.uk", amzLines("Dispatched: 2 items", "£15.98")), text: amzText("15.98 GBP") },
+    html: htmlPage("Amazon.co.uk", amzLines("Dispatched: 2 items", "£15.98"), amzAlts), text: amzText("15.98 GBP") },
 };
 
 // ---- A hotel booked through a travel site, to be paid at the property, and its cancellation naming it by "Itinerary #" -------
@@ -78,7 +80,7 @@ export default function holdout22() {
     add("holdout22-amazon-book-surname-first", "Amazon", "a book's title cut short over its author written surname first ('Lane, Robin'), then 'Sold by: Amazon EU S.a.r.L.', 'Qty: 1', its price",
       { from: AMZ, subject: 'Your Amazon.co.uk order of "Plain Speaking: Revised..."', date: "Sat, 18 Jan 2025 12:00:00 +0000",
         html: htmlPage('Your Amazon.co.uk order of "Plain Speaking: Revised..."', ["Your Orders", "Amazon.co.uk", "Order Confirmation", "Hello,", "Thanks for your order. We’ll let you know once your item(s) have dispatched.",
-          "Your order will be sent to:", SHOPPER.first, "Leeds", "United Kingdom", "Order #", "204-5556667-7778889", "View order details", title.slice(0, 36) + "...", "Lane, Robin", "Sold by: Amazon EU S.a.r.L.", "Qty: 1", "£6.40",
+          "Your order will be sent to:", SHOPPER.first, "Leeds", "United Kingdom", "Order #", "204-5556667-7778889", "View order details", title, "Lane, Robin", "Sold by: Amazon EU S.a.r.L.", "Qty: 1", "£6.40",
           "Order Total:", "£6.40", "Selected Payment Method:", "Mastercard"]),
         text: ["Amazon.co.uk Order Confirmation", "Order #204-5556667-7778889", "Ordered item(s):" + title + " of Lane, Robin £6.40", "Sold by: Amazon EU S.a.r.L.", "Order Total: £6.40"].join("\n") },
       o, "Amazon", "2025-01-18", { orderRef: "204-5556667-7778889" });
@@ -90,7 +92,7 @@ export default function holdout22() {
         html: htmlPage("RaceHub", ["Your receipt", "Each participant in your booking will receive a confirmation email containing important information about their event.",
           "Riverside 10K 2025 — 1x Riverside 10K Charity Entry - Charity", "£45.00", "Riverside 10K 2025 — 1x Booking Fee", "£3.25", "Riverside 10K 2025 — 1x Reserved Entry Discount", "-£48.25", "Total", "£0.00",
           "Payment Reference", "5f1a2b3c4d5e6f7a8b9c0d1e", "Got a question about your payment?"]) },
-      o, "RaceHub", "2025-03-20", { orderRef: "5f1a2b3c4d5e6f7a8b9c0d1e", fees: [{ label: "Riverside 10K 2025 — 1x Booking Fee", pence: 325 }] });
+      o, "RaceHub", "2025-03-20", { orderRef: "5f1a2b3c4d5e6f7a8b9c0d1e", fees: [["Riverside 10K 2025 — 1x Booking Fee", 325]] });
   }
   add("holdout22-shop-got-your-order", "Threadly", "'It’s in the bag' (a subject that says nothing): 'We've got your order', 'Order Number:', each thing over its code, 'Qty: 1', 'Size:', 'Colour:', 'Status:' and its price",
     THREADLY.order, order(threads.map(([n, , , , , now]) => ({ name: n, qty: 1, unit: Math.round(Number(now.slice(1)) * 100) }))), "Threadly", "2025-03-10", { orderRef: "UK2200113344" });
