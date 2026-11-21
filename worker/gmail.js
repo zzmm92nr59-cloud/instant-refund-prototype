@@ -1135,6 +1135,8 @@ function classify(rawText, ref, lenient = false) {
       // (When the email was sent, to the minute, so a payment service's receipt can find the shop's receipt for the same
       // purchase, and what a gift card paid of an Amazon order. Round 13.)
       ...(receipt.sentAt ? { sentAt: receipt.sentAt } : {}), ...(receipt.giftCardPence ? { giftCardPence: receipt.giftCardPence } : {}),
+      // (The reference is a payment service's own transaction ID, not the shop's order number. Round 21.)
+      ...(receipt.refIsPayment ? { refIsPayment: true } : {}),
       // (A stay booked to be paid at the property: nothing was taken up front, the card only guaranteed it. Round 15.)
       ...(receipt.payAtProperty ? { payAtProperty: true } : {}),
       // (An email about the order's progress, not the order: it never leads the order's card. Round 19.)
@@ -1167,8 +1169,12 @@ function classify(rawText, ref, lenient = false) {
         ...(can.subscription ? { subscription: true, subscriptionName: can.subscriptionName, endsOn: can.endsOn, refund: can.refund } : {}),
         retailer: can.retailer, source: "shopper_email", refundEligible: false, parserVersion: PARSER_VERSION };
     } else if (dis.ok) {
+      // (A dispatch email that lists the order's items and states its total, "Total £15.98", when the order's own email
+      // printed "Total £0.00" for priced items: the amount it states is kept, for an order with no total to take. Round 21.)
+      let stated = null;
+      try { const r = parseReceiptEmail(rawText, { lenient: true }); if (r.ok && Number.isInteger(r.totalPence) && r.totalPence > 0 && (r.items || []).length && r.orderRef && sameOrderRef(r.orderRef, dis.orderRef)) stated = r; } catch { stated = null; }
       details = { kind: "delivery_update", ...ref, status: dis.status, at: dis.at, carrier: dis.carrier, trackingNumber: dis.trackingNumber,
-        merchant: null, retailer: dis.retailer, orderRef: dis.orderRef, source: "shopper_email", refundEligible: false, parserVersion: PARSER_VERSION };
+        merchant: null, retailer: dis.retailer, orderRef: dis.orderRef, ...(stated ? { orderTotalPence: stated.totalPence, currency: stated.currency || "GBP" } : {}), source: "shopper_email", refundEligible: false, parserVersion: PARSER_VERSION };
     } else {
       // Remember that this email is not one of ours so it is never fetched again.
       details = { kind: "not_receipt", parserVersion: PARSER_VERSION };
@@ -1921,6 +1927,20 @@ export function laterCopies(g) {
   }
   return out;
 }
+// The shop's own word on what was finally paid (a supermarket's delivery-day email, "Payment received: £99.40") is the
+// order's total. When it isn't what the order's items came to (the order was changed, or weighed items cost more), the
+// card says some items may be missing: the full receipt is the shop's attachment, which Relay doesn't read. Round 10.
+function paidIs(c, o) {
+  if (c.totalPence != null && c.totalPence !== o.totalPence) c.estimatedTotalPence = c.totalPence;
+  c.totalPence = o.totalPence; c.currency = o.currency || c.currency; c.paidFrom = "shop";
+  const sum = (c.items || []).reduce((n, i) => n + (lineOf(i) ?? NaN), 0);
+  // (What the order's own emails add to its items, its delivery fee: worked out from the estimate when there is one, or the
+  // fees they list when the estimate was what was paid. Round 21.)
+  const fees = c.estimatedTotalPence != null && c.itemsCheck && Number.isInteger(c.itemsCheck.itemsPence) ? c.estimatedTotalPence - c.itemsCheck.itemsPence : (c.fees || []).reduce((n, f) => n + (Number.isInteger(f.pence) ? f.pence : 0), 0);
+  if (!(c.items || []).length || Number.isNaN(sum) || Math.abs(sum + fees - o.totalPence) > 1) c.itemsCheck = { ...(c.itemsCheck || {}), complete: false, paidDiffers: true, expectedPence: o.totalPence - fees, missingPence: Number.isNaN(sum) ? null : o.totalPence - fees - sum, ...(o.detailsInAttachment ? { inAttachment: o.detailsInAttachment } : {}) };
+  else if (c.itemsCheck && (c.itemsCheck.complete !== true || c.itemsCheck.missingPence !== 0 || c.itemsCheck.expectedPence !== o.totalPence - fees)) c.itemsCheck = { ...c.itemsCheck, complete: true, expectedPence: o.totalPence - fees, missingPence: 0 };
+  if (o.detailsInAttachment && !c.detailsInAttachment) c.detailsInAttachment = o.detailsInAttachment;
+}
 // opts.keyFor(email): the group an email must be in (the shopper's own "same order" / "different orders", order-joins.js),
 // or undefined for the reader's own joining.
 export function mergeOrderEmails(orders, opts = {}) {
@@ -1966,7 +1986,7 @@ export function mergeOrderEmails(orders, opts = {}) {
   const near = (a, b) => a.sentAt && b.sentAt && Math.abs(Date.parse(a.sentAt) - Date.parse(b.sentAt)) <= 10 * 60000;
   const paidFits = (p, o) => o !== p && !(o.retailer && o.retailer.via) && o.orderRef && !isForwarded(o) && o.retailer && o.retailer.domain && p.retailer.name &&
     nameFitsDomain(p.retailer.name, o.retailer.domain) && o.totalPence != null && o.totalPence === p.totalPence && (o.currency || "GBP") === (p.currency || "GBP") && near(o, p);
-  const unref = orders.filter((p) => p.retailer && p.retailer.via && !p.orderRef && p.totalPence != null && p.sentAt && !isForwarded(p));
+  const unref = orders.filter((p) => p.retailer && p.retailer.via && (!p.orderRef || p.refIsPayment) && p.totalPence != null && p.sentAt && !isForwarded(p));
   const byTotal = unref.length ? indexBy(orders, (o) => [o.totalPence]) : null, unrefByTotal = indexBy(unref, (q) => [q.totalPence]);
   // (Several purchases of the same money minutes apart, "Special Offer £2.39" bought twice four minutes apart, each with its
   // PayPal receipt seconds after the shop's: each receipt goes with the shop's receipt nearest to it in time, when each is
@@ -2116,8 +2136,13 @@ export function mergeOrderEmails(orders, opts = {}) {
     // change) replace what the confirmation listed, so taken-off items are gone and added ones are there. Round 12.
     const changes = g.filter(o => o.orderUpdate === "amended" && (o.items || []).length).sort((a, b) => String(a.amendedAt || "").localeCompare(String(b.amendedAt || "")) || a.createdAt - b.createdAt);
     const latest = changes[changes.length - 1];
+    // (The paid receipt leads when the order's first confirmation isn't there, only its change and its delivery-day email: the
+    // change's list and estimate replace the paid email's empty list, and the amount paid is put back over the estimate below,
+    // with the change's delivery fee. Round 21.)
+    const paidLead = latest && c.orderUpdate === "paid" && c.totalPence != null ? { totalPence: c.totalPence, currency: c.currency, detailsInAttachment: c.detailsInAttachment || null } : null;
     if (latest) {
       c.items = latest.items.map(i => ({ ...i }));
+      if (paidLead) { delete c.orderUpdate; if (!(c.fees || []).length && (latest.fees || []).length) c.fees = latest.fees.map(f => ({ ...f })); }
       if (latest.itemsCheck) c.itemsCheck = latest.itemsCheck;
       if (latest.totalPence != null) { c.totalPence = latest.totalPence; c.currency = latest.currency || c.currency; }
       if (latest.itemCount) c.itemCount = latest.itemCount; else delete c.itemCount;
@@ -2179,14 +2204,7 @@ export function mergeOrderEmails(orders, opts = {}) {
       // The shop's own word on what was finally paid (a supermarket's delivery-day email, "Payment received: £99.40") is the
       // order's total. When it isn't what the order's items came to (the order was changed, or weighed items cost more), the
       // card says some items may be missing: the full receipt is the shop's attachment, which Relay doesn't read. Round 10.
-      if (o.orderUpdate === "paid" && o.totalPence != null && c.orderUpdate !== "paid") {
-        if (c.totalPence != null && c.totalPence !== o.totalPence) c.estimatedTotalPence = c.totalPence;
-        c.totalPence = o.totalPence; c.currency = o.currency || c.currency; c.paidFrom = "shop";
-        const sum = (c.items || []).reduce((n, i) => n + (lineOf(i) ?? NaN), 0);
-        const fees = c.estimatedTotalPence != null && c.itemsCheck && Number.isInteger(c.itemsCheck.itemsPence) ? c.estimatedTotalPence - c.itemsCheck.itemsPence : 0;
-        if (!(c.items || []).length || Number.isNaN(sum) || Math.abs(sum + fees - o.totalPence) > 1) c.itemsCheck = { ...(c.itemsCheck || {}), complete: false, paidDiffers: true, expectedPence: o.totalPence - fees, missingPence: Number.isNaN(sum) ? null : o.totalPence - fees - sum, ...(o.detailsInAttachment ? { inAttachment: o.detailsInAttachment } : {}) };
-        if (o.detailsInAttachment && !c.detailsInAttachment) c.detailsInAttachment = o.detailsInAttachment;
-      }
+      if (o.orderUpdate === "paid" && o.totalPence != null && c.orderUpdate !== "paid") paidIs(c, o);
       if (o.shipment && o.shipment.trackingNumber && !(c.shipment && c.shipment.trackingNumber)) c.shipment = o.shipment;
       if (o.returns) {
         const r = c.returns || (c.returns = {});
@@ -2195,6 +2213,7 @@ export function mergeOrderEmails(orders, opts = {}) {
         r.qrMentioned = Boolean(r.qrMentioned || o.returns.qrMentioned); r.labelMentioned = Boolean(r.labelMentioned || o.returns.labelMentioned);
       }
     }
+    if (paidLead) paidIs(c, paidLead);
     // (What was paid, as the payment service says it, when the shop's own email gave another amount for the same order
     // number: the shop's before VAT or before delivery. Round 15.)
     const paidBy = !(c.retailer && c.retailer.via) && rest.find((o) => o.retailer && o.retailer.via && o.totalPence != null && (o.currency || "GBP") === (c.currency || "GBP") && o.orderRef && c.orderRef && refCore(o.orderRef) === refCore(c.orderRef));
@@ -2340,6 +2359,12 @@ export function attachDeliveries(orders, deliveries) {
           !sameStore(o).some(p => p !== o && storeKey(p) === storeKey(o) && p.orderDate > o.orderDate && p.orderDate <= d.at);
       }
       if (!hit) continue;
+      // (The order's total as its dispatch email states it, for an order whose own email gave none. Round 21.)
+      if (o.totalPence == null && Number.isInteger(d.orderTotalPence) && d.orderTotalPence > 0 && byRef(d) && (d.currency || "GBP") === (o.currency || "GBP")) {
+        o.totalPence = d.orderTotalPence; o.totalFrom = "dispatch";
+        const sum = (o.items || []).reduce((n, i) => n + (lineOf(i) ?? NaN), 0), add = (o.fees || []).reduce((n, f) => n + (f.pence || 0), 0) - (o.discounts || []).reduce((n, f) => n + (f.pence || 0), 0);
+        if ((o.items || []).length && !Number.isNaN(sum)) o.itemsCheck = { ...(o.itemsCheck || {}), complete: Math.abs(sum + add - o.totalPence) <= 1, itemsPence: sum, expectedPence: o.totalPence - add, missingPence: o.totalPence - add - sum };
+      }
       if (!best || (STAGE[d.status] || 0) > (STAGE[best.status] || 0) || ((STAGE[d.status] || 0) === (STAGE[best.status] || 0) && (d.at || "") > (best.at || ""))) {
         best = { status: d.status, at: d.at || null, carrier: d.carrier || (best && best.carrier) || null, trackingNumber: d.trackingNumber || (best && best.trackingNumber) || null };
       } else if (best && !best.carrier && d.carrier) best.carrier = d.carrier;

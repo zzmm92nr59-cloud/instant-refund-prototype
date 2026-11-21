@@ -1,0 +1,35 @@
+{
+ "id": "holdout22-amazon-ordered-total-zero",
+ "sender": "Amazon",
+ "layout": "'Ordered:' layout whose 'Total' says £0.00 though both items are priced, with no gift card or promotion named",
+ "headers": {
+  "from": "\"Amazon.co.uk\" <auto-confirm@amazon.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Ordered: 2 items",
+  "date": "Tue, 11 Mar 2025 09:12:00 +0000"
+ },
+ "html": "<html><head><title>Amazon.co.uk</title></head><body><table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"><tr><td>Ordered: 2 items</td></tr>\n<tr><td>Your Orders</td></tr>\n<tr><td>Thanks for your order, Sam!</td></tr>\n<tr><td>Arriving tomorrow</td></tr>\n<tr><td>Sam – Leeds</td></tr>\n<tr><td>Order # 204-1112223-3334445</td></tr>\n<tr><td>View or edit order</td></tr>\n<tr><td>Brightleaf Magnesium Glycinate Ca...</td></tr>\n<tr><td>Sold by Brightleaf Health</td></tr>\n<tr><td>Condition: New</td></tr>\n<tr><td>Quantity: 1</td></tr>\n<tr><td>&pound;</td></tr>\n<tr><td>7</td></tr>\n<tr><td>49</td></tr>\n<tr><td>&pound; 7 49</td></tr>\n<tr><td>Brightleaf Omega 3 Fish Oil 1000m...</td></tr>\n<tr><td>Sold by Brightleaf Health</td></tr>\n<tr><td>Condition: New</td></tr>\n<tr><td>Quantity: 1</td></tr>\n<tr><td>&pound;</td></tr>\n<tr><td>8</td></tr>\n<tr><td>49</td></tr>\n<tr><td>&pound; 8 49</td></tr>\n<tr><td>Total</td></tr>\n<tr><td>&pound;0.00</td></tr>\n<tr><td>Amazon.co.uk is a trading name for Amazon EU Sarl, for Amazon Europe Core Sarl and for Amazon Media EU Sarl.</td></tr></table></body></html>",
+ "text": "Thanks for your order, Sam!\nOrder #\n204-1112223-3334445\nView or edit order\n\n* Brightleaf Magnesium Glycinate Capsules - 120 Vegan Capsules - High Strength - Made in the UK\n  Quantity: 1\n  7.49 GBP\n\n* Brightleaf Omega 3 Fish Oil 1000mg - 180 Softgels - Lemon Flavour\n  Quantity: 1\n  8.49 GBP\n\nTotal\n0 GBP",
+ "expected": {
+  "shop": "Amazon",
+  "date": "2025-03-11",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Brightleaf Magnesium Glycinate Capsules - 120 Vegan Capsules - High Strength - Made in the UK",
+    "qty": 1,
+    "linePence": 749
+   },
+   {
+    "name": "Brightleaf Omega 3 Fish Oil 1000mg - 180 Softgels - Lemon Flavour",
+    "qty": 1,
+    "linePence": 849
+   }
+  ],
+  "subtotalPence": 1598,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": null
+ }
+}

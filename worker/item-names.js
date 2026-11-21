@@ -96,7 +96,9 @@ function why(name, opts, all) {
   if (shop && norm(n) === shop && all.length > 1) return "shop";
   const w = words(n);
   const fn = (n.match(FUNCTION_WORDS) || []).length;
-  if (kind.confidence === "low" && w.length >= 5 && (fn >= 2 || /[.!?]$/.test(n))) return "sentence";
+  // (A book's title as Amazon names it with its author, "… How to Say What You Mean of Lane, Robin": a title, not a sentence.
+  // Round 21.)
+  if (kind.confidence === "low" && w.length >= 5 && (fn >= 2 || /[.!?]$/.test(n)) && !/ of \p{Lu}[\p{L}'’-]{1,24}, \p{Lu}[\p{L}.'’-]{0,20}(?: \p{Lu}[\p{L}.'’-]{0,20}){0,2}$/u.test(n)) return "sentence";
   return null;
 }
 

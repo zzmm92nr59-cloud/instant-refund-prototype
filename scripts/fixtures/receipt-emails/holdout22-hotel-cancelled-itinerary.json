@@ -1,0 +1,18 @@
+{
+ "id": "holdout22-hotel-cancelled-itinerary",
+ "sender": "Expedia",
+ "layout": "'Expedia Hotel Cancellation Confirmation … (Itinerary # …)', 'your reservation was cancelled'",
+ "headers": {
+  "from": "\"Expedia.co.uk\" <expedia@eg.expedia.com>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Expedia Hotel Cancellation Confirmation - The Larkspur Hotel, Fri, 8 Aug - Tue, 12 Aug (Itinerary # 73001122334455)",
+  "date": "Tue, 17 Jun 2025 10:00:00 +0000"
+ },
+ "html": "<html><head><title>Expedia</title></head><body><table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"><tr><td>Your Expedia hotel cancellation is confirmed</td></tr>\n<tr><td>Hello Sam Taylor, your reservation was cancelled</td></tr>\n<tr><td>Itinerary # 73001122334455</td></tr>\n<tr><td>Your reservation with The Larkspur Hotel at 12 Example Street, Boston, MA, 02100 United States of America from Fri, 8 Aug to Tue, 12 Aug was cancelled.</td></tr>\n<tr><td>View cancelled reservation</td></tr>\n<tr><td>Refund summary</td></tr>\n<tr><td>Based on your cancellation policy, your refund will be issued to the payment method you used at checkout.</td></tr>\n<tr><td>Where to find help</td></tr>\n<tr><td>Itinerary # 73001122334455</td></tr></table></body></html>",
+ "text": "",
+ "expected": {
+  "notPurchase": {
+   "kind": "cancellation"
+  }
+ }
+}
