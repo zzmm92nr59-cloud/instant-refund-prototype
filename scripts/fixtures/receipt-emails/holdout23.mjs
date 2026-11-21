@@ -108,7 +108,9 @@ export default function holdout23() {
   const add = (id, sender, layout, m, o, shop, date, extra = {}) => { const f = fixture(id, sender, layout, m, expected(shop, date, o, extra)); out.push(f); return f; };
   const not = (id, sender, layout, m, kind, extra = {}) => { const f = fixture(id, sender, layout, m, { notPurchase: { kind, ...extra } }); out.push(f); return f; };
   not("holdout23-jeweller-cancelled-number-in-html", "Silverline", "'Order Cancellation': 'your order is now cancelled', the order number only in the HTML", JEWELLER.cancelled, "cancellation");
-  not("holdout23-takeaway-accepted", "Dinedash", "'Your order #… was accepted': 'Thank you for ordering from Lagoon Grill.' (no money: the order's news)", TAKEAWAY.accepted, "order_update");
+  // (The takeaway's "accepted" email is read in scripts/test-receipt-real-23.mjs only: as a row of a new kind, an earlier worker
+  // would take it for a cancellation, so the receipts-list comparison with that worker (test-receipts-list-speed.mjs) could not
+  // stay the same.)
   add("holdout23-outlet-savings-banner", "Bargain Barn", "'Congrats! You've saved at least £21.50' at the top, each thing's brand over its name, 'Size:', its price, '✕ 1', 'RRP' and 'Save'",
     OUTLET, order([{ name: "Tan Leather Weekend Holdall", qty: 1, unit: 3499 }, { name: "Grey Marl Merino Crew Jumper", qty: 1, unit: 1999 }], { fees: [["Standard Delivery", 399]] }), "Bargain Barn", "2024-12-03", { orderRef: "55120934" });
   add("holdout23-market-total-over-lines", "Craftly", "'Total ( 1 item' over ')' over '£16.20'; the item's name runs on into '- Transaction ID: …'",
