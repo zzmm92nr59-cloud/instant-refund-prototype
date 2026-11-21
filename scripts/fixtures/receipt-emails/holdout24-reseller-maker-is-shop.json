@@ -1,0 +1,31 @@
+{
+ "id": "holdout24-reseller-maker-is-shop",
+ "sender": "Paddle",
+ "layout": "'PhotoTidy (via Paddle.com)': the maker is the shop; the thing over its price before VAT, 'VAT (20%)' over its amount, 'Amount Paid' over the total",
+ "headers": {
+  "from": "\"PhotoTidy (via Paddle.com)\" <help@paddle.com>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your PhotoTidy receipt",
+  "date": "Mon, 12 Jan 2026 09:15:00 +0000"
+ },
+ "html": "<html><head><title>Your PhotoTidy receipt</title></head><body><table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"><tr><td>Your PhotoTidy subscription receipt</td></tr>\n<tr><td>Receipt # 11223344-55667788</td></tr>\n<tr><td>Amount Paid</td></tr>\n<tr><td>&pound;29.99</td></tr>\n<tr><td>Receipt Date</td></tr>\n<tr><td>12th January 2026</td></tr>\n<tr><td>Payment Method</td></tr>\n<tr><td></td></tr>\n<tr><td>PhotoTidy Pro Subscription - 2 devices</td></tr>\n<tr><td>&pound;24.99</td></tr>\n<tr><td>VAT (20%)</td></tr>\n<tr><td>&pound;5.00</td></tr>\n<tr><td>Amount Paid</td></tr>\n<tr><td>&pound;29.99</td></tr>\n<tr><td>View Receipt</td></tr>\n<tr><td>The &pound;29.99 payment will appear on your bank/card statement as:</td></tr>\n<tr><td>PADDLE.NET* PHOTOTIDY</td></tr>\n<tr><td>Your subscription will renew at &pound;29.99 unless you cancel, by 11th January 2027.</td></tr>\n<tr><td>Thanks,</td></tr>\n<tr><td>PhotoTidy</td></tr>\n<tr><td>Paddle.com Market Ltd, Judd House, 18-29 Mora Street, London EC1V 8BT</td></tr>\n<tr><td>11223344-55667788</td></tr></table></body></html>",
+ "text": "",
+ "expected": {
+  "shop": "PhotoTidy",
+  "date": "2026-01-12",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "PhotoTidy Pro Subscription - 2 devices",
+    "qty": 1,
+    "linePence": 2499
+   }
+  ],
+  "subtotalPence": 2499,
+  "feesPence": 500,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 2999,
+  "orderRef": "11223344-55667788"
+ }
+}

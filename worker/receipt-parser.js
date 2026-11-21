@@ -1589,8 +1589,8 @@ function shopOf({ ld, sender, fromName, subject, text, html, otherText }) {
   // Paddle.com)" <help@paddle.com>: the maker is the shop, the reseller only how it was sold. Only when the name in brackets
   // is the sending address's own. Round 23.)
   {
-    const vm = /^\s*"?(\p{L}[\p{L}\d&'’. -]{1,40}?)\s+\(via\s+([A-Za-z0-9-]+(?:\.[A-Za-z]{2,10}){0,2})\)"?\s*$/u.exec(String(sender?.name || ""));
-    if (vm && sentDomain && !asSent && vm[2].toLowerCase().split(".")[0] === domainBase(sentDomain).replace(/-/g, "") && !/^(?:orders?|no-?reply|support|team|billing|receipts?)$/i.test(vm[1])) ranked.name = vm[1].trim();
+    const vm = /^\s*"?(\p{L}[\p{L}\d&'’. -]{1,40}?)\s+\(via\s+([A-Za-z0-9-]+(?:\.[A-Za-z]{2,10}){0,2})\)"?\s*$/u.exec(String((asSent ? fw.name : sender?.name) || ""));
+    if (vm && sentDomain && vm[2].toLowerCase().split(".")[0] === domainBase(sentDomain).replace(/-/g, "") && !/^(?:orders?|no-?reply|support|team|billing|receipts?)$/i.test(vm[1])) ranked.name = vm[1].trim();
   }
   // Uber sends rides and Uber Eats orders from the same address and name: a food order is Uber Eats.
   if (/(^|\.)uber\.com$/i.test(sentDomain || "") && /^uber$/i.test(ranked.name || "") && (/\buber eats\b/i.test(subject) || (/\border\b/i.test(subject) && /\buber eats\b/i.test(text.slice(0, 4000))))) ranked.name = "Uber Eats";
@@ -3482,7 +3482,19 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   if (!result.orderRef) { const es = /(?:^|[\s|])(?:orden|pedido|n\.?\s?[°º]\s?de pedido|n[úu]mero de pedido)[ \t]*:[ \t]*((?=[A-Z0-9-]*\d)[A-Z0-9][A-Z0-9-]{4,23})(?![A-Za-z0-9-])/im.exec(text.slice(0, 8000)) || /(?:^|\s)(?:n\.?\s?[°º]\s?de pedido|n[úu]mero de pedido)[ \t]*:[ \t]*((?=[A-Z0-9-]*\d)[A-Z0-9][A-Z0-9-]{4,23})(?![A-Za-z0-9-])/i.exec(String(subject || "")); if (es) result.orderRef = es[1]; }
   // (A price written with its currency after it, "$ 150.00 MXN" under "Acceso por 2 horas": the code is never the thing
   // bought. The one line of that price is named by the line over it, when that line is a name. Round 23.)
-  if (result.items.length === 1 && /^(?:MXN|USD|EUR|GBP|CAD|AUD|PLN|CHF|SEK|NOK|DKK|JPY)$/.test(String(result.items[0].name || "").trim())) {
+  // (Nor the detail of a line, "Acceso por 2 horas | $ 150.00 MXN", nor a line of its own beside the real ones, the total's
+  // "$ 150.00 MXN" read again.)
+  const CUR_CODE = /^(?:MXN|USD|EUR|GBP|CAD|AUD|PLN|CHF|SEK|NOK|DKK|JPY)$/;
+  if (result.items.some((i) => CUR_CODE.test(String(i.name || "").trim()) || CUR_CODE.test(String(i.variant || "").trim()))) {
+    for (const i of result.items) if (CUR_CODE.test(String(i.variant || "").trim())) delete i.variant;
+    const kept = result.items.filter((i) => !CUR_CODE.test(String(i.name || "").trim()));
+    if (kept.length && kept.length < result.items.length) {
+      result.items = kept;
+      const sum = kept.reduce((n, i) => n + (lineOf(i) ?? NaN), 0);
+      if (!Number.isNaN(sum) && result.itemsCheck) result.itemsCheck = { ...result.itemsCheck, itemsPence: sum, complete: result.itemsCheck.expectedPence != null && sum === result.itemsCheck.expectedPence, missingPence: result.itemsCheck.expectedPence != null ? result.itemsCheck.expectedPence - sum : null };
+    }
+  }
+  if (result.items.length === 1 && CUR_CODE.test(String(result.items[0].name || "").trim())) {
     const code = String(result.items[0].name).trim();
     const ls = String(fromHtml || text).slice(0, 40000).split("\n").map((x) => x.replace(/^[\s|]+|[\s|]+$/g, "")).filter(Boolean);
     const k = ls.findIndex((x) => new RegExp("^(?:[A-Z]{0,2}\\$|€|£)?\\s?\\d{1,3}(?:,\\d{3})*(?:\\.\\d{2})?\\s?" + code + "$").test(x));
