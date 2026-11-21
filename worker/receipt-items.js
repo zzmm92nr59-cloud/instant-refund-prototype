@@ -97,7 +97,7 @@ const SKIP_END = /^(?:substitutions?|substituted items|delivered items|your item
 // Details under an item that are not extras: codes, sellers, delivery notes, links, a substitution's note.
 // ("When ordering on the McDonald's app" under a deal's name is the deal's condition. Round 15.)
 // (Round 3: barcodes and part numbers, "EAN: 4977961000000", "MPN: …"; a pre-order's release date; stock notes.)
-const DETAIL = /^(?:when ordering (?:on|via|through|in|with) (?:the )?[^|£\n]{2,30}? app\b|ticket (?:number|no\.?|holder|id)\s*:|(?:monthly|yearly|annual(?:ly)?|weekly|daily|one-off|lifetime)$|(?:ean|upc|gtin|isbn(?:-1[03])?|mpn|barcode|part (?:no\.?|number)|model (?:no\.?|number)|item code|code)\s*[:#]|\d{8,14}$|release(?:s|d)?\b|releasing\b|available (?:from|on)\b|pre-?order\b|in stock\b|back in stock\b|out on\b|expected (?:dispatch|delivery|on|by)\b|ships? (?:on|by|from|in)\b|art\.?\s?no\b\.?|article(?: no\.?| number)?\b|item no\b\.?|item number\b|cat\.?\s?no\b\.?|catalogue number\b|product code\b|sku\b|style (?:no\.?|code)\b|style\s*#|ref\.|ref:|seller\s*:|sold by|condition\s*:|edition\s*:|format\s*:|dispatch(?:es|ed)?\b|delivered\b|arriving\b|arrives\b|estimated\b|in-app purchase|report a problem|write a review|buy again|view item|renews\b|auto-renew|instead of\b|(?:no )?substitutions? (?:allowed|not allowed)\b|substitute|\(substitut|\(substitute\)|was £|save £|you save|price per\b|(?:clubcard|nectar|my morrisons|mywaitrose|member|rollback|lower)\s+price\b|rollback$|age[- ]restricted\b|over 18s?\b|(?:id|proof of age) (?:may|will|might) be (?:checked|required|asked for)|picked weight\b|estimated weight\b|replac(?:ed|es|ing)\b(?!\s*(?:with|by)\b)|£[\d.,]+\s*\/\s*(?:kg|100g|100ml|l|each|unit))/i;
+const DETAIL = /^(?:when ordering (?:on|via|through|in|with) (?:the )?[^|£\n]{2,30}? app\b|ticket (?:number|no\.?|holder|id)\s*:|(?:monthly|yearly|annual(?:ly)?|weekly|daily|one-off|lifetime)$|(?:ean|upc|gtin|isbn(?:-1[03])?|mpn|barcode|part (?:no\.?|number)|model (?:no\.?|number)|item code|code)\s*[:#]|\d{8,14}$|release(?:s|d)?\b|releasing\b|available (?:from|on)\b|pre-?order\b|in stock\b|back in stock\b|out on\b|expected (?:dispatch|delivery|on|by)\b|ships? (?:on|by|from|in)\b|art\.?\s?no\b\.?|article(?: no\.?| number)?\b|item no\b\.?|item number\b|cat\.?\s?no\b\.?|catalogue number\b|product code\b|sku\b|style (?:no\.?|code)\b|style\s*#|ref\.|ref:|seller\s*:|sold by|condition\s*:|(?:order |item )?status\s*:|edition\s*:|format\s*:|dispatch(?:es|ed)?\b|delivered\b|arriving\b|arrives\b|estimated\b|in-app purchase|report a problem|write a review|buy again|view item|renews\b|auto-renew|instead of\b|(?:no )?substitutions? (?:allowed|not allowed)\b|substitute|\(substitut|\(substitute\)|was £|save £|you save|price per\b|(?:clubcard|nectar|my morrisons|mywaitrose|member|rollback|lower)\s+price\b|rollback$|age[- ]restricted\b|over 18s?\b|(?:id|proof of age) (?:may|will|might) be (?:checked|required|asked for)|picked weight\b|estimated weight\b|replac(?:ed|es|ing)\b(?!\s*(?:with|by)\b)|£[\d.,]+\s*\/\s*(?:kg|100g|100ml|l|each|unit))/i;
 // (Or the size, the fit and how many set apart by slashes, "Waist 36"/91.5cm 30" Leg Trouser / Slim fit / Qty 1",
 // "16 1/2 Col 35 Sleeve Single Cuff / Slim fit / Qty 1": a size line, never the item's name. Round 12.)
 const VARIANT = /^[^|£]{2,70}\s\/\s[^|£/]{0,30}\bfit\s*(?:\/\s*(?:(?:qty|quantity)\s*:?\s*\d{1,3}\s*)?)?$|^(?:colou?r|(?:pack |uk |eu |us )?size|style|fit|length|width|waist|leg|flavou?r|scent|shade|strength|option|edition|storage|capacity|platform|format|pack|dosage|region|language|dimensions|finish|material|frame|lens(?:es)?|ticket type|seat(?:ing)?|block|row|area|section)\s*:\s*\S/i;
@@ -306,6 +306,9 @@ function readLine(raw) {
     if (i === 0 && cells.length === 1 && /^\p{Ll}/u.test(t) && /\.$/.test(t) && t.split(/\s+/).length <= 6) { line.noise = true; continue; }
     // (A heading or a button's words after a drawn symbol, "🧾 View Order", or with how many after them, "Product Ordered (3)",
     // are still that heading, never an item's name. Round 15e.)
+    // (A shop's chatty heading trailing off, "It’s in the bag...", "It's coming to...", "You've selected...": never a name.
+    // Round 21.)
+    if (i === 0 && cells.length === 1 && /^(?:it|you|we|here|that|this)(?:'|’)(?:s|ve|ll|re)\b[^£|]{0,40}(?:\.\.\.|…)$/i.test(String(c).trim())) { line.heading = true; continue; }
     if (HEADING.test(t) || HEADING.test(t.replace(/^[\p{Extended_Pictographic}\u{1F1E6}-\u{1F1FF}\uFE0F\u200D\s]+(?=\p{L})/u, "").replace(/\s*\(\d{1,3}\)$/, ""))) { line.heading = true; continue; }
     if (!line.names.length && s.tail) { line.nameRaw = s.untailed; line.nameTail = { name: keepAdd || t, raw: s.untailed }; }
     line.names.push(keepAdd || t);
@@ -425,7 +428,7 @@ export function readItems(text, opts = {}) {
   // (A label on its line and its value on the next, "size:" over "150x200 cm [King]", "Product code:" over "UKI83120652": one
   // line, so the value is the item's size or code, never a name. Round 11.)
   for (let k = raw.length - 2; k >= 0; k--) {
-    if ((/^[\s|]*(?:size|colou?r|style|fit|length|width|product code|item code|sku|code|style\s*(?:#|no\.?|code)|model(?: no\.?)?|ref(?:erence)?|article(?: no\.?)?|art\. ?no\.?)\s*:[\s|]*$/i.test(raw[k]) || /^[\s|]*(?:order|transaction|payment|invoice|receipt)\s+(?:id|number|no\.?)\s*:?[\s|]*$/i.test(raw[k])) && !/£|:\s*$/.test(raw[k + 1]) && raw[k + 1].trim().length <= 60) {
+    if ((/^[\s|]*(?:size|colou?r|style|fit|length|width|status|product code|item code|sku|code|style\s*(?:#|no\.?|code)|model(?: no\.?)?|ref(?:erence)?|article(?: no\.?)?|art\. ?no\.?)\s*:[\s|]*$/i.test(raw[k]) || /^[\s|]*(?:order|transaction|payment|invoice|receipt)\s+(?:id|number|no\.?)\s*:?[\s|]*$/i.test(raw[k])) && !/£|:\s*$/.test(raw[k + 1]) && raw[k + 1].trim().length <= 60) {
       raw.splice(k, 2, raw[k].replace(/[\s|]+$/, "") + " " + raw[k + 1].replace(/^[\s|]+/, ""));
       afterRow.splice(k + 1, 1);
     }
@@ -705,10 +708,16 @@ function priceAbove(lines) {
     // (Never the total's own amount, "Order Total" over "£310.00" over "The Tiffany Blue Box®": what is under a total is not
     // what it paid for. Round 14.)
     const afterTotal = k > 0 && /\b(?:order|grand|basket|bag|invoice|final)?\s*total\b|\b(?:amount|balance)\s+(?:paid|due)\b/i.test(String(lines[k - 1] || "")) && !/\bsub-?\s?total\b/i.test(String(lines[k - 1] || ""));
-    if (b && !afterTotal && !a.names.length && a.prices.length === 1 && a.cells.length === 1 && !a.endWord && !a.negative && a.qty == null &&
+    // (Nor, in a list whose every item starts with "* ", a price straight under how many, "Quantity: 1" over "7.49 GBP" over
+    // "* Next thing": it is the item above's. Round 21b.)
+    const afterQty = k > 0 && /^[\s|]*(?:qty|quantity)\s*:?\s*\d{1,3}[\s|]*$/i.test(String(lines[k - 1] || "")) && /^[ \t]*\*[ \t]+\S/.test(String(lines[k + 1] || ""));
+    if (b && !afterTotal && !afterQty && !a.names.length && a.prices.length === 1 && a.cells.length === 1 && !a.endWord && !a.negative && a.qty == null &&
         b.names.length && !b.prices.length && !b.noise && !b.heading && !b.endWord && b.unit == null &&
         // (Never a money line's label: "£1.59" over "Inclusive of VAT at 20%" is a total and its VAT, not an item.)
-        !END.test(b.cells[0] || "") && !FEE_NAME.test(b.cells[0] || "") && !/\b(?:vat|tax|total|subtotal|paid|balance|payment)\b/i.test(b.cells[0] || "")) {
+        !END.test(b.cells[0] || "") && !FEE_NAME.test(b.cells[0] || "") && !/\b(?:vat|tax|total|subtotal|paid|balance|payment)\b/i.test(b.cells[0] || "") &&
+        // (Nor a name that ends on what a money line is, "Riverside 10K 2026 — 1x Booking Fee", "… 1x Reserved Entry Discount":
+        // the price over it is the line before's. Round 21.)
+        !/\b(?:fees?|charges?|surcharge|discount|voucher|promo(?:tion)?|coupon)[\s.:)]*$/i.test(b.cells[0] || "")) {
       out.push(lines[k + 1].replace(/[\s|]+$/, "") + " | " + a.cells[0] + " |"); k++; continue;
     }
     out.push(lines[k]);

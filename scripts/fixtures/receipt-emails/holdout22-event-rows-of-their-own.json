@@ -1,0 +1,37 @@
+{
+ "id": "holdout22-event-rows-of-their-own",
+ "sender": "RaceHub",
+ "layout": "an event's receipt, each line's name and price on rows of their own: the entry, 'Booking Fee', a '-£48.25' discount, 'Total £0.00', 'Payment Reference' over its code",
+ "headers": {
+  "from": "RaceHub <noreply@info.racehub.example>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your RaceHub receipt",
+  "date": "Thu, 20 Mar 2025 14:05:00 +0000"
+ },
+ "html": "<html><head><title>RaceHub</title></head><body><table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"><tr><td>Your receipt</td></tr>\n<tr><td>Each participant in your booking will receive a confirmation email containing important information about their event.</td></tr>\n<tr><td>Riverside 10K 2025 — 1x Riverside 10K Charity Entry - Charity</td></tr>\n<tr><td>&pound;45.00</td></tr>\n<tr><td>Riverside 10K 2025 — 1x Booking Fee</td></tr>\n<tr><td>&pound;3.25</td></tr>\n<tr><td>Riverside 10K 2025 — 1x Reserved Entry Discount</td></tr>\n<tr><td>-&pound;48.25</td></tr>\n<tr><td>Total</td></tr>\n<tr><td>&pound;0.00</td></tr>\n<tr><td>Payment Reference</td></tr>\n<tr><td>5f1a2b3c4d5e6f7a8b9c0d1e</td></tr>\n<tr><td>Got a question about your payment?</td></tr></table></body></html>",
+ "text": "",
+ "expected": {
+  "shop": "RaceHub",
+  "date": "2025-03-20",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Riverside 10K 2025 — 1x Riverside 10K Charity Entry - Charity",
+    "qty": 1,
+    "linePence": 4500
+   }
+  ],
+  "subtotalPence": 4500,
+  "feesPence": 325,
+  "discountsPence": 4825,
+  "tipsPence": 0,
+  "totalPence": 0,
+  "orderRef": "5f1a2b3c4d5e6f7a8b9c0d1e",
+  "fees": [
+   [
+    "Riverside 10K 2025 — 1x Booking Fee",
+    325
+   ]
+  ]
+ }
+}

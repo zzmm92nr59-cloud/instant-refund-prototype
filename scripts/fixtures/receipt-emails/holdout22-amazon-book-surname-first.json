@@ -1,0 +1,31 @@
+{
+ "id": "holdout22-amazon-book-surname-first",
+ "sender": "Amazon",
+ "layout": "a book's title cut short over its author written surname first ('Lane, Robin'), then 'Sold by: Amazon EU S.a.r.L.', 'Qty: 1', its price",
+ "headers": {
+  "from": "\"Amazon.co.uk\" <auto-confirm@amazon.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your Amazon.co.uk order of \"Plain Speaking: Revised...\"",
+  "date": "Sat, 18 Jan 2025 12:00:00 +0000"
+ },
+ "html": "<html><head><title>Your Amazon.co.uk order of \"Plain Speaking: Revised...\"</title></head><body><table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"><tr><td>Your Orders</td></tr>\n<tr><td>Amazon.co.uk</td></tr>\n<tr><td>Order Confirmation</td></tr>\n<tr><td>Hello,</td></tr>\n<tr><td>Thanks for your order. We&rsquo;ll let you know once your item(s) have dispatched.</td></tr>\n<tr><td>Your order will be sent to:</td></tr>\n<tr><td>Sam</td></tr>\n<tr><td>Leeds</td></tr>\n<tr><td>United Kingdom</td></tr>\n<tr><td>Order #</td></tr>\n<tr><td>204-5556667-7778889</td></tr>\n<tr><td>View order details</td></tr>\n<tr><td>Plain Speaking: Revised and Updated Edition: How to Say What You Mean and Mean What You Say</td></tr>\n<tr><td>Lane, Robin</td></tr>\n<tr><td>Sold by: Amazon EU S.a.r.L.</td></tr>\n<tr><td>Qty: 1</td></tr>\n<tr><td>&pound;6.40</td></tr>\n<tr><td>Order Total:</td></tr>\n<tr><td>&pound;6.40</td></tr>\n<tr><td>Selected Payment Method:</td></tr>\n<tr><td>Mastercard</td></tr></table></body></html>",
+ "text": "Amazon.co.uk Order Confirmation\nOrder #204-5556667-7778889\nOrdered item(s):Plain Speaking: Revised and Updated Edition: How to Say What You Mean and Mean What You Say of Lane, Robin £6.40\nSold by: Amazon EU S.a.r.L.\nOrder Total: £6.40",
+ "expected": {
+  "shop": "Amazon",
+  "date": "2025-01-18",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Plain Speaking: Revised and Updated Edition: How to Say What You Mean and Mean What You Say of Lane, Robin",
+    "qty": 1,
+    "linePence": 640
+   }
+  ],
+  "subtotalPence": 640,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 640,
+  "orderRef": "204-5556667-7778889"
+ }
+}

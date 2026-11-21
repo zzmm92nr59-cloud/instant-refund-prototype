@@ -1,0 +1,18 @@
+{
+ "id": "holdout22-shop-dispatched",
+ "sender": "Threadly",
+ "layout": "'It's on its way' with the order's items under 'Order Number:'",
+ "headers": {
+  "from": "Threadly <mail@threadly.example>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "It's on its way",
+  "date": "Tue, 11 Mar 2025 08:30:00 +0000"
+ },
+ "html": "<html><head><title>Threadly</title></head><body><table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"><tr><td>Hey Sam Taylor</td></tr>\n<tr><td>Great news. Your parcel's on its way</td></tr>\n<tr><td>Order Number:<br>UK2200113344</td></tr>\n<tr><td>Order Date:<br>10/03/2025</td></tr>\n<tr><td>It's coming to...</td></tr>\n<tr><td>12 Example Road, Leeds, LS1 4AB</td></tr>\n<tr><td>You've selected...</td></tr>\n<tr><td>UK Next Day Delivery</td></tr>\n<tr><td>It&rsquo;s in the bag...</td></tr>\n<tr><td>Relaxed Linen Shirt In Sand</td></tr>\n<tr><td>QXA10021-101-34</td></tr>\n<tr><td>Qty: 1</td></tr>\n<tr><td>Size:<br>L</td></tr>\n<tr><td>Colour:<br>Sand</td></tr>\n<tr><td>Status:<br>Dispatched</td></tr>\n<tr><td>&pound;9.00</td></tr>\n<tr><td>Cropped Cargo Trouser</td></tr>\n<tr><td>QXA10022-102-34</td></tr>\n<tr><td>Qty: 1</td></tr>\n<tr><td>Size:<br>M</td></tr>\n<tr><td>Colour:<br>Olive</td></tr>\n<tr><td>Status:<br>Dispatched</td></tr>\n<tr><td>&pound;14.50</td></tr>\n<tr><td>Ribbed Tank Top</td></tr>\n<tr><td>QXA10023-103-34</td></tr>\n<tr><td>Qty: 1</td></tr>\n<tr><td>Size:<br>S</td></tr>\n<tr><td>Colour:<br>Black</td></tr>\n<tr><td>Status:<br>Dispatched</td></tr>\n<tr><td>&pound;6.00</td></tr>\n<tr><td>Subtotal: &pound;29.50</td></tr>\n<tr><td>Delivery: &pound;0.00</td></tr>\n<tr><td>Total Vat: &pound;4.92</td></tr>\n<tr><td>Discounts Included:</td></tr>\n<tr><td>ONSITE_SPRING_25OFF(- &pound;9.50)</td></tr>\n<tr><td>Order Total :</td></tr>\n<tr><td>&pound;29.50</td></tr>\n<tr><td>Payment Method: PayPal</td></tr></table></body></html>",
+ "text": "",
+ "expected": {
+  "notPurchase": {
+   "kind": "dispatch"
+  }
+ }
+}

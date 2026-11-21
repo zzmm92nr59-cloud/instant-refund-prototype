@@ -18,16 +18,22 @@
    {
     "name": "Special Offer",
     "qty": 1,
-    "linePence": 319
+    "linePence": 266
    }
   ],
-  "subtotalPence": 319,
-  "feesPence": 0,
+  "subtotalPence": 266,
+  "feesPence": 53,
   "discountsPence": 0,
   "tipsPence": 0,
   "totalPence": 319,
   "shopAlso": [
    "Appcharge"
+  ],
+  "fees": [
+   [
+    "Tax",
+    53
+   ]
   ]
  }
 }

@@ -1,0 +1,18 @@
+{
+ "id": "holdout22-amazon-dispatched-total",
+ "sender": "Amazon",
+ "layout": "'Dispatched: 2 items': the order's items and 'Total £15.98' (the order's news, never a second purchase)",
+ "headers": {
+  "from": "\"Amazon.co.uk\" <shipment-tracking@amazon.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Dispatched: 2 items",
+  "date": "Wed, 12 Mar 2025 16:40:00 +0000"
+ },
+ "html": "<html><head><title>Amazon.co.uk</title></head><body><table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"><tr><td>Dispatched: 2 items</td></tr>\n<tr><td>Your Orders</td></tr>\n<tr><td>Thanks for your order, Sam!</td></tr>\n<tr><td>Arriving tomorrow</td></tr>\n<tr><td>Sam – Leeds</td></tr>\n<tr><td>Order # 204-1112223-3334445</td></tr>\n<tr><td>View or edit order</td></tr>\n<tr><td>Brightleaf Magnesium Glycinate Ca...</td></tr>\n<tr><td>Sold by Brightleaf Health</td></tr>\n<tr><td>Condition: New</td></tr>\n<tr><td>Quantity: 1</td></tr>\n<tr><td>&pound;</td></tr>\n<tr><td>7</td></tr>\n<tr><td>49</td></tr>\n<tr><td>&pound; 7 49</td></tr>\n<tr><td>Brightleaf Omega 3 Fish Oil 1000m...</td></tr>\n<tr><td>Sold by Brightleaf Health</td></tr>\n<tr><td>Condition: New</td></tr>\n<tr><td>Quantity: 1</td></tr>\n<tr><td>&pound;</td></tr>\n<tr><td>8</td></tr>\n<tr><td>49</td></tr>\n<tr><td>&pound; 8 49</td></tr>\n<tr><td>Total</td></tr>\n<tr><td>&pound;15.98</td></tr>\n<tr><td>Amazon.co.uk is a trading name for Amazon EU Sarl, for Amazon Europe Core Sarl and for Amazon Media EU Sarl.</td></tr></table><p><img src=\"https://m.media-amazon.com/images/I/item.jpg\" alt=\"Brightleaf Magnesium Glycinate Capsules - 120 Vegan Capsules - High Strength - Made in the UK\" width=\"64\" height=\"64\"></p><p><img src=\"https://m.media-amazon.com/images/I/item.jpg\" alt=\"Brightleaf Omega 3 Fish Oil 1000mg - 180 Softgels - Lemon Flavour\" width=\"64\" height=\"64\"></p></body></html>",
+ "text": "Thanks for your order, Sam!\nOrder #\n204-1112223-3334445\nView or edit order\n\n* Brightleaf Magnesium Glycinate Capsules - 120 Vegan Capsules - High Strength - Made in the UK\n  Quantity: 1\n  7.49 GBP\n\n* Brightleaf Omega 3 Fish Oil 1000mg - 180 Softgels - Lemon Flavour\n  Quantity: 1\n  8.49 GBP\n\nTotal\n15.98 GBP",
+ "expected": {
+  "notPurchase": {
+   "kind": "dispatch"
+  }
+ }
+}
