@@ -141,7 +141,12 @@ const PAYDAY = base("77777777-7777-4777-8777-777777777777", "Fresh Basket", { to
 st = { receipts: [NOLIST, PAYDAY], log: [], reread: (id, j) => j({ error: "x" }, 500) };
 ({ ctx, page, errors } = await shopper());
 const lotus = await page.locator("#homePage .hl-sq", { hasText: "Lotus Grill" }).first().innerText();
-assert.match(lotus, /£8\.64/, "Home shows what it comes to after the refund\n" + lotus); assert.ok(!/Uber Eats/.test(lotus), "named after the restaurant\n" + lotus);
+assert.match(lotus, /£8\.64/, "Home shows what it comes to after the refund\n" + lotus);
+// Named after the restaurant; the app it came through is the line under it (as the Receipts list says it), never the name.
+const lotusSq = page.locator("#homePage .hl-sq", { hasText: "Lotus Grill" }).first();
+assert.equal(await lotusSq.locator(".hl-sqs").innerText(), "Lotus Grill", "named after the restaurant\n" + lotus);
+assert.equal(await lotusSq.locator(".hl-sqn").innerText(), "Uber Eats", "the app under the restaurant\n" + lotus);
+assert.equal((lotus.match(/Uber Eats/g) || []).length, 1, "the app said once\n" + lotus);
 await openFromHome(page, "Lotus Grill");
 txt = await sheetText(page);
 assert.match(txt, /Uber Eats' email doesn't list what you ordered/, txt); assert.match(txt, /It only gives the total, £17\.40\./);

@@ -265,6 +265,10 @@ export function cleanItem(item, stored = false) {
   if (/@|https?:|www\./i.test(name)) return null;
   // (A sign-off or a link's words where an item would be, "We hope to see you again soon.", "View order details". Round 13.)
   if (/^(?:we hope to see you (?:again|soon)\b|thank(?:s| you) for (?:shopping|your order)\b|we(?:'|’)ll let you know\b|view (?:or edit )?order(?: details)?$|view or edit order$)/i.test(name)) return null;
+  // (Who the order is from, "Order from Chapati Man (Whitechapel)", "Your order with Noodle Bar", "Receipt from Café Nine":
+  // the email's heading, never a thing bought. With no dishes listed the receipt has no items. Kept away from receipts read
+  // before too, as they are served.)
+  if (/^(?:your\s+)?(?:new\s+)?(?:order|receipt)\s+(?:from|with|at|for)\s+\S/i.test(name)) return null;
   // (A plan's period with the tax note under the item, Apple's "Monthly Inclusive of VAT at 20%", or the note alone. Round 15.)
   if (/^(?:(?:monthly|yearly|annual|weekly|quarterly)\s+)?(?:inclusive of|incl\.?|including)\s+vat(?:\s+at\s+\d{1,2}(?:\.\d)?%)?(?:\s*£\s?\d{1,4}\.\d{2})?$/i.test(name)) return null;
   // (A returns sentence under the item, "Returns accepted within 14 days of delivery", "Returns & exchanges not accepted".

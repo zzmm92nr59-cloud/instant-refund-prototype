@@ -142,8 +142,10 @@ jobs:
         run: node --import ./scripts/record-app-requests.mjs scripts/test-second-step-ui.mjs
       - name: Test signing in with your phone (a code, approved once from the phone, signs itself in, stops asking, runs out plainly)
         run: node --import ./scripts/record-app-requests.mjs scripts/test-phone-signin-ui.mjs
-      - name: Test Home cards (a takeaway shows the restaurant, how many things and the total; View receipt after Profile)
+      - name: Test Home cards (a takeaway shows the restaurant, the app, how many things and the total; never the name twice; View receipt after Profile)
         run: node --import ./scripts/record-app-requests.mjs scripts/test-home-cards-ui.mjs
+      - name: Test Shops on Relay with no shops yet (one next step, Connect your email or See your receipts)
+        run: node --import ./scripts/record-app-requests.mjs scripts/test-shops-empty-ui.mjs
       - name: Test receipt titles (shop first; the restaurant or the game as the title; no return countdown on digital purchases; refunds shown whole; search by item)
         run: node --import ./scripts/record-app-requests.mjs scripts/test-receipt-titles-ui.mjs
       - name: Test the help chat (an AI that says so, answers, once per tap, plain errors, a person by email)

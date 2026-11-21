@@ -1,7 +1,8 @@
 // Browser test: what a Home card says, and "View receipt" after Profile was opened. Stubbed Relay server, made-up person,
 // invented shops and restaurants. Nothing here proves a real phone.
 // Checks: a takeaway of several dishes ordered through an app shows the restaurant, how many things and what the whole
-// order came to (never the first dish and its own price: Connor, 19 Nov 2026); a single thing keeps its name and price;
+// order came to (never the first dish and its own price: Connor, 19 Nov 2026), with the app first ("Just Eat, 5 items");
+// one with no dishes listed shows the app under the restaurant, never "Order from" it again; a single thing keeps its name and price;
 // after Profile has been opened and left, a receipt opened from Home still opens its email with "View receipt".
 import assert from "node:assert/strict";
 import { createRequire } from "node:module"; import { createServer } from "node:http"; import { readFile, mkdir } from "node:fs/promises"; import { resolve, extname } from "node:path";
@@ -21,7 +22,10 @@ const receipts = [
     itemsCheck: { complete: true, itemsPence: 2260, expectedPence: 2260, missingPence: 0, namesOk: true } },
   { id: "bbbbbbbb-2222-4222-8222-222222222222", status: "pending", kind: "receipt", retailer: { name: "Fern & Finch", domain: "fernfinch.example" },
     orderDate: day(-3), totalPence: 4200, currency: "GBP", category: "fashion", returnable: true, gmailId: "msgbbbb2222",
-    items: [{ name: "Ribbed Knit Scarf", qty: 1, pricePence: 4200, category: "fashion" }], itemsCheck: { complete: true, itemsPence: 4200, expectedPence: 4200, missingPence: 0, namesOk: true } }
+    items: [{ name: "Ribbed Knit Scarf", qty: 1, pricePence: 4200, category: "fashion" }], itemsCheck: { complete: true, itemsPence: 4200, expectedPence: 4200, missingPence: 0, namesOk: true } },
+  // A takeaway whose email lists no dishes: the restaurant, then the app (never "Order from" the restaurant again).
+  { id: "cccccccc-3333-4333-8333-333333333333", status: "pending", kind: "receipt", retailer: { name: "Uber Eats", domain: "uber.com" }, merchant: "Saffron Corner (Bow)",
+    orderDate: day(-2), totalPence: 2136, currency: "GBP", category: "food", returnable: false, gmailId: "msgcccc3333", items: [] }
 ];
 let originals = 0;
 const browser = await chromium.launch();
@@ -51,13 +55,24 @@ await homeReady(page);
 // 1. The takeaway: the restaurant, how many dishes, the whole order's total.
 const take = page.locator("#homePage .hl-sq", { hasText: "Golden Lantern" });
 await take.waitFor();
-assert.equal(await take.locator(".hl-sqn").innerText(), "5 items");
+assert.equal(await take.locator(".hl-sqn").innerText(), "Just Eat, 5 items");
 assert.equal(await take.locator(".hl-sqp").innerText(), "£26.45");
 assert.ok(!/Crispy Chilli Beef|£7\.90/.test(await take.innerText()), "not the first dish and its own price");
 // One thing: its own name and price.
 const one = page.locator("#homePage .hl-sq", { hasText: "Fern & Finch" });
 assert.equal(await one.locator(".hl-sqn").innerText(), "Ribbed Knit Scarf");
 assert.equal(await one.locator(".hl-sqp").innerText(), "£42.00");
+// A takeaway with no dishes listed: the restaurant, then the app it came through, never the restaurant again.
+const bare = page.locator("#homePage .hl-sq", { hasText: "Saffron Corner (Bow)" });
+assert.equal(await bare.locator(".hl-sqs").innerText(), "Saffron Corner (Bow)");
+assert.equal(await bare.locator(".hl-sqn").innerText(), "Uber Eats");
+assert.ok(!/Order from/i.test(await bare.innerText()), "no 'Order from' line under the restaurant");
+// And no card's second line is only its title again.
+for (const sq of await page.locator("#homePage .hl-sq").all()) {
+  const key = (t) => t.toLowerCase().replace(/^(?:your\s+)?order\s+from\s+/, "").replace(/[^a-z0-9]+/g, "");
+  const t = await sq.locator(".hl-sqs").innerText(), n = await sq.locator(".hl-sqn").count() ? await sq.locator(".hl-sqn").innerText() : "";
+  assert.ok(!n || !key(t).startsWith(key(n)), "second line repeats the title: " + t + " / " + n);
+}
 await page.screenshot({ path: "/tmp/shots/home-cards.png" });
 console.log("ok - a takeaway card shows the restaurant, how many dishes and the total; one thing keeps its name and price");
 
