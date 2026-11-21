@@ -3447,9 +3447,10 @@ export async function handleGmailRoute(request, env, url, cors, shopper, opts) {
       const copy = await hiddenCopyFromRaw(env, shopper, got.raw);
       const section = orderSection(copy.copy && copy.copy.text);
       const total = d.totalPence ?? (r.ok ? r.totalPence : null);
-      const ans = section ? await askForItems(env, section, opts.fetchImpl) : { error: "unreadable" };
+      const ans = section ? await askForItems(env, section, opts.fetchImpl, { shopperId: shopper.id, now }) : { error: "unreadable" };
       const kept = ans.reading && namedInEmail(ans.reading, section) ? acceptAiItems(ans.reading, section, total, d.retailer && d.retailer.name) : null;
-      await log(true, kept ? "ai" : ans.error || "didnt_add_up");
+      // (Over the spending limit nothing was asked: it isn't counted as an AI read.)
+      await log(ans.capped ? false : true, kept ? "ai" : ans.capped ? "not_sure" : ans.error || "didnt_add_up");
       if (kept) return reply(await save({ items: kept.items, itemsCheck: kept.check, itemsFrom: "ai", ...(d.totalPence == null && total != null ? { totalPence: total, currency: d.currency || "GBP" } : {}) }), "ai");
       return json({ ok: true, complete: false, via: null, reason: ans.error === "ai_busy" || ans.error === "ai_unreachable" ? "busy" : "not_sure", items: d.items || [], itemsCheck: d.itemsCheck || null }, 200, cors);
     }

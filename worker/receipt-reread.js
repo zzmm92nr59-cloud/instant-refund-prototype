@@ -15,6 +15,7 @@
 //    Only counts are kept (receipt_rereads: who, which receipt, when, whether the AI was asked, and how it ended), deleted
 //    with the receipt's inbox, the permission or the account.
 import { aiAvailable } from "./ai-reader.js";
+import { DEFAULT_MODEL, claudeFetch, isCapped, noThinking } from "./ai-spend.js";
 import { checkItems, moneyOf, lineOf } from "./receipt-items.js";
 import { cleanItems } from "./receipt-reader.js";
 import { namesCheck } from "./item-names.js";
@@ -25,7 +26,7 @@ export const REREAD_AI_ALL_DAY = 1000;
 export const REREADS_SQL = `CREATE TABLE IF NOT EXISTS receipt_rereads (shopper_id TEXT NOT NULL, receipt_id TEXT NOT NULL, ai INTEGER NOT NULL DEFAULT 0,
   outcome TEXT, created_at INTEGER NOT NULL)`;
 const MAX_SECTION = 6000;
-const model = (env) => env.AI_READER_MODEL || "claude-haiku-5-5";
+const model = (env) => env.AI_READER_MODEL || DEFAULT_MODEL;
 
 export const REREAD_SYSTEM = [
   "You read the order section of one shopping email for Relay, a UK app that keeps people's receipts, and reply with one JSON object and nothing else.",
@@ -74,15 +75,17 @@ export function cleanRereadAnswer(answer) {
 }
 
 // Asks Claude for the items in one order section. { reading } or { error: "ai_off" | "ai_unreachable" | "ai_busy" | "ai_refused" | "unreadable" }.
-export async function askForItems(env, section, fetchImpl) {
+// Over Relay's AI spending limit (the month's, or the shopper's for the day: o.shopperId) it is "ai_off", as without the key.
+export async function askForItems(env, section, fetchImpl, o = {}) {
   if (!aiAvailable(env)) return { error: "ai_off" };
   let r;
   try {
-    r = await fetchImpl("https://api.anthropic.com/v1/messages", { method: "POST",
+    r = await claudeFetch(env, "reread", fetchImpl, { method: "POST",
       headers: { "x-api-key": env.ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json" },
-      body: JSON.stringify({ model: model(env), max_tokens: 2000, system: REREAD_SYSTEM, messages: [{ role: "user", content: section }] }),
-      signal: AbortSignal.timeout(40000) });
+      body: JSON.stringify({ model: model(env), max_tokens: 2000, ...noThinking(env), system: REREAD_SYSTEM, messages: [{ role: "user", content: section }] }),
+      signal: AbortSignal.timeout(40000) }, o);
   } catch { return { error: "ai_unreachable" }; }
+  if (isCapped(r)) return { error: "ai_off", capped: r.capped };
   if (r.status === 429 || r.status >= 500) return { error: "ai_busy" };
   if (!r.ok) return { error: "ai_refused" };
   const body = await r.json().catch(() => null);

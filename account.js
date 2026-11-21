@@ -6760,6 +6760,27 @@
           });
           box.appendChild(group("AI help", [el("div", { className: "rl-hp-rows" }, arRows)]));
         }
+        // AI spending (worker/ai-spend.js): this month's estimated cost against the monthly limit, by feature. Past the
+        // limit every AI feature works as it does without the key until next month.
+        var sp = h.aiSpend;
+        if (sp) {
+          var GBP = function (p) { return "£" + (Math.round(Number(p || 0)) / 100).toFixed(2); };
+          var FEAT = { reader: "AI help reading receipts", reread: "Read it again", receipt_photo: "Receipt photos", item_kinds: "What things are, for picks",
+            shop_kinds: "What shops sell", photo_search: "Search by photo", help_chat: "Help chat" };
+          var used = sp.limitPence ? Math.min(100, Math.round(sp.spentPence * 100 / sp.limitPence)) : 100;
+          var spKids = [
+            el("div", { className: "rl-hp-mhead" }, [el("b", { text: "This month" }), el("span", { text: GBP(sp.spentPence) + " of " + GBP(sp.limitPence) })]),
+            el("div", { className: "rl-hp-meter", role: "img", ariaLabel: used + "% of this month's AI limit used" }, [el("i", { style: "width:" + used + "%" })]),
+            el("p", { className: "rl-hp-sub", text: sp.reached ? "The limit is reached, so AI features work as they do without the key until next month."
+              : "An estimate from Anthropic's prices. When it reaches the limit, AI features pause until next month." })];
+          var spRows = [row("Calls to the AI", N(sp.calls), "This month")];
+          (sp.byFeature || []).forEach(function (f) { spRows.push(row(FEAT[f.feature] || "Other", GBP(f.pence), plural(f.calls, "call", "calls"))); });
+          if (sp.reader && (sp.reader.filled + sp.reader.agreed + sp.reader.differed)) spRows.push(row("What the AI reader found", N(sp.reader.filled) + " gaps filled",
+            N(sp.reader.agreed) + " agreed with the rules, " + N(sp.reader.differed) + " differed"));
+          spRows.push(row("Limit per shopper", GBP(sp.shopperDayLimitPence) + " a day", "For reading their receipts"));
+          spKids.push(el("div", { className: "rl-hp-rows" }, spRows));
+          box.appendChild(group("AI spending", spKids));
+        }
         // Emails shoppers sent because they were read wrong: how many are waiting, and the way to read them.
         var se = h.sharedEmails;
         if (se) box.appendChild(group("Emails shoppers sent", [el("div", { className: "rl-hp-rows" }, [
@@ -9124,6 +9145,7 @@
     [el("h2", { className: "rl-xs-h", text: "Search by photo is off" }),
       el("p", { className: "rl-ps-note", text: "It needs Relay's Anthropic key. In Cloudflare, open Workers & Pages, then relay-square-api2, Settings, Variables and Secrets. Add a secret named ANTHROPIC_API_KEY with the key from console.anthropic.com, then reload Relay." }),
       el("p", { className: "rl-ps-note", text: "The same key turns on the help chat and AI help for receipts." }),
+      el("p", { className: "rl-ps-note", text: "Relay stops using the AI once it has spent about £20 in a month, and starts again next month. To change the limit, add a variable named AI_MONTHLY_LIMIT_PENCE in the same place, set to the limit in pence, such as 5000 for £50." }),
       el("button", { className: "rl-btn", text: "Close", onclick: close })].forEach(function (n) { sheet.appendChild(n); });
     document.body.appendChild(layer);
   }
