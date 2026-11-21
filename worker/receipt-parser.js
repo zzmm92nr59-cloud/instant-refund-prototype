@@ -881,6 +881,13 @@ function extractReturns(text, html, orderDate, other = "") {
       if (/unsubscribe|privacy|terms/i.test(href + " " + label)) continue;
       if (/return|refund|exchange/i.test(label) || /\/returns?\b|returns?[-_.]|[?&]return/i.test(href)) { out.portalUrl = href; break; }
     }
+    // (A digital purchase's way to cancel, the link in Apple's "To cancel your purchase within 14 days …, report a problem":
+    // kept apart from a returns page, as where to ask. Round 21.)
+    if (out.cancelWithin) for (const a of html.matchAll(/<a\b[^>]*href=(?:["']([^"']+)["']|([^\s"'>]+))[^>]*>([\s\S]*?)<\/a>/gi)) {
+      const href = (a[1] || a[2]).replace(/&amp;/g, "&").trim();
+      const label = a[3].replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+      if (/^https:\/\//i.test(href) && href.length <= 800 && /^(?:report a problem|request a refund|cancel (?:your |this |the )?(?:purchase|order|subscription))$/i.test(label)) { out.cancelUrl = href; break; }
+    }
   }
 
   // How-to wording straight from the email (max three short sentences).
@@ -3182,10 +3189,16 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   if (!result.items.length && result.totalPence != null) {
     const flatT = String(fromHtml || text).replace(/[\s|]+/g, " ");
     const bought = /\byou(?:'|’)?ve just bought (.{3,80}?)\s?\.(?:\s|$)/i.exec(flatT) || /\bthank you for buying (.{3,80}?)(?:\s(?:receipt|dear|hi|hello)\b|[.!])/i.exec(flatT);
-    const site = /\bwebsite\s*:?\s+((?:[a-z0-9-]+\.)+[a-z]{2,})\b/i.exec(flatT);
+    // (Or where the email says it was sent from, "because of your activity on example.com", when its "Website" is only a
+    // page's path. Round 21.)
+    const site = /\bwebsite\s*:?\s+((?:[a-z0-9-]+\.)+[a-z]{2,})\b/i.exec(flatT) || /\bbecause of your activity on ((?:[a-z0-9-]+\.)+[a-z]{2,})\b/i.exec(flatT);
     if (bought && /\b(?:membership|subscription|trial|plan|pass)\b/i.test(bought[1])) {
       result.items = [{ name: bought[1].trim(), qty: 1, pricePence: result.totalPence }];
       const siteDomain = site ? site[1].toLowerCase() : null;
+      // (No website named at all: the billing company is the shop, by its name and not its mailbox's, "Example Info" from
+      // info@example.com is "Example". Round 21.)
+      const role = /^(.{2,40}?)\s+(?:info|support|billing|team|notifications?|no-?reply)$/i.exec(String(result.retailer.name || ""));
+      if (!siteDomain && role && domainBase(String(result.retailer.domain || "")) === role[1].toLowerCase().replace(/[^a-z0-9]/g, "")) result.retailer = { ...result.retailer, name: role[1] };
       if (siteDomain && siteDomain !== String(result.retailer.domain || "").toLowerCase()) {
         const bases = [domainBase(siteDomain), siteDomain.split(".")[0]].map((b) => b.replace(/-/g, ""));
         const named = (bought[1].match(/[\p{L}\d]+/gu) || []).find((w) => bases.includes(w.toLowerCase()));

@@ -250,7 +250,14 @@
     if (add) logoMisses[path] = 1;
     return Boolean(logoMisses[path]);
   }
+  // Something digital (an app's coins, a subscription, a download) is never sent back. A window its email gives (Apple's
+  // "cancel within 14 days of receiving this invoice") is to cancel or ask for a refund, said on its page in the email's
+  // words, and never a return date: no countdown, no "Return today", no reminder, no red number.
+  function noReturnClock(x) {
+    return Boolean(x && ((x.returns && x.returns.cancelWithin === true) || (x.category === "digital" && !(x.returnableItems && x.returnableItems.length))));
+  }
   function deadlineOf(x) {
+    if (noReturnClock(x)) return null;
     // A food order can still hold something that goes back on its own (a kettle in the weekly shop): its date counts too.
     var open = x.returnable !== false || Boolean(x.returnableItems && x.returnableItems.length);
     var by = open && x.returnBy && x.returnBy.date;
@@ -3657,7 +3664,11 @@
     // A booking that can be cancelled for free until a day the email states (Booking.com). Round 13.
     else if (x.returns && /^\d{4}-\d{2}-\d{2}$/.test(String(x.returns.freeCancellationUntil || ""))) card.appendChild(el("p", { className: "rl-po-now", text: "Free cancellation until " + longDate(x.returns.freeCancellationUntil) + " " + x.returns.freeCancellationUntil.slice(0, 4) + ", as the booking email says." }));
     // Something digital that can be cancelled within days (Apple's "cancel within 14 days of receiving this invoice"), not a parcel to send back.
-    if (x.returns && x.returns.cancelWithin === true && Number(x.returns.windowDays) > 0) card.appendChild(el("p", { className: "rl-po-now", text: "You can cancel within " + Number(x.returns.windowDays) + " days of the invoice, as the email says." }));
+    // (No countdown: it's no return date. The email's own link to ask, when it has one: Apple's "report a problem".)
+    if (x.returns && x.returns.cancelWithin === true && Number(x.returns.windowDays) > 0) {
+      card.appendChild(el("p", { className: "rl-po-now", text: "You can cancel within " + Number(x.returns.windowDays) + " days of the invoice, as the email says." }));
+      if (/^https:\/\//.test(x.returns.cancelUrl || "")) card.appendChild(el("a", { className: "rl-ret-go", href: x.returns.cancelUrl, target: "_blank", rel: "noopener noreferrer" }, [el("span", { text: "Ask " + who + " to cancel" }), jIc("ext", 18)]));
+    }
     // A subscription that ends (Google Play "your subscription will be cancelled"): when, and that nothing comes back.
     if (x.subscriptionEnds && x.subscriptionEnds.on) card.appendChild(el("p", { className: "rl-po-now", text: "This subscription ends on " + longDate(x.subscriptionEnds.on) + " " + String(x.subscriptionEnds.on).slice(0, 4) + (x.subscriptionEnds.refund === false ? ", with no refund." : ".") }));
     // Paid with a gift card (Amazon): the total is what was left to pay.
@@ -3684,7 +3695,8 @@
     // When to return it, in two lines: the date to go by, then why that date (and whose words they are).
     var by = x.returnBy && deadlineOf(x) === x.returnBy.date ? x.returnBy : null;
     var legal = by && by.basis === "uk_law" ? by.date : null;
-    var rt = x.returns || (legal ? {} : null) || {};
+    // (Nothing digital goes back: no return date, window or returns page for it here.)
+    var rt = noReturnClock(x) ? {} : x.returns || (legal ? {} : null) || {};
     var day = function (d) { var t = new Date(d + "T00:00:00Z"), f = function (o) { return t.toLocaleDateString("en-GB", Object.assign({ timeZone: "UTC" }, o)); }; return f({ weekday: "short" }) + " " + f({ day: "numeric", month: "short" }); };
     var head = null, why = null, policyLink = null;
     // The shop's published returns policy, when its emails say nothing and Relay has read it (worker/return-policies.js).
@@ -3901,6 +3913,34 @@
     var n = Number(x && x.itemCount);
     // A takeaway through an app is "Order from Chapati Man", the restaurant (x.merchant), not the app.
     return n > 1 ? n + " items" : n === 1 ? "1 item" : "Order from " + ((x && typeof x.merchant === "string" && x.merchant.trim()) || (x && x.retailer && (x.retailer.name || x.retailer.domain)) || "this shop");
+  }
+  // Who a receipt is from, as the shopper knows it: the business, not the platform that sold for it. A takeaway through an
+  // app is the restaurant (x.merchant: "East Ocean", with Just Eat as the platform); an in-app purchase from Apple is the
+  // game, which Apple's invoice names over the thing bought (the item's variant: "Match Masters" over "Stack of Coins").
+  // Otherwise the shop. { name, via }: via is the platform when it isn't the business.
+  function bizOf(x) {
+    var shop = (x && x.retailer && (x.retailer.name || x.retailer.domain)) || "";
+    var m = x && typeof x.merchant === "string" ? x.merchant.trim() : "";
+    var same = function (a, b) { return String(a).toLowerCase().replace(/[^a-z0-9]+/g, "") === String(b).toLowerCase().replace(/[^a-z0-9]+/g, ""); };
+    if (m) return { name: m, via: shop && !same(shop, m) ? shop : null };
+    var app = appOf(x);
+    if (app) return { name: app, via: shop || null };
+    return { name: shop || "Unknown store", via: null };
+  }
+  function appOf(x) {
+    var r = (x && x.retailer) || {};
+    if (!x || x.category !== "digital" || !(/(^|\.)apple\.com$/i.test(r.domain || "") || /^apple$/i.test(String(r.name || "").trim()))) return null;
+    var apps = (x.items || []).filter(function (i) { return i && i.name; }).map(function (i) { return typeof i.variant === "string" ? i.variant.trim() : ""; });
+    return apps.length && apps[0] && apps[0].length <= 60 && apps.every(function (a) { return a === apps[0]; }) ? apps[0] : null;
+  }
+  // What was bought, in a few words: "Stack of Coins", "2 × Flat White", "Hennessy VS Cognac and 40 more", or how many
+  // things the email says it has. null when the email names nothing.
+  function boughtWords(x) {
+    var named = (x && x.items || []).filter(function (i) { return i && i.name; });
+    if (named.length === 1) return (Number(named[0].qty) > 1 ? named[0].qty + " × " : "") + named[0].name;
+    if (named.length > 1) return headlineItem(x).name + " and " + (named.length - 1) + " more";
+    var n = Number(x && x.itemCount);
+    return n > 1 ? n + " items" : n === 1 ? "1 item" : null;
   }
   // A parcel's latest news, in a line with a small drawing: on its way (with whom), due, or delivered.
   function shipWords(dv, short) {
