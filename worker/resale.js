@@ -119,7 +119,7 @@ async function listable(env, shopperId, now) {
     r.items.forEach((it, i) => {
       if (!resellable(r, it, learned.get(storeKey(r)))) return;
       out.push({ receiptId: r.id, itemIndex: i, title: it.name, store: (r.retailer && (r.retailer.name || r.retailer.domain)) || null,
-        pricePence: it.pricePence ?? null, currency: r.currency || "GBP", hasImage: Boolean(r.hasImage),
+        pricePence: it.pricePence ?? null, ...(it.free === true && it.pricePence === 0 ? { free: true } : {}), currency: r.currency || "GBP", hasImage: Boolean(r.hasImage),
         orderDate: r.orderDate || null, returnWindowOpen: rw.open, returnDeadline: rw.deadline, alreadyListed: taken.has(r.id + ":" + i) });
     });
   }
