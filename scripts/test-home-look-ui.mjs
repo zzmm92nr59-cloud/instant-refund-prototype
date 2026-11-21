@@ -186,8 +186,9 @@ assert.equal(await nf.locator(".h2-line-t b").innerText(), "On its way");
 assert.ok(!/Return by|days? left/.test(await nf.innerText()), "a date Relay worked out (UK law's minimum) is never shown as a return date or countdown");
 await page.waitForTimeout(450);
 dsheet = await openHomeCard(page, "Northfold");
-assert.equal(await dsheet.getByRole("heading").first().innerText(), "Flow Flared Pant", "its page names what was bought");
-assert.equal(await dsheet.locator(".rl-dt-sub").innerText(), "Northfold");
+// (Shop first since 21 Nov 2026, as on the card and in Receipts: the shop is the page's title, what was bought under it.)
+assert.equal(await dsheet.getByRole("heading").first().innerText(), "Northfold", "its page is titled by the shop");
+assert.equal(await dsheet.locator(".rl-dt-sub").innerText(), "Flow Flared Pant", "and names what was bought");
 assert.match(await dsheet.locator(".rl-dt-facts").innerText(), /Price\s+£69\.00\s+Size or colour\s+UK 8\s+Ordered\s+\d+ \w+ \d{4}\s+Order number\s+R-4444/);
 await dsheet.getByText("No return date in Northfold's email", { exact: true }).waitFor();
 // (Still on its way, so no date even though the server counted one from a delivery: the screen never contradicts itself.)
