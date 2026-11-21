@@ -3055,7 +3055,8 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   // not only a PayPal Debit Card, names no order of the shop's: its "Transaction ID: 1AB23456CD7890123" is the reference.
   // Marked as PayPal's own, so the shop's own receipt for the same money still joins it and keeps its own number. Never an
   // authorisation, which is not a payment yet. Round 23.)
-  if (!result.orderRef && viaPayPal && !/\bauthori[sz]ed\b/i.test(String(subject || "")) && /\byou(?:'|’)?ve (?:successfully )?sent a payment\b|\byou paid (?:£|\$|€|[A-Z]{2}\$)\s?[\d,]+\.\d{2}\b/i.test(text.slice(0, 4000))) {
+  // (Only for a merchant PayPal names, never money sent to a person, which is no purchase at all.)
+  if (!result.orderRef && viaPayPal && /^[ \t|*]*merchant\b/im.test(text.slice(0, 8000)) && !/\bauthori[sz]ed\b/i.test(String(subject || "")) && /\byou(?:'|’)?ve (?:successfully )?sent a payment\b|\byou paid (?:£|\$|€|[A-Z]{2}\$)\s?[\d,]+\.\d{2}\b/i.test(text.slice(0, 4000))) {
     const tid = /\b[Tt]ransaction (?:ID|id|Id)[ \t|:]*(?:\n[ \t|]*){0,3}([A-Z0-9]{17})(?![A-Z0-9-])/.exec(text.slice(0, 20000));
     if (tid && /\d/.test(tid[1]) && /[A-Z]/.test(tid[1])) { result.orderRef = tid[1]; result.refIsPayment = true; }
   }
