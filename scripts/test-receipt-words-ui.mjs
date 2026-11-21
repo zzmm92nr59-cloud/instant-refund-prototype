@@ -5,7 +5,7 @@
 // Home, Receipts, each receipt's page and Wrapped are then opened in a phone-sized browser, and the words on screen must
 // match the receipt exactly:
 //   * every item's name, quantity ("2 ×") and price, and each total, in its own currency (€ stays €, never £);
-//   * "+ N more" counts the other items exactly;
+//   * "+ N more" on Home ("and N more" under the shop in Receipts) counts the other items exactly;
 //   * "Relay may have missed some items" only when the totals check says so (and always when it does);
 //   * "Some item names on this receipt may not be right" only when the name check says so (round 9), never on Home;
 //   * "Cancelled" / "Part cancelled" on cancelled orders; refunded money is said, never counted as spending without saying so;
