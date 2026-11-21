@@ -10934,14 +10934,14 @@
       if (isCarrier(x) || !/^\d{4}-\d{2}-\d{2}$/.test(x.orderDate || "")) return;
       // A takeaway ordered through an app (Just Eat, Uber Eats, Deliveroo) is named after the restaurant (x.merchant).
       // (And an in-app purchase after its game, bizOf: the same business as Receipts shows.)
-      var who = bizOf(x).name || "Shop";
+      var biz = bizOf(x), who = biz.name || "Shop";
       var named = (x.items || []).filter(function (i) { return i && i.name; });
       // An order where only some things can go back (a kettle in a food shop): those lead the card, and its line names them.
       var keep = x.returnable === false ? (x.returnableItems || []).map(function (i) { return (x.items || [])[i]; }).filter(function (i) { return i && i.name; }) : [];
       if (keep.length) named = keep.concat(named.filter(function (i) { return keep.indexOf(i) < 0; }));
       var dl = deadlineOf(x), stated = statedDeadline(x), dv = x.delivery, p = x.returnProgress, rt = retOf(x);
       var canGoBack = (x.returnable !== false || Boolean((x.returnableItems || []).length)) && Boolean(dl) && dl >= today && !p && !rt;
-      var e = { key: "r" + x.id, shop: who, at: x.orderDate, cat: x.category || "other", dom: logoDom(x), when: (canGoBack && stated) || "", toReturn: canGoBack, rank: 2,
+      var e = { key: "r" + x.id, shop: who, via: biz.via || "", at: x.orderDate, cat: x.category || "other", dom: logoDom(x), when: (canGoBack && stated) || "", toReturn: canGoBack, rank: 2,
         noReturn: x.returnable === false && !(x.returnableItems || []).length, digital: x.category === "digital",
         title: named.length ? named[0].name + (named.length > 1 ? " + " + (named.length - 1) + " more" : "") : noItemsTitle(x),
         // What the whole receipt came to, and how many things: a card shows these, never the first item's own price
@@ -10998,7 +10998,7 @@
   var hlPic = function (e, cls) { var box = el("span", { className: cls }), art = el("span", { className: "h2-art" }); art.setAttribute("aria-hidden", "true"); box.appendChild(art); if (e.tiles && e.tiles[0]) e.tiles[0].draw(art); return box; };
   // Today: a row per purchase, its picture small, the shop, what it is, and what's happening with it.
   function todayRow(e) {
-    var t = e.tiles && e.tiles[0], what = e.title || (t && t.name) || "";
+    var what = e.shop ? homeWhat(e) : e.title || (e.tiles && e.tiles[0] && e.tiles[0].name) || "";
     var r = el("button", { type: "button", className: "hl-row", ariaLabel: [e.shop, what, e.line, e.strip].filter(Boolean).join(". "), onclick: tapOnce(e.open) }, [
       hlPic(e, "hl-pic"),
       el("span", { className: "hl-mid" }, [el("b", { text: e.shop || what }), what && e.shop ? el("span", { text: what }) : null, el("em", { className: e.stripKind || "", text: e.strip ? e.line + ", " + e.strip.charAt(0).toLowerCase() + e.strip.slice(1) : e.line })].filter(Boolean)),
@@ -11013,12 +11013,23 @@
     var n = String(name || "").replace(/[™®©]/g, "").replace(/\s+/g, " ").trim().replace(/^(item|product)\s*:\s*/i, ""), sh = String(shop || "").trim();
     if (sh && n.toLowerCase().indexOf(sh.toLowerCase() + " ") === 0) n = n.slice(sh.length).trim();
     n = n.replace(/(\s+[A-Z0-9]{3,}(\/[A-Z0-9]{2,})+.*)$/, "").replace(/\s+[A-Z]{2,}\d[A-Z0-9-]*$/, "").replace(/^[\s,:-]+|[\s,:-]+$/g, "");
-    if (!n || (sh && n.toLowerCase() === sh.toLowerCase())) return "";
+    // ("Order from Chapati Man" under Chapati Man is the shop's name again too: never a line of its own.)
+    var bare = n.replace(/^(?:your\s+)?(?:new\s+)?(?:order|receipt)\s+(?:from|with|at|for)\s+/i, ""), key = function (s) { return String(s).toLowerCase().replace(/[^a-z0-9]+/g, ""); };
+    if (!n || (sh && (key(n) === key(sh) || (bare !== n && (!key(bare) || key(sh).indexOf(key(bare)) === 0 || key(bare).indexOf(key(sh)) === 0))))) return "";
     return n;
+  }
+  // The line under a Home card's shop (Wallet squares, Today rows, the big cards): what it is, and for a takeaway or an in-app
+  // purchase the app it came through first, as the Receipts list says it ("Just Eat, 4 items"). Never the shop's name again.
+  function homeWhat(e) {
+    var t = e.tiles && e.tiles[0], key = function (s) { return String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, ""); };
+    var what = e.count > 1 ? e.count + " items" : cleanName(e.title || (t && t.name) || "", e.shop);
+    var via = e.via && key(e.via) !== key(e.shop) ? e.via : "";
+    if (via && key(what) === key(via)) what = "";
+    return [via, what].filter(Boolean).join(", ");
   }
   window.relayCleanName = cleanName;
   function walletSquare(e) {
-    var t = e.tiles && e.tiles[0], what = e.count > 1 ? e.count + " items" : cleanName(e.title || (t && t.name) || "", e.shop), price = e.price || (t && t.price) || "", tag = e.tag || e.strip || (e.onWay ? "On its way" : e.toReturn && e.when ? "Return by " + dayWords(e.when) : e.swaps ? e.line : "");
+    var t = e.tiles && e.tiles[0], what = homeWhat(e), price = e.price || (t && t.price) || "", tag = e.tag || e.strip || (e.onWay ? "On its way" : e.toReturn && e.when ? "Return by " + dayWords(e.when) : e.swaps ? e.line : "");
     var pic = hlPic(e, "hl-sqpic"); if (tag) pic.appendChild(el("span", { className: "hl-tag " + (e.strip ? e.stripKind || "" : ""), text: tag }));
     var sq = el("button", { type: "button", className: "hl-sq" + (e.cat && TILE_COLOURS[e.cat] ? " has-c" : ""), ariaLabel: [e.shop, what, price, tag].filter(Boolean).join(". "), onclick: tapOnce(e.open) }, [
       pic, el("span", { className: "hl-sqs", text: e.shop || "" }), what ? el("span", { className: "hl-sqn", text: what }) : null, price ? el("span", { className: "hl-sqp", text: price }) : null].filter(Boolean));
@@ -11108,8 +11119,9 @@
     };
     if (e.tiles && e.tiles.length === 1) {
       // One thing: its square, and beside it what it is (up to three lines) and what it cost. No price on the picture.
-      var one = e.tiles[0];
-      card.appendChild(el("div", { className: "h2-one" }, [square(one, false), el("span", { className: "h2-one-t" }, [el("span", { className: "h2-one-n", text: e.title || one.name })].concat(one.price ? [el("span", { className: "h2-one-p", text: one.price })] : []))]));
+      // (Under the shop's name: never the shop's name again, and a takeaway's app first, homeWhat.)
+      var one = e.tiles[0], oneName = e.shop && (e.via || !cleanName(e.title || one.name, e.shop)) ? homeWhat(e) : e.title || one.name;
+      card.appendChild(el("div", { className: "h2-one" }, [square(one, false), el("span", { className: "h2-one-t" }, (oneName ? [el("span", { className: "h2-one-n", text: oneName })] : []).concat(one.price ? [el("span", { className: "h2-one-p", text: one.price })] : []))]));
     } else if (e.tiles && e.tiles.length) {
       var row = el("div", { className: "h2-tiles" });
       e.tiles.forEach(function (t) { row.appendChild(square(t, true)); });
@@ -11760,6 +11772,10 @@
     // Search by photo on Discover: whether it's on (asked once, then remembered), and the search itself.
     photoAvailable: photoAvailable, photoSearch: photoSearch,
     interests: function () { return interestsLoad(); },
+    // Whether an inbox is connected (Shops on Relay's first step): what this phone last knew at once, then Relay's answer
+    // (reused when it was just loaded, as Home and Receipts share it). A review account has its receipts already.
+    mailKnown: function () { return isReview() || hasMailbox(); },
+    mailConnected: function () { if (isReview()) return Promise.resolve(true); return cachedGet("gmail", "/relay/my/gmail").then(function (g) { return g.ok && g.body ? Boolean(g.body.connected) : hasMailbox(); }, function () { return hasMailbox(); }); },
     purchases: function () { return (memo.purchases || api(purchasesPath())).then(function (r) { return (r.ok && r.body && r.body.purchases) || []; }, function () { return []; }); } };
   function keyboardWatch() {
     var vv = window.visualViewport; if (!vv || window.__rlKb) return; window.__rlKb = true;

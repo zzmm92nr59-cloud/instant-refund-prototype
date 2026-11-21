@@ -20,6 +20,15 @@ t("real items are kept, with a quantity that ran into the name moved out", () =>
   assert.deepEqual(cleanItem({ name: "Sausage roll x2", qty: 1 }), { name: "Sausage roll", qty: 2 });
   assert.equal(cleanItems([{ name: "You've saved" }, { name: "Wool jumper", qty: 1 }]).length, 1);
 });
+t("who the order is from is never an item, as read or as stored", () => {
+  for (const junk of ["Order from Saffron Corner (Bow)", "Your order from Lotus Grill", "Order with Noodle Barn", "Receipt from Café Nine", "Your new order at Pizza Lane"]) {
+    assert.equal(cleanItem({ name: junk, qty: 1 }), null, junk);
+    assert.equal(cleanItem({ name: junk, qty: 1 }, true), null, junk + " (stored)");
+  }
+  // (No dishes listed: no items, never the heading as one.)
+  assert.deepEqual(cleanItems([{ name: "Order from Saffron Corner (Bow)", qty: 1, pricePence: 2136 }], { stored: true }), []);
+  for (const ok of ["Order Book A5 Duplicate", "Ordering Pad", "Receipt Printer Paper Rolls"]) assert.equal(cleanItem({ name: ok, qty: 1 })?.name, ok, ok);
+});
 t("card numbers never survive as an item", () => {
   assert.equal(cleanItem({ name: "Payment 4000 00** **** 1234" }), null);
   assert.equal(cleanItem({ name: "Card ****1234" }), null);
