@@ -1949,6 +1949,20 @@ function paidIs(c, o) {
 }
 // opts.keyFor(email): the group an email must be in (the shopper's own "same order" / "different orders", order-joins.js),
 // or undefined for the reader's own joining.
+// The shop's own things at the money a payment service's receipt of the same purchase sets out: the shop's lines as they are
+// when they and the payment's fees and money off come to its total; or at the payment's one price before tax, when its one
+// line is all the shop's lines counted together, each at the same price. null when neither adds up. Round 23.
+function paymentFit(shop, pay) {
+  const extra = (pay.fees || []).reduce((n, f) => n + (f.pence || 0), 0) - (pay.discounts || []).reduce((n, d) => n + (d.pence || 0), 0);
+  const items = shop.items || [];
+  const lines = items.map((i) => lineOf(i));
+  if (lines.length && lines.every((x) => Number.isInteger(x)) && lines.reduce((x, y) => x + y, 0) + extra === pay.totalPence) return items.map((i) => ({ ...i }));
+  const count = items.reduce((n, i) => n + (i.qty || 1), 0);
+  const one = pay.items.length === 1 && Number.isInteger(pay.items[0].pricePence) && (pay.items[0].qty || 1) === count && count > 1 &&
+    items.every((i) => !i.lineTotal && Number.isInteger(i.pricePence) && i.pricePence === items[0].pricePence);
+  if (one && pay.items[0].pricePence * count + extra === pay.totalPence) return items.map((i) => ({ ...i, pricePence: pay.items[0].pricePence }));
+  return null;
+}
 export function mergeOrderEmails(orders, opts = {}) {
   // (One email confirming two orders: a card for each, the second named by its own number, total and items. Its id says
   // which email it came from. Round 12.)
@@ -2125,7 +2139,16 @@ export function mergeOrderEmails(orders, opts = {}) {
     // nor does the order's confirmation sent again later, the day before a flight: the order's own email gives its day and its
     // lines. Round 19.)
     const later = laterCopies(g);
-    const [lead, ...rest] = g.slice().sort((a, b) => (a.orderUpdate === "amended") - (b.orderUpdate === "amended") || later.has(a) - later.has(b) || score(b) - score(a) || a.createdAt - b.createdAt);
+    // (The shop's own list doesn't come to what was paid, its six tickets at their price and nothing else, while the payment
+    // service's receipt of the same purchase sets out the money whole and adds up, "Qty: 6" at the price before tax, a
+    // booking fee, the discount and the tax: the shop's own email leads, as it would without them, and the card shows the
+    // payment service's fees, discount and tax with the shop's own names for the things, at the payment service's price when
+    // its one line is the shop's lines counted together. Never when the shop's email has fees or money off of its own.
+    // Round 23.)
+    const payFor = g.find((o) => o.retailer && o.retailer.via && o.totalPence != null && o.itemsCheck && o.itemsCheck.complete === true && ((o.fees || []).length || (o.discounts || []).length) && (o.items || []).length);
+    const pref = payFor ? g.find((o) => o !== payFor && o.retailer && !o.retailer.via && !isForwarded(o) && (o.items || []).length && !(o.fees || []).length && !(o.discounts || []).length && !(o.itemsCheck && o.itemsCheck.complete === true) &&
+      (o.totalPence == null || o.totalPence === payFor.totalPence) && (o.currency || "GBP") === (payFor.currency || "GBP") && paymentFit(o, payFor)) : null;
+    const [lead, ...rest] = g.slice().sort((a, b) => (a.orderUpdate === "amended") - (b.orderUpdate === "amended") || later.has(a) - later.has(b) || (b === pref) - (a === pref) || score(b) - score(a) || a.createdAt - b.createdAt);
     const c = { ...lead, items: (lead.items || []).map(i => ({ ...i })), returns: lead.returns ? { ...lead.returns } : null };
     // (The order's day is the day it was placed: the first day one of its emails was sent when the leading email's day is
     // only the day it was sent, so a re-sent confirmation or a status email that leads with its fuller list never moves the
@@ -2229,30 +2252,14 @@ export function mergeOrderEmails(orders, opts = {}) {
     // booking fee, the discount and the tax: the card shows the payment service's fees, discount and tax with the shop's own
     // names for the things, at the payment service's price when its one line is the shop's lines counted together. Never
     // when the card already has fees or money off of its own. Round 23.)
-    // (Whichever of the two leads: the shop's own email's things, the payment service's money.)
-    {
-      const viaLed = Boolean(lead.retailer && lead.retailer.via);
-      const shopE = viaLed ? rest.find((o) => o.retailer && !o.retailer.via && !isForwarded(o) && (o.items || []).length) : lead;
-      const pay = viaLed ? lead : rest.find((o) => o.retailer && o.retailer.via && o.totalPence === c.totalPence && (o.currency || "GBP") === (c.currency || "GBP"));
-      const shopItems = shopE && shopE !== lead ? shopE.items : c.items;
-      const plain = shopE && (!viaLed ? !(c.fees || []).length && !(c.discounts || []).length && !(c.itemsCheck && c.itemsCheck.complete === true) : !(shopE.fees || []).length && !(shopE.discounts || []).length && !(shopE.itemsCheck && shopE.itemsCheck.complete === true));
-      if (shopE && pay && plain && c.totalPence != null && pay.totalPence === c.totalPence && (shopItems || []).length && pay.itemsCheck && pay.itemsCheck.complete === true && ((pay.fees || []).length || (pay.discounts || []).length) && (pay.items || []).length) {
-        const extra = (pay.fees || []).reduce((n, f) => n + (f.pence || 0), 0) - (pay.discounts || []).reduce((n, d) => n + (d.pence || 0), 0);
-        const lines = shopItems.map((i) => lineOf(i));
-        const own = lines.every((x) => Number.isInteger(x)) ? lines.reduce((x, y) => x + y, 0) : null;
-        const count = shopItems.reduce((n, i) => n + (i.qty || 1), 0);
-        const one = pay.items.length === 1 && Number.isInteger(pay.items[0].pricePence) && (pay.items[0].qty || 1) === count && count > 1 && shopItems.every((i) => !i.lineTotal && Number.isInteger(i.pricePence) && i.pricePence === shopItems[0].pricePence);
-        let items = null;
-        if (own != null && own + extra === c.totalPence) items = shopItems.map((i) => ({ ...i }));
-        else if (one && pay.items[0].pricePence * count + extra === c.totalPence) items = shopItems.map((i) => ({ ...i, pricePence: pay.items[0].pricePence }));
-        if (items) {
-          c.items = items;
-          if ((pay.fees || []).length) c.fees = pay.fees.map((f) => ({ ...f })); else delete c.fees;
-          if ((pay.discounts || []).length) c.discounts = pay.discounts.map((d) => ({ ...d })); else delete c.discounts;
-          if (viaLed && shopE.orderRef) { c.orderRef = shopE.orderRef; delete c.refIsPayment; }
-          const sum = items.reduce((n, i) => n + lineOf(i), 0);
-          c.itemsCheck = { ...(pay.itemsCheck || {}), complete: true, itemsPence: sum, expectedPence: c.totalPence - extra, missingPence: 0, fromPayment: true };
-        }
+    if (pref && lead === pref && payFor) {
+      const items = paymentFit(pref, payFor);
+      if (items && c.totalPence === payFor.totalPence) {
+        c.items = items;
+        if ((payFor.fees || []).length) c.fees = payFor.fees.map((f) => ({ ...f })); else delete c.fees;
+        if ((payFor.discounts || []).length) c.discounts = payFor.discounts.map((d) => ({ ...d })); else delete c.discounts;
+        const extra = (payFor.fees || []).reduce((n, f) => n + (f.pence || 0), 0) - (payFor.discounts || []).reduce((n, d) => n + (d.pence || 0), 0);
+        c.itemsCheck = { ...(payFor.itemsCheck || {}), complete: true, itemsPence: items.reduce((n, i) => n + lineOf(i), 0), expectedPence: c.totalPence - extra, missingPence: 0, fromPayment: true };
       }
     }
     // Which emails the card was made from, for choices the shopper made on an email that isn't the one shown (attachGifts).

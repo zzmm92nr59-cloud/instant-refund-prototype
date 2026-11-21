@@ -3485,8 +3485,13 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   // (Nor the detail of a line, "Acceso por 2 horas | $ 150.00 MXN", nor a line of its own beside the real ones, the total's
   // "$ 150.00 MXN" read again.)
   const CUR_CODE = /^(?:MXN|USD|EUR|GBP|CAD|AUD|PLN|CHF|SEK|NOK|DKK|JPY)$/;
-  if (result.items.some((i) => CUR_CODE.test(String(i.name || "").trim()) || CUR_CODE.test(String(i.variant || "").trim()))) {
-    for (const i of result.items) if (CUR_CODE.test(String(i.variant || "").trim())) delete i.variant;
+  const curPart = (x) => CUR_CODE.test(x) || /^(?:tax|vat|iva)$|^(?:tipo de pago|forma de pago|payment (?:type|method))\b/i.test(x);
+  if (result.items.some((i) => CUR_CODE.test(String(i.name || "").trim()) || String(i.variant || "").split(", ").some((x) => CUR_CODE.test(x.trim())))) {
+    for (const i of result.items) {
+      if (!String(i.variant || "").split(", ").some((x) => CUR_CODE.test(x.trim()))) continue;
+      const v = String(i.variant).split(", ").filter((x) => !curPart(x.trim())).join(", ");
+      if (v) i.variant = v; else delete i.variant;
+    }
     const kept = result.items.filter((i) => !CUR_CODE.test(String(i.name || "").trim()));
     if (kept.length && kept.length < result.items.length) {
       result.items = kept;
