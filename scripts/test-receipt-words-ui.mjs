@@ -105,7 +105,13 @@ function pageWords(where, r, text) {
   }
   if (r.refund || (r.returnProgress && r.returnProgress.refundPence != null)) check(/refund/i.test(flat), where + ": refunded order doesn't say it was refunded");
 }
-function titleOf(r) { const n = named(r); return n.length > 1 ? " + " + (n.length - 1) + " more" : null; }
+// (Shop first since 21 Nov 2026: a row's title is the business, the restaurant for a takeaway through an app or the game
+// for an Apple in-app purchase, and the line under it says what was bought: "… and 3 more".)
+function titleOf(r) { const n = named(r); return n.length > 1 ? " and " + (n.length - 1) + " more" : null; }
+const bizOf = (r) => { const m = typeof r.merchant === "string" && r.merchant.trim(); if (m) return m;
+  const v = named(r).map((i) => (typeof i.variant === "string" ? i.variant.trim() : ""));
+  const apple = r.category === "digital" && (/(^|\.)apple\.com$/i.test((r.retailer && r.retailer.domain) || "") || /^apple$/i.test((r.retailer && r.retailer.name) || ""));
+  return apple && v.length && v[0] && v.every((x) => x === v[0]) ? v[0] : shopOf(r); };
 
 // ---- The browser ------------------------------------------------------------------------------------------------------------
 const root = resolve(".");
@@ -180,12 +186,12 @@ check(WRAPPED.spentPence === yearSpent, "Wrapped's total " + WRAPPED.spentPence 
 check(WRAPPED.refundedPence === yearBack, "Wrapped's refunds " + WRAPPED.refundedPence + " aren't the receipts' " + yearBack);
 check((WRAPPED.otherCurrencies || []).some((o) => o.currency === "EUR" && o.spentPence === 9494), "Wrapped lists the euros apart: " + JSON.stringify(WRAPPED.otherCurrencies));
 for (const r of receipts) {
-  const esc = shopOf(r).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const row = page.locator("#receiptsPage .rl-rr").filter({ has: page.locator(".rl-rr-mid > span").filter({ hasText: new RegExp("^(" + esc + "(,|$)|Order )") }) }).first();
-  if (!(await row.count())) { check(false, "Receipts: no row for " + shopOf(r)); continue; }
+  const esc = bizOf(r).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const row = page.locator("#receiptsPage .rl-rr").filter({ has: page.locator(".rl-rr-mid > b").filter({ hasText: new RegExp("^" + esc + "$") }) }).first();
+  if (!(await row.count())) { check(false, "Receipts: no row for " + bizOf(r)); continue; }
   const head = await row.locator(".rl-rr-main").innerText();
-  const more = titleOf(r);
-  if (more) check(head.includes(more), "Receipts: " + shopOf(r) + "'s row should say '" + more.trim() + "': " + head.replace(/\n/g, " | "));
+  const more = titleOf(r), whole = await row.locator(".rl-rr-mid .rl-sr").textContent();
+  if (more) check(whole.includes(more), "Receipts: " + shopOf(r) + "'s row should say '" + more.trim() + "': " + whole);
   if (Number.isInteger(r.totalPence)) check(head.includes(money(r.totalPence, r.currency)), "Receipts: " + shopOf(r) + "'s row total " + money(r.totalPence, r.currency) + ": " + head.replace(/\n/g, " | "));
   if (r.cancelled) check(new RegExp(r.cancelled.partial ? "Part cancelled" : "Cancelled").test(head), "Receipts: " + shopOf(r) + "'s row doesn't say " + (r.cancelled.partial ? "Part cancelled" : "Cancelled"));
   const back = r.returnProgress && r.returnProgress.refundedAt && r.returnProgress.refundPence;
@@ -198,13 +204,13 @@ for (const r of receipts) {
   if (SHOTS && ["Argos", "Nespresso", "Kestrel Outdoor"].includes(shopOf(r))) { await row.scrollIntoViewIfNeeded(); await page.screenshot({ path: SHOTS + "/receipts-" + shopOf(r).replace(/\W+/g, "-").toLowerCase() + ".png" }); }
   await row.locator(".rl-rr-main").click();
 }
-console.log("ok - Receipts: each row's title, '+ N more', total and Cancelled; each opened row's items, quantities, prices, flag and return words");
+console.log("ok - Receipts: each row's title (the business), 'and N more', total and Cancelled; each opened row's items, quantities, prices, flag and return words");
 
 // 3. Each receipt's page, opened from Home.
 await page.evaluate(() => window.go("profile"));
 await homeReady(page); await page.waitForTimeout(400);
 for (const r of NEWEST.receipts.filter((x) => (x.kind || "receipt") === "receipt")) {
-  const sq = page.locator("#homePage .hl-sq", { hasText: shopOf(r) }).first();
+  const sq = page.locator("#homePage .hl-sq", { hasText: bizOf(r) }).first();
   if (!(await sq.count())) continue;
   await sq.scrollIntoViewIfNeeded(); await sq.click();
   const sheet = page.locator(".rl-back .rl-sheet").last(); await sheet.waitFor(); await page.waitForTimeout(300);
