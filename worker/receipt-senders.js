@@ -31,9 +31,27 @@ export function uberEmail(domain, subject, text) {
   // (A receipt pasted in has no sender: it is Uber's when it says so itself.)
   if (!/(^|\.)uber\.com$/i.test(domain || "") && !(!domain && /\buber\b/i.test(t.slice(0, 3000) + " " + (subject || "")))) return null;
   const top = t.slice(0, 3000);
-  const adj = /\bwe (?:adjusted|have adjusted|(?:'|’)ve adjusted) the total for your (?:recent )?order from ([^\n|]{2,80}?)\s*[.|\n]/i.exec(top);
+  // (Or, the receipt sent again after a refund, "We’ve updated your receipt for Noodle Yard.", "Your refund has been applied.",
+  // "Previous total £19.40", "New Total £0.00", with the refund under the payments as "-£19.40" over "Refund"; and a ride's
+  // "We adjusted the total for your recent ride.", "fare adjustment". Round 20.)
+  const adj = /\bwe(?: have|(?:'|’)ve)? adjusted the total for your (?:recent )?order from ([^\n|]{2,80}?)\s*[.|\n]/i.exec(top) ||
+    /\bwe(?: have|(?:'|’)ve)? updated your receipt for ([^\n|]{2,80}?)\s*[.|\n]/i.exec(top);
   if (adj || (/\bprevious total\b/i.test(t) && /\bnew total\b/i.test(t))) {
-    return { kind: "adjusted", merchant: adj ? tidyName(adj[1]) : null, refundPence: labelled(list, /refund/), previousPence: labelled(list, /previous total/), newPence: labelled(list, /new total/) };
+    const previousPence = labelled(list, /previous total/), newPence = labelled(list, /new total/);
+    let refundPence = labelled(list, /refund/);
+    if (refundPence == null) {
+      // ("-£6.25" on the row over "Refund", the refund's own line under the payments.)
+      const at = list.findIndex((r, i) => i > 0 && /^refund$/i.test(r) && /^[-−–]\s*£\s?[\d,]+\.\d{2}$/.test(list[i - 1]));
+      if (at > 0) refundPence = pence(MONEY.exec(list[at - 1]));
+      else if (previousPence != null && newPence != null && previousPence >= newPence && /\brefund\b/i.test(t)) refundPence = previousPence - newPence;
+    }
+    // (When the order was paid, as the payments list it, "14/05/2026 19:05", so two orders of the same total on the same day
+    // from the same restaurant are told apart.)
+    const pay = list.findIndex((r) => /^payments?$/i.test(r));
+    const paid = pay >= 0 ? list.slice(pay + 1, pay + 6).map((r) => /^(\d{2})\/(\d{2})\/(\d{4})[ \t]+(\d{2}):(\d{2})$/.exec(r)).find(Boolean) : null;
+    const ride = !adj && /\bthe total for your (?:recent )?(?:ride|trip)\b/i.test(top);
+    return { kind: "adjusted", merchant: adj ? tidyName(adj[1]) : null, refundPence, previousPence, newPence,
+      ...(paid ? { paidAt: `${paid[3]}-${paid[2]}-${paid[1]}T${paid[4]}:${paid[5]}` } : {}), ...(ride ? { ride: true } : {}) };
   }
   if ((/\bthanks for riding\b|\bwe hope you enjoyed your (?:ride|trip)\b|\byour [^\n]{0,30}\btrip with uber\b/i.test(top + "\n" + (subject || "")) && /\btrip fare\b|\bfare\b/i.test(t)) ||
       (/^[|\t\v\f \u00a0\u1680\u2000-\u200a\u202f\u205f\u3000\ufeff]*trip fare\b/im.test(t) && !/\bhere(?:'|’)s your receipt for\b|\buber eats\b/i.test(top))) {
@@ -47,7 +65,10 @@ export function uberEmail(domain, subject, text) {
   if (/\byour uber one payment was successful\b/i.test(top + "\n" + (subject || "")) && /\btotal charged\b/i.test(t)) return { kind: "ride", item: "Uber One membership", membership: true };
   const rest = /\bhere(?:'|’)s your receipt for ([^\n|]{2,80}?)\s*\.?\s*(?:\||\n|$)/i.exec(top);
   if (rest || /\bto view your full receipt go to uber eats\b/i.test(t)) {
-    return { kind: "eats", merchant: rest ? tidyName(rest[1]) : null, noItemList: /\bto view your full receipt\b/i.test(t) };
+    // (An order the restaurant or courier couldn't complete, "Your order from Pizza Corner could not be delivered." with
+    // "Total £0.00": nothing was bought. Round 20.)
+    const undelivered = /\byour order from [^\n|]{2,80}? (?:could not|couldn(?:'|’)t|cannot|can(?:'|’)t) be (?:delivered|completed|fulfilled)\b/i.test(top) && labelled(list, /total/) === 0;
+    return { kind: "eats", merchant: rest ? tidyName(rest[1]) : null, noItemList: /\bto view your full receipt\b/i.test(t), ...(undelivered ? { undelivered: true } : {}) };
   }
   return null;
 }
@@ -198,10 +219,27 @@ export function supportRefund(subject, text) {
     "\\bwe(?:'|’)?(?:ve| have)? refunded (?:you |your (?:card|account|original payment method) )?(?:with )?" + AMT,
     "\\ban? (?:partial |full )?refund of " + AMT + " (?:has been|was|is being) (?:processed|issued|sent|made)\\b"]);
   const creditPence = one(["\\b(?:we(?:'|’)?(?:ve| have) )?added an? " + AMT + " credit to your\\b", "\\b" + AMT + " (?:of )?(?:account )?credit (?:has been|was) added\\b"]);
-  if (refundPence == null && creditPence == null) return null;
+  // (Or "We've arranged a refund for the below amount." over the items refunded, "Qty | Product | Total", "3 | Yoghurt 150g |
+  // 2.70": what they come to. Round 20.)
+  let listed = null;
+  if (refundPence == null && creditPence == null && /\b(?:arranged|processed|issued|approved) (?:you )?an? (?:partial |full )?refund for the (?:below|following) (?:amount|items?)\b/i.test(t)) {
+    const list = rows(String(text || "").slice(0, 8000));
+    const head = list.findIndex((r) => /^(?:qty|quantity) \| (?:product|item|description)s? \| (?:total|amount|price|refund)$/i.test(r));
+    let sum = 0, n = 0;
+    for (let i = head + 1; head >= 0 && i < list.length && i < head + 40; i++) {
+      const m = /^\d{1,3} \| [^|]{2,160} \| £?\s?(\d{1,4})\.(\d{2})$/.exec(list[i]);
+      if (!m) break;
+      sum += Number(m[1]) * 100 + Number(m[2]); n++;
+    }
+    if (n) listed = sum;
+  }
+  if (refundPence == null && creditPence == null && listed == null) return null;
   const refs = [];
   for (const src of [t, String(subject || "")]) for (const m of src.matchAll(/\border\s*(?:number|no\.?|id)?\s*[:#]?\s*#?\s*(\d{6,14})\b/gi)) if (!refs.includes(m[1])) refs.push(m[1]);
-  return { refundPence, creditPence, refs };
+  // ("Item refund for purchase 1234-5678-90": the purchase the subject names by its number.)
+  const pm = /\b(?:refund|refunded)\b[^\n]{0,30}\bfor (?:your )?(?:purchase|order)\s+#?(\d{3,6}(?:-\d{2,6}){1,3})\s*$/i.exec(String(subject || ""));
+  if (pm && !refs.includes(pm[1])) refs.unshift(pm[1]);
+  return { refundPence: refundPence ?? listed, creditPence, refs };
 }
 
 // A payment service's "You've authorised £38.00 GBP to We Love Holidays Lim..." (money taken for a booking paid in parts:
@@ -401,4 +439,142 @@ export function labelledItems(text) {
     if (unit != null) out.push({ name: item[1].trim(), qty: qty || 1, pricePence: unit, lineTotal: false });
   }
   return out;
+}
+
+// ---- A shop's till receipt sent by email (Ecrebo and the like) ----------------------------------------------------------
+// The till's own lines under "Item | Price": each thing and what it came to, in pounds with no "£" ("Steel Mop Bucket
+// | 18.00"), several of one thing said under its name ("Quantity: 2 at £6.00 each"), then "TOTAL" with how many things
+// and what was paid ("9 Items | £64.50"). Only when the lines come to that total and their count to that number; otherwise
+// null. Round 20.
+export function tillEReceipt(text) {
+  // (Copied from the page, its cells come apart with tabs.)
+  const list = rows(String(text || "").slice(0, 40000).replace(/[ ]*\t[\t ]*/g, " | "));
+  const head = list.findIndex((r) => /^(?:item|description|product)s? \| (?:price|amount|value|£)$/i.test(r));
+  if (head < 0) return null;
+  const items = [];
+  let pendingName = null, pendingQty = null, totalPence = null, count = null;
+  for (let i = head + 1; i < list.length && i < head + 400; i++) {
+    const r = list[i];
+    const tot = /^total$/i.test(r) ? /^(\d{1,4}) items? \| £\s?(\d{1,5})\.(\d{2})$/i.exec(list[i + 1] || "") : /^total(?: \| )?(?:(\d{1,4}) items? \| )?£\s?(\d{1,5})\.(\d{2})$/i.exec(r);
+    if (tot) { count = tot[1] ? Number(tot[1]) : null; totalPence = Number(tot[2]) * 100 + Number(tot[3]); break; }
+    const qty = /^quantity\s*:\s*(\d{1,3}) at £\s?(\d{1,5})\.(\d{2}) each$/i.exec(r);
+    if (qty) { pendingQty = { qty: Number(qty[1]), each: Number(qty[2]) * 100 + Number(qty[3]) }; continue; }
+    if (/^s\/n\s*:/i.test(r)) {
+      // ("S/N: | | 12.00": the line's amount, under its name and how many.)
+      const amt = /\| ([-−–]?)(\d{1,5})\.(\d{2})$/.exec(r);
+      if (amt && pendingName) { items.push({ name: pendingName, qty: pendingQty ? pendingQty.qty : 1, pricePence: (Number(amt[2]) * 100 + Number(amt[3])) * (amt[1] ? -1 : 1), ...(pendingQty && pendingQty.qty > 1 ? { lineTotal: true } : {}) }); pendingName = null; pendingQty = null; }
+      continue;
+    }
+    const line = /^(\p{L}[^|£]{1,60}?) \| ([-−–]?)(\d{1,5})\.(\d{2})$/u.exec(r);
+    if (line) {
+      const p = (Number(line[3]) * 100 + Number(line[4])) * (line[2] ? -1 : 1);
+      const q = pendingQty && pendingName === null ? pendingQty : null;
+      items.push({ name: line[1].trim(), qty: q ? q.qty : 1, pricePence: p, ...(q && q.qty > 1 ? { lineTotal: true } : {}) });
+      pendingQty = null; continue;
+    }
+    if (/^\p{L}[^|£]{1,60}$/u.test(r)) { pendingName = r.trim(); pendingQty = null; continue; }
+    return null;
+  }
+  if (totalPence == null || !items.length || items.some((x) => x.pricePence < 0)) return null;
+  const sum = items.reduce((a, x) => a + x.pricePence, 0), n = items.reduce((a, x) => a + x.qty, 0);
+  if (sum !== totalPence || (count != null && count !== n)) return null;
+  // (Each line's own price: several of one thing keep the price of one.)
+  return { items: items.map((x) => (x.lineTotal ? { name: x.name, qty: x.qty, pricePence: x.pricePence, lineTotal: true } : x)), totalPence };
+}
+
+// ---- Receipts sent for a shop by an e-receipt or ordering platform ---------------------------------------------------------
+// A till receipt emailed by Ecrebo ("Your Digital Receipt" from a homeware shop), yReceipts ("Your receipt from Tailor
+// & Co", the receipt itself a picture), me&u ("Your receipt from Wine Bar Riverside", the receipt behind "View receipt"),
+// OrderYOYO ("Spice House | Your order 10203040 is accepted") and Viva Wallet's "Successful Payment" for a shop
+// ("Requested by | Example Trading Ltd", "Description | Cloud Shop", "Amount | £21.40"): the shop's purchase, named by the shop, sent
+// by the platform. Round 20.
+const shopName = (n) => { const s = tidyName(String(n || "").replace(/["“”]/g, "")); return s.length >= 2 && s.length <= 80 ? s : null; };
+export function eReceiptPlatform(domain, subject, fromName, text) {
+  const t = String(text || "").slice(0, 8000);
+  // (Pasted in, the email has no sender or subject of its own: the sender's address and the subject are its top lines.)
+  const pastedFrom = !domain ? /^[^\n@]{0,80}<?[\w.+-]{1,64}@([a-z0-9-]{1,63}(?:\.[a-z0-9-]{1,63}){1,4})>?[ \t]*$/im.exec(t.slice(0, 600)) : null;
+  const d = String(domain || (pastedFrom ? pastedFrom[1] : "")).toLowerCase();
+  const pastedSubject = !subject && pastedFrom ? (t.slice(0, 600).split("\n").find((l) => /\breceipt from\b|\byour order\b|\bsuccessful payment\b|\breceipt\b/i.test(l)) || "") : "";
+  const s = String(subject || pastedSubject).replace(/^\s*(?:(?:fwd?|fw)\s*:\s*)+/i, "").trim().slice(0, 300);
+  if (/(^|\.)ecrebo\.com$/.test(d) && (/\b(?:digital|e-?)\s?receipt\b/i.test(s) || /\be-?receipt\b/i.test(t.slice(0, 1500)))) {
+    const sub = /^([a-z][a-z0-9]{1,30})(?:-[a-z]+)?\.ecrebo\.com$/.exec(d);
+    return { platform: d, shop: shopName(fromName) || (sub ? sub[1][0].toUpperCase() + sub[1].slice(1) : null) };
+  }
+  const from = /\breceipt from (\S[^|]{1,79})$/i.exec(s);
+  if (/(^|\.)yreceipts\.com$/.test(d) && from) {
+    // (Its words only the shop's name, once what a forward adds at its top is left out.)
+    const own = t.replace(/^[ \t>*|]*(?:-+ ?forwarded message ?-+|begin forwarded message:|_{8,}|(?:from|sent|date|to|subject|cc)\s*:[^\n]{0,300})[ \t|]*$/gim, "");
+    return { platform: d, shop: shopName(from[1]), picture: own.replace(/\s+/g, " ").trim().length < 200 };
+  }
+  if (/(^|\.)meandu\.(?:com|app|com\.au)$/.test(d) && from) return { platform: d, shop: shopName(from[1]), atLink: /\bview (?:your )?(?:order (?:&|and) )?receipt\b/i.test(t) };
+  if (/(^|\.)orderyoyo\.com$/.test(d)) {
+    const m = /^(\S[^|]{1,59}?)\s*\|\s*your order\s+#?\d{3,14}\s+(?:is|has been)\s+(?:accepted|confirmed|received)\b/i.exec(s);
+    if (m) return { platform: d, shop: shopName(m[1]) };
+  }
+  if (/(^|\.)viva(?:wallet)?\.com$/.test(d) && /\bsuccessful payment\b/i.test(s)) {
+    const list = rows(t);
+    const cell = (re) => { for (const r of list) { const m = new RegExp("^(?:" + re.source + ") \\| (.{1,80})$", "i").exec(r); if (m) return m[1].trim(); } return null; };
+    const by = cell(/requested by/), what = cell(/description/), amt = MONEY.exec(cell(/amount/) || "");
+    if (!amt || !(by || what)) return null;
+    // (The description is the shop's own words: its name when it is a name, otherwise who asked for the money.)
+    const name = what && /^\p{L}[\p{L}&'’ .-]{1,40}$/u.test(what) ? what : by;
+    return { platform: d, shop: shopName(name), amountPence: pence(amt) };
+  }
+  return null;
+}
+
+// ---- A takeaway's own ordering page's email (OrderYOYO and the like) --------------------------------------------------------
+// "Pcs | Name | Total", then each thing as how many, its name, what was chosen with it ("+ Paneer") and its price, the
+// pound sign in a cell of its own ("£ | 8.50"); then "Subtotal", money off ("Discount 10%" "-2.10"), what was added
+// ("Delivery", "Bag fee", "Service fee") and "Total (Incl. VAT)". Only when the things come to the subtotal and the subtotal,
+// less money off, plus what was added, to the total; otherwise null. Round 20.
+export function pcsOrder(text) {
+  const list = rows(String(text || "").slice(0, 30000));
+  const head = list.findIndex((r) => /^(?:pcs|qty|quantity) \| (?:name|item|product)s? \| (?:total|price|amount)$/i.test(r));
+  if (head < 0) return null;
+  const AMT = /^(?:£ \| |£\s?)?([-−–])?\s?(\d{1,5})\.(\d{2})$/;
+  const amt = (r) => { const m = AMT.exec(r || ""); return m ? (Number(m[2]) * 100 + Number(m[3])) * (m[1] ? -1 : 1) : null; };
+  const items = [], fees = [], discounts = [];
+  let subtotal = null, total = null, i = head + 1;
+  for (; i < list.length && i < head + 300; ) {
+    const q = /^(\d{1,3})$/.exec(list[i]);
+    if (!q) break;
+    const name = list[i + 1];
+    if (!name || !/^\p{L}/u.test(name) || name.length > 100) return null;
+    const extras = [];
+    let k = i + 2;
+    while (k < list.length && /^\+\s?\S/.test(list[k]) && extras.length < 8) { extras.push(list[k].replace(/^\+\s?/, "").trim()); k++; }
+    const p = amt(list[k]);
+    if (p == null || p < 0) return null;
+    const qty = Number(q[1]);
+    items.push({ name: name.replace(/\s+\)$/, ")").trim(), qty, pricePence: p, ...(qty > 1 ? { lineTotal: true } : {}), ...(extras.length ? { variant: extras.join(", ") } : {}) });
+    i = k + 1;
+  }
+  for (; i < list.length && i < head + 340; i++) {
+    const label = list[i], p = amt(list[i + 1]);
+    if (p == null || !/^\p{L}[^|£]{1,40}$/u.test(label)) continue;
+    if (/^sub-?\s?total\b/i.test(label)) subtotal = p;
+    else if (/^total\b/i.test(label)) { total = p; break; }
+    else if (p < 0 || /\b(?:discount|voucher|promo(?:tion)?|offer|saving)\b/i.test(label)) discounts.push({ label, pence: Math.abs(p) });
+    else if (p > 0) fees.push({ label, pence: p });
+    i++;
+  }
+  if (!items.length || total == null || subtotal == null) return null;
+  const sum = items.reduce((a, x) => a + x.pricePence, 0);
+  if (sum !== subtotal || subtotal - discounts.reduce((a, x) => a + x.pence, 0) + fees.reduce((a, x) => a + x.pence, 0) !== total) return null;
+  return { items, fees, discounts, totalPence: total };
+}
+
+// ---- A subscription started today ---------------------------------------------------------------------------------------
+// "Thanks for subscribing to StreamBox Plus", "You'll be charged £7.49/1 month(s) starting on 02/03/2026": the first payment is
+// taken the day the email says, so when that is the day it was sent (or the next), the subscription was bought that day for
+// that much. A later start (a free trial) is nothing paid yet: null. Round 20.
+export function subscriptionStarted(subject, text, sentOn) {
+  const t = String(text || "").slice(0, 6000).replace(/[ \t]+/g, " ");
+  const name = /\bthanks? (?:you )?for subscribing to ([\p{L}\d][^\n.!|]{1,50}?)\s*[.!\n|]/iu.exec(t);
+  const charge = /\b(?:you(?:'|’)ll|you will) be charged £\s?(\d{1,4})\.(\d{2})\s*(?:\/|per|a|every)\s*[^\n]{0,30}?\bstarting (?:on|from) (\d{1,2})\/(\d{1,2})\/(\d{4})\b/i.exec(t);
+  if (!name || !charge || !/^\d{4}-\d{2}-\d{2}$/.test(String(sentOn || ""))) return null;
+  const start = Date.UTC(+charge[5], +charge[4] - 1, +charge[3]), sent = Date.parse(sentOn + "T00:00:00Z");
+  if (!Number.isFinite(start) || start < sent || start - sent > 864e5) return null;
+  return { name: tidyName(name[1]), pence: Number(charge[1]) * 100 + Number(charge[2]) };
 }

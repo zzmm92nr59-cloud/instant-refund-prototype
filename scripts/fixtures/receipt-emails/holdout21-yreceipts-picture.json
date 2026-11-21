@@ -1,0 +1,25 @@
+{
+ "id": "holdout21-yreceipts-picture",
+ "sender": "Tailor & Co",
+ "layout": "an e-receipt platform's receipt that is only a picture: 'Your receipt from Tailor & Co', the email's words only the shop's name",
+ "headers": {
+  "from": "Tailor & Co Leeds <receipts@yreceipts.com>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your receipt from Tailor & Co",
+  "date": "Sat, 05 Feb 2022 15:14:00 +0000"
+ },
+ "html": "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">\n<html xmlns=\"http://www.w3.org/1999/xhtml\"><head><meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\" /><meta name=\"viewport\" content=\"width=device-width\" />\n<title>Tailor &amp; Co</title><style type=\"text/css\">body{margin:0;padding:0}td{font-family:Helvetica,Arial,sans-serif;font-size:14px;color:#222}.muted{color:#777}@media only screen and (max-width:600px){.w600{width:100%!important}}</style></head>\n<body style=\"margin:0;padding:0;background-color:#f3f3f3\">\n<div style=\"display:none;max-height:0;overflow:hidden\">&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;</div>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#f3f3f3\"><tr><td align=\"center\">\n<table role=\"presentation\" class=\"w600\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#ffffff\">\n<tr><td style=\"padding:24px 24px 8px 24px\"><a href=\"https://www.tailorandco.example/?utm_source=email\"><img src=\"https://www.tailorandco.example/static/email/logo.png\" alt=\"Tailor &amp; Co\" width=\"140\" height=\"40\" border=\"0\" /></a></td></tr>\n<tr><td style=\"padding:6px 24px\"><p>Tailor &amp; Co.</p><img src=\"https://img.yreceipts.example/r/1.png\" alt=\"\"></td></tr>\n<tr><td style=\"padding:24px;font-size:12px\" class=\"muted\">&copy; 2026 Tailor &amp; Co. All rights reserved.<br /><a href=\"https://www.tailorandco.example/help\">Help</a> | <a href=\"https://www.tailorandco.example/privacy\">Privacy</a> | <a href=\"https://www.tailorandco.example/unsubscribe\">Unsubscribe</a></td></tr>\n</table></td></tr></table>\n<img src=\"https://click.tailorandco.example/open/abc123.gif\" width=\"1\" height=\"1\" alt=\"\" />\n</body></html>",
+ "text": "",
+ "expected": {
+  "shop": "Tailor & Co",
+  "date": "2022-02-05",
+  "currency": null,
+  "items": [],
+  "subtotalPence": null,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": null,
+  "attachmentOnly": "image"
+ }
+}

@@ -185,7 +185,7 @@ async function gmailGet(fetchImpl, url, headers) {
 // 42: codes to show or scan (scan-codes.js): a return barcode in a shipping email, a receipt's own barcode, a drop-off QR code,
 // a collection QR code and tickets' barcodes are kept with the order's receipt; an email that is only such a code for an order
 // it names is kept for it (kind "order_codes").
-export const PARSER_VERSION = 55;
+export const PARSER_VERSION = 56;
 // Which full read of every mailbox is due: version 33 of the reader was full read 14, and each reader version since is one
 // more, so a better reader always reaches old receipts too, without anyone having to remember to raise this.
 export const READER_FULL_REV = 14 + Math.max(0, PARSER_VERSION - 33);
@@ -1160,7 +1160,7 @@ function classify(rawText, ref, lenient = false) {
       // to that order by attachAdjustments. Round 10.
       details = { kind: "order_update", ...ref, stage: adj.stage || "adjusted", at: adj.at, ...(adj.paymentRef ? { paymentRef: adj.paymentRef } : {}), orderRef: adj.orderRef, merchant: adj.merchant, amountPence: adj.amountPence,
         ...(adj.orderRefs ? { orderRefs: adj.orderRefs } : {}), ...(adj.creditPence ? { creditPence: adj.creditPence } : {}), ...(adj.bySupport ? { bySupport: true } : {}),
-        previousTotalPence: adj.previousTotalPence, newTotalPence: adj.newTotalPence, currency: adj.currency, retailer: adj.retailer, source: "shopper_email", refundEligible: false, parserVersion: PARSER_VERSION };
+        previousTotalPence: adj.previousTotalPence, newTotalPence: adj.newTotalPence, ...(adj.paidAt ? { paidAt: adj.paidAt } : {}), currency: adj.currency, retailer: adj.retailer, source: "shopper_email", refundEligible: false, parserVersion: PARSER_VERSION };
     } else if (can.ok) {
       details = { kind: "order_update", ...ref, stage: "cancelled", partial: can.partial, at: can.at, orderRef: can.orderRef, amountPence: can.amountPence, currency: can.currency, ...(can.byItems ? { byItems: true } : {}), ...(can.free ? { free: true } : {}),
         ...(Array.isArray(can.cancelledItems) && can.cancelledItems.length ? { cancelledItems: can.cancelledItems } : {}),
@@ -2465,6 +2465,17 @@ export function attachCancellations(orders, cancels) {
 // £7.02) joins the order it changed: the same app, the same restaurant, the order's total was the previous total, and the
 // order was placed in the week before. The order keeps what was bought and gains `adjusted` (the refund and the new total);
 // nothing is guessed when no order fits exactly one way. Round 10.
+// A UK wall-clock time, "2026-05-14T19:05", as the moment it was (British Summer Time from 01:00 UTC on the last Sunday of
+// March to 01:00 UTC on the last Sunday of October); null when it isn't one.
+export function ukLocalMs(local) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(String(local || ""));
+  if (!m) return null;
+  const y = +m[1], asUtc = Date.UTC(y, +m[2] - 1, +m[3], +m[4], +m[5]);
+  if (!Number.isFinite(asUtc)) return null;
+  const lastSunday = (month) => { const d = new Date(Date.UTC(y, month + 1, 0)); return Date.UTC(y, month, d.getUTCDate() - d.getUTCDay(), 1); };
+  const bst = asUtc - 3600e3 >= lastSunday(2) && asUtc - 3600e3 < lastSunday(9);
+  return bst ? asUtc - 3600e3 : asUtc;
+}
 export function attachAdjustments(orders, adjusts) {
   const low = (x) => String(x || "").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
   // (The orders each could be about, by number or by shop name, made once: the rules below are checked on those alone.)
@@ -2500,8 +2511,15 @@ export function attachAdjustments(orders, adjusts) {
     const fits = among(index().name, [low(a.retailer && a.retailer.name)]).filter((o) => o.kind !== "order_update" && low(o.retailer && o.retailer.name) === low(a.retailer && a.retailer.name) &&
       (!a.merchant || low(o.merchant) === low(a.merchant)) && (a.previousTotalPence == null || o.totalPence === a.previousTotalPence) &&
       (!a.at || !o.orderDate || (o.orderDate <= a.at && Date.parse(a.at) - Date.parse(o.orderDate) <= 7 * 864e5)));
-    if (fits.length !== 1) continue;
-    const o = fits[0];
+    // (Two orders of the same total on the same day from the same restaurant: the one paid at the time the changed receipt
+    // gives for the first payment, "14/05/2026 19:05" in UK time, the minute its own receipt was sent. Round 20.)
+    let pick = fits;
+    if (fits.length > 1 && a.paidAt) {
+      const paidMs = ukLocalMs(a.paidAt);
+      if (paidMs != null) pick = fits.filter((o) => { const s = Date.parse(o.sentAt || ""); return Number.isFinite(s) && Math.abs(s - paidMs) <= 3 * 60e3; });
+    }
+    if (pick.length !== 1) continue;
+    const o = pick[0];
     o.adjusted = { at: a.at || null, refundPence: (o.adjusted ? o.adjusted.refundPence : 0) + a.amountPence, newTotalPence: a.newTotalPence ?? null, currency: a.currency || o.currency || "GBP" };
   }
 }

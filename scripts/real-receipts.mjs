@@ -63,6 +63,8 @@ export function realInbox({ now = Date.UTC(2026, 10, 19, 12) } = {}) {
     // What Relay kept for one receipt (its details), as stored.
     details: (id) => { const r = sqlite.prepare("SELECT details FROM captured_receipts WHERE id = ?").get(id); return r ? JSON.parse(r.details) : null; },
     paste: async (email) => call("/relay/my/receipts/add-pasted", { method: "POST", body: { email } }),
+    // Every email Relay kept, with what it made of it (round 20).
+    stored: () => sqlite.prepare("SELECT id, status, details FROM captured_receipts").all().map((r) => ({ id: r.id, status: r.status, details: JSON.parse(r.details) })),
     call,
   };
 }
