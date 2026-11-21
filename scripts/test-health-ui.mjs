@@ -36,6 +36,9 @@ const HEALTH = {
   aiReader: { on: true, shoppersOn: 2, reads: 14, thisWeek: 5, failed: 1, notPurchase: 2,
     parts: { shop: { filled: 2, agreed: 8, differed: 0 }, total: { filled: 6, agreed: 3, differed: 1 }, date: { filled: 0, agreed: 0, differed: 0 },
       number: { filled: 1, agreed: 9, differed: 0 }, items: { filled: 4, agreed: 5, differed: 2 } } },
+  aiSpend: { month: "2026-11", limitPence: 2000, shopperDayLimitPence: 10, spentPence: 512.4, reached: false, calls: 310,
+    byFeature: [{ feature: "reader", calls: 240, inputTokens: 900000, outputTokens: 70000, pence: 410.2 }, { feature: "help_chat", calls: 70, inputTokens: 200000, outputTokens: 20000, pence: 102.2 }],
+    reader: { filled: 13, agreed: 25, differed: 3 } },
   checkedByShops: { days: 90, orders: 14, shoppers: 6, withInbox: 12, found: 10, byNumber: 8, notFound: 1, unsure: 1, allRight: 7,
     parts: { shop: { right: 9, wrong: 1, missing: 0 }, total: { right: 8, wrong: 1, missing: 1 }, date: { right: 10, wrong: 0, missing: 0 },
       number: { right: 8, wrong: 0, missing: 0 }, items: { right: 8, none: 1, missing: 0, extra: 1, quantity: 0 } },
@@ -165,6 +168,14 @@ const aiGroup = (await view.locator(".rl-agroup", { hasText: "Emails read by the
 for (const s of ["AI help", "On", "Shoppers with it on", "Emails read by the AI", "14", "5 this week, 1 couldn't be read, 2 not purchases", "Totals", "6 filled in",
   "3 agreed with the rules, 1 differed", "Items", "4 filled in", "Order numbers"]) assert.ok(aiGroup.includes(s), "AI help shows: " + s);
 assert.ok(!aiGroup.includes("Dates"), "a part with nothing to say is left out");
+// AI spending: this month against the limit, by feature, and what the AI reader found.
+const spendGroup = view.locator(".rl-agroup", { hasText: "Calls to the AI" });
+const spendText = await spendGroup.innerText();
+for (const s of ["This month", "£5.12 of £20.00", "Calls to the AI", "310", "AI help reading receipts", "£4.10", "240 calls", "Help chat", "£1.02", "70 calls",
+  "What the AI reader found", "13 gaps filled", "25 agreed with the rules, 3 differed", "Limit per shopper", "£0.10 a day"]) assert.ok(spendText.includes(s), "AI spending shows: " + s);
+assert.match(spendText.toLowerCase(), /ai spending/);
+assert.equal(await spendGroup.locator(".rl-hp-meter").getAttribute("aria-label"), "26% of this month's AI limit used");
+assert.ok(!/pence|reader|help_chat|undefined|NaN/.test(spendText.replace("AI reader", "")), "plain words, no codes");
 const sentGroup = view.locator(".rl-agroup", { hasText: "Each is deleted 30 days after it was sent" });
 const sentText = (await sentGroup.innerText()).toLowerCase(); // section names are shown in capitals
 for (const s of ["Emails shoppers sent", "Waiting to be read", "Each is deleted 30 days after it was sent", "From 2 people in all"]) assert.ok(sentText.includes(s.toLowerCase()), "emails sent shows: " + s);
