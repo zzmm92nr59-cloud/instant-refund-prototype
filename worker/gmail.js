@@ -185,7 +185,7 @@ async function gmailGet(fetchImpl, url, headers) {
 // 42: codes to show or scan (scan-codes.js): a return barcode in a shipping email, a receipt's own barcode, a drop-off QR code,
 // a collection QR code and tickets' barcodes are kept with the order's receipt; an email that is only such a code for an order
 // it names is kept for it (kind "order_codes").
-export const PARSER_VERSION = 59;
+export const PARSER_VERSION = 60;
 // Which full read of every mailbox is due: version 33 of the reader was full read 14, and each reader version since is one
 // more, so a better reader always reaches old receipts too, without anyone having to remember to raise this.
 export const READER_FULL_REV = 14 + Math.max(0, PARSER_VERSION - 33);
@@ -1949,6 +1949,20 @@ function paidIs(c, o) {
 }
 // opts.keyFor(email): the group an email must be in (the shopper's own "same order" / "different orders", order-joins.js),
 // or undefined for the reader's own joining.
+// The shop's own things at the money a payment service's receipt of the same purchase sets out: the shop's lines as they are
+// when they and the payment's fees and money off come to its total; or at the payment's one price before tax, when its one
+// line is all the shop's lines counted together, each at the same price. null when neither adds up. Round 23.
+function paymentFit(shop, pay) {
+  const extra = (pay.fees || []).reduce((n, f) => n + (f.pence || 0), 0) - (pay.discounts || []).reduce((n, d) => n + (d.pence || 0), 0);
+  const items = shop.items || [];
+  const lines = items.map((i) => lineOf(i));
+  if (lines.length && lines.every((x) => Number.isInteger(x)) && lines.reduce((x, y) => x + y, 0) + extra === pay.totalPence) return items.map((i) => ({ ...i }));
+  const count = items.reduce((n, i) => n + (i.qty || 1), 0);
+  const one = pay.items.length === 1 && Number.isInteger(pay.items[0].pricePence) && (pay.items[0].qty || 1) === count && count > 1 &&
+    items.every((i) => !i.lineTotal && Number.isInteger(i.pricePence) && i.pricePence === items[0].pricePence);
+  if (one && pay.items[0].pricePence * count + extra === pay.totalPence) return items.map((i) => ({ ...i, pricePence: pay.items[0].pricePence }));
+  return null;
+}
 export function mergeOrderEmails(orders, opts = {}) {
   // (One email confirming two orders: a card for each, the second named by its own number, total and items. Its id says
   // which email it came from. Round 12.)
@@ -2125,7 +2139,16 @@ export function mergeOrderEmails(orders, opts = {}) {
     // nor does the order's confirmation sent again later, the day before a flight: the order's own email gives its day and its
     // lines. Round 19.)
     const later = laterCopies(g);
-    const [lead, ...rest] = g.slice().sort((a, b) => (a.orderUpdate === "amended") - (b.orderUpdate === "amended") || later.has(a) - later.has(b) || score(b) - score(a) || a.createdAt - b.createdAt);
+    // (The shop's own list doesn't come to what was paid, its six tickets at their price and nothing else, while the payment
+    // service's receipt of the same purchase sets out the money whole and adds up, "Qty: 6" at the price before tax, a
+    // booking fee, the discount and the tax: the shop's own email leads, as it would without them, and the card shows the
+    // payment service's fees, discount and tax with the shop's own names for the things, at the payment service's price when
+    // its one line is the shop's lines counted together. Never when the shop's email has fees or money off of its own.
+    // Round 23.)
+    const payFor = g.find((o) => o.retailer && o.retailer.via && o.totalPence != null && o.itemsCheck && o.itemsCheck.complete === true && ((o.fees || []).length || (o.discounts || []).length) && (o.items || []).length);
+    const pref = payFor ? g.find((o) => o !== payFor && o.retailer && !o.retailer.via && !isForwarded(o) && (o.items || []).length && !(o.fees || []).length && !(o.discounts || []).length && !(o.itemsCheck && o.itemsCheck.complete === true) &&
+      (o.totalPence == null || o.totalPence === payFor.totalPence) && (o.currency || "GBP") === (payFor.currency || "GBP") && paymentFit(o, payFor)) : null;
+    const [lead, ...rest] = g.slice().sort((a, b) => (a.orderUpdate === "amended") - (b.orderUpdate === "amended") || later.has(a) - later.has(b) || (b === pref) - (a === pref) || score(b) - score(a) || a.createdAt - b.createdAt);
     const c = { ...lead, items: (lead.items || []).map(i => ({ ...i })), returns: lead.returns ? { ...lead.returns } : null };
     // (The order's day is the day it was placed: the first day one of its emails was sent when the leading email's day is
     // only the day it was sent, so a re-sent confirmation or a status email that leads with its fuller list never moves the
@@ -2224,6 +2247,21 @@ export function mergeOrderEmails(orders, opts = {}) {
     // number: the shop's before VAT or before delivery. Round 15.)
     const paidBy = !(c.retailer && c.retailer.via) && rest.find((o) => o.retailer && o.retailer.via && o.totalPence != null && (o.currency || "GBP") === (c.currency || "GBP") && o.orderRef && c.orderRef && refCore(o.orderRef) === refCore(c.orderRef));
     if (paidBy && c.totalPence !== paidBy.totalPence && c.orderUpdate !== "paid") { if (c.totalPence != null) c.shopTotalPence = c.totalPence; c.totalPence = paidBy.totalPence; }
+    // (The shop's own list doesn't come to what was paid, its six tickets at their price and nothing else, while the payment
+    // service's receipt of the same purchase sets out the money whole and adds up, "Qty: 6" at the price before tax, a
+    // booking fee, the discount and the tax: the card shows the payment service's fees, discount and tax with the shop's own
+    // names for the things, at the payment service's price when its one line is the shop's lines counted together. Never
+    // when the card already has fees or money off of its own. Round 23.)
+    if (pref && lead === pref && payFor) {
+      const items = paymentFit(pref, payFor);
+      if (items && c.totalPence === payFor.totalPence) {
+        c.items = items;
+        if ((payFor.fees || []).length) c.fees = payFor.fees.map((f) => ({ ...f })); else delete c.fees;
+        if ((payFor.discounts || []).length) c.discounts = payFor.discounts.map((d) => ({ ...d })); else delete c.discounts;
+        const extra = (payFor.fees || []).reduce((n, f) => n + (f.pence || 0), 0) - (payFor.discounts || []).reduce((n, d) => n + (d.pence || 0), 0);
+        c.itemsCheck = { ...(payFor.itemsCheck || {}), complete: true, itemsPence: items.reduce((n, i) => n + lineOf(i), 0), expectedPence: c.totalPence - extra, missingPence: 0, fromPayment: true };
+      }
+    }
     // Which emails the card was made from, for choices the shopper made on an email that isn't the one shown (attachGifts).
     // Not enumerable, so it never goes to the app.
     Object.defineProperty(c, "emailIds", { value: [...new Set(g.flatMap(o => o.emailIds || [o.id]))], enumerable: false });
@@ -2406,8 +2444,19 @@ function attachPayments(orders, pays) {
     const fits = orders.filter(o => o.kind !== "order_update" && o.orderDate && o.orderDate <= p.at && Date.parse(p.at) - Date.parse(o.orderDate) <= 366 * 864e5 &&
       (() => { const s = squash(o.retailer && o.retailer.name); return s.length >= 5 && (m.includes(s) || s.includes(m)); })());
     if (!fits.length) continue;
-    const last = fits.reduce((a, b) => (b.orderDate > a.orderDate ? b : a));
-    if (fits.filter(o => o.orderDate === last.orderDate).length !== 1) continue;
+    // (A payment of just what one of the shop's orders came to, within three days of it, is that order's: "You've authorised
+    // £12.40 GBP to UBER PAYMENTS UK" goes with the £12.40 ride, never with another ride. A ride or a takeaway is paid in one
+    // go, so a payment that isn't its money is never put on it; and no payment is ever more than the whole order. Round 23.)
+    const near = (o) => Math.abs(Date.parse(p.at) - Date.parse(o.orderDate)) <= 3 * 864e5;
+    const exact = fits.filter(o => o.totalPence === p.amountPence && (o.currency || "GBP") === (p.currency || "GBP") && near(o));
+    let last = exact.length === 1 ? exact[0] : null;
+    if (!last && exact.length > 1) continue;
+    if (!last) {
+      last = fits.reduce((a, b) => (b.orderDate > a.orderDate ? b : a));
+      if (fits.filter(o => o.orderDate === last.orderDate).length !== 1) continue;
+      if (Number.isInteger(last.totalPence) && (last.currency || "GBP") === (p.currency || "GBP") && p.amountPence > last.totalPence) continue;
+      if (/(^|\.)(?:uber\.com|bolt\.eu|lyft\.com|deliveroo\.co\.uk|just-eat\.co\.uk|justeat\.co\.uk|freenow\.com|addisonlee\.com)$/i.test((last.retailer && last.retailer.domain) || "")) continue;
+    }
     const list = last.payments || (last.payments = []);
     if (!list.some(x => x.at === p.at && x.amountPence === p.amountPence)) list.push({ at: p.at, amountPence: p.amountPence, currency: p.currency || "GBP" });
     list.sort((a, b) => a.at.localeCompare(b.at));

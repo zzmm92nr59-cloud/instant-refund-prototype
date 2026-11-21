@@ -781,7 +781,8 @@ export function moneyOf(text) {
   // (Blank lines between an HTML email's rows say nothing: "Subtotal" and its amount can have one between them. Round 10.)
   const lines = stackedMoney(prepText(text).replace(/\r\n?/g, "\n").split("\n").map((x) => x.replace(/\s+/g, " ").trim()).filter((x) => x && !/^[|\s]+$/.test(x)));
   // ("£-27.24": Domino's writes the minus after the pound sign. Round 10.)
-  const amountOf = (s) => { const m = new RegExp("^([-−–])?\\s?" + MONEY + "\\s*\\*?$", "i").exec(s.trim().replace(/^£\s?[-−–]\s?(?=\d)/, "-£").replace(/^\+\s?(?=£)/, "")); return m ? { p: pence(m[2], m[3], m[4]), neg: Boolean(m[1]) } : /^(?:free|£0\.00)$/i.test(s.trim()) ? { p: 0, neg: false } : null; };
+  // (The way it was sent after a delivery charge, "Shipping: | £4.95 via Next Day": the charge. Round 23.)
+  const amountOf = (s) => { const m = new RegExp("^([-−–])?\\s?" + MONEY + "\\s*\\*?$", "i").exec(s.trim().replace(/^(£\s?\d[\d,]{0,9}(?:\.\d{2})?) via \p{L}[\p{L}\d .&'’-]{0,40}$/u, "$1").replace(/^£\s?[-−–]\s?(?=\d)/, "-£").replace(/^\+\s?(?=£)/, "")); return m ? { p: pence(m[2], m[3], m[4]), neg: Boolean(m[1]) } : /^(?:free|£0\.00)$/i.test(s.trim()) ? { p: 0, neg: false } : null; };
   const seen = new Set();
   for (let i = 0; i < lines.length; i++) {
     const cells = lines[i].split("|").map((x) => x.trim()).filter(Boolean);

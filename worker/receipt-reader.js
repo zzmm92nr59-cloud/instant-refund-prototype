@@ -404,15 +404,26 @@ export function itemsFromCells(text) {
 export const GAME_SHOP = /(^|\.)(appcharge\.com|xsolla\.com)$/i;
 const cellsOf = (text) => String(text || "").split(/\r\n|\r|\n/).flatMap((l) => l.split("|"))
   .map((c) => c.replace(/[\u200b-\u200d\u034f\u00ad\u2060\ufeff]/g, "").replace(/\s+/g, " ").trim()).filter(Boolean);
-export function gameTitle(text) {
+export function gameTitle(text, subject) {
   for (const c of cellsOf(text).slice(0, 12)) {
     if (c.length < 3 || c.length > 48 || /\d/.test(c) || !/\p{L}{2}/u.test(c)) continue;
     if (/\b(purchase|confirmation|receipt|order|thank|thanks|hello|hi|dear|payment|invoice|powered|contact|support|help|questions?|assistance|support team)\b/i.test(c)) continue;
     // (The web shop's own heading, "Appcharge Reciept" (sic), is not the game: a misspelt receipt, or the shop's name. Round 12.)
     if (/\breci?ei?pt\b|\b(?:appcharge|xsolla)\b/i.test(c)) continue;
+    // (Nor a heading of the receipt's own, "Items", "Subtotal", "Payment Method": a receipt whose plain text runs its
+    // headings together shows them first. Round 23.)
+    if (/^(?:items?|sub-?\s?total|total|vat|tax|payment method|payment date|country|order id|receipt number|apple pay|google pay|paypal)\b/i.test(c)) continue;
     // (A forward's own header lines, "From: Puzzle Pals <receipts@…>", are not the game's title. Round 10.)
     if (/^(?:from|to|sent|subject|date|cc)\s*:|@|forwarded message|original message/i.test(c)) continue;
     let name = c.replace(/\s*[-–]\s*[A-Z0-9][A-Z0-9 &.]{1,30}$/, "").trim() || c;
+    if (name === name.toUpperCase()) name = name.toLowerCase().replace(/(^|[\s-])(\p{L})/gu, (m, a, b) => a + b.toUpperCase());
+    return name;
+  }
+  // (When the body gives no heading of its own, the subject names the game: "Your PUZZLE PALS-ACME GAMES receipt
+  // #123-456-789". Round 23.)
+  const sm = /^\s*your\s+(\p{L}[\p{L}\p{N} &'’.:-]{1,46}?)\s+receipt\s+#?\s?\d/iu.exec(String(subject || ""));
+  if (sm && !/\b(?:appcharge|xsolla|purchase|order|payment)\b/i.test(sm[1])) {
+    let name = sm[1].replace(/\s*[-–]\s*[A-Z0-9][A-Z0-9 &.]{1,30}$/, "").trim() || sm[1];
     if (name === name.toUpperCase()) name = name.toLowerCase().replace(/(^|[\s-])(\p{L})/gu, (m, a, b) => a + b.toUpperCase());
     return name;
   }
