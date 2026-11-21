@@ -3745,7 +3745,7 @@
     var keepNames = x.returnable === false ? (x.returnableItems || []).map(function (i) { return (x.items || [])[i] && x.items[i].name; }).filter(Boolean) : [];
     if (keepNames.length) card.appendChild(el("p", { className: "rl-keep", text: "The food can't go back, but you can usually return the " + keepNames.join(", the ") + "." ,
       style: "margin:8px 0 0;padding:10px 12px;border-radius:12px;background:var(--rl-accent-bg);color:var(--rl-text);font-size:14px;font-weight:600;line-height:1.4" }));
-    else if (x.returnable === false && !(x.returns && x.returns.freeCancellationUntil) && !(x.returns && x.returns.cancelWithin)) card.appendChild(el("span", { text: "Usually can't be returned", style: "display:inline-block;margin:6px 6px 0 0;padding:4px 10px;border-radius:999px;font-weight:700;font-size:13px;background:var(--rl-fill);color:var(--rl-text2)" }));
+    else if (x.returnable === false && !x.payAtProperty && !(x.returns && x.returns.freeCancellationUntil) && !(x.returns && x.returns.cancelWithin)) card.appendChild(el("span", { text: "Usually can't be returned", style: "display:inline-block;margin:6px 6px 0 0;padding:4px 10px;border-radius:999px;font-weight:700;font-size:13px;background:var(--rl-fill);color:var(--rl-text2)" }));
     var left = daysLeft(statedDeadline(x));
     var leftText = left === null ? "" : left < 0 ? "Deadline passed" : left === 0 ? "Return today" : left + " day" + (left === 1 ? "" : "s") + " left";
     var leftTone = left === null ? "" : left < 0 ? "past" : left <= 2 ? "red" : left <= 7 ? "amber" : "green";
@@ -9936,7 +9936,7 @@
         if (payLater(x) && !one) fact("To pay at the hotel", Number.isInteger(x.totalPence) ? money(x.totalPence, x.currency) : null); else fact("Price", price);
         // Not in pounds: shown as it was charged, and left out of anything Relay adds up.
         if (price && notPounds(x)) { var cn = moneyName(x.currency); fact("Currency", cn.charAt(0).toUpperCase() + cn.slice(1) + " (not added to your totals in pounds)"); }
-        if (first.variant) fact("Size or colour", first.variant);
+        if (first.variant) fact(x.payAtProperty || /\b\d+\s+nights?\b/i.test(first.variant) ? "Stay" : "Size or colour", first.variant);
         // Every item on its own line, with how many and what each line cost, as the receipt says (round 7).
         if (!one && (named.length > 1 || (named.length === 1 && Number(named[0].qty) > 1))) {
           var iul = el("ul", { className: "rl-rr-list" }); named.forEach(function (i) { iul.appendChild(itemLine(i, x.currency)); });

@@ -89,6 +89,8 @@ const hotelSq = await page.locator("#homePage .hl-sq", { hasText: "Harbour View 
 assert.match(hotelSq, /£240\.00 to pay/, "Home doesn't show the stay as paid\n" + hotelSq);
 let t = await openFromHome("Harbour View Hotel", "1-pay-at-hotel.png");
 assert.match(t, /Nothing has been paid yet\. You pay £240\.00 at the hotel, as the booking email says\./, t);
+assert.doesNotMatch(t, /Usually can.t be returned/, "a stay paid at the hotel never says it usually can't be returned");
+assert.doesNotMatch(t, /Size or colour/, "a stay's nights are never called a size or colour");
 assert.match(t, /To pay at the hotel\s+£240\.00/, t);
 assert.ok(!/^Price\s/m.test(t), "no 'Price' as if paid\n" + t);
 noDots(t, "hotel"); await shut();
