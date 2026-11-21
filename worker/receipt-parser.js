@@ -1092,7 +1092,10 @@ function receiptSignals(subject, text) {
   // (A purchase confirmed in so many words under a subject that only names it, "Plan Purchase - Terminal 2": "Here's a
   // quick email to confirm your purchase.", "Cost: 4.00 GBP". Round 20.)
   const confirmsPurchase = /\b(?:email|message) to confirm your purchase\b|\bthis (?:email|message) confirms your purchase\b/i.test(top) && /^[ \t|]*cost\s*:[ \t|]*(?:£ ?)?\d{1,5}\.\d{2}\b/im.test(String(text || "").slice(0, 6000));
-  return { subjectHit: subjectHit || bodyOrder || confirmsPurchase, bodyHit: bodyHit || atPrice || costLine || bookedPrice };
+  // (In Spanish, "Gracias por su compra" over "Orden: AB12345CD" (or "Pedido"), under a subject that asks to check "los
+  // datos de su compra" and gives "N.° de pedido": a purchase confirmed, the same as in English. Round 23.)
+  const spanish = /\bgracias por su (?:compra|pedido)\b/i.test(top) && /(?:^|[\s|])(?:orden|pedido|n\.?\s?[°º]\s?de pedido|n[úu]mero de pedido)\s*:\s*(?=[A-Z0-9-]*\d)[A-Z0-9-]{5,24}\b/im.test(top + "\n" + String(subject || ""));
+  return { subjectHit: subjectHit || bodyOrder || confirmsPurchase || spanish, bodyHit: bodyHit || atPrice || costLine || bookedPrice };
 }
 function looksLikeReceipt(subject, text) {
   const { subjectHit, bodyHit } = receiptSignals(subject, text);
@@ -2935,6 +2938,16 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
       missingPence: sum == null || result.totalPence == null ? null : result.totalPence - sum };
     if (stay.payAtProperty) result.payAtProperty = true;
   }
+  // (Booking.com's newer layout sets out no price details, only "Prepayment" over "You don't need to prepay", and "You will
+  // pay the hotel in the hotel's local currency": nothing was taken up front. And the hotel is the business the stay is
+  // with, as the subject names it, "Thanks! Your booking is confirmed at Harbour View Hotel": Booking.com only sold it.
+  // Round 23.)
+  if (bookingCom) {
+    const head = text.slice(0, 40000);
+    if (!result.payAtProperty && (/\byou don(?:'|’)t need to prepay\b|\bno prepayment (?:is )?(?:needed|required)\b/i.test(head) || /\byou(?:'|’)ll pay (?:when you stay|the property|at the property)\b|\byou will pay the (?:hotel|property)\b/i.test(head)) && !/\byou(?:'|’)ve (?:already )?paid\b|\bprepayment of\b|\bpaid in full\b/i.test(head)) result.payAtProperty = true;
+    const at = /\b(?:booking|reservation|stay) (?:is|has been) confirmed at (\p{L}[^\n|]{1,98}?)\s*[.!]?\s*$/iu.exec(String(subject || "").replace(/^\s*(?:(?:fwd?|fw)\s*:\s*)+/i, ""));
+    if (at && !result.merchant && !/^booking\.com$/i.test(at[1].trim())) result.merchant = at[1].trim();
+  }
   // (A ticket seller's order summary with its columns named, "Item Price Fee Quantity Subtotal", then each ticket's row with
   // bare amounts, "Individual Ticket 75.00 0.00 1 75.00" (Ticket Tailor): the ticket, how many, and what the row came to with
   // its fee. Round 15.)
@@ -3464,6 +3477,18 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   if (!opts.lenient && viaPayPal && !result.orderRef && !result.items.length && !/^[ \t|*]*merchant\b/im.test(text)) {
     const to = /\b(?:payment (?:of [^\n]{1,30} )?to|sent (?:[^\n]{1,30} )?to|you paid [^\n]{1,30} to)\s+([^\n|.]{2,60}?)\s*(?:\||\.|\n|$)/i.exec(String(subject || "") + "\n" + text.slice(0, 3000));
     if (to && looksLikePerson(to[1].trim(), null)) return { ok: false, reason: "payment_to_person", source: "shopper_email" };
+  }
+  // (A Spanish email's order number, "Orden: AB12345CD", "N.° de pedido :AB12345CD". Round 23.)
+  if (!result.orderRef) { const es = /(?:^|[\s|])(?:orden|pedido|n\.?\s?[°º]\s?de pedido|n[úu]mero de pedido)[ \t]*:[ \t]*((?=[A-Z0-9-]*\d)[A-Z0-9][A-Z0-9-]{4,23})(?![A-Za-z0-9-])/im.exec(text.slice(0, 8000)) || /(?:^|\s)(?:n\.?\s?[°º]\s?de pedido|n[úu]mero de pedido)[ \t]*:[ \t]*((?=[A-Z0-9-]*\d)[A-Z0-9][A-Z0-9-]{4,23})(?![A-Za-z0-9-])/i.exec(String(subject || "")); if (es) result.orderRef = es[1]; }
+  // (A price written with its currency after it, "$ 150.00 MXN" under "Acceso por 2 horas": the code is never the thing
+  // bought. The one line of that price is named by the line over it, when that line is a name. Round 23.)
+  if (result.items.length === 1 && /^(?:MXN|USD|EUR|GBP|CAD|AUD|PLN|CHF|SEK|NOK|DKK|JPY)$/.test(String(result.items[0].name || "").trim())) {
+    const code = String(result.items[0].name).trim();
+    const ls = String(fromHtml || text).slice(0, 40000).split("\n").map((x) => x.replace(/^[\s|]+|[\s|]+$/g, "")).filter(Boolean);
+    const k = ls.findIndex((x) => new RegExp("^(?:[A-Z]{0,2}\\$|€|£)?\\s?\\d{1,3}(?:,\\d{3})*(?:\\.\\d{2})?\\s?" + code + "$").test(x));
+    const nm = k > 0 ? ls[k - 1] : "";
+    if (nm && nm.length >= 3 && nm.length <= 80 && /\p{L}{3}/u.test(nm) && !/\d[.,]\d{2}\b|[£€$]|:\s*$|\b(?:total|subtotal|tax|vat|iva|pago|payment|fecha|date|orden|order)\b/i.test(nm)) result.items = [{ ...result.items[0], name: nm }];
+    else { result.items = []; result.itemsCheck = { complete: false, itemsPence: 0, expectedPence: result.totalPence ?? null, missingPence: result.totalPence ?? null }; }
   }
   result.returns = extractReturns(text, html, result.orderDate, otherPart);
   // (Every item personalised, and the seller says personalised orders can't be returned: no window, and why. Round 15.)
@@ -4347,6 +4372,31 @@ export function parseOrderAdjustmentEmail(rawEmail) {
     if (pa && pa.amountPence) return { ok: true, kind: "order_update", stage: "payment", at: parseDate(pa.on || "", u.headers.date ? new Date(u.headers.date) : null) || u.at,
       orderRef: null, paymentRef: pa.orderRef, merchant: null, amountPence: pa.amountPence, previousTotalPence: null, newTotalPence: null, currency: "GBP",
       retailer: { name: pa.merchant, domain: null, via: (fw && fw.domain) || sender.domain } };
+  }
+  // (A booking paid in parts, the shop's own word that one part was taken, "your recent payment has been successful and your
+  // payment history is detailed below", with the booking's reference and each payment's day over its amount: the payment
+  // dated the day the email was sent (or the latest one listed) is one payment towards that booking, joined to it like a
+  // payment service's. Never from a payment service or the shopper's own mailbox. Round 23.)
+  {
+    const from0 = (fw && fw.domain) ? fw : sender;
+    if (from0 && from0.domain && !PERSONAL_MAIL.test(from0.domain) && !isVia(from0.domain) && !/(^|\.)(?:paypal|klarna|clearpay|laybuy)\./i.test(from0.domain)) {
+      const t = String(u.text || "").slice(0, 20000);
+      const said = /\b(?:your|the) (?:recent |latest |scheduled |instalment )?payment (?:has been|was) (?:successful|received|taken|processed)\b/i.test(t) && /\bpayment history\b/i.test(t);
+      const bref = /\bbooking ref(?:erence)?(?: number)?\s*:?\s*((?=[A-Z0-9-]*\d)[A-Z0-9][A-Z0-9-]{4,23})\b/i.exec(t);
+      if (said && bref) {
+        const rows = t.split("\n").map((x) => x.replace(/^[\s|]+|[\s|]+$/g, "")).filter(Boolean);
+        const hist = [];
+        const h0 = rows.findIndex((r) => /\bpayment history\b/i.test(r));
+        for (let k = h0 + 1; k + 1 < rows.length && k < h0 + 80 && hist.length < 24; k++) {
+          const d = /^(\d{1,2} [A-Za-z]{3,9}\.? \d{4})$/.exec(rows[k]);
+          const a = /^£\s?(\d{1,3}(?:,\d{3})*|\d{1,7})(?:\.(\d{2}))?$/.exec(rows[k + 1] || "");
+          if (d && a) { hist.push({ on: parseDate(d[1]), pence: Number(a[1].replace(/,/g, "")) * 100 + Number(a[2] || 0) }); k++; }
+        }
+        const pick = hist.find((x) => x.on && x.on === u.at) || hist[hist.length - 1];
+        if (pick && pick.pence > 0) return { ok: true, kind: "order_update", stage: "payment", at: pick.on || u.at, orderRef: null, paymentRef: bref[1].toUpperCase(), merchant: null,
+          amountPence: pick.pence, previousTotalPence: null, newTotalPence: null, currency: "GBP", retailer: { name: from0.name || null, domain: from0.domain } };
+      }
+    }
   }
   const from = (fw && fw.domain) ? fw : sender;
   if ((!ub || ub.kind !== "adjusted") && from && from.domain && !PERSONAL_MAIL.test(from.domain) && !/(^|\.)(?:paypal|klarna|clearpay|laybuy)\./i.test(from.domain)) {

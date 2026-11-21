@@ -2437,8 +2437,19 @@ function attachPayments(orders, pays) {
     const fits = orders.filter(o => o.kind !== "order_update" && o.orderDate && o.orderDate <= p.at && Date.parse(p.at) - Date.parse(o.orderDate) <= 366 * 864e5 &&
       (() => { const s = squash(o.retailer && o.retailer.name); return s.length >= 5 && (m.includes(s) || s.includes(m)); })());
     if (!fits.length) continue;
-    const last = fits.reduce((a, b) => (b.orderDate > a.orderDate ? b : a));
-    if (fits.filter(o => o.orderDate === last.orderDate).length !== 1) continue;
+    // (A payment of just what one of the shop's orders came to, within three days of it, is that order's: "You've authorised
+    // £12.40 GBP to UBER PAYMENTS UK" goes with the £12.40 ride, never with another ride. A ride or a takeaway is paid in one
+    // go, so a payment that isn't its money is never put on it; and no payment is ever more than the whole order. Round 23.)
+    const near = (o) => Math.abs(Date.parse(p.at) - Date.parse(o.orderDate)) <= 3 * 864e5;
+    const exact = fits.filter(o => o.totalPence === p.amountPence && (o.currency || "GBP") === (p.currency || "GBP") && near(o));
+    let last = exact.length === 1 ? exact[0] : null;
+    if (!last && exact.length > 1) continue;
+    if (!last) {
+      last = fits.reduce((a, b) => (b.orderDate > a.orderDate ? b : a));
+      if (fits.filter(o => o.orderDate === last.orderDate).length !== 1) continue;
+      if (Number.isInteger(last.totalPence) && (last.currency || "GBP") === (p.currency || "GBP") && p.amountPence > last.totalPence) continue;
+      if (/(^|\.)(?:uber\.com|bolt\.eu|lyft\.com|deliveroo\.co\.uk|just-eat\.co\.uk|justeat\.co\.uk|freenow\.com|addisonlee\.com)$/i.test((last.retailer && last.retailer.domain) || "")) continue;
+    }
     const list = last.payments || (last.payments = []);
     if (!list.some(x => x.at === p.at && x.amountPence === p.amountPence)) list.push({ at: p.at, amountPence: p.amountPence, currency: p.currency || "GBP" });
     list.sort((a, b) => a.at.localeCompare(b.at));
