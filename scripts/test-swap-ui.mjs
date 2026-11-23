@@ -82,7 +82,7 @@ async function openSwap(page) {
   await page.getByRole('button', { name: /Large\. £5\.00 more/ }).click();
   if (process.env.SHOTS) await page.screenshot({ path: process.env.SHOTS + '/swap-confirm.png' });
   const box = await page.locator('.rl-sheet').last().innerText();
-  assert.match(box, /costs £5\.00 more\. We'll take £5\.00 from your Apple Pay · Visa ending 4242 only once the shop has updated your order\. \(Test mode: no real money\.\)/);
+  assert.match(box, /costs £5\.00 more\. We'll take £5\.00 from your Visa ending 4242 in Apple Pay only once the shop has updated your order\. \(Test mode: no real money\.\)/);
   await page.getByRole('button', { name: 'Swap and pay £5.00' }).click();
   await page.getByText(/£5\.00 was taken from your card \(test mode, no real money\)/).waitFor();
   assert.deepEqual(posts.find(x => x.p === '/relay/my/exchange').body, { orderId: 'o1', lineId: 'L1', variantKey: 'k14', agreedDiffMinor: 500 });
@@ -143,7 +143,7 @@ async function openSwap(page) {
   assert.deepEqual(errors, []);
   await context.close();
   const w = await run({ card: null, returnInfo: { status: 'requested', ref: 'RLY-CCCC-DDDD', trackingNumber: 'TT123456789GB', refundMinor: null, refundedAt: null } });
-  await w.page.getByText('Return started · ref RLY-CCCC-DDDD · Royal Mail TT123456789GB. Waiting for Kick Lane to refund.').waitFor();
+  await w.page.getByText('Return started, reference RLY-CCCC-DDDD, Royal Mail tracking TT123456789GB. Waiting for Kick Lane to refund.').waitFor();
   await w.context.close();
   console.log('PASS return status: refunded, or waiting for the shop');
 }
@@ -169,7 +169,7 @@ async function openSwap(page) {
   // keeping it. A difference already paid still shows as paid.
   const back = { status: 'requested', ref: 'RLY-EEEE-FFFF', trackingNumber: null, refundMinor: null, refundedAt: null };
   const r = await run({ card: null, returnInfo: back, exchange: { fromTitle: 'Black', toTitle: 'Large', status: 'done', at: Date.now(), balance: { owedMinor: 500, paid: false, payUrl: 'https://kick-lane.myshopify.com/1/invoices/abc' } } });
-  await r.page.getByText('Return started · ref RLY-EEEE-FFFF. Waiting for Kick Lane to refund.').waitFor();
+  await r.page.getByText('Return started, reference RLY-EEEE-FFFF. Waiting for Kick Lane to refund.').waitFor();
   assert.equal(await r.page.getByText(/still to pay/).count(), 0, 'no difference asked for on an item going back');
   assert.equal(await r.page.getByRole('link', { name: /Pay £5\.00/ }).count(), 0);
   if (process.env.SHOTS) await r.page.locator('.rl-po').first().screenshot({ path: process.env.SHOTS + '/swap-balance-then-return.png' });
@@ -177,7 +177,7 @@ async function openSwap(page) {
   await r.context.close();
   const rp = await run({ card: null, returnInfo: back, exchange: { fromTitle: 'Black', toTitle: 'Large', status: 'done', at: Date.now(), balance: { owedMinor: 500, paid: true, payUrl: null } } });
   await rp.page.getByText('✓ £5.00 difference paid to Kick Lane').waitFor();
-  await rp.page.getByText('Return started · ref RLY-EEEE-FFFF. Waiting for Kick Lane to refund.').waitFor();
+  await rp.page.getByText('Return started, reference RLY-EEEE-FFFF. Waiting for Kick Lane to refund.').waitFor();
   await rp.context.close();
   console.log('PASS swap balance: still to pay (with or without link), then paid; not asked for once a return has started');
 }

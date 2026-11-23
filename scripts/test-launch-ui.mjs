@@ -130,11 +130,15 @@ await page.getByRole("button", { name: /Price alerts, 1 watched/ }).click();
 await page.getByRole("heading", { name: "Price alerts", exact: true }).waitFor();
 assert.equal(await lit(), "Home", "Price alerts opens from Home's bell, and Home stays lit");
 await page.locator("#radarList").getByText("Court Classic Trainers").waitFor();
-await page.locator("#radarList").getByText("Was £85.00 when you started watching").waitFor();
-assert.equal(await page.locator("#radarList .card").count(), 1, "old watches on made-up or test-shop products aren't listed");
+// The same one-tap cards as Home's Watching (rule 16): the card opens its page, with the prices and Stop watching.
+assert.equal(await page.locator("#radarList .wl-card").count(), 1, "old watches on made-up or test-shop products aren't listed");
+assert.equal(await page.locator("#radarList .wl-card button, #radarList .wl-card a").count(), 0, "no buttons on the card");
 assert.doesNotMatch(await page.locator("#radarList").innerText(), /Retro High Trainers|Sandbox Hoodie/);
 assert.doesNotMatch(await viewText(), SHOPPER_NEVER_SEES);
-await page.getByRole("button", { name: "Stop watching" }).click();
+await page.locator("#radarList .wl-card").click();
+{ const sh = page.locator(".rl-back .rl-sheet").last(); await sh.waitFor();
+  assert.match(await sh.innerText(), /When you started watching\s*£85\.00/);
+  await sh.getByRole("button", { name: "Stop watching" }).click(); }
 await page.getByText("Nothing watched yet").waitFor();
 console.log("ok - Price alerts lists what's watched, opens from Home's bell, and stops watching on request");
 // Swap & resell has no tab, but Browse leads to it.

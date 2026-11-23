@@ -780,7 +780,7 @@
     ".rl-abar{position:sticky;top:0;z-index:2;display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px;margin:0 -16px;padding:6px 8px;background:var(--rl-glass);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px)}" +
     ".rl-abar-t{font-size:16px;color:var(--rl-text);text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:56vw}" +
     ".rl-abtn{all:unset;box-sizing:border-box;cursor:pointer;min-height:44px;display:inline-flex;align-items:center;gap:2px;padding:0 10px;border-radius:12px;font-size:16px;font-weight:600;color:var(--rl-text);justify-self:start}" +
-    ".rl-abtn.done{justify-self:end;font-weight:800}.rl-abtn:active{background:rgba(16,24,40,.08)}.rl-abtn:focus-visible{outline:2px solid var(--rl-text);outline-offset:2px}.rl-ab-i{display:inline-flex}" +
+    ".rl-abtn.done{justify-self:end;font-weight:800}.rl-abtn:active{background:rgba(16,24,40,.08)}.rl-abtn[data-back]{color:var(--rl-accent);font-weight:400;font-size:17px}.rl-abtn[data-back] .rl-ab-i{color:inherit}.rl-abtn:focus-visible{outline:2px solid var(--rl-text);outline-offset:2px}.rl-ab-i{display:inline-flex}" +
     ".rl-sheet h2.rl-atitle{font-family:var(--rl-sys);font-weight:800;font-size:32px;margin:2px 2px 14px;letter-spacing:-.02em;color:var(--rl-text)}" +
     ".rl-ahead{all:unset;box-sizing:border-box;cursor:pointer;width:100%;display:flex;align-items:center;gap:14px;background:var(--rl-card);border:1px solid var(--rl-line);border-radius:20px;padding:16px;transition:background .15s}" +
     ".rl-ahead:active{background:var(--rl-fill)}.rl-ahead:focus-visible{outline:2px solid var(--rl-text);outline-offset:2px}" +
@@ -1077,7 +1077,7 @@
     ".rl-ret-steps{display:flex;flex-direction:column;gap:4px;margin:4px 0}.rl-ret-steps>span{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--rl-text2)}.rl-ret-steps>span.done{color:var(--rl-accent);font-weight:600}.rl-ret-steps .rl-jic{margin:0;flex:none}" +
     ".rl-rc-acts{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}" +
     // Return tracking on a receipt's page: the four steps, each with its day and who said so (worker/return-tracking.js).
-    ".rl-rt{display:flex;flex-direction:column;gap:10px;margin:0 0 16px;padding:16px;border-radius:18px;background:var(--rl-card)}" +
+    ".rl-rt{display:flex;flex-direction:column;gap:10px;margin:0 0 16px;padding:16px;border-radius:18px;background:var(--rl-card)}.rl-rt.rl-rt-bare{padding:0;background:none;margin-top:-4px}" +
     ".rl-rt-steps{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}" +
     ".rl-rt-step{position:relative;display:flex;gap:12px;padding:0 0 14px}.rl-rt-step:last-child{padding-bottom:0}" +
     ".rl-rt-step:not(:last-child)::before{content:'';position:absolute;left:13px;top:28px;bottom:2px;width:2px;background:var(--rl-line)}.rl-rt-step.done:not(:last-child)::before{background:var(--rl-accent)}" +
@@ -1122,7 +1122,7 @@
     ".rl-fix input{box-sizing:border-box;width:100%;min-width:0;min-height:48px;margin:0;padding:0 14px;border:0;border-radius:12px;background:var(--rl-fill);color:var(--rl-text);font:inherit;font-size:16px}" +
     ".rl-fix input::placeholder{color:var(--rl-text2)}.rl-fix input:focus-visible{outline:2px solid var(--rl-accent);outline-offset:1px}" +
     ".rl-fix-2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px}" +
-    ".rl-fix-money{position:relative;display:block;min-width:0}.rl-fix-money i{position:absolute;left:14px;top:50%;transform:translateY(-50%);font-style:normal;font-size:16px;color:var(--rl-text2);pointer-events:none}.rl-fix-money input{padding-left:30px}" +
+    ".rl-fix-money{position:relative;display:block;min-width:0}.rl-fix-money i{position:absolute;left:14px;top:50%;transform:translateY(-50%);font-style:normal;font-size:16px;color:var(--rl-text2);pointer-events:none;z-index:1}.rl-fix-money input{padding-left:30px}" +
     ".rl-fix-items{margin:2px 0 8px}.rl-fix-h{display:block;margin:0 0 8px}.rl-fix-item{display:grid;grid-template-columns:minmax(0,1fr) 96px 44px;gap:8px;align-items:center;margin:0 0 8px}" +
     ".rl-fix-x{all:unset;box-sizing:border-box;width:44px;height:44px;display:grid;place-items:center;border-radius:12px;color:var(--rl-text2);cursor:pointer}.rl-fix-x:active{background:var(--rl-fill)}.rl-fix-x:focus-visible{outline:2px solid var(--rl-text);outline-offset:1px}" +
     ".rl-fix-add{all:unset;box-sizing:border-box;min-height:44px;display:inline-flex;align-items:center;gap:6px;cursor:pointer;font-size:15px;font-weight:700;color:var(--rl-accent)}.rl-fix-add:active{opacity:.6}.rl-fix-add:focus-visible{outline:2px solid var(--rl-text);outline-offset:2px;border-radius:8px}" +
@@ -1429,7 +1429,7 @@
     ".wl-note{all:unset;box-sizing:border-box;cursor:pointer;width:100%;display:flex;align-items:center;gap:12px;min-height:56px;padding:8px 16px;margin:0 0 10px;border-radius:18px;background:var(--rl-card);color:var(--rl-text);transition:transform .12s,background .12s}.wl-note:active{transform:scale(.98);background:var(--rl-fill)}.wl-note:focus-visible{outline:2px solid var(--rl-text);outline-offset:2px}" +
     ".wl-note-i{flex:none;width:36px;height:36px;border-radius:50%;display:grid;place-items:center;background:var(--rl-fill)}.wl-note-t{flex:1;min-width:0;font-size:15px;line-height:20px}.wl-note .rl-arow-c{flex:none;color:var(--rl-text2)}" +
     // A watched thing's own page (a sheet): its photo and name, the prices, and what you can do.
-    ".wl-sh-head{display:flex;align-items:flex-start;gap:14px;margin:6px 0 16px}.wl-sh-head .wl-mid{padding-top:0}.wl-sh-head .wl-n{font-size:20px;line-height:25px;font-weight:700;-webkit-line-clamp:5}" +
+    ".wl-sh-head{display:flex;align-items:flex-start;gap:14px;margin:6px 0 16px}.wl-sh-head .wl-mid{padding-top:0}.wl-sh-head .wl-n{font-size:20px;line-height:25px;font-weight:700;display:block;-webkit-line-clamp:unset;overflow:visible}" +
     ".wl-sh-facts{background:var(--rl-card);border-radius:18px;padding:4px 16px;margin:0 0 14px}.wl-sh-f{display:flex;align-items:baseline;justify-content:space-between;gap:12px;min-height:44px;padding:11px 0;box-sizing:border-box;border-top:1px solid var(--rl-line);font-size:16px;line-height:21px}.wl-sh-f:first-child{border-top:0}.wl-sh-f span{color:var(--rl-text2)}.wl-sh-f b{color:var(--rl-text);text-align:right}" +
     ".wl-sh-f b.wl-sh-down{color:var(--rl-accent)}" +
     ".hl-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px 12px;margin:10px 0 18px}@media(min-width:720px){.hl-grid{grid-template-columns:repeat(4,minmax(0,1fr))}}" +
@@ -1438,7 +1438,7 @@
     // A shop's logo (no photo of the thing): smaller, whole, on white, with a thin edge so the square still shows on the white page.
     ".hl-sqpic .h2-art.rl-has-logo{box-shadow:inset 0 0 0 1px var(--rl-line)!important;border-radius:18px}.hl-sqpic .h2-art>img.rl-logo-img{left:24%;top:24%;width:52%!important;height:52%!important}" +
     ".hl-pic .h2-art.rl-has-logo{box-shadow:inset 0 0 0 1px var(--rl-line)!important;border-radius:14px}.hl-pic .h2-art>img.rl-logo-img{left:20%;top:20%;width:60%!important;height:60%!important}" +
-    ".hl-tag{position:absolute;left:8px;top:8px;max-width:calc(100% - 16px);box-sizing:border-box;padding:4px 10px;border-radius:999px;font-size:13px;line-height:17px;font-weight:700;background:#fff;color:#101828;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;box-shadow:0 1px 3px rgba(16,24,40,.18)}.hl-tag.urgent{background:#d92d20;color:#fff}.hl-tag.soon{background:#f5a524;color:#3b2500}" +
+    ".hl-tag{position:absolute;left:8px;top:8px;max-width:calc(100% - 16px);box-sizing:border-box;padding:4px 10px;border-radius:13px;font-size:13px;line-height:17px;font-weight:700;background:#fff;color:#101828;white-space:normal;overflow-wrap:anywhere;box-shadow:0 1px 3px rgba(16,24,40,.18)}.hl-tag.urgent{background:#d92d20;color:#fff}.hl-tag.soon{background:#f5a524;color:#3b2500}" +
     ".hl-sqs{margin:9px 0 2px;font-size:13px;line-height:17px;font-weight:600;color:var(--rl-text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.hl-sqn{font-size:14px;line-height:19px;color:var(--rl-text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.hl-sqp{font-size:15px;line-height:20px;font-weight:700;color:var(--rl-text);margin-top:2px}" +
     ".h2-item{scroll-snap-stop:always;cursor:pointer;border-radius:28px;-webkit-tap-highlight-color:transparent;transition:transform .15s}.h2-item:active{transform:scale(.985)}.h2-item:focus-visible{outline:2px solid var(--rl-text);outline-offset:3px}" +
     ".h2-card{position:relative;z-index:1;display:flex;flex-direction:column;gap:10px;padding:16px;border-radius:28px;background:var(--rl-card);color:var(--rl-text)}" +
@@ -1540,7 +1540,7 @@
     ".rl-ask-sq{position:relative;display:block;width:115px;height:115px;border-radius:24px;overflow:hidden;background:var(--rl-fill)}" +
     ".rl-ask-tile:active{transform:scale(.96)}.rl-ask-tile:focus-visible .rl-ask-sq{outline:2px solid var(--rl-accent);outline-offset:2px}" +
     ".rl-ask-sq .h2-art>img.rl-logo-img{left:14px;top:14px;width:calc(100% - 28px)!important;height:calc(100% - 28px)!important}" +
-    ".rl-ask-day{padding:0 2px;font-size:13px;line-height:16px;color:var(--rl-text2)}" +
+    ".rl-ask-nm{padding:0 2px;font-size:14px;line-height:18px;font-weight:600;color:var(--rl-text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.rl-ask-tile .rl-ask-nm+.rl-ask-day{margin-top:-4px}.rl-ask-day{padding:0 2px;font-size:13px;line-height:16px;color:var(--rl-text2)}" +
     // The day it was bought is a line under the tile, so it never covers a photo or a logo. The shop is in the picture when
     // Relay has its logo, and always in the tile's spoken name.
     ".rl-ask-q{all:unset;box-sizing:border-box;cursor:pointer;display:flex;align-items:center;gap:12px;width:100%;min-height:64px;padding:8px 0;transition:opacity .12s}.rl-ask-q:active{opacity:.55}.rl-ask-q:focus-visible{outline:2px solid var(--rl-accent);outline-offset:-2px;border-radius:14px}" +
@@ -2496,7 +2496,7 @@
     var due = new Date(Date.now() + 12 * 864e5).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
     var front = el("div", { className: "rl-wcard rl-sfront" }, [el("span", { className: "rl-wini", text: "A", style: "background:#D47B1F" }),
       el("span", { className: "rl-wcard-t" }, [el("b", { text: "Canvas Cruiser" }), el("span", { text: "Allbirds" })]), el("b", { className: "rl-wprice", text: "£60" }),
-      el("div", { className: "rl-wdue" }, [el("div", { className: "rl-wtrack" }, [el("i")]), el("span", { text: "Return by " + due + " · 12 days left" })])]);
+      el("div", { className: "rl-wdue" }, [el("div", { className: "rl-wtrack" }, [el("i")]), el("span", { text: "Return by " + due + ", 12 days left" })])]);
     var stack = el("div", { className: "rl-sstack" }, [el("div", { className: "rl-sback b1 rl-rise" }), el("div", { className: "rl-sback b2 rl-rise" }), front]);
     front.classList.add("rl-rise");
     var art = el("div", { className: "rl-sart" }, [stack]);
@@ -2990,8 +2990,8 @@
     return stripeLoading.then(function () { return window.Stripe(pk); });
   }
   function cardText(c) {
-    var w = c.wallet === "apple_pay" ? "Apple Pay · " : c.wallet === "google_pay" ? "Google Pay · " : "";
-    return w + (c.brand ? c.brand.charAt(0).toUpperCase() + c.brand.slice(1) : "Card") + " ending " + c.last4;
+    var w = c.wallet === "apple_pay" ? " in Apple Pay" : c.wallet === "google_pay" ? " in Google Pay" : "";
+    return (c.brand ? c.brand.charAt(0).toUpperCase() + c.brand.slice(1) : "Card") + " ending " + c.last4 + w;
   }
   function addCard(box, onSaved) {
     var note = el("div", { className: "rl-msg" });
@@ -3104,7 +3104,7 @@
             });
           };
           list.appendChild(el("div", { className: "rl-order" }, [el("b", { text: k.name || "Passkey" }),
-            el("span", { text: "Added " + new Date(k.createdAt).toLocaleDateString("en-GB") + (k.lastUsedAt ? " · last used " + new Date(k.lastUsedAt).toLocaleDateString("en-GB") : "") }), rm]));
+            el("span", { text: "Added " + new Date(k.createdAt).toLocaleDateString("en-GB") + (k.lastUsedAt ? ", last used " + new Date(k.lastUsedAt).toLocaleDateString("en-GB") : "") }), rm]));
         });
       }).catch(function () {});
     }
@@ -4564,7 +4564,7 @@
         var rank = function (r) { var d = daysLeft(deadlineOf(r)); return d === null ? [1, 0] : d < 0 ? [2, -d] : [0, d]; };
         var sorted = rows.slice().sort(function (a, b) { var A = rank(a), B = rank(b); return A[0] - B[0] || A[1] - B[1]; });
         if (query) { sorted.forEach(function (r) { list.appendChild(receiptRow(r)); }); list.appendChild(el("p", { className: "rl-none", text: "No receipts match that search.", style: "display:none" })); applyFilter(); return; }
-        var by = {}; sorted.forEach(function (r) { var k = r.category || "other"; (by[k] = by[k] || []).push(r); });
+        var by = {}; sorted.forEach(function (r) { var k = r.category && groupNames[r.category] && r.category !== "gifts" ? r.category : "other"; (by[k] = by[k] || []).push(r); });
         var keys = Object.keys(by).sort(function (a, b) { var na = by[a][0].returnable === false ? 1 : 0, nb = by[b][0].returnable === false ? 1 : 0; return (a === "other") - (b === "other") || na - nb || by[b].length - by[a].length; });
         if (memo.openCat === "shop" && shopRows.length) {
           list.appendChild(el("button", { className: "rl-po-secondary", text: "‹ All receipts", "data-back": "", style: "flex:none;padding:7px 14px;font-size:14px", onclick: function () { memo.openCat = null; drawList(); window.scrollTo && window.scrollTo(0, memo.catY || 0); } }));
@@ -5061,7 +5061,7 @@
         rows.forEach(function (x) {
           var card = el("div", { className: "rl-order" });
           card.appendChild(el("b", { text: x.reason || "(no reason given)" }));
-          card.appendChild(el("span", { text: x.item.title + (x.item.store ? " · " + x.item.store : "") + " · " + new Date(x.createdAt).toLocaleDateString("en-GB") }));
+          card.appendChild(el("span", { text: x.item.title + (x.item.store ? " from " + x.item.store : "") + ", " + new Date(x.createdAt).toLocaleDateString("en-GB") }));
           var listing = x.kind === "listing", it = x.item || {};
           card.appendChild(el("span", { style: "display:block;margin-top:4px", text: (listing ? "A member reported this listing." : "Reported by the " + x.reporterRole + " about the " + x.reportedRole + ".") +
             " Reports against this " + (listing ? "seller" : "member") + ": " + x.reportsAgainstReported + (x.reportedAlreadyBlocked ? " (already blocked)" : "") + "." }));
@@ -5797,7 +5797,9 @@
           var shop = (x.retailer && x.retailer.name) || "", when = x.orderDate ? shortDate(x.orderDate) : "";
           var art = el("span", { className: "h2-art" }); art.setAttribute("aria-hidden", "true"); receiptPic(art, x, 60, 64);
           var day = el("span", { className: "rl-ask-day", text: when || "\u00a0" }); day.setAttribute("aria-hidden", "true");
-          var tile = el("button", { type: "button", className: "rl-ask-tile", onclick: function () { askAssistantAbout(x, true); } }, [el("span", { className: "rl-ask-sq" }, [art]), day]);
+          // The business under its picture, then the day (screen audit, 23 Nov 2026: three tiles that said only "23 Nov").
+          var nm = el("span", { className: "rl-ask-nm", text: bizOf(x).name || shop }); nm.setAttribute("aria-hidden", "true");
+          var tile = el("button", { type: "button", className: "rl-ask-tile", onclick: function () { askAssistantAbout(x, true); } }, [el("span", { className: "rl-ask-sq" }, [art]), nm, day]);
           tile.setAttribute("aria-label", "Ask about your receipt" + (shop ? " from " + shop : "") + (when ? ", " + when : ""));
           tile.setAttribute("data-receipt", x.id);
           if (x.category && x.category !== "shop" && x.category !== "other" && TILE_COLOURS[x.category]) tile.style.setProperty("--h2-ink", TILE_COLOURS[x.category]);
@@ -6474,7 +6476,7 @@
         }, function () { free(); say(note, "Couldn't reach Relay. Check your connection and try again.", true); });
       };
       go.onclick = function () { connectTo(null); };
-      function when(iso) { if (!iso) return "Not read yet"; var m = Math.round((Date.now() - Date.parse(iso)) / 60000); return m < 2 ? "Read just now" : m < 60 ? "Read " + m + " minutes ago" : m < 1440 ? "Read " + Math.round(m / 60) + " hours ago" : "Read " + Math.round(m / 1440) + " days ago"; }
+      function when(iso) { if (!iso) return "Not read yet"; var m = Math.round((Date.now() - Date.parse(iso)) / 60000); return m < 2 ? "Read just now" : m < 60 ? "Read " + m + " minutes ago" : m < 90 ? "Read an hour ago" : m < 1440 ? "Read " + Math.round(m / 60) + " hours ago" : m < 2160 ? "Read yesterday" : "Read " + Math.round(m / 1440) + " days ago"; }
       function drawLinks(body) {
         list.textContent = "";
         tilesBox.textContent = "";
@@ -6739,7 +6741,7 @@
           var col = el("button", { type: "button", ariaLabel: label }, [el("i", { style: "height:" + (d.kept ? Math.max(3, Math.round(d.kept / max * 100)) : 0) + "%" })]);
           var show = function () {
             tip.textContent = ""; tip.appendChild(el("b", { text: dname(d.day, { weekday: "short", day: "numeric", month: "short" }) }));
-            tip.appendChild(el("span", { text: plural(d.kept, "receipt", "receipts") + " · " + plural(d.skipped, "skipped", "skipped") }));
+            tip.appendChild(el("span", { text: plural(d.kept, "receipt", "receipts") + ", " + plural(d.skipped, "skipped", "skipped") }));
             tip.hidden = false;
             var x = col.offsetLeft + col.offsetWidth / 2, w = chart.offsetWidth;
             tip.style.left = Math.max(70, Math.min(w - 70, x)) + "px";
@@ -6772,7 +6774,7 @@
         var l = el("div", { className: "rl-hp-shops" });
         list.forEach(function (s) {
           l.appendChild(el("div", { className: "rl-hp-shop" }, [el("b", { text: s.domain }),
-            el("span", { text: plural(s.receipts, "receipt", "receipts") + (withPeople ? " from " + plural(s.people, "person", "people") : "") + (s.receipts ? " · " + pct(s.high, s.receipts) + "% read confidently" : "") }), chips(s)]));
+            el("span", { text: plural(s.receipts, "receipt", "receipts") + (withPeople ? " from " + plural(s.people, "person", "people") : "") + (s.receipts ? ", " + pct(s.high, s.receipts) + "% read confidently" : "") }), chips(s)]));
         });
         return l;
       }
@@ -9372,7 +9374,7 @@
           var price = (x.maxPriceMinor ? "From " : "") + money(x.priceMinor, "GBP");
           list.appendChild(el("button", { type: "button", className: "rl-ps-item", ariaLabel: x.product + (x.variation ? ", " + x.variation : "") + ", " + price + ", from " + x.storeName + (x.inStock === false ? ", out of stock" : ""),
             onclick: function () { close(); if (window.relayOpenProduct) window.relayOpenProduct(x.sku, x.product); } },
-            [img, el("b", { text: x.product }), el("span", { text: [x.variation, x.storeName].filter(Boolean).join(" · ") }), el("span", { className: "rl-ps-price", text: price + (x.inStock === false ? " · out of stock" : "") })]));
+            [img, el("b", { text: x.product }), el("span", { text: [x.variation && !/^default title$/i.test(x.variation) ? x.variation : null, x.storeName].filter(Boolean).join(", ") }), el("span", { className: "rl-ps-price", text: price + (x.inStock === false ? ", out of stock" : "") })]));
         });
         out.appendChild(list);
         sheet.insertBefore(again, shut);
@@ -9563,7 +9565,7 @@
     var hasPhoto = Boolean(it.imageUrl && /^https:\/\//.test(it.imageUrl));
     var info = el("div", { className: "rl-po-info" }, [
       el("div", { className: "rl-po-head" }, [el("h3", { className: "rl-po-brand", text: o.store || "Shop" }), el("div", { className: "rl-po-price", text: money(it.priceMinor, it.currency) })]),
-      el("div", { className: "rl-po-meta", text: [hasPhoto ? null : it.title, it.variant, it.quantity > 1 ? "×" + it.quantity : null, shortDate(o.orderedAt)].filter(Boolean).join(" · ") })]);
+      el("div", { className: "rl-po-meta", text: [hasPhoto ? null : it.title, it.variant, it.quantity > 1 ? "×" + it.quantity : null, shortDate(o.orderedAt)].filter(Boolean).join(", ") })]);
     if (hasPhoto) info.insertBefore(el("span", { className: "rl-sr", text: it.title }), info.childNodes[1]);
     card.appendChild(el("div", { className: "rl-po-top" }, [img, info]));
     var status = function (text, done) { card.appendChild(el("div", { className: "rl-po-status" + (done ? "" : " wait"), text: text })); };
@@ -9588,7 +9590,7 @@
     if (it.returnInfo) {
       var ri = it.returnInfo, refunded = ri.status === "refunded";
       status(refunded ? "✓ Refunded" + (ri.refundMinor ? " " + money(ri.refundMinor, it.currency) : "") + " by " + shopName + (ri.refundedAt ? " on " + shortDate(ri.refundedAt) : "")
-        : "Return started · ref " + ri.ref + (ri.trackingNumber ? " · Royal Mail " + ri.trackingNumber : "") + ". Waiting for " + shopName + " to refund.", refunded);
+        : "Return started, reference " + ri.ref + (ri.trackingNumber ? ", Royal Mail tracking " + ri.trackingNumber : "") + ". Waiting for " + shopName + " to refund.", refunded);
       if (!refunded && o.testOrder && testingOn()) {
         var tm = el("div", { className: "rl-msg" });
         var tb = el("button", { className: "rl-po-secondary", text: "Test shop: refund it", onclick: function () {
@@ -9724,6 +9726,10 @@
       var t = retOf(x);
       if (!t && !retCanSend(x)) { box.style.display = "none"; return; }
       box.style.display = "";
+      // Nothing sent yet: just the button, under the page's other return buttons, never a second dark one in a box of its own
+      // (screen audit, 23 Nov 2026: "Start return", "I'm sending this back" and a boxed "I've sent it back" read as three
+      // equal first steps).
+      box.classList.toggle("rl-rt-bare", !t);
       if (t) {
         box.appendChild(el("b", { className: "rl-ret-h", text: "Your return" }));
         var list = el("ol", { className: "rl-rt-steps" });
@@ -9752,7 +9758,7 @@
       }
       if (retCanSend(x) && (!t || ((t.state === "started" || t.state === "sent") && !t.returnInTransit) || (t.typed && !t.returnReceived && t.state !== "refunded"))) {
         var typed = t && t.typed;
-        var b = el("button", { type: "button", className: typed ? "rl-po-secondary" : "rl-po-primary" }, [el("span", { text: typed ? "Change what you told Relay" : "I've sent it back" })]);
+        var b = el("button", { type: "button", className: typed || !t ? "rl-po-secondary" : "rl-po-primary" }, [el("span", { text: typed ? "Change what you told Relay" : "I've sent it back" })]);
         b.onclick = tapOnce(function () { sentSheet(x, function (body) { if (body && body.returnTracking !== undefined) x.returnTracking = body.returnTracking; draw(); if (changed) changed(); }); });
         box.appendChild(b);
       }
@@ -11143,13 +11149,13 @@
           draw: function (box) { illustrate(box, { items: [{ name: i.name }], retailer: x.retailer || {}, category: x.category }, 96); } }; })
         : [{ name: named.length ? named[0].name : noItemsTitle(x), price: totalText(x), draw: function (box) { receiptPic(box, x, 96, 104); } }];
       // The shop cancelled it (all of it: nothing to send back), said before anything else.
-      if (x.cancelled && !x.cancelled.partial) e.line = cancelWords(x);
+      if (x.cancelled && !x.cancelled.partial) { e.line = cancelWords(x); e.tag = "Cancelled"; }
       // A return Relay is following (return tracking): where it has got to, and "Refund not seen yet" when it's due.
       else if (rt) {
         e.line = retLine(x); e.returning = rt.state !== "refunded"; e.swaps = e.returning; e.rank = e.returning ? 1 : 2; e.nudge = Boolean(rt.refundNotSeen);
         e.tag = rt.refundNotSeen ? "Refund not seen yet" : rt.state === "refunded" ? "Refunded" : rt.state === "received" ? "At the shop" : rt.state === "sent" ? "Sent back" : "Return started";
       }
-      else if (p) { e.line = p.refundedAt ? "Refunded" + (p.refundPence != null ? " " + money(p.refundPence, p.currency || "GBP") : "")
+      else if (p) { if (p.refundedAt) e.tag = "Refunded"; e.line = p.refundedAt ? "Refunded" + (p.refundPence != null ? " " + money(p.refundPence, p.currency || "GBP") : "")
           : p.receivedAt || (p.parcel && p.parcel.status === "delivered") ? "Back at the shop, waiting for the refund" : "Sent back, on its way to the shop";
         e.swaps = !p.refundedAt; e.rank = p.refundedAt ? 2 : 1; }
       else if (canGoBack && stated && daysLeft(stated) <= 7) { e.line = "Return by " + dayWords(stated); soon(e, stated); }
@@ -11242,6 +11248,30 @@
       .concat(f.drop ? [el("span", { className: "wl-ch", text: f.drop })] : []));
     return el("button", { type: "button", className: "wl-card", "data-sku": w.sku, ariaLabel: [f.name, w.store, f.now, f.drop].filter(Boolean).join(". "),
       onclick: tapOnce(function () { if (Date.now() < watchQuietUntil) return; watchSheet(w, changed); }) }, [watchPic(w, 140), mid]);
+  }
+  // Price alerts (the bell on Home): the same one-tap cards as Home's Watching, newest first (screen audit, 23 Nov 2026: this
+  // page had its own older cards, with a Stop watching button on each, the shop in 12px letters, "Default Title" as the
+  // size and an arrow character). Only real products, as on Home; until the shops' products are in, greyed outlines.
+  function mountWatchList(box) {
+    if (!box) return;
+    var draw = function () {
+      if (!box.isConnected) return;
+      var ready = window.relayNeedCatalog ? window.relayNeedCatalog() : true, all = [];
+      try { all = (window.relayLocalWatches ? window.relayLocalWatches() : []).filter(function (w) { return w && w.sku && w.product && w.real; }).reverse(); } catch (e) {}
+      box.textContent = ""; box.className = "";
+      if (all.length) { box.appendChild(el("div", { className: "wl-list", "data-round": "plain" }, all.map(function (w) { return watchCard(w, draw); }))); return; }
+      if (!ready) {
+        var bones = el("div", { className: "wl-list" });
+        for (var k = 0; k < 2; k++) bones.appendChild(el("div", { className: "wl-card wl-bone" }, [el("span", { className: "wl-pic rl-skel" }), el("span", { className: "wl-mid" }, [el("span", { className: "rl-skel", style: "height:16px;width:90%;border-radius:8px" }), el("span", { className: "rl-skel", style: "height:16px;width:50%;border-radius:8px" })])]));
+        box.appendChild(bones);
+        window.addEventListener("relay-catalogue", draw, { once: true });
+        return;
+      }
+      box.appendChild(el("div", { className: "rl-po h2-start", style: "margin:0" }, [el("h3", { text: "Nothing watched yet", style: "margin:0;font-size:19px" }),
+        el("p", { text: "Find something you like in Browse and tap Watch price. Relay tells you when it drops.", style: "margin:0;color:var(--rl-text2);font-size:15px;line-height:1.45" }),
+        el("button", { type: "button", className: "rl-po-primary", text: "Go to Browse", style: "max-width:280px", onclick: tapOnce(function () { if (window.go) window.go("discover"); }) })]));
+    };
+    draw();
   }
   // A watched thing's page: its photo and name, the latest price and the price when watching started, then what you can do
   // (see it in Browse, or stop watching it). Swipes down to close, like every sheet.
@@ -12042,7 +12072,7 @@
     buyAtShop: buyAtShop,
     picksAiSheet: picksAiSheet,
     itemKinds: function () { return api("/relay/my/item-kinds", { fresh: true }).then(function (r) { return r.ok ? r.body : null; }, function () { return null; }); },
-    openAuctions: openAuctions, openAuction: openAuction, mountAuctions: mountAuctions, mountAsk: mountAsk, askOn: askOn, mountBrowse: mountBrowse, auctionsLive: auctionsLive, auctionsCheck: auMineCheck,
+    mountWatchList: mountWatchList, openAuctions: openAuctions, openAuction: openAuction, mountAuctions: mountAuctions, mountAsk: mountAsk, askOn: askOn, mountBrowse: mountBrowse, auctionsLive: auctionsLive, auctionsCheck: auMineCheck,
     openMarket: function () { if (!load()) return show(); open(function (sh) { resaleView(sh, close, null, "browse"); }); },
     // Search by photo on Discover: whether it's on (asked once, then remembered), and the search itself.
     photoAvailable: photoAvailable, photoSearch: photoSearch,
