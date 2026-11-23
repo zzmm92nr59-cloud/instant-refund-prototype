@@ -289,7 +289,10 @@
   // A logo sits on white, like an app icon. When the logo's own picture has a solid background of another colour (a
   // pale grey square, say), its box takes that colour instead, so the picture's square edge never shows inside the box.
   // The new layout's tiles and circles use it (--logo-bg); nothing else does.
+  // (Worked out once per picture: a list of forty rows with the same shop's logo reads its corners once, not forty times.)
+  var logoBacks = {};
   function logoBack(box, pic) {
+    if (pic.src && logoBacks[pic.src]) return box.style.setProperty("--logo-bg", logoBacks[pic.src]);
     var back = "#fff";
     try {
       var c = document.createElement("canvas"); c.width = c.height = 8;
@@ -298,6 +301,7 @@
       var k = [at(0, 0), at(7, 0), at(0, 7), at(7, 7)];
       if (k.every(function (q) { return q[3] > 250 && Math.abs(q[0] - k[0][0]) + Math.abs(q[1] - k[0][1]) + Math.abs(q[2] - k[0][2]) < 12; })) back = "rgb(" + k[0][0] + "," + k[0][1] + "," + k[0][2] + ")";
     } catch (e) { back = "#fff"; }
+    if (pic.src) logoBacks[pic.src] = back;
     box.style.setProperty("--logo-bg", back);
   }
   function shopLogo(box, dom, px, onMiss) {
@@ -1136,6 +1140,17 @@
     ".rl-bk-row{display:flex;align-items:center;gap:12px;min-height:60px;padding:10px 0;border-top:.5px solid var(--rl-line)}.rl-bk-row:first-child{border-top:0}" +
     "button.rl-bk-row{width:100%;background:none;border-left:0;border-right:0;border-bottom:0;font:inherit;color:inherit;text-align:left;cursor:pointer;transition:opacity .15s}button.rl-bk-row:active{opacity:.55}" +
     ".rl-bk-row.rl-bk-not .rl-bk-t,.rl-bk-row.rl-bk-not .rl-bk-a{opacity:.5}" +
+    // Which cards are yours: a row a card (name and last four digits) with a round tick, then Save.
+    ".rl-bk-pick{margin:16px 0 6px;padding:16px 18px;border-radius:18px;background:var(--rl-card);border:1px solid var(--rl-line)}" +
+    ".rl-bk-pick h3{margin:0;font-size:18px;line-height:1.3;font-weight:700;color:var(--rl-text)}.rl-bk-pick p{margin:6px 0 4px;font-size:15px;line-height:1.45;color:var(--rl-text2)}" +
+    ".rl-bk-pick .rl-btn{margin-top:12px}.rl-bk-pick .rl-msg:empty{display:none}" +
+    ".rl-bk-card{display:flex;align-items:center;gap:12px;width:100%;min-height:56px;padding:8px 0;background:none;border:0;border-top:.5px solid var(--rl-line);font:inherit;color:var(--rl-text);text-align:left;cursor:pointer;transition:opacity .15s;-webkit-tap-highlight-color:transparent}" +
+    ".rl-bk-card:first-child{border-top:0}.rl-bk-card:active{opacity:.55}.rl-bk-card:disabled{cursor:default}" +
+    ".rl-bk-card b{flex:1;min-width:0;font-size:16px;font-weight:600;line-height:1.3;overflow-wrap:anywhere}" +
+    ".rl-bk-tick{flex:none;display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:999px;border:2px solid var(--rl-text2);box-sizing:border-box;color:transparent;transition:background .15s,border-color .15s}" +
+    ".rl-bk-card[aria-checked=true] .rl-bk-tick{background:var(--rl-accent);border-color:var(--rl-accent);color:#fff}" +
+    ".rl-bk-tick-i{display:inline-flex;line-height:0}.rl-bk-tick-i svg{stroke-width:2.6}" +
+    ".rl-bk-cards{margin-top:6px}" +
     ".rl-bk-t{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}.rl-bk-t b{font-size:16px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--rl-text)}.rl-bk-t span,.rl-bk-a span{font-size:14px;color:var(--rl-text2)}" +
     ".rl-bk-a{flex:none;display:flex;flex-direction:column;align-items:flex-end;gap:2px}.rl-bk-a b{font-size:16px;font-weight:600;color:var(--rl-text)}" +
     // A payment that likely should have a receipt, and the sheet for adding a photo of it (receiptPhotoSheet).
@@ -1395,6 +1410,28 @@
     ".hl-pic{position:relative;flex:none;width:64px;height:64px;border-radius:14px;overflow:hidden;background:var(--rl-fill)}.hl-pic .h2-art svg{max-width:52px;max-height:52px}" +
     ".hl-mid{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}.hl-mid b{font-size:16px;line-height:21px;color:var(--rl-text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.hl-mid span{font-size:14px;line-height:19px;color:var(--rl-text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.hl-mid em{font-style:normal;font-size:14px;line-height:19px;font-weight:600;color:var(--rl-text)}.hl-mid em.urgent{color:#b42318}.hl-mid em.soon{color:#93540a}" +
     ".hl-row .rl-arow-c{flex:none;color:var(--rl-text2)}" +
+    // Watching (Connor, 23 Nov 2026): a flat rounded card per watched thing, the whole card one tap (rule 16). Its photo as a
+    // 140px square (filling it; a tall photo shows its top), and beside it what it is, the shop (its own logo when Relay has
+    // one), the latest price and, when it has dropped, one small plain line saying by how much. Text wraps and the card grows
+    // with it (bigger phone text), so nothing sits on top of anything.
+    // Nothing on the list is a snap point, so it scrolls freely.
+    ".wl-list{display:flex;flex-direction:column;gap:10px;margin:0 0 18px}" +
+    ".wl-card{all:unset;box-sizing:border-box;cursor:pointer;width:100%;display:flex;align-items:flex-start;gap:14px;padding:16px;border-radius:22px;background:var(--rl-card);color:var(--rl-text);-webkit-tap-highlight-color:transparent;transition:transform .12s,background .12s;scroll-snap-align:none}" +
+    ".wl-card:active{transform:scale(.98);background:var(--rl-fill)}.wl-card:focus-visible{outline:2px solid var(--rl-text);outline-offset:2px}" +
+    "@media(prefers-reduced-motion:reduce){.wl-card{transition:background .12s}.wl-card:active{transform:none}}" +
+    ".wl-pic{position:relative;flex:none;width:140px;height:140px;border-radius:18px;overflow:hidden;background:var(--rl-fill)}.wl-pic>img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center top;display:block}.wl-pic .h2-art svg{max-width:96px;max-height:96px}" +
+    ".wl-mid{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px;padding-top:2px}" +
+    ".wl-n{font-size:16px;line-height:21px;font-weight:600;color:var(--rl-text);display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}" +
+    ".wl-shop{display:flex;align-items:center;gap:6px;min-width:0}.wl-shop-n{font-size:14px;line-height:19px;color:var(--rl-text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}" +
+    ".wl-logo{flex:none;width:22px;height:22px;border-radius:50%;overflow:hidden;display:none;place-items:center;background:var(--logo-bg,#fff);box-shadow:inset 0 0 0 1px var(--rl-line)}.wl-logo.rl-has-logo{display:grid}.wl-logo>img{width:16px!important;height:16px!important;object-fit:contain}" +
+    ".wl-p{font-size:17px;line-height:22px;font-weight:700;color:var(--rl-text);margin-top:2px}.wl-ch{font-size:14px;line-height:19px;font-weight:600;color:var(--rl-accent);overflow-wrap:anywhere}" +
+    ".h2-feed>.wl-list,.h2-feed>.wl-note{scroll-snap-align:none}.wl-bone{cursor:default}.wl-bone:active{transform:none;background:var(--rl-card)}.wl-bone .wl-mid{gap:10px}" +
+    ".wl-note{all:unset;box-sizing:border-box;cursor:pointer;width:100%;display:flex;align-items:center;gap:12px;min-height:56px;padding:8px 16px;margin:0 0 10px;border-radius:18px;background:var(--rl-card);color:var(--rl-text);transition:transform .12s,background .12s}.wl-note:active{transform:scale(.98);background:var(--rl-fill)}.wl-note:focus-visible{outline:2px solid var(--rl-text);outline-offset:2px}" +
+    ".wl-note-i{flex:none;width:36px;height:36px;border-radius:50%;display:grid;place-items:center;background:var(--rl-fill)}.wl-note-t{flex:1;min-width:0;font-size:15px;line-height:20px}.wl-note .rl-arow-c{flex:none;color:var(--rl-text2)}" +
+    // A watched thing's own page (a sheet): its photo and name, the prices, and what you can do.
+    ".wl-sh-head{display:flex;align-items:flex-start;gap:14px;margin:6px 0 16px}.wl-sh-head .wl-mid{padding-top:0}.wl-sh-head .wl-n{font-size:20px;line-height:25px;font-weight:700;-webkit-line-clamp:5}" +
+    ".wl-sh-facts{background:var(--rl-card);border-radius:18px;padding:4px 16px;margin:0 0 14px}.wl-sh-f{display:flex;align-items:baseline;justify-content:space-between;gap:12px;min-height:44px;padding:11px 0;box-sizing:border-box;border-top:1px solid var(--rl-line);font-size:16px;line-height:21px}.wl-sh-f:first-child{border-top:0}.wl-sh-f span{color:var(--rl-text2)}.wl-sh-f b{color:var(--rl-text);text-align:right}" +
+    ".wl-sh-f b.wl-sh-down{color:var(--rl-accent)}" +
     ".hl-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px 12px;margin:10px 0 18px}@media(min-width:720px){.hl-grid{grid-template-columns:repeat(4,minmax(0,1fr))}}" +
     ".hl-sq{all:unset;box-sizing:border-box;cursor:pointer;display:flex;flex-direction:column;min-width:0;transition:transform .12s}.hl-sq:active{transform:scale(.97)}.hl-sq:focus-visible{outline:2px solid var(--rl-text);outline-offset:3px;border-radius:18px}" +
     ".hl-sqpic{position:relative;display:block;width:100%;aspect-ratio:1/1;border-radius:18px;overflow:hidden;background:var(--rl-fill)}.hl-sqpic .h2-art svg{max-width:62%;max-height:62%}" +
@@ -1413,6 +1450,9 @@
     // price on each; one thing has its square on the left and its name and price beside it.
     ".h2-tiles{display:flex;gap:8px;overflow-x:auto;margin:0 -16px;padding:0 16px;scrollbar-width:none;scroll-snap-type:x proximity;scroll-padding-left:16px}.h2-tiles::-webkit-scrollbar{display:none}" +
     ".h2-pic{position:relative;flex:none;display:block;width:140px;height:140px;border-radius:22px;overflow:hidden;background:var(--rl-fill);scroll-snap-align:start}" +
+    // (A single picture beside its words is not in a sideways row: it is never a stopping point for the page's own
+    // up-and-down snapping, which used to catch on every photo in a list and pull cards up under Home's pinned chips.)
+    ".h2-one .h2-pic{scroll-snap-align:none}" +
     ".h2-art{position:absolute;inset:0;display:grid;place-items:center}.h2-art>img{position:absolute;left:0;top:0;width:100%!important;height:100%!important;object-fit:cover;object-position:center}" +
     ".h2-art.rl-has-logo{background:var(--logo-bg,#fff)!important;box-shadow:none}.h2-art>img.rl-logo-img{left:16px;top:16px;width:calc(100% - 32px)!important;height:calc(100% - 32px)!important;object-fit:contain}" +
     // Receipts and other lists in the new layout: a logo sits whole on white (or its own colour), no pale ring, as on Home.
@@ -6006,7 +6046,8 @@
         if (!r.ok || !r.body || !r.body.available) return;
         bankRow.style.display = "";
         var n = (r.body.connections || []).length;
-        if (n && bankRow.setDetail) bankRow.setDetail(n === 1 ? (r.body.connections[0].bank || "1 connected") : n + " connected");
+        var asks = (r.body.connections || []).some(function (c) { return c.needsChoice; });
+        if (n && bankRow.setDetail) bankRow.setDetail(asks ? "Choose which cards are yours" : n === 1 ? (r.body.connections[0].bank || "1 connected") : n + " connected");
       }, function () {});
     }
     openBankPage = function () { var note = wantBank; wantBank = null; page("Bank and cards", function (b) { bankPage(b, note); }); return true; };
@@ -6443,16 +6484,71 @@
         if (body.testBanks) { testLine.hidden = false; testLine.textContent = "Test banks only for now. Choose Mock Bank, then sign in with john and doe."; }
         var cs = body.connections || [];
         if (!cs.length) return;
+        // A bank that lists more than one card asks which are yours before any payment is read (worker/bank.js), right here.
+        cs.forEach(function (c) {
+          if (c.needsChoice && c.cards) list.appendChild(cardChooser(c, true, function () { say(note, "Saved. Relay reads payments only from your cards."); load(); }));
+        });
         list.appendChild(accGroup("Connected", cs.map(function (c) {
-          return accRow("card", c.bank || "Bank", c.needsReconnect ? "Connect again to keep reading payments" : when(c.syncedAt) + (c.matched ? ", " + c.matched + (c.matched === 1 ? " receipt matched" : " receipts matched") : ""), function () {
+          var disconnect = function () {
             ask("Disconnect " + (c.bank || "this bank") + "? Relay deletes the payments it read from it.", "Disconnect", function () {
               api("/relay/my/bank/disconnect", { method: "POST", body: { id: c.id } }).then(function (r) {
                 if (!r.ok) return say(note, "Couldn't disconnect it. Try again in a moment.", true);
                 say(note, "Disconnected. The payments read from it are deleted."); load();
               }, function () { say(note, "Couldn't reach Relay. Check your connection and try again.", true); });
             });
+          };
+          var yours = (c.cards || []).filter(function (k) { return k.mine === true; }).length;
+          var detail = c.needsReconnect ? "Connect again to keep reading payments" : c.needsChoice ? "Choose which cards are yours"
+            : when(c.syncedAt) + (c.cards ? ", " + (yours === 1 ? "1 card is yours" : yours + " cards are yours") : "") + (c.matched ? ", " + c.matched + (c.matched === 1 ? " receipt matched" : " receipts matched") : "");
+          return accRow("card", c.bank || "Bank", detail, function () {
+            if (!c.cards) return disconnect();
+            chooseBox(c.bank || "Bank", [["Choose your cards", function () { cardsPage(c); }], ["Disconnect", disconnect]]);
           });
         })));
+        // A card company that sends every card on the account together, without saying which card each payment was on.
+        if (cs.some(function (c) { return c.unsplit; })) list.appendChild(el("p", { className: "rl-anote", text: "American Express sends the payments of every card on your account together, without saying which card each was on. If someone else has a card on it, tap a payment that isn't yours to say so." }));
+      }
+      // "Which of these are yours?": a row a card (its name and last four digits), each ticked on or off, then Save. Shown
+      // on the bank page when it's asked (top) and on its own page when they change it later. done(connection) after saving.
+      function cardChooser(c, top, done) {
+        var box = el("section", { className: "rl-bk-pick" });
+        var picked = {}; c.cards.forEach(function (k) { picked[k.ref] = k.mine === true; });
+        if (top) box.appendChild(el("h3", { text: "Which of these are yours?" }));
+        box.appendChild(el("p", { text: (c.bank || "Your bank") + " shows more than one card. Relay reads payments only from the ones you choose, so nobody sees someone else's spending." }));
+        var rows = el("div", { className: "rl-bk-cards", role: "group", ariaLabel: "Your cards at " + (c.bank || "your bank") });
+        var save = el("button", { type: "button", className: "rl-btn" }), msg = el("p", { className: "rl-msg", role: "status" });
+        var word = function () { save.textContent = c.cards.some(function (k) { return picked[k.ref]; }) ? "Save" : "None of these are mine"; };
+        c.cards.forEach(function (k) {
+          var tick = el("span", { className: "rl-bk-tick" }, [accIc("check", 16, "rl-bk-tick-i")]);
+          var row = el("button", { type: "button", className: "rl-bk-card", role: "checkbox" }, [el("b", { text: k.label }), tick]);
+          var draw = function () { row.setAttribute("aria-checked", picked[k.ref] ? "true" : "false"); };
+          row.onclick = function () { if (save.disabled) return; picked[k.ref] = !picked[k.ref]; draw(); word(); };
+          draw(); rows.appendChild(row);
+        });
+        word();
+        save.onclick = function () {
+          if (save.disabled) return;
+          var buttons = Array.prototype.slice.call(box.querySelectorAll("button"));
+          buttons.forEach(function (x) { x.disabled = true; }); save.textContent = "Saving\u2026"; say(msg, "");
+          var free = function () { buttons.forEach(function (x) { x.disabled = false; }); word(); };
+          api("/relay/my/bank/cards", { method: "POST", body: { id: c.id, cards: c.cards.map(function (k) { return { ref: k.ref, mine: Boolean(picked[k.ref]) }; }) } }).then(function (r) {
+            if (!r.ok) { free(); return say(msg, r.status === 404 ? "This bank's cards have changed. Go back and open it again." : "Couldn't save that. Try again in a moment.", true); }
+            memo.bankPays = null; done(r.body && r.body.connection);
+          }, function () { free(); say(msg, "Couldn't reach Relay. Check your connection and try again.", true); });
+        };
+        box.appendChild(rows); box.appendChild(save); box.appendChild(msg);
+        return box;
+      }
+      // Changing it later: its own page, whose Back returns to Bank and cards.
+      function cardsPage(c) {
+        var prev = backTo;
+        var reopen = function () { backTo = prev; page("Bank and cards", function (b2) { bankPage(b2, null); }); };
+        reopen.word = "Bank and cards";
+        backTo = reopen;
+        page("Your cards", function (b2) {
+          b2.appendChild(cardChooser(c, false, function () { reopen(); }));
+        });
+        backTo = prev;
       }
       function drawPays(body) {
         pays.textContent = "";
@@ -11100,6 +11196,76 @@
       accIc("chev", 16, "rl-arow-c")]);
     return r;
   }
+  // A shop's photo at about the size it's shown. Shopify's own image addresses (cdn.shopify.com, or a shop's /cdn/shop/)
+  // can be asked for at a given width, so a phone fetches and decodes a 320px picture for a 140px square instead of the
+  // shop's full 2000px original; any other address is left as it is. (The original is used if the smaller one fails.)
+  function photoAt(url, px) {
+    try {
+      var u = new URL(url);
+      if (!(u.hostname === "cdn.shopify.com" || /^\/cdn\/shop\//.test(u.pathname))) return url;
+      u.searchParams.set("width", String(px)); return u.toString();
+    } catch (e) { return url; }
+  }
+  function watchPic(w, px) {
+    var pic = el("span", { className: "wl-pic" }), tried = false;
+    var img = el("img", { alt: "", width: px, height: px, loading: "lazy", decoding: "async", referrerPolicy: "no-referrer" });
+    img.onerror = function () {
+      if (!tried && img.src !== w.image) { tried = true; img.src = w.image; return; }
+      img.remove(); var art = el("span", { className: "h2-art" }); pic.appendChild(art); illustrate(art, { items: [{ name: w.product }], retailer: { name: w.store || "" }, category: "other" }, 96);
+    };
+    img.src = photoAt(w.image, px * 2 + 40); pic.appendChild(img);
+    return pic;
+  }
+  function watchShop(w) {
+    var shop = el("span", { className: "wl-shop" });
+    if (w.dom && !/\.myshopify\.com$/.test(w.dom)) { var logo = el("span", { className: "wl-logo" }); logo.setAttribute("aria-hidden", "true"); shopLogo(logo, w.dom, 16, function () { logo.remove(); }); shop.appendChild(logo); }
+    shop.appendChild(el("span", { className: "wl-shop-n", text: w.store }));
+    return shop;
+  }
+  // What's said about a watched thing, worked out once for its card and its page. Only what Relay knows: the latest price
+  // from the shop and the price when watching started; nothing about a drop unless both are known and it has dropped.
+  function watchFacts(w) {
+    var cur = w.currency || "GBP", now = Number.isInteger(w.nowMinor) ? w.nowMinor : null, was = Number.isInteger(w.priceMinor) && w.priceMinor > 0 ? w.priceMinor : null;
+    var full = w.product + (w.variation && !/^(default title|one size)$/i.test(w.variation) ? ", " + w.variation : "");
+    var drop = now !== null && was !== null && now < was;
+    return { name: cleanName(full, w.store) || full, now: now !== null ? money(now, cur) : "", was: was !== null ? money(was, cur) : "",
+      drop: drop ? "Down " + money(was - now, cur) + " since you started watching" : "", by: drop ? money(was - now, cur) : "" };
+  }
+  // Watching: a card per watched thing, the whole card one tap to its page (rule 16: no buttons on the card).
+  // (A second tap of a double tap on the page's Stop watching lands on the list once the page has closed: for a moment
+  // after the page closes, a tap on the list opens nothing, rule 9.)
+  var watchQuietUntil = 0;
+  function watchCard(w, changed) {
+    var f = watchFacts(w);
+    var mid = el("span", { className: "wl-mid" }, [el("span", { className: "wl-n", text: f.name }), watchShop(w)]
+      .concat(f.now ? [el("span", { className: "wl-p", text: f.now })] : [])
+      .concat(f.drop ? [el("span", { className: "wl-ch", text: f.drop })] : []));
+    return el("button", { type: "button", className: "wl-card", "data-sku": w.sku, ariaLabel: [f.name, w.store, f.now, f.drop].filter(Boolean).join(". "),
+      onclick: tapOnce(function () { if (Date.now() < watchQuietUntil) return; watchSheet(w, changed); }) }, [watchPic(w, 140), mid]);
+  }
+  // A watched thing's page: its photo and name, the latest price and the price when watching started, then what you can do
+  // (see it in Browse, or stop watching it). Swipes down to close, like every sheet.
+  function watchSheet(w, changed) {
+    var f = watchFacts(w);
+    open(function (sheet) {
+      sheet.setAttribute("aria-label", f.name);
+      sheet.appendChild(el("div", { className: "wl-sh-head" }, [watchPic(w, 140), el("span", { className: "wl-mid" }, [el("h2", { className: "wl-n", text: f.name }), watchShop(w)])]));
+      var facts = [];
+      if (f.now) facts.push(el("div", { className: "wl-sh-f" }, [el("span", { text: "Latest price" }), el("b", { text: f.now })]));
+      if (f.was) facts.push(el("div", { className: "wl-sh-f" }, [el("span", { text: "When you started watching" }), el("b", { text: f.was })]));
+      if (f.by) facts.push(el("div", { className: "wl-sh-f" }, [el("span", { text: "Price drop" }), el("b", { className: "wl-sh-down", text: f.by })]));
+      if (facts.length) sheet.appendChild(el("div", { className: "wl-sh-facts" }, facts));
+      var stopped = false;
+      sheet.appendChild(accGroup("", [
+        accRow("bag", "See it in Browse", "", tapOnce(function () { close(); if (window.relayOpenProduct) window.relayOpenProduct(w.sku, w.product); })),
+        accRow("trash", "Stop watching", "", function () {
+          if (stopped) return; stopped = true;
+          if (typeof window.unwatch === "function") window.unwatch(w.sku);
+          watchQuietUntil = Date.now() + 500; close(); if (changed) changed();
+        }, { danger: true })]));
+      sheet.appendChild(el("button", { type: "button", className: "rl-btn ghost", text: "Close", style: "margin-top:14px", onclick: close }));
+    });
+  }
   // Wallet: the thing as a big square, a label on it only when something is happening, then the shop, what it is and the price.
   // A product's name as a person would say it under its picture (Connor, 17 Nov 2026: Home showed "lululemon
   // lululemon Align™ High-R…", "Nespresso Nespresso" and "W Restfeel Slide TOPK/TOPK…"): no shop name in front of it, no
@@ -11307,7 +11473,10 @@
     // An inbox this phone knows is connected counts as connected until Relay says otherwise (so its answer, the same, draws nothing).
     var state = { both: null, mail: [], wins: [], connected: memo.gmail && memo.gmail.r && memo.gmail.r.body ? Boolean(memo.gmail.r.body.connected) : hasMailbox() ? true : null, pick: memo.homeChip || "you" };
     // Watching: real products only (a shop's website, or a shop on Relay that isn't one of Relay's test shops), newest first.
-    var watches = function () { try { return (window.relayLocalWatches ? window.relayLocalWatches() : []).filter(function (w) { return w && w.sku && w.product && w.real; }).reverse(); } catch (e) { return []; } };
+    // (state.watchWaiting: some watched things have nothing kept on this phone yet and wait for the shops' products.)
+    var watches = function () { try { var all = window.relayLocalWatches ? window.relayLocalWatches() : [];
+      state.watchWaiting = all.some(function (w) { return w && w.kept && !w.real && !/^web:/.test(w.sku); });
+      return all.filter(function (w) { return w && w.sku && w.product && w.real; }).reverse(); } catch (e) { return []; } };
     // A brand-new account: one card that says what to do first.
     var startCard = function () {
       return el("div", { className: "rl-po h2-start", style: "margin:0;border:1.5px solid #c7d5f5;background:var(--rl-accent-bg)" }, [
@@ -11322,7 +11491,7 @@
       if (!state.both || !document.body.contains(feed)) return;
       var watched = watches();
       var key = [homeIds(state.both[0]), homeIds(state.both[1]), homeIds(memo.needReceipt), state.connected, state.mail.length, state.wins.length, state.pick, homeLook(), homeFocus(),
-        watched.map(function (w) { return w.sku + ":" + w.nowMinor + ":" + (w.image ? 1 : 0) + ":" + (w.store || ""); }).join(",")].join("|");
+        watched.map(function (w) { return w.sku + ":" + w.nowMinor + ":" + (w.image ? 1 : 0) + ":" + (w.store || "") + ":" + (w.dom || ""); }).join(","), state.watchWaiting ? 1 : 0].join("|");
       if (!force && key === drawnKey && feed.firstChild && !feed.querySelector(".rl-skel")) return;
       drawnKey = key;
       var all = homeFeedEntries(state.both[0], state.both[1]);
@@ -11357,30 +11526,10 @@
       });
       chips.style.display = "";
       feed.textContent = "";
-      var look = homeLook(); feed.classList.toggle("hl", look !== "cards");
+      var look = homeLook(); feed.classList.toggle("hl", look !== "cards" || state.pick === "watch");
       // For you leads with what the chosen focus puts first (Settings, Home layout: Receipts first or Orders first).
       if (state.pick === "you") { if (homeFocus() === "orders") drawOrders(all); else drawReceipts(all, watched); }
-      if (state.pick === "watch" && !watched.length) feed.appendChild(el("p", { className: "rl-calm-none h2-none", text: "Nothing watched yet. Tap the heart on something in Browse and Relay tells you when its price drops." }));
-      // Watched things without a photo yet: Browse's products give it (asked once, only when Watching is opened).
-      if (state.pick === "watch" && watched.some(function (w) { return !w.image; }) && window.relayNeedCatalog && !memo.watchPicsAsked) {
-        memo.watchPicsAsked = true;
-        if (!window.relayNeedCatalog()) window.addEventListener("relay-catalogue", function () { if (state.pick === "watch" && feed.isConnected) draw(true); }, { once: true }); }
-      // Only real products from the shops, with their own photo and the shop's name (Connor, 18 Nov 2026: "It should be real
-      // products with real photos from the stores we have and the ones I've clicked watch"). One a shop's website no longer
-      // has is left off, with one line saying so once the shops' products are in.
-      var shownWatch = watched.filter(function (w) { return w.image && /^https:\/\//.test(w.image) && w.store; }), gone = watched.length - shownWatch.length;
-      if (state.pick === "watch" && gone && window.relayNeedCatalog && window.relayNeedCatalog()) feed.appendChild(feedCard({ small: true, icon: "bell",
-        line: gone === 1 ? "1 thing you watched isn't on its shop's website any more" : gone + " things you watched aren't on their shops' websites any more",
-        open: function () { if (window.go) window.go("radar"); } }));
-      if (state.pick === "watch") shownWatch.slice(0, 12).forEach(function (w) {
-        var now = Number.isInteger(w.nowMinor) ? w.nowMinor : null, was = Number.isInteger(w.priceMinor) ? w.priceMinor : null, drop = now !== null && was !== null && now < was;
-        feed.appendChild(feedCard({ shop: w.store || "Watching", cat: null, tiles: [{ name: w.product + (w.variation ? ", " + w.variation : ""), price: now !== null ? money(now, w.currency || "GBP") : "",
-            draw: function (box) { var drawIt = function () { illustrate(box, { items: [{ name: w.product }], retailer: { name: w.store || "" }, category: "other" }, 96); };
-              // The shop's own photo of what's watched (Connor, 17 Nov 2026), or a drawing when there isn't one.
-              if (w.image && /^https:\/\//.test(w.image)) { var ph = el("img", { src: w.image, alt: "", referrerPolicy: "no-referrer" }); ph.onerror = function () { ph.remove(); box.classList.remove("rl-has-photo"); drawIt(); }; box.classList.add("rl-has-photo"); box.appendChild(ph); } else drawIt(); } }],
-          line: drop ? "Down " + money(was - now, w.currency || "GBP") + " since you started watching" : now !== null ? "Watching the price" : was !== null ? "Watching since it was " + money(was, w.currency || "GBP") : "Watching the price",
-          open: function () { if (window.relayOpenProduct) window.relayOpenProduct(w.sku, w.product); } }));
-      });
+      if (state.pick === "watch") drawWatching(watched);
       else if (state.pick !== "you") {
         // The other chips: that list, about twelve of it.
         var list = sets[state.pick], shown = list.slice(0, 12);
@@ -11391,8 +11540,39 @@
         } else shown.forEach(function (e) { feed.appendChild(feedCard(e)); });
         if (!list.length && state.connected !== false && !isReview()) feed.appendChild(el("p", { className: "rl-calm-none h2-none", text: "What you buy shows up here as Relay finds the receipts." }));
       }
-      if (state.both[1].length || state.both[0].length) feed.appendChild(feedCard({ small: true, icon: "doc", line: "All receipts", open: function () { if (window.go) window.go("receipts"); } }));
+      if (state.pick !== "watch" && (state.both[1].length || state.both[0].length)) feed.appendChild(feedCard({ small: true, icon: "doc", line: "All receipts", open: function () { if (window.go) window.go("receipts"); } }));
       firstScreen();
+    };
+    // Watching (Connor, 23 Nov 2026: "this page layout is awful. Boxes overlap options etc and it's very laggy"): one list,
+    // a row per watched thing, the whole row one tap to its page. Only real products from the shops, with their own photo
+    // and the shop's name (Connor, 18 Nov 2026); one a shop's website no longer has is left off, with one line saying so
+    // once the shops' products are in. What was kept on this phone shows at once; the shops' products are asked for once
+    // (only when Watching is opened) and the list is drawn again when they come.
+    var watchList = null;
+    var drawWatching = function (watched) {
+      var ready = window.relayNeedCatalog ? window.relayNeedCatalog() : true;
+      if (!ready && !memo.watchWait) { memo.watchWait = true; window.addEventListener("relay-catalogue", function () { memo.watchWait = false; if (state.pick === "watch" && feed.isConnected) draw(true); }, { once: true }); }
+      var shown = watched.filter(function (w) { return w.image && /^https:\/\//.test(w.image) && w.store; }), gone = watched.length - shown.length;
+      if (ready && gone) {
+        var note = el("button", { type: "button", className: "wl-note", onclick: tapOnce(function () { if (window.go) window.go("radar"); }) }, [
+          el("span", { className: "wl-note-i" }, [accIc("bell", 18)]),
+          el("span", { className: "wl-note-t", text: gone === 1 ? "1 thing you watched isn't on its shop's website any more" : gone + " things you watched aren't on their shops' websites any more" }),
+          accIc("chev", 16, "rl-arow-c")]);
+        feed.appendChild(note);
+      }
+      // Plain rounded corners on this list (data-round="plain", relay-corners.js): clipping a list as tall as forty rows,
+      // and each photo in it, to a drawn shape made every scroll and every visit to Watching slower on a phone.
+      // The cards are built once and kept while what they say is the same: going to another chip and back to Watching puts
+      // the same cards (and their loaded photos) back instead of building and loading forty of them again.
+      var listKey = shown.map(function (w) { return [w.sku, w.nowMinor, w.priceMinor, w.image, w.store, w.dom, w.product, w.variation].join("\u0001"); }).join("\u0002");
+      if (shown.length && (!watchList || watchList.key !== listKey)) watchList = { key: listKey, node: el("div", { className: "wl-list", "data-round": "plain" }, shown.map(function (w) { return watchCard(w, function () { if (feed.isConnected) draw(true); }); })) };
+      if (shown.length) feed.appendChild(watchList.node);
+      else if (!ready && (state.watchWaiting || watched.length)) {
+        // Still waiting for the shops' products, with nothing kept on this phone yet: greyed outlines of the rows (rule 7).
+        var bones = el("div", { className: "wl-list" });
+        for (var k = 0; k < 3; k++) bones.appendChild(el("div", { className: "wl-card wl-bone" }, [el("span", { className: "wl-pic rl-skel" }), el("span", { className: "wl-mid" }, [el("span", { className: "rl-skel", style: "height:16px;width:90%;border-radius:8px" }), el("span", { className: "rl-skel", style: "height:14px;width:55%;border-radius:7px" }), el("span", { className: "rl-skel", style: "height:17px;width:40%;border-radius:8px" })])]));
+        feed.appendChild(bones);
+      } else if (!gone) feed.appendChild(el("p", { className: "rl-calm-none h2-none", text: "Nothing watched yet. Tap the heart on something in Browse and Relay tells you when its price drops." }));
     };
     // Home's parts: a heading, and things drawn the way Home looks (Wallet squares or Cards).
     var heading = function (text) { feed.appendChild(el("h2", { className: "hl-h h2-sec", text: text })); };

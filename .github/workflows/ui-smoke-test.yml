@@ -23,6 +23,7 @@ on:
       - scripts/test-tips-ui.mjs
       - scripts/sample-pictures.mjs
       - scripts/test-swap-ui.mjs
+      - scripts/test-watching-ui.mjs
       - .github/workflows/ui-smoke-test.yml
   pull_request:
   workflow_dispatch:
@@ -84,6 +85,8 @@ jobs:
         run: node --import ./scripts/record-app-requests.mjs scripts/test-add-receipt-ui.mjs
       - name: Test the sign-in page and Home (Relay's navy, return countdowns, colourful tiles)
         run: node --import ./scripts/record-app-requests.mjs scripts/test-home-look-ui.mjs
+      - name: Test Home's Watching list (one-tap cards with 140px photos, nothing overlapping, bigger text, its page with Stop watching)
+        run: node --import ./scripts/record-app-requests.mjs scripts/test-watching-ui.mjs
       - name: Test what Home shows first (Receipts first and Orders first, switched in Settings or ?focus=, real data only, no extra requests)
         run: node --import ./scripts/record-app-requests.mjs scripts/test-home-focus-ui.mjs
       - name: Test more than one inbox in the app (listed, added, removed one at a time, searched together)
@@ -110,6 +113,8 @@ jobs:
         run: node --import ./scripts/record-app-requests.mjs scripts/test-ai-help-ui.mjs
       - name: Bank and cards
         run: node --import ./scripts/record-app-requests.mjs scripts/test-bank-ui.mjs
+      - name: Which cards are yours (asked before payments show, exact ticks saved once, changed later on its own page)
+        run: node --import ./scripts/record-app-requests.mjs scripts/test-bank-cards-ui.mjs
       - name: Receipt photos (Home card, the sheet, outlines while reading, sent once, Receipt from your photo with both totals)
         run: node --import ./scripts/record-app-requests.mjs scripts/test-receipt-photo-ui.mjs
       - name: Receipt items (+ N more on Home, item counts, "may have missed some items" with Read it again once per tap and See the email)

@@ -9,7 +9,7 @@ Check new work against these before shipping (scripts/test-polish-ui.mjs checks 
 4. Everything tappable is at least 44px tall.
 5. Cache what was loaded: show the last copy at once, update quietly, remove it on sign-out.
 6. No everyday text under 13px (uppercase labels 12px at the smallest).
-7. No spinners or bare "Loading…": show greyed-out outlines of the content.
+7. No spinners or bare "Loading…": show greyed-out outlines of the content. The one exception: pull to refresh shows its circular arrow turning while it refreshes (Connor, 23 Nov).
 8. No emoji or symbol characters as icons in buttons; use the drawn line icons (ic() in index.html).
 9. A double tap must never do the thing twice (guard in index.html; disable buttons while a request is running).
 10. A new user never lands on an empty screen: always say what to do first.

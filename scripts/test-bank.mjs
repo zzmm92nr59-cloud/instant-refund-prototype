@@ -197,7 +197,19 @@ assert.equal(pickProvider(PROVIDERS, "nobank"), null); assert.equal(pickProvider
 }
 console.log("ok - a bank chosen in Relay opens that bank straight away (TrueLayer's own id for it), or TrueLayer's list");
 
-// 3. Payments read straight away and matched to receipts; money coming in isn't kept.
+// 3. This bank lists an account and a card, so Relay asks which are Jess's before reading any payment; once she says
+// both, they're read straight away and matched to receipts; money coming in isn't kept.
+r = await (await call("/relay/my/bank", { token: jess })).json();
+assert.equal(r.connections[0].needsChoice, true, "two listed: asked first");
+assert.deepEqual(r.connections[0].cards.map((c) => [c.label, c.mine]), [["Current account", null], ["Credit card ending 4242", null]], "none ticked when there are several");
+assert.deepEqual((await (await call("/relay/my/bank/payments", { token: jess })).json()).payments, [], "nothing read before she says");
+assert.ok(!calls.some((c) => /\/transactions/.test(c.url)), "no payments asked of the bank before she says");
+{
+  const conn = r.connections[0];
+  const chose = await (await call("/relay/my/bank/cards", { method: "POST", token: jess, body: { id: conn.id, cards: conn.cards.map((c) => ({ ref: c.ref, mine: true })) } })).json();
+  assert.equal(chose.ok, true); assert.equal(chose.connection.needsChoice, undefined, "answered");
+  assert.deepEqual(chose.connection.cards.map((c) => c.mine), [true, true]);
+}
 r = await (await call("/relay/my/bank/payments", { token: jess })).json();
 assert.deepEqual(r.payments.map((p) => p.shop), ["Coffee Corner", "Brindle and Co"], "tidy names; round-ups and betting never kept");
 assert.equal(sqlite.prepare("SELECT COUNT(*) AS n FROM bank_payments WHERE description IN ('SAVE THE CHANGE', 'PAYPAL BETFRED')").get().n, 0);
