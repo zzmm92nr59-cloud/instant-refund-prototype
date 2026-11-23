@@ -177,7 +177,7 @@ export function flightLegs(text, refDate) {
       for (let k = i + 1; k <= i + 14 && k + 1 < lines.length && ends.length < 2; k++) {
         if (/^[\s|]*[A-Z0-9]{2}\s?\d{1,4}[\s|]*$/.test(lines[k]) && flightNo(lines[k])) break;
         if (!/^[\s|]*\d{1,2}[:.]\d{2}[\s|]*$/.test(lines[k])) continue;
-        const raw = lines[k + 1].replace(/^[\s|]+|[\s|]+$/g, "");
+        const raw = lines[k + 1].replace(/^[\s|]+|(?<![\s|])[\s|]+$/g, "");
         const p = /\d/.test(raw) ? null : placeIn(raw);
         if (p) ends.push({ c: p, k: k + 1, day: legDay(lines[k - 1] || "", refDate) });
       }
@@ -195,9 +195,14 @@ export function flightLegs(text, refDate) {
       continue;
     }
     // "Manchester to Alicante" with a flight number right by it.
-    const named = NAME_PAIR.exec(l);
-    if (named && nearby(lines, i, flightNo)) {
-      const a = airportByName(named[1]), b = airportByName(named[2]);
+    // (Or a travel site's "London Luton Apt → Lisbon Apt" over its day and times, "12 Jun · 06:40 - 12 Jun · 09:25",
+    // with no flight number at all: Booking.com's flight confirmation. Round 24.)
+    let cut = l.length; while (cut > 0 && (l[cut - 1] === "|" || l[cut - 1] === " ")) cut--;
+    const named = NAME_PAIR.exec(l.slice(0, cut));
+    const timed = (k) => { while (k < lines.length && k <= i + 3 && /^[\s|]*$/.test(lines[k])) k++; return k < lines.length && /\b\d{1,2}[:.]\d{2}\b/.test(lines[k]) && Boolean(legDay(lines[k], refDate)); };
+    if (named && (nearby(lines, i, flightNo) || (/→/.test(l) && timed(i + 1)))) {
+      const apt = (n) => airportByName(n) || airportByName(n.replace(/\s(?:Apt|Airport)\.?$/i, ""));
+      const a = apt(named[1]), b = apt(named[2]);
       if (a && b) add(a.code, b.code, i);
     }
   }
@@ -246,15 +251,19 @@ function paidBelow(lines, i) {
     if (/^[\s|]*$/.test(lines[k])) continue;
     seen++;
     const m = AMOUNT_ONLY.exec(lines[k]);
-    if (m && (m[1] || m[3])) return lines[k].replace(/^[\s|]+|[\s|]+$/g, "");
+    if (m && (m[1] || m[3])) return lines[k].replace(/^[\s|]+|(?<![\s|])[\s|]+$/g, "");
     if (!PAID_SKIP.test(lines[k])) return null;
   }
   return null;
 }
+// (A travel site's price under the flights, "1 passenger · £189.40": what was paid for them all. Round 24.)
+const PASSENGERS_PAID = /^[\s|]*\d{1,2} (?:passengers?|adults?|travell?ers?)[ \t]*[·•|,-][ \t]*(£|€|\$)\s?(\d{1,3}(?:,\d{3})*\.\d{2})[\s|]*$/i;
 function paidOf(text) {
   const lines = String(text || "").split(/\n/);
   for (let i = 0; i < lines.length; i++) {
     let line = lines[i];
+    const pp = PASSENGERS_PAID.exec(line);
+    if (pp) line = "Total paid " + pp[1] + pp[2];
     if (PAID_LABEL.test(line) && !/\d/.test(line)) { const below = paidBelow(lines, i); if (below) line = "Total paid " + below; }
     const m = PAID.exec(line);
     if (!m || !(m[1] || m[3])) continue;
@@ -268,11 +277,13 @@ function paidOf(text) {
   }
   return null;
 }
+// (Booking.com's flights: "Customer reference" over "40-123456789", the reference its help centre asks for. Round 24.)
+const CUSTOMER_REF = /^[ \t|]*customer reference[ \t|:]*(?:\n[ \t|]*){0,6}(\d{2}-\d{6,12})[ \t|]*$/im;
 function refOf(text) {
-  const m = REF.exec(String(text || "")) || BARE_REF.exec(String(text || "").slice(0, 20000));
+  const m = REF.exec(String(text || "")) || BARE_REF.exec(String(text || "").slice(0, 20000)) || CUSTOMER_REF.exec(String(text || "").slice(0, 40000));
   if (!m) return null;
   const r = m[1];
-  return r === r.toUpperCase() && /[A-Z]/.test(r) || /^\d{6,14}$/.test(r) ? r : null;
+  return r === r.toUpperCase() && /[A-Z]/.test(r) || /^\d{6,14}$/.test(r) || /^\d{2}-\d{6,12}$/.test(r) ? r : null;
 }
 
 // What kind of flight email this is (see the top of this file), from its subject, its text and who sent it.

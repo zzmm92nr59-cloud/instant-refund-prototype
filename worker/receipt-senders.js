@@ -5,7 +5,7 @@
 
 const MONEY = /£\s?(\d{1,3}(?:,\d{3})+|\d+)\.(\d{2})/;
 const pence = (m) => (m ? Number(m[1].replace(/,/g, "")) * 100 + Number(m[2]) : null);
-const rows = (text) => String(text || "").split("\n").map((x) => x.replace(/^[\s|]+|[\s|]+$/g, "").replace(/[\s|]+/g, (run) => { const k = run.split("|").length - 1; return k ? " | ".repeat(k) : run; }).trim()).filter(Boolean);
+const rows = (text) => String(text || "").split("\n").map((x) => x.replace(/^[\s|]+|(?<![\s|])[\s|]+$/g, "").replace(/[\s|]+/g, (run) => { const k = run.split("|").length - 1; return k ? " | ".repeat(k) : run; }).trim()).filter(Boolean);
 // The amount on a labelled row, "Refund | -£8.76", or on the row under the label.
 function labelled(list, re) {
   for (let i = 0; i < list.length; i++) {
