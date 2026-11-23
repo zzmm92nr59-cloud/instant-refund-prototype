@@ -39,9 +39,10 @@ import holdout21 from "./holdout21.mjs";
 import holdout22 from "./holdout22.mjs";
 import holdout23 from "./holdout23.mjs";
 import holdout24 from "./holdout24.mjs";
+import holdout25 from "./holdout25.mjs";
 
 const dir = dirname(fileURLToPath(import.meta.url));
-const all = [...food(), ...grocery(), ...retail(), ...digital(), ...holdout(), ...holdout2(), ...holdout3(), ...holdout4(), ...holdout5(), ...holdout6(), ...holdout7(), ...holdout8(), ...holdout9(), ...holdout10(), ...holdout11(), ...holdout12(), ...holdout13a(), ...holdout13b(), ...holdout14a(), ...holdout14b(), ...holdout15(), ...holdout16a(), ...holdout16b(), ...holdout16c(), ...holdout16d(), ...holdout16e(), ...holdout17(), ...holdout17b(), ...holdout18(), ...holdout19(), ...holdout20(), ...holdout21(), ...holdout22(), ...holdout23(), ...holdout24()];
+const all = [...food(), ...grocery(), ...retail(), ...digital(), ...holdout(), ...holdout2(), ...holdout3(), ...holdout4(), ...holdout5(), ...holdout6(), ...holdout7(), ...holdout8(), ...holdout9(), ...holdout10(), ...holdout11(), ...holdout12(), ...holdout13a(), ...holdout13b(), ...holdout14a(), ...holdout14b(), ...holdout15(), ...holdout16a(), ...holdout16b(), ...holdout16c(), ...holdout16d(), ...holdout16e(), ...holdout17(), ...holdout17b(), ...holdout18(), ...holdout19(), ...holdout20(), ...holdout21(), ...holdout22(), ...holdout23(), ...holdout24(), ...holdout25()];
 const ids = new Set();
 for (const f of all) { if (ids.has(f.id)) throw new Error("two fixtures called " + f.id); ids.add(f.id); }
 for (const name of readdirSync(dir)) if (name.endsWith(".json")) unlinkSync(join(dir, name));

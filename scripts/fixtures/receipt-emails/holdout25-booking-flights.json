@@ -1,0 +1,31 @@
+{
+ "id": "holdout25-booking-flights",
+ "sender": "Booking.com",
+ "layout": "'<city> flight confirmation': 'London Luton Apt → Lisbon Apt' over '12 Jun · 06:40 - 12 Jun · 09:25', no flight numbers; '1 passenger · £189.40'; 'Customer reference' over '40-111222333'",
+ "headers": {
+  "from": "\"Booking.com\" <noreply@booking.com>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Lisbon flight confirmation",
+  "date": "Tue, 03 Mar 2026 20:15:00 +0100"
+ },
+ "html": "<html><head><title>Lisbon flight confirmation</title></head><body><table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"><tr><td>Lisbon flight confirmation</td></tr>\n<tr><td>Sam, you're flying to Lisbon</td></tr>\n<tr><td>Hi Sam,</td></tr>\n<tr><td>It&rsquo;s all confirmed, thanks for booking! You&rsquo;ll get your check-in details in a separate email from us.</td></tr>\n<tr><td>Your flight details</td></tr>\n<tr><td>London Luton Apt → Lisbon Apt</td></tr>\n<tr><td>12 Jun · 06:40 - 12 Jun · 09:25</td></tr>\n<tr><td>Direct · 2h 45m</td></tr>\n<tr><td>Lisbon Apt → London Luton Apt</td></tr>\n<tr><td>16 Jun · 18:10 - 16 Jun · 20:55</td></tr>\n<tr><td>Direct · 2h 45m</td></tr>\n<tr><td>1 passenger · &pound;189.40</td></tr>\n<tr><td>View and manage booking</td></tr>\n<tr><td>Looking for help?</td></tr>\n<tr><td>Visit the Flights help centre, and please have your customer reference and PIN code handy</td></tr>\n<tr><td>Customer reference</td></tr>\n<tr><td>40-111222333</td></tr>\n<tr><td>PIN code</td></tr>\n<tr><td>1234</td></tr>\n<tr><td>Have a good flight!</td></tr></table></body></html>",
+ "text": "",
+ "expected": {
+  "shop": "Booking.com",
+  "date": "2026-03-03",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Return flights London Luton to Lisbon",
+    "qty": 1,
+    "linePence": 18940
+   }
+  ],
+  "subtotalPence": 18940,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 18940,
+  "orderRef": "40-111222333"
+ }
+}

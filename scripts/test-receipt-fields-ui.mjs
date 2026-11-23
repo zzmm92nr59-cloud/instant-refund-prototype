@@ -6,6 +6,10 @@
 //  3. The shop's own total when PayPal took a different amount (shopTotalPence): "The shop's total was £42.00; PayPal took £45.99."
 //  4. A free gift at £0.00 (item free): "Free gift" on its line, never "£0.00".
 //  5. A pack with one price for all its lines (itemsCheck.pack): its lines show no price, never "£0.00".
+//  6. An order paid partly with a gift card (giftCardPence, cardPaid): what the gift card paid and what the card paid, as the
+//     email gives them. A receipt whose amount is only in its PDF says so on its row, never a blank.
+//  7. A receipt from one of Relay's own test shops (testShop, marked by the server) is never shown without the testing tools
+//     (CLAUDE.md rule 15).
 // RELAY_SHOTS=<folder> also saves a 390x844 screenshot of each page there.
 import assert from "node:assert/strict";
 import { createRequire } from "node:module"; import { createServer } from "node:http"; import { readFile, mkdir } from "node:fs/promises"; import { resolve, extname, join } from "node:path";
@@ -43,7 +47,13 @@ const OLDSTAY = base("a7777777-7777-4777-8777-777777777777", "Booking.com", { me
   items: [{ name: "Twin Room", qty: 1, pricePence: 31000, lineTotal: true }], itemsCheck: { complete: true, itemsPence: 31000, expectedPence: 31000, missingPence: 0 } });
 const BOOK = base("a8888888-8888-4888-8888-888888888888", "Page Turner", { totalPence: 1200, orderDate: "2025-03-12", items: [{ name: "A Novel", qty: 1, pricePence: 1200 }],
   itemsCheck: { complete: true, itemsPence: 1200, expectedPence: 1200, missingPence: 0 } });
-const RECEIPTS = [HOTEL, FLIGHT, OLDFLIGHT, PAYPAL, GIFT, PACK, OLDSTAY, BOOK];
+const GIFTCARD = base("a9999999-9999-4999-8999-999999999999", "Teapot Corner", { totalPence: 4700, orderDate: day(-20), category: "home", giftCardPence: 625, cardPaid: { label: "Visa", pence: 4075 },
+  items: [{ name: "Ceramic Teapot", qty: 1, pricePence: 2200 }, { name: "Breakfast Tea 250g", qty: 1, pricePence: 2500 }], itemsCheck: { complete: true, itemsPence: 4700, expectedPence: 4700, missingPence: 0, giftCardPence: 625 } });
+const PDFONLY = base("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", "Northbridge Institute", { totalPence: null, currency: null, orderDate: day(-25), detailsInAttachment: "pdf", items: [],
+  itemsCheck: { complete: false, itemsPence: 0, expectedPence: null, missingPence: null, inAttachment: "pdf" } });
+const TESTSHOP = base("abbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", "Kestrel Test Kicks", { totalPence: 9500, orderDate: day(-1), testShop: true,
+  items: [{ name: "Trail Runner Shoes", qty: 1, pricePence: 9500 }], itemsCheck: { complete: true, itemsPence: 9500, expectedPence: 9500, missingPence: 0 } });
+const RECEIPTS = [HOTEL, FLIGHT, OLDFLIGHT, PAYPAL, GIFT, PACK, OLDSTAY, BOOK, GIFTCARD, PDFONLY, TESTSHOP];
 
 const H = { "access-control-allow-origin": "*", "access-control-allow-headers": "*", "access-control-allow-methods": "*" };
 const browser = await chromium.launch();
@@ -147,6 +157,23 @@ console.log("ok - a pack's lines show no price, and its one price is said once")
 
 if (SHOTS) { await page.locator("#receiptsPage .rl-cat-month", { hasText: "March 2025" }).scrollIntoViewIfNeeded(); await page.waitForTimeout(200); await page.screenshot({ path: join(SHOTS, "6-month-total.png") }); }
 console.log("ok - a month's total leaves out a stay not paid yet; Receipts shows it as to pay; no return chip on the flights");
+
+// 6. A gift card's part and the card's; an amount only in the PDF.
+const gcRow = page.locator("#receiptsPage .rl-rr", { hasText: "Teapot Corner" }).first();
+await gcRow.scrollIntoViewIfNeeded(); await gcRow.locator(".rl-rr-main").click();
+await gcRow.locator(".rl-rr-detail").waitFor(); await page.waitForTimeout(300);
+t = await gcRow.locator(".rl-rr-detail").innerText();
+assert.match(t, /£6\.25 was paid with a gift card and £40\.75 with Visa\./, t);
+await gcRow.locator(".rl-rr-main").click();
+const pdfEnd = await page.locator("#receiptsPage .rl-rr", { hasText: "Northbridge Institute" }).first().locator(".rl-rr-end").innerText();
+assert.match(pdfEnd, /In the PDF/, "the row says where the amount is: " + pdfEnd);
+console.log("ok - a gift card's part and the card's part, as the email gives them; an amount only in the PDF says so");
+
+// 7. Relay's own test shops, without the testing tools.
+assert.equal(await page.locator("#receiptsPage .rl-rr", { hasText: "Kestrel Test Kicks" }).count(), 0, "a test shop's receipt is never in Receipts without the testing tools");
+await page.evaluate(() => window.go("home")); await page.waitForTimeout(500);
+assert.ok(!(await page.locator("#homePage").innerText()).includes("Kestrel Test Kicks"), "nor on Home");
+console.log("ok - a receipt from one of Relay's test shops shows only with the testing tools");
 
 assert.deepEqual(errors, [], "no page errors");
 await browser.close(); server.close();

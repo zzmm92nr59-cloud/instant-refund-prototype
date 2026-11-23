@@ -44,22 +44,22 @@ export default function holdout16d() {
   const not = (id, sender, layout, m, kind, extra = {}) => { const f = fixture(id, sender, layout, m, { notPurchase: { kind, ...extra } }); out.push(f); return f; };
   const own = (id, sender, layout, m, exp) => { const f = fixture(id, sender, layout, m, exp); out.push(f); return f; };
 
-  // ---- Appcharge: a pack of three things, each its own line; the shop's own Order ID is the order's number -----------------
-  own("holdout16d-game-pack-lines", "Appcharge", "'Items', then 'Lantern Cat | 1', 'Arcade Tokens | x 20', 'Coins | 1,000' on rows of their own; one price for the pack; 'Order ID' under the receipt number",
+  // ---- Appcharge: a pack of three things, each its own line; the receipt number is the order's (round 24; its Order ID was) ---
+  own("holdout16d-game-pack-lines", "Appcharge", "'Items', then 'Lantern Cat | 1', 'Arcade Tokens | x 20', 'Coins | 1,000' on rows of their own; one price for the pack; 'Order ID' under the receipt number (the receipt number is the reference)",
     gameReceipt("308-512-774", "6a9f01c2b3d4e5f60718293a", "United Kingdom", ["Lantern Cat | 1", "Arcade Tokens | x 20", "Coins | 1,000"], ["Subtotal | £3.99", "VAT (20%) | £0.80"], "£4.79",
       "Sat, 25 Apr 2026 19:20:11 +0000", "April 25, 2026 7:20 PM UTC"),
-    { shop: "Harbour Heroes", date: "2026-04-25", currency: "GBP", totalPence: 479, orderRef: "6a9f01c2b3d4e5f60718293a",
+    { shop: "Harbour Heroes", date: "2026-04-25", currency: "GBP", totalPence: 479, orderRef: "308-512-774",
       items: [{ name: "Lantern Cat", qty: 1, linePence: null }, { name: "Arcade Tokens", qty: 20, linePence: null }, { name: "1,000 Coins", qty: 1, linePence: null }] });
   // ---- Appcharge: one thing, two of it ("Big box | x 2"): two at the pack's price ------------------------------------------------
   add("holdout16d-game-two-boxes", "Appcharge", "one line 'Golden SE box | x 2': two of one thing",
     gameReceipt("411-090-215", "6a9f01c2b3d4e5f6071829aa", "United Kingdom", ["Golden SE box | x 2"], ["Subtotal | £1.66", "VAT (20%) | £0.33"], "£1.99",
       "Sun, 10 May 2026 09:02:40 +0000", "May 10, 2026 9:02 AM UTC"),
-    { ...order([{ name: "Golden SE box", qty: 2, unit: 0 }]), bought: [{ name: "Golden SE box", qty: 2, line: 199 }], subtotal: 199, total: 199 }, "Harbour Heroes", "2026-05-10", { orderRef: "6a9f01c2b3d4e5f6071829aa" });
+    { ...order([{ name: "Golden SE box", qty: 2, unit: 0 }]), bought: [{ name: "Golden SE box", qty: 2, line: 199 }], subtotal: 199, total: 199 }, "Harbour Heroes", "2026-05-10", { orderRef: "411-090-215" });
   // ---- Appcharge bought abroad: dollars with a decimal comma, "$1,68", "$2,00 USD" --------------------------------------------
   add("holdout16d-game-comma-dollars", "Appcharge", "bought in Tunisia: 'Subtotal | $1,68', 'Tax (19%) | $0,32', 'Total | $2,00' (a decimal comma, no currency code)",
     gameReceipt("774-930-120", "69a873747398ede69c05b5ff", "Tunisia", ["Powerup Tokens | 1,000"], ["Subtotal | $1,68", "Tax (19%) | $0,32"], "$2,00",
       "Wed, 4 Mar 2026 18:01:30 +0000", "March 04, 2026 6:01 PM UTC"),
-    { ...order([{ name: "1,000 Powerup Tokens", qty: 1, unit: 200 }]) }, "Harbour Heroes", "2026-03-04", { currency: "USD", orderRef: "69a873747398ede69c05b5ff" });
+    { ...order([{ name: "1,000 Powerup Tokens", qty: 1, unit: 200 }]) }, "Harbour Heroes", "2026-03-04", { currency: "USD", orderRef: "774-930-120" });
 
   // ---- PayPal's receipt for a game shop: one thing, its price before the tax PayPal adds: the thing cost what was paid --------
   add("holdout16d-paypal-offer-taxed", "PayPal", "'Special Offer', 'Qty: 1', '£2.66', 'Subtotal £2.66', 'Tax £0.53', 'Total £3.19 GBP'",
