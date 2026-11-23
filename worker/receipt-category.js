@@ -489,7 +489,9 @@ const KNOWN_NAMES = { appcharge: "Appcharge", lycamobile: "Lycamobile", shopifye
   mcdonalds: "McDonald's", ctshirts: "Charles Tyrwhitt", sharkninja: "Ninja", dominospizza: "Domino's", dominos: "Domino's", nordaccount: "NordVPN",
   admiralcasino: "Admiral Casino", greatbeanbags: "Great Bean Bags", thescentreserve: "The Scent Reserve", myeflorist: "eFlorist", eflorist: "eFlorist",
   // (CeX sends from its web address, webuy.com, and names itself "CeX" in every subject. Round 17.)
-  webuy: "CeX", cexwebuy: "CeX", cexwebuycom: "CeX" };
+  webuy: "CeX", cexwebuy: "CeX", cexwebuycom: "CeX",
+  // (H&M sends from hm.com: two letters, too short for the shop list's spellings. Round 62.)
+  hm: "H&M" };
 const MAIL_SUBDOMAIN = /^(e|em|email|emails|mail|mailer|news|newsletter|info|hello|noreply|no-reply|orders?|shop|store|click|links?|g|t|m|r|reply|notify|notifications?|updates?|service|customerservice|support|accounts?)$/i;
 // Personal email services: a receipt "from" one of these is one the shopper (or a friend) forwarded, not a shop.
 export const PERSONAL_MAIL = /(^|\.)(gmail\.com|googlemail\.com|outlook\.com|hotmail\.(com|co\.uk)|live\.(com|co\.uk)|msn\.com|icloud\.com|me\.com|mac\.com|yahoo\.(com|co\.uk)|ymail\.com|aol\.com|proton\.me|protonmail\.com|pm\.me|btinternet\.com|sky\.com|virginmedia\.com)$/i;
@@ -520,6 +522,10 @@ function shopDisplayNameOf(r) {
     if (clean && /^[A-Za-z][a-z]+$/.test(clean) && clean.length >= 8 && !KNOWN_NAMES[letters(clean)] && (!r.domain || via || letters(clean) === domainBase(r.domain))) clean = spellOut(clean) || clean;
     const known = clean && KNOWN_NAMES[letters(clean)];
     if (known) return known;
+    // (A shop on Relay's list whose name came squashed into one word from its web address, "Tkmaxx", or all in capitals,
+    // "TK MAXX": the list's own spelling, "TK Maxx". Round 62.)
+    const proper = clean && properName(clean);
+    if (proper) return proper;
     // A person's name from the shop's own address ("Liam Hartley" at clarechampion.ie): the address names the shop instead.
     if (clean && !via && r.domain && looksLikePerson(clean, r.domain)) return nameOfDomain(r.domain) || clean;
     if (clean) return clean;
@@ -530,10 +536,29 @@ function shopDisplayNameOf(r) {
   return nameOfDomain(r.domain);
 }
 const letters = (s) => String(s || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+// Each listed shop's own spelling (shop-seed.js, the name before any "|"), by its letters: "tkmaxx" → "TK Maxx". Only the
+// shop's own name, never its other spellings, so nothing is renamed to a different shop.
+const PROPER_NAMES = new Map();
+for (const list of Object.values(SEED_LIST)) for (const entry of list) {
+  const name = String(entry).split("|")[0].trim();
+  for (const k of new Set([letters(name), letters(name.replace(/&/g, " and "))])) if (k.length >= 3 && !PROPER_NAMES.has(k)) PROPER_NAMES.set(k, name);
+}
+// A name written as one squashed word ("Tkmaxx", "Newlook") or all in capitals ("TK MAXX") is given the list's spelling.
+function properName(clean) {
+  const s = String(clean || "");
+  if (!(/^[A-Za-z][a-z0-9]+$/.test(s) || (!/\p{Ll}/u.test(s) && /^[A-Z0-9&' .-]+$/.test(s)))) return null;
+  const k = letters(s), p = k.length >= 3 && PROPER_NAMES.get(k);
+  // (Only a spelling a web address or capitals lose, a space, a mark or a capital inside it: "lululemon" written
+  // "Lululemon" by the shop's own email keeps how that email writes it.)
+  return p && p !== s && /[^A-Za-z0-9]|.\p{Lu}/u.test(p) ? p : null;
+}
 function nameOfDomain(domain) {
   const base = readerBase(domain).replace(/[^a-z0-9-]/g, "");
   if (!base) return null;
   if (Object.prototype.hasOwnProperty.call(KNOWN_NAMES, base)) return KNOWN_NAMES[base];
+  // (A shop on Relay's list, "tkmaxx" → "TK Maxx", "newlook" → "New Look", as the list writes it. Round 62.)
+  const proper = properName(base.replace(/-/g, "").replace(/^./, (x) => x.toUpperCase()));
+  if (proper) return proper;
   // "just-eat" → "Just Eat"; "tvbedsnorthwest" → "TV Beds North West" (only when every piece is a known word).
   const split = base.split("-").filter(Boolean).map(w => splitWords(w) || null);
   if (split.every(Boolean)) return split.join(" ");

@@ -189,7 +189,11 @@ async function gmailGet(fetchImpl, url, headers) {
 // booking with the airlines' own emails joined to it; "Your payment will be handled by <hotel>" paid at the hotel; Amazon
 // gift-card orders with the card's part; a dispatch email with the whole order as the purchase when no other email is there;
 // the shopper's own forwards joined; Appcharge's receipt number; Shopify's "Invoice #N" for an edited order.
-export const PARSER_VERSION = 61;
+// 62 (round 25): a payment through PayPal to a company selling for a game or app is that game's or app's; shops on Relay's
+// list keep their own spelling ("TK Maxx", never "Tkmaxx"); a booking fee said only in a sentence is its own line; a free
+// gift never stops a refund matching the paid item; a refund with no number or amount finds its booking; a meal deal's
+// part keeps how many apart from its name; a counter's short order number only joins emails of the same day.
+export const PARSER_VERSION = 62;
 // Which full read of every mailbox is due: version 33 of the reader was full read 14, and each reader version since is one
 // more, so a better reader always reaches old receipts too, without anyone having to remember to raise this.
 export const READER_FULL_REV = 14 + Math.max(0, PARSER_VERSION - 33);
@@ -1155,6 +1159,8 @@ function classify(rawText, ref, lenient = false) {
       ...(receipt.updatedReceipt ? { updatedReceipt: true } : {}), ...(receipt.collection ? { collection: receipt.collection } : {}),
       // The receipt is only in the email's attachment ("pdf" or "image"): the app says so and nothing is read from it.
       ...(receipt.detailsInAttachment ? { detailsInAttachment: receipt.detailsInAttachment } : {}),
+      // (The company behind the shop, as a picture at its foot names it: only for finding a refund it sends. Round 62.)
+      ...(Array.isArray(receipt.otherNames) && receipt.otherNames.length ? { otherNames: receipt.otherNames.slice(0, 4) } : {}),
       needsShopperConfirmation: receipt.needsShopperConfirmation, method: receipt.method, returns: receipt.returns, shipment: receipt.shipment || null,
       // A flight booking's flights (airport codes, day, flight number, out or back): for the receipt and for Wrapped.
       ...(receipt.flights ? { flights: receipt.flights } : {}),
@@ -2161,6 +2167,9 @@ function mergeOrderEmailsAll(orders, opts = {}) {
       const e = shopFor.get(ref);
       if (e && e.keys.size === 1 && (o.totalPence == null || !e.totals.size || e.totals.has(o.totalPence))) return [...e.keys][0] + "|" + ref;
     }
+    // (A number of three figures or fewer, the one a restaurant's counter calls, "Order Number: 042", starts again each day:
+    // two orders a week apart with the same one are two purchases, so it only joins emails of the same day. Round 62.)
+    if (/^\d{1,3}$/.test(ref)) return joinStore(o) + "|" + ref + "|" + String(o.orderDate || o.sentAt || "").slice(0, 10);
     return joinStore(o) + "|" + ref;
   };
   // (A shop's invoice email that is only its PDF, no items and no total of its own (Nespresso, Tempur), sent within a few days
@@ -2784,6 +2793,12 @@ export function estimateReturnBy(o, today) {
 // A payment service's refund that names no order but says what was first paid, to whom and on which day ("You originally
 // paid UBER PAYMENTS UK LIMITED £4.99 GBP on 5 March 2026"): the one order of that shop for that money on that day, or
 // the next (a shop's email can be dated the day after). Never a guess between two. Round 12.
+// The name part of a web address, "shop" in "mail.shop.co.uk" (bareRefunds in attachReturnProgress).
+function bareBase(domain) {
+  const parts = String(domain || "").toLowerCase().replace(/[^a-z0-9.-]/g, "").split(".").filter(Boolean);
+  while (parts.length > 1 && /^(?:com|co|uk|net|org|io|eu|ie|biz|info|test|example)$/.test(parts[parts.length - 1])) parts.pop();
+  return (parts[parts.length - 1] || "").replace(/-/g, "");
+}
 function refundFits(u, o, orders, byTotal) {
   if (u.stage !== "refunded" || !Number.isInteger(u.paidPence) || !/^\d{4}-\d{2}-\d{2}$/.test(u.paidOn || "")) return false;
   const words = (x) => String(x || "").toLowerCase().replace(/\b(?:payments?|uk|ltd|limited|plc|inc|online|the|gb|europe|services?)\b|[^a-z0-9 ]+/g, " ").trim().split(/\s+/).filter(Boolean);
@@ -2827,6 +2842,18 @@ export function attachReturnProgress(orders, deliveries, updates) {
   const paidIx = indexBy(updates, (u) => (!u.orderRef ? [u.paidPence] : []));
   const byTotal = indexBy(orders, (o) => [o.totalPence]);
   const trackIx = indexBy(deliveries, (d) => [d.trackingNumber]);
+  // (A refund that names no order and no money, "Your refund has been processed" from a person at the company behind the
+  // shop: it goes with the one purchase from that company's address, or the one whose email named that company at its foot,
+  // in the six months before it. It says refunded, with no amount: Relay never makes one up. Round 62.)
+  const bare = updates.filter((u) => u.stage === "refunded" && !u.orderRef && !Number.isInteger(u.amountPence) && !Number.isInteger(u.paidPence) && u.retailer && u.retailer.domain && !isVia(u.retailer.domain) && !PERSONAL_MAIL.test(u.retailer.domain) && u.at);
+  const bareOrder = new Map();
+  for (const u of bare) {
+    const base = bareBase(u.retailer.domain);
+    if (base.length < 5) continue;
+    const fits = orders.filter((o) => o.kind !== "order_update" && o.orderDate && o.orderDate <= u.at && Date.parse(u.at) - Date.parse(o.orderDate) <= 183 * 864e5 &&
+      ((o.retailer && o.retailer.domain && bareBase(o.retailer.domain) === base) || (o.otherNames || []).some((n) => String(n).toLowerCase().replace(/[^a-z0-9]/g, "") === base)));
+    if (fits.length === 1) bareOrder.set(u, fits[0]);
+  }
   for (const o of orders) {
     const plan = o.returnPlan || null;
     const t = plan && plan.trackingNumber;
@@ -2838,7 +2865,8 @@ export function attachReturnProgress(orders, deliveries, updates) {
     }
     const mine = (ref ? among(refIx, [ref]).filter(u => u.orderRef && String(u.orderRef).toUpperCase() === ref && (!u.retailer || !u.retailer.domain || storeKey(u) === storeKey(o))) : [])
       .concat(among(paidIx, [o.totalPence]).filter(u => !u.orderRef && refundFits(u, o, orders, byTotal)))
-      .concat(o.authorised === true ? updates.filter(u => !u.orderRef && u.paidPence !== o.totalPence && refundFits(u, o, orders, null)) : []);
+      .concat(o.authorised === true ? updates.filter(u => !u.orderRef && u.paidPence !== o.totalPence && refundFits(u, o, orders, null)) : [])
+      .concat(bare.filter(u => bareOrder.get(u) === o));
     const received = mine.filter(u => u.stage === "received").sort((a, b) => (a.at || "").localeCompare(b.at || ""))[0] || null;
     const refunded = mine.filter(u => u.stage === "refunded").sort((a, b) => (b.at || "").localeCompare(a.at || ""))[0] || null;
     if (!parcel && !received && !refunded && !t) continue;
@@ -2858,14 +2886,18 @@ export function attachReturnProgress(orders, deliveries, updates) {
 // gives an amount that matches exactly one set of the order's item prices, those items are shown as returned.
 export function itemsForRefund(items, refundPence) {
   const priced = (items || []).map((it, i) => ({ i, p: it && Number.isInteger(it.pricePence) ? it.pricePence * (Number(it.qty) > 0 && !it.lineTotal ? Number(it.qty) : 1) : null }));
-  if (!Number.isInteger(refundPence) || refundPence <= 0 || priced.length < 2 || priced.length > 12 || priced.some(x => x.p == null)) return null;
+  if (!Number.isInteger(refundPence) || refundPence <= 0 || priced.length < 2 || priced.some(x => x.p == null)) return null;
+  // (A free gift at £0 adds nothing to any refund, so it never makes two sets fit: the paid items alone decide. Round 62.)
+  const paid = priced.filter(x => x.p > 0);
+  if (paid.length > 12) return null;
   let found = null;
-  for (let mask = 1; mask < (1 << priced.length); mask++) {
+  for (let mask = 1; mask < (1 << paid.length); mask++) {
     let sum = 0; const pick = [];
-    for (let k = 0; k < priced.length; k++) if (mask & (1 << k)) { sum += priced[k].p; pick.push(priced[k].i); }
+    for (let k = 0; k < paid.length; k++) if (mask & (1 << k)) { sum += paid[k].p; pick.push(paid[k].i); }
     if (sum === refundPence) { if (found) return null; found = pick; }   // two different sets fit: don't guess
   }
-  return found && found.length < priced.length ? found : null;           // the whole order isn't a per-item answer
+  // The whole order isn't a per-item answer; the paid items of an order with a free gift are (the gift cost nothing back).
+  return found && found.length < priced.length ? found : null;
 }
 export function attachItemReturns(orders, marks) {
   const byId = new Map();
@@ -2876,6 +2908,43 @@ export function attachItemReturns(orders, marks) {
     const rp = o.returnProgress, guess = rp && rp.refundPence != null ? itemsForRefund(o.items, rp.refundPence) : null;
     if (guess) { o.itemReturns = Object.fromEntries(guess.map(i => [i, "returning"])); o.itemReturnsFrom = "refund"; }
   }
+}
+
+// A payment made through PayPal to a company that sells on another's behalf, "Receipt for your payment to Appcharge ltd" or
+// "to Paddle.com Market Ltd", with no receipt from the seller to join it to: the shop is the game or app the money was for,
+// not the company that took it. Only when it is known: the payment's own item names it ("[CLIPWISE] 1x Clipwise"), or, for a
+// game web shop, every receipt it sent this shopper itself names the same one game. Otherwise the payment keeps its name.
+// Round 62.
+const RESELLER = /^(?:appcharge|xsolla|paddle|fastspring|digitalriver|2checkout|verifone|lemonsqueezy|cleverbridge|mycommerce)/;
+const GAME_RESELLER = /^(?:appcharge|xsolla)/;
+const squash = (x) => String(x || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+export function gamesByShop(cards) {
+  const out = new Map();
+  for (const c of cards || []) {
+    const r = (c && c.retailer) || {}, d = String(r.domain || "").toLowerCase();
+    const m = /(?:^|\.)(appcharge|xsolla)\.com$/.exec(d);
+    if (!m || !r.name || GAME_RESELLER.test(squash(r.name))) continue;
+    const name = String(r.name).trim();
+    if (!/\p{L}{2}/u.test(name) || name.length > 48 || /^(?:items?|receipt|purchase|order)$/i.test(name)) continue;
+    if (!out.has(m[1])) out.set(m[1], new Map());
+    out.get(m[1]).set(squash(name), name);
+  }
+  return out;
+}
+export function resellerSeller(c, gamesSold) {
+  const r = (c && c.retailer) || {};
+  const who = squash(r.name);
+  if (!r.name || !RESELLER.test(who) || !(r.via || !r.domain || isVia(r.domain))) return null;
+  for (const it of (c.items || []).slice(0, 6)) {
+    const m = /^\s*\[([A-Za-z0-9][A-Za-z0-9 &'’.-]{1,40})\]/.exec(String((it && it.name) || ""));
+    if (!m || RESELLER.test(squash(m[1]))) continue;
+    const said = String(it.name).slice(m[0].length).split(/\s+/).find((w) => w.length > 2 && squash(w) === squash(m[1]));
+    const name = said || (m[1] === m[1].toUpperCase() ? m[1].toLowerCase().replace(/(^|\s)(\p{L})/gu, (x, a, b) => a + b.toUpperCase()) : m[1]);
+    return name.trim();
+  }
+  const game = GAME_RESELLER.exec(who);
+  const sold = game && gamesSold && gamesSold.get(game[0]);
+  return sold && sold.size === 1 ? [...sold.values()][0] : null;
 }
 
 // An email Relay itself sent (from its own sending address), which the receipt reader can mistake for a purchase.
@@ -3045,6 +3114,8 @@ async function listReceipts(env, shopperId, timing, opts = {}) {
   const today = new Date().toISOString().slice(0, 10);
   // One name per shop across all receipts from the same address (see agreedShopNames).
   const agreed = agreedShopNames(cards);
+  // Games each game web shop (Appcharge, Xsolla) has sold this shopper, from its own receipts (resellerSeller).
+  const gamesSold = gamesByShop(cards);
   return cards.filter(c => {
     // A store the shopper said "this is just promotions" about only hides emails that carry no order number.
     const l = mine.get(storeKey(c)) || mine.get(legacyStoreKey(c));
@@ -3063,7 +3134,7 @@ async function listReceipts(env, shopperId, timing, opts = {}) {
     const r0 = c.retailer || {};
     const domain = r0.domain ? String(r0.domain).toLowerCase().replace(/[^a-z0-9.-]/g, "") : null;
     // A shop name the shopper typed in is theirs, and isn't tidied away.
-    const shown = (c.fixed && c.fixed.shop && r0.name) || agreedNameFor(agreed, r0, domain) || shopDisplayName({ ...r0, domain });
+    const shown = (c.fixed && c.fixed.shop && r0.name) || agreedNameFor(agreed, r0, domain) || resellerSeller(c, gamesSold) || shopDisplayName({ ...r0, domain });
     const via = r0.via || (isVia(domain) ? domain : null);
     const retailer = { ...r0, domain: isVia(domain) ? null : domain, name: shown || r0.name || null, ...(shown && r0.name && shown !== r0.name ? { legalName: r0.name } : {}), ...(via ? { via } : {}) };
     // Where the app gets the shop's logo from (null: no logo to look for, so the app draws one from what was bought).

@@ -321,6 +321,10 @@ function readLine(raw) {
   if (line.qty == null && line.names.length && line.prices.length && cells.length > 1) {
     const q = /^(\d{1,2})\s+(\p{Lu}.*)$/u.exec(line.names[0]);
     if (q && !/^(?:adults?|child(?:ren)?|items?|for|pack|people|nights?|days?|months?)\b/i.test(q[2])) { line.qty = Number(q[1]); line.names[0] = q[2]; line.head = true; }
+    // (How many before a name that starts with its own number, a meal deal's part "1 6 Chicken Nuggets" over its price:
+    // one of "6 Chicken Nuggets", never a name "1 6 …". Round 62.)
+    const q2 = !q && /^(\d{1,2}) (\d{1,3} \p{Lu}[^|£]{1,100})$/u.exec(line.names[0]);
+    if (q2 && Number(q2[1]) >= 1) { line.qty = Number(q2[1]); line.names[0] = q2[2]; }
   }
   // "Unavailable – refunded | £2.99": a note that this line wasn't charged, not the start of a list of missing items.
   if (line.skipStart && (line.prices.length || line.free) && cells.length > 1) { line.skipStart = false; line.notCharged = true; line.names = []; }

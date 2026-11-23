@@ -24,7 +24,7 @@ import { AUTHORISED, AGENT_FLIGHTS, HOTEL_TAKES_PAYMENT, AMAZON_GIFT_CARD, DISPA
 const raw = (m, id = "x", attach) => rawEmail({ ...fixture(id, "", "", m, {}), ...(attach ? { attach } : {}) });
 let n = 0;
 const read = (m, id, attach) => ({ ...classifyEmail(raw(m, id, attach), { gmailId: id }).details, id, createdAt: ++n });
-assert.equal(PARSER_VERSION, 61);
+assert.ok(PARSER_VERSION >= 61, "these came with reader version 61: " + PARSER_VERSION);
 
 // 1. PayPal's authorisation.
 {

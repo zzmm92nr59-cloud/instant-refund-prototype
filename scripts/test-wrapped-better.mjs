@@ -73,11 +73,12 @@ import { placeAt } from "../worker/uk-places.js";
     { id: "5", retailer: { name: "Sam Smith", domain: "gmail.com" }, items: [] },                           // forwarded: never sent
     { id: "6", retailer: { name: "Oddly Named Ltd", domain: "oddly.example" }, items: [{ name: "Wool Jumper", categorySure: true }] }, // items already say
   ];
-  assert.deepEqual(unclearShops(cards).map((s) => s.name), ["Cathkidston", "Xqzzyblorp"]);
+  // (A shop on Relay's list squashed into one word is asked about by its own spelling, "Cath Kidston". Round 62.)
+  assert.deepEqual(unclearShops(cards).map((s) => s.name), ["Cath Kidston", "Xqzzyblorp"]);
   let calls = [];
   const fetchImpl = async (url, init) => { calls.push({ url, body: JSON.parse(init.body), key: init.headers["x-api-key"] });
     const asked = JSON.parse(JSON.parse(init.body).messages[0].content);
-    return new Response(JSON.stringify({ content: [{ type: "text", text: JSON.stringify({ shops: asked.map((s) => ({ id: s.id, kind: s.name === "Cathkidston" ? "home" : "made-up-kind" })) }) }] }), { status: 200 }); };
+    return new Response(JSON.stringify({ content: [{ type: "text", text: JSON.stringify({ shops: asked.map((s) => ({ id: s.id, kind: s.name === "Cath Kidston" ? "home" : "made-up-kind" })) }) }] }), { status: 200 }); };
   // Without the key: nothing is asked, nothing pretended.
   assert.equal(await learnShopKinds({ RELAY_DB: db }, cards, { fetchImpl }), 0);
   assert.equal(calls.length, 0);

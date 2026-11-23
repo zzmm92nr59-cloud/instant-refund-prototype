@@ -3847,6 +3847,21 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   // numbers: the thing bought is not known, so the list is flagged, never passed off as right. Round 18.)
   if (!isFlight && result.items.length === 1 && /^(?:\d{1,2}\s?x?\s)?(?:adults?|child(?:ren)?|infants?|passengers?)$/i.test(String(result.items[0].name || "").trim()) && result.itemsCheck && hasFlightNumber(text) && /\b(?:flights?|airline|airport|boarding|departure|terminal|baggage|passenger)\b/i.test(text))
     result.itemsCheck = { ...result.itemsCheck, complete: false, namesOk: false, suspectNames: [{ name: String(result.items[0].name).slice(0, 120), why: "fare" }] };
+  // (A fee said only in a sentence under the total, a cinema's "This total includes a non-refundable booking fee of £3.80":
+  // its own line, when the items and that fee come to what was paid, as other shops' booking and service fees are. Round 62.)
+  if (Number.isInteger(result.totalPence) && result.items.length && (result.currency || "GBP") === "GBP") {
+    const said = /\b(?:total|price|amount)[ \t]+(?:also[ \t]+)?includes?[ \t]+an?[ \t]+(?:non-?refundable[ \t]+)?((?:online[ \t]+)?(?:booking|service|handling|transaction|processing|admin(?:istration)?)[ \t]+(?:fee|charge))[ \t]+of[ \t]+£[ \t]?(\d{1,4}(?:,\d{3})?\.\d{2})(?!\d)/i.exec(text.slice(0, 60000));
+    if (said) {
+      const pence = money(said[2]);
+      const lineP = (i) => (Number.isInteger(i.pricePence) ? (i.lineTotal ? i.pricePence : i.pricePence * (i.qty || 1)) : NaN);
+      const itemsP = result.items.reduce((a, i) => a + lineP(i), 0);
+      const feesP = (result.fees || []).reduce((n, f) => n + (f.pence || 0), 0), offP = (result.discounts || []).reduce((n, f) => n + (f.pence || 0), 0);
+      if (pence > 0 && !Number.isNaN(itemsP) && !(result.fees || []).some((f) => f.pence === pence) && Math.abs(itemsP + feesP + pence - offP - result.totalPence) <= 1) {
+        const label = said[1].replace(/[ \t]+/g, " ").toLowerCase();
+        result.fees = [...(result.fees || []), { label: label.charAt(0).toUpperCase() + label.slice(1), pence }];
+      }
+    }
+  }
   // (Prices before VAT with the VAT added under them, "Plus: 1-month subscription £10.99/month", "VAT 20% - £2.20", "Total:
   // £13.19/month": the VAT is part of what was paid, kept as its own line so the receipt adds up. Round 17.)
   if (result.itemsCheck && result.itemsCheck.complete === true && Number.isInteger(result.totalPence) && Number.isInteger(result.itemsCheck.itemsPence) && !(result.fees || []).some((f) => /\b(?:vat|tax)\b/i.test(String(f.label || "")))) {
@@ -3864,6 +3879,19 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   // (Names found cut short stay flagged when the email gives no total to check them against, Amazon's "Total £0.00" for
   // priced items. Round 21b.)
   if (result.cutShortNames) { if (result.itemsCheck && result.itemsCheck.namesCut && result.itemsCheck.complete == null) result.itemsCheck = { ...result.itemsCheck, complete: false, namesOk: false }; delete result.cutShortNames; }
+  // (The company behind the shop, named only by a picture's words at the foot of a booking, a venue operator's logo, "Acme
+  // Leisure Group": kept, a few short names, so a refund from that company's own address with no order number and no amount can find
+  // this booking (attachReturnProgress). Never shown. Round 62.)
+  if (html) {
+    const shopKey = String((result.retailer && result.retailer.name) || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+    const names = new Set();
+    for (const m of html.slice(0, 400000).matchAll(/<img\b[^>]{0,400}?\balt\s?=\s?["']([^"'<>]{3,40})["']/gi)) {
+      const n = m[1].replace(/\s+/g, " ").trim(), k = n.toLowerCase().replace(/[^a-z0-9]/g, "");
+      if (k.length >= 5 && /^\p{L}[\p{L}\p{N} &'’.-]+$/u.test(n) && /\b(?:group|leisure|events|venues|entertainment|hospitality|holdings)$/i.test(n) && k !== shopKey && !/\b(?:logo|icon|facebook|twitter|instagram|youtube|tiktok|linkedin|pinterest|app store|google play|apple|android|qr|divider|spacer|banner|image|arrow|button)\b/i.test(n)) names.add(n);
+      if (names.size >= 4) break;
+    }
+    if (names.size) result.otherNames = [...names];
+  }
   return result;
 }
 
