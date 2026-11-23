@@ -151,7 +151,7 @@ export function findCodes(rawEmail, details = {}) {
     const tight = before.slice(-320) + "\n" + c.named + "\n" + after.slice(0, 220);
     if (APP_DOWNLOAD.test(tight) || SECRET_NEAR.test(tight) || ACCESS_PASS.test(before.slice(-500) + "\n" + after.slice(0, 300) + "\n" + subject) || PROMO_NEAR.test(tight) || PRINTED_ELSEWHERE.test(tight)) continue;
     // The lines that talk about this code: the nearest ones that name it, else the few around the picture.
-    const bl = before.split("\n").map((l) => l.replace(/^[\s|]+|[\s|]+$/g, "").trim()).filter(Boolean), al = after.split("\n").map((l) => l.replace(/^[\s|]+|[\s|]+$/g, "").trim()).filter(Boolean);
+    const bl = before.split("\n").map((l) => l.replace(/^[\s|]+|(?<![\s|])[\s|]+$/g, "").trim()).filter(Boolean), al = after.split("\n").map((l) => l.replace(/^[\s|]+|(?<![\s|])[\s|]+$/g, "").trim()).filter(Boolean);
     const nearB = bl.slice(-6), nearA = al.slice(0, 3);
     let focus = null;
     for (let i = nearB.length - 1; i >= 0 && !focus; i--) if (CODE_WORD.test(nearB[i])) focus = nearB[i];
@@ -163,7 +163,7 @@ export function findCodes(rawEmail, details = {}) {
       const upTo = text.slice(0, at), lines = upTo.split("\n");
       for (let i = lines.length - 1; i >= 0 && !focus; i--) {
         if (/\u0001\d+\u0001/.test(lines[i]) && cands.some((o) => o.k !== c.k && lines[i].includes(MARK(o.k)))) break;
-        if (/\b(?:qr |bar ?)?codes? (?:below|underneath)\b/i.test(lines[i])) focus = clean(lines[i]).replace(/^[\s|]+|[\s|]+$/g, "");
+        if (/\b(?:qr |bar ?)?codes? (?:below|underneath)\b/i.test(lines[i])) focus = clean(lines[i]).replace(/^[\s|]+|(?<![\s|])[\s|]+$/g, "");
       }
     }
     const around = nearB.slice(-4).join("\n") + "\n" + c.named + "\n" + nearA.slice(0, 2).join("\n");

@@ -38,12 +38,15 @@ const stored = (raw, createdAt) => { const c = classifyEmail(raw); assert.ok(c.d
   assert.ok(!b.progressEmail, "the receipt is the order's own email");
   const [card, ...more] = mergeOrderEmails([a, b]);
   assert.equal(more.length, 0, "one card");
-  assert.equal(card.orderDate, "2026-10-04", "dated by the receipt, never by the progress email");
+  // (Round 24: the order was placed by the evening its "We're working on your order" email was sent, so that is its day; the
+  // receipt still leads. It used to be the receipt's day, the morning after.)
+  assert.equal(card.orderDate, "2026-10-03", "dated by the first email about the order");
   assert.deepEqual(card.items.map((i) => [i.name, i.pricePence]), [["Sonic 40\" Smart TV", 24900]]);
   assert.equal(card.emailIds.length, 2);
   // (Whichever was stored first.)
-  assert.equal(mergeOrderEmails([{ ...b, createdAt: 2000 }, { ...a, createdAt: 1000 }])[0].orderDate, "2026-10-04");
-  console.log("ok - a progress email joined to its order never leads it or gives its day");
+  assert.equal(mergeOrderEmails([{ ...b, createdAt: 2000 }, { ...a, createdAt: 1000 }])[0].orderDate, "2026-10-03");
+  assert.equal(mergeOrderEmails([{ ...b, createdAt: 2000 }, { ...a, createdAt: 1000 }])[0].id, b.id, "the receipt leads");
+  console.log("ok - a progress email joined to its order never leads it; the order is dated by its first email");
 }
 // 2. An airline's booking confirmation sent again the day before the flight, giving the payment's day and one merged line.
 {

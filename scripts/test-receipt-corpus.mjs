@@ -396,12 +396,12 @@ const joinWrong = [];
   attachCancellations(sub, [det("holdout14a-google-play-sub-ending")]);
   if (!sub[0].subscriptionEnds || sub[0].subscriptionEnds.on !== "2019-08-13" || sub[0].subscriptionEnds.refund !== false || sub[0].cancelled) joinWrong.push("a subscription ending read on its payment as " + JSON.stringify([sub[0].subscriptionEnds, sub[0].cancelled]));
   const paid = mergeOrderEmails([det("holdout14a-game-shop-usd"), det("holdout14a-paypal-to-game-shop"), det("holdout14a-game-shop-mxn")]);
-  if (paid.length !== 2 || !paid.some((c) => c.orderRef === "6b0c1d2e3f405162738495a6" && c.totalPence === 647 && c.currency === "USD")) joinWrong.push("PayPal's receipt for a game shop purchase made " + JSON.stringify(paid.map((c) => [c.retailer && c.retailer.name, c.orderRef, c.totalPence])));
+  if (paid.length !== 2 || !paid.some((c) => c.orderRef === "612-904-337" && c.totalPence === 647 && c.currency === "USD")) joinWrong.push("PayPal's receipt for a game shop purchase made " + JSON.stringify(paid.map((c) => [c.retailer && c.retailer.name, c.orderRef, c.totalPence])));
 }
 {
   // Round 15d (made-up copies of Connor's real layouts): the same game-shop offer bought twice four minutes apart, each with
   // PayPal's receipt seconds after the shop's: two cards, each the shop's receipt with its own PayPal receipt, never four,
-  // and the shop's own name and Order ID on each.
+  // and the shop's own name and receipt number on each (its Order ID until round 24).
   const { gameReceipt, payPalToAppcharge } = await import("./fixtures/receipt-emails/holdout16d.mjs");
   const fx = (id) => JSON.parse(readFileSync(join(dir, id + ".json"), "utf8"));
   const read = (m, id) => ({ ...classifyEmail(rawEmail(fixture16(id, m))).details, id, createdAt: 0 });
@@ -412,7 +412,7 @@ const joinWrong = [];
   const p2 = read(payPalToAppcharge("Special Offer", "£2.66", "£0.53", "£3.19", "Thu, 30 Apr 2026 02:24:58 +0000", "2BB22222BB2222222"), "p2");
   const cards = mergeOrderEmails([g1, p1, g2, p2]);
   const ids = cards.map((c) => (c.emailIds || [c.id]).slice().sort().join("+")).sort();
-  if (ids.join(" ") !== "g1+p1 g2+p2" || !cards.every((c) => /^6aaa0+\d$/.test(c.orderRef) && c.totalPence === 319 && c.retailer && !c.retailer.via))
+  if (ids.join(" ") !== "g1+p1 g2+p2" || !cards.every((c) => /^100-200-30\d$/.test(c.orderRef) && c.totalPence === 319 && c.retailer && !c.retailer.via))
     joinWrong.push("two same-money game purchases minutes apart, each with PayPal's receipt, made " + JSON.stringify(cards.map((c) => [c.emailIds, c.orderRef, c.retailer && c.retailer.name])));
   // PayPal's receipt numbering the purchase its own way ("Order ID hbf-1201"), the shop's name cut short ("Hopfield Beer
   // Fe..."), eight seconds after the festival's ticket email (its own number, no total): one card, the festival's, with the

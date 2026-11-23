@@ -1,7 +1,7 @@
 {
  "id": "holdout16d-game-pack-lines",
  "sender": "Appcharge",
- "layout": "'Items', then 'Lantern Cat | 1', 'Arcade Tokens | x 20', 'Coins | 1,000' on rows of their own; one price for the pack; 'Order ID' under the receipt number",
+ "layout": "'Items', then 'Lantern Cat | 1', 'Arcade Tokens | x 20', 'Coins | 1,000' on rows of their own; one price for the pack; 'Order ID' under the receipt number (the receipt number is the reference)",
  "headers": {
   "from": "no-reply <no-reply@appcharge.com>",
   "to": "sam.taylor@example.co.uk",
@@ -15,7 +15,7 @@
   "date": "2026-04-25",
   "currency": "GBP",
   "totalPence": 479,
-  "orderRef": "6a9f01c2b3d4e5f60718293a",
+  "orderRef": "308-512-774",
   "items": [
    {
     "name": "Lantern Cat",

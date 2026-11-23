@@ -16,7 +16,7 @@
 import { decodePhoto, RECEIPT_PHOTOS_SQL } from "./photos.js";
 import { receiptsToAdd } from "./bank.js";
 import { recordReceiptShops } from "./shop-directory.js";
-import { mailText, parseReceiptEmail, parseReturnEmail, parseReturnUpdateEmail, parseReturnParcelEmail, parseDeliveryEmail, parseDispatchEmail, parseCancellationEmail, parseOrderAdjustmentEmail, parseOrderAcceptedEmail, trackingLink, extractProductImageUrls, photoShowsItem } from "./receipt-parser.js";
+import { mailText, emailForReading, parseReceiptEmail, parseReturnEmail, parseReturnUpdateEmail, parseReturnParcelEmail, parseDeliveryEmail, parseDispatchEmail, parseCancellationEmail, parseOrderAdjustmentEmail, parseOrderAcceptedEmail, trackingLink, extractProductImageUrls, photoShowsItem } from "./receipt-parser.js";
 import { ensureOnce, runAll } from "./once.js";
 import { buildWrapped } from "./wrapped.js";
 import { readShopKinds, learnShopKinds } from "./shop-kind-ai.js";
@@ -185,7 +185,11 @@ async function gmailGet(fetchImpl, url, headers) {
 // 42: codes to show or scan (scan-codes.js): a return barcode in a shipping email, a receipt's own barcode, a drop-off QR code,
 // a collection QR code and tickets' barcodes are kept with the order's receipt; an email that is only such a code for an order
 // it names is kept for it (kind "order_codes").
-export const PARSER_VERSION = 60;
+// 61 (round 24): PayPal's "You authorised a payment of …" as the purchase when the shop sends nothing; a travel site's flight
+// booking with the airlines' own emails joined to it; "Your payment will be handled by <hotel>" paid at the hotel; Amazon
+// gift-card orders with the card's part; a dispatch email with the whole order as the purchase when no other email is there;
+// the shopper's own forwards joined; Appcharge's receipt number; Shopify's "Invoice #N" for an edited order.
+export const PARSER_VERSION = 61;
 // Which full read of every mailbox is due: version 33 of the reader was full read 14, and each reader version since is one
 // more, so a better reader always reaches old receipts too, without anyone having to remember to raise this.
 export const READER_FULL_REV = 14 + Math.max(0, PARSER_VERSION - 33);
@@ -1135,8 +1139,14 @@ function classify(rawText, ref, lenient = false) {
       // (When the email was sent, to the minute, so a payment service's receipt can find the shop's receipt for the same
       // purchase, and what a gift card paid of an Amazon order. Round 13.)
       ...(receipt.sentAt ? { sentAt: receipt.sentAt } : {}), ...(receipt.giftCardPence ? { giftCardPence: receipt.giftCardPence } : {}),
+      // (What the rest was paid with, the email's "Visa (£40.75)", beside the gift card's part. Round 24.)
+      ...(receipt.giftCardPence && receipt.cardPaid ? { cardPaid: receipt.cardPaid } : {}),
       // (The reference is a payment service's own transaction ID, not the shop's order number. Round 21.)
       ...(receipt.refIsPayment ? { refIsPayment: true } : {}),
+      // (PayPal's "You authorised a payment of …", read as the purchase: the final amount can be less. Round 24.)
+      ...(receipt.authorised ? { authorised: true } : {}),
+      // (The shopper's own forward of a shop's email: it joins the shop's own email of the purchase. Round 24.)
+      ...(receipt.forwardedCopy ? { forwardedCopy: true } : {}),
       // (A stay booked to be paid at the property: nothing was taken up front, the card only guaranteed it. Round 15.)
       ...(receipt.payAtProperty ? { payAtProperty: true } : {}),
       // (An email about the order's progress, not the order: it never leads the order's card. Round 19.)
@@ -1154,11 +1164,16 @@ function classify(rawText, ref, lenient = false) {
     // Not a purchase. Two kinds of the shop's own news about an order are still kept, so they can join the order they name
     // (round 6): a cancellation (all or part of the order), and a dispatch email with no items (its parcel's tracking number
     // lets the carrier's later emails find the order). Checked only now, so an email that is a receipt stays one.
-    const adj = parseOrderAdjustmentEmail(rawText);
-    const can = adj.ok ? { ok: false } : parseCancellationEmail(rawText);
+    const edit = orderEdited(rawText);
+    const adj = edit ? { ok: false } : parseOrderAdjustmentEmail(rawText);
+    const can = edit || adj.ok ? { ok: false } : parseCancellationEmail(rawText);
     const dis = adj.ok || can.ok ? { ok: false } : parseDispatchEmail(rawText);
     const acc = adj.ok || can.ok || dis.ok ? { ok: false } : parseOrderAcceptedEmail(rawText);
-    if (acc.ok) {
+    if (edit) {
+      // (A shop's invoice for an order it edited, Shopify's "Invoice #2004": the order as it now is, joined to it by
+      // attachEdits. Never a purchase of its own. Round 24.)
+      details = { kind: "order_update", ...ref, stage: "edited", ...edit, source: "shopper_email", refundEligible: false, parserVersion: PARSER_VERSION };
+    } else if (acc.ok) {
       // (A takeaway app's "Your order #… was accepted" naming the restaurant: joined to the app's payment receipt for it by
       // attachAccepted. Never a purchase of its own. Round 22.)
       details = { kind: "order_update", ...ref, stage: "accepted", at: acc.at, orderRef: acc.orderRef, merchant: acc.merchant, sentAt: acc.sentAt,
@@ -1180,7 +1195,12 @@ function classify(rawText, ref, lenient = false) {
       let stated = null;
       try { const r = parseReceiptEmail(rawText, { lenient: true }); if (r.ok && Number.isInteger(r.totalPence) && r.totalPence > 0 && (r.items || []).length && r.orderRef && sameOrderRef(r.orderRef, dis.orderRef)) stated = r; } catch { stated = null; }
       details = { kind: "delivery_update", ...ref, status: dis.status, at: dis.at, carrier: dis.carrier, trackingNumber: dis.trackingNumber,
-        merchant: null, retailer: dis.retailer, orderRef: dis.orderRef, ...(stated ? { orderTotalPence: stated.totalPence, currency: stated.currency || "GBP" } : {}), source: "shopper_email", refundEligible: false, parserVersion: PARSER_VERSION };
+        merchant: null, retailer: dis.retailer, orderRef: dis.orderRef, ...(stated ? { orderTotalPence: stated.totalPence, currency: stated.currency || "GBP" } : {}),
+        // (The whole order as the dispatch email sets it out, its things adding up to its "Order Total": the purchase, when no
+        // email of the order's own is there (listReceipts). Round 24.)
+        ...(stated && stated.itemsCheck && stated.itemsCheck.complete === true ? { orderCopy: { retailer: stated.retailer || dis.retailer, orderDate: stated.orderDate || dis.at || null, orderDateFrom: stated.orderDateFrom || null,
+          totalPence: stated.totalPence, currency: stated.currency || "GBP", items: stated.items, itemsCheck: stated.itemsCheck, ...(stated.fees ? { fees: stated.fees } : {}), ...(stated.discounts ? { discounts: stated.discounts } : {}), ...(stated.returns ? { returns: stated.returns } : {}) } } : {}),
+        source: "shopper_email", refundEligible: false, parserVersion: PARSER_VERSION };
     } else {
       // Remember that this email is not one of ours so it is never fetched again.
       details = { kind: "not_receipt", parserVersion: PARSER_VERSION };
@@ -1963,11 +1983,93 @@ function paymentFit(shop, pay) {
   if (one && pay.items[0].pricePence * count + extra === pay.totalPence) return items.map((i) => ({ ...i, pricePence: pay.items[0].pricePence }));
   return null;
 }
+// A shop's invoice for an order it edited after it was paid, Shopify's "Invoice #2004": "Removed 1 of 1", "Added 1",
+// "Updated total £120.00", "Already paid £100.00", "Amount to pay £20.00": the order's things and total as they now are, and
+// what is still to pay. Only when its things come to its updated total. Round 24.
+const MONEY_AFTER = (label, t) => { const m = new RegExp("(?:^|\\n)[ \\t|]*" + label + "[ \\t|:]*(?:\\n[ \\t|]*){0,4}£[ \\t]?(\\d{1,3}(?:,\\d{3})*|\\d{1,7})\\.(\\d{2})\\b", "i").exec(t); return m ? Number(m[1].replace(/,/g, "")) * 100 + Number(m[2]) : null; };
+export function orderEdited(rawText) {
+  let e; try { e = emailForReading(rawText); } catch { return null; }
+  const sub = /^\s*(?:(?:fwd?|fw)\s*:\s*)*invoice #?(\d{3,12})\s*$/i.exec(String(e.subject || ""));
+  if (!sub) return null;
+  const t = String(e.fromHtml || e.plain || "").slice(0, 30000);
+  const now = MONEY_AFTER("updated total", t), before = MONEY_AFTER("already paid", t), due = MONEY_AFTER("amount to pay", t);
+  if (now == null || before == null) return null;
+  let r; try { r = parseReceiptEmail(rawText, { lenient: true }); } catch { return null; }
+  if (!r || !r.ok || !sameOrderRef(r.orderRef, sub[1]) || r.totalPence !== now || !(r.items || []).length || !(r.itemsCheck && r.itemsCheck.complete === true)) return null;
+  const d = e.date ? new Date(e.date) : null, ok = d && !Number.isNaN(d.getTime());
+  return { at: ok ? d.toISOString().slice(0, 10) : null, sentAt: ok ? d.toISOString() : null, orderRef: sub[1], retailer: r.retailer, currency: r.currency || "GBP",
+    items: r.items, itemsCheck: r.itemsCheck, newTotalPence: now, previousTotalPence: before, ...(due != null ? { amountDuePence: due } : {}) };
+}
+// Each edited order's latest invoice changes it: the one order of that shop with that number, whose total was what had been
+// paid (or that an earlier invoice already changed). Round 24.
+export function attachEdits(orders, edits) {
+  for (const u of edits.slice().sort((a, b) => String(a.sentAt || "").localeCompare(String(b.sentAt || "")))) {
+    if (!u.orderRef || !Number.isInteger(u.newTotalPence)) continue;
+    let k; try { k = joinStore(u); } catch { continue; }
+    const fits = orders.filter((o) => o.kind !== "order_update" && o.orderRef && sameOrderRef(o.orderRef, u.orderRef) && (() => { try { return joinStore(o) === k; } catch { return false; } })() &&
+      (o.currency || "GBP") === (u.currency || "GBP") && (o.totalPence == null || o.totalPence === u.previousTotalPence || (o.amended && o.amended.byInvoice)));
+    if (fits.length !== 1) continue;
+    const o = fits[0];
+    o.items = u.items.map((i) => ({ ...i })); o.itemsCheck = u.itemsCheck; o.totalPence = u.newTotalPence;
+    o.amended = { at: u.sentAt || u.at || null, changes: ((o.amended && o.amended.changes) || 0) + 1, byInvoice: true, ...(Number.isInteger(u.amountDuePence) ? { amountDuePence: u.amountDuePence } : {}) };
+  }
+}
+// A dispatch email that sets out the whole order and its total ("It's on its way", the things, "Order Total : £12.40"), for
+// an order none of whose own emails is there: that order, from the dispatch email, once (the first such email of the order),
+// so it is never missing. Never when an email of the order's own, by its number and shop, is there. Round 24.
+export function ordersFromDispatch(deliveries, bought) {
+  const out = [], seen = new Set();
+  const have = indexBy(bought, (o) => (o.orderRef ? [refCore(o.orderRef)] : []));
+  for (const d of deliveries.slice().sort((a, b) => String(a.at || "").localeCompare(String(b.at || "")) || (a.createdAt || 0) - (b.createdAt || 0))) {
+    const c = d.orderCopy;
+    if (!c || !d.orderRef || !Number.isInteger(c.totalPence) || !(c.items || []).length) continue;
+    let k; try { k = joinStore({ retailer: c.retailer || d.retailer }) + "|" + refCore(d.orderRef); } catch { continue; }
+    if (seen.has(k)) continue;
+    seen.add(k);
+    if (among(have, [refCore(d.orderRef)]).some((o) => sameOrderRef(o.orderRef, d.orderRef) && joinStore(o) === joinStore({ retailer: c.retailer || d.retailer }))) continue;
+    out.push({ id: d.id, status: "pending", createdAt: d.createdAt, ...(d.gmailId ? { gmailId: d.gmailId } : {}), ...(d.outlookId ? { outlookId: d.outlookId } : {}), kind: "receipt",
+      ...c, orderRef: d.orderRef, fromDispatch: true, source: d.source, parserVersion: d.parserVersion });
+  }
+  return out;
+}
+// A travel site's flight booking, Booking.com's "Lisbon flight confirmation" (£189.40, a customer reference), makes the
+// airlines send their own confirmations of the same flights (one airline's "Travel Itinerary" in euros, another's "booking
+// confirmation"): the money the travel site took is the purchase, and each airline's email is part of it, never
+// more money spent in another currency. An airline's booking joins the travel site's when every one of its flights is one of
+// the travel site's (the same airports and day), it was booked within three days of it, and exactly one travel-site booking
+// fits. The card keeps who flies it and their references. Round 24.
+const FLIGHT_AGENT = /(^|\.)(?:booking\.com|expedia\.(?:com|co\.uk)|expediamail\.com|lastminute\.com|trip\.com|kiwi\.com|opodo\.co\.uk|edreams\.co\.uk|skyscanner\.(?:net|com)|mytrip\.com|gotogate\.co\.uk)$/i;
+function foldAirlineLegs(cards, opts) {
+  const agent = (c) => FLIGHT_AGENT.test(String((c.retailer && c.retailer.domain) || "")) && Array.isArray(c.flights) && c.flights.length && Number.isInteger(c.totalPence);
+  const agents = cards.filter(agent);
+  if (!agents.length) return cards;
+  const legKey = (g) => g && g.from && g.to && g.date ? g.from + ">" + g.to + "@" + g.date : null;
+  const gone = new Set();
+  for (const b of cards) {
+    if (agent(b) || !Array.isArray(b.flights) || !b.flights.length || !b.orderDate || isForwarded(b) || FLIGHT_AGENT.test(String((b.retailer && b.retailer.domain) || ""))) continue;
+    if (opts.keyFor && opts.keyFor(b) !== undefined) continue;
+    const keys = b.flights.map(legKey);
+    if (keys.some((k) => !k)) continue;
+    const fits = agents.filter((a) => a.orderDate && Math.abs(Date.parse(a.orderDate) - Date.parse(b.orderDate)) <= 3 * 864e5 && keys.every((k) => a.flights.some((g) => legKey(g) === k)));
+    if (fits.length !== 1) continue;
+    const a = fits[0];
+    gone.add(b);
+    (a.flownBy || (a.flownBy = [])).push({ name: (b.retailer && b.retailer.name) || null, orderRef: b.orderRef || null });
+    const ids = [...(a.emailIds || [a.id]), ...(b.emailIds || [b.id])].filter(Boolean);
+    const own = Object.getOwnPropertyDescriptor(a, "emailIds");
+    if (own && !own.configurable) { for (const id of ids) if (!a.emailIds.includes(id)) a.emailIds.push(id); }
+    else Object.defineProperty(a, "emailIds", { value: [...new Set(ids)], enumerable: false, configurable: true });
+  }
+  return gone.size ? cards.filter((c) => !gone.has(c)) : cards;
+}
 export function mergeOrderEmails(orders, opts = {}) {
+  return foldAirlineLegs(mergeOrderEmailsAll(orders, opts), opts);
+}
+function mergeOrderEmailsAll(orders, opts = {}) {
   // (One email confirming two orders: a card for each, the second named by its own number, total and items. Its id says
   // which email it came from. Round 12.)
   orders = orders.flatMap((o) => !Array.isArray(o.moreOrders) || !o.moreOrders.length ? [o] : [{ ...o, moreOrders: undefined },
-    ...o.moreOrders.map((m, k) => ({ ...o, moreOrders: undefined, id: o.id + "-" + (k + 2), fromEmail: o.id, orderRef: m.orderRef, totalPence: m.totalPence, currency: m.currency || o.currency, items: m.items, itemsCheck: m.itemsCheck, itemCount: undefined, giftCardPence: m.giftCardPence || undefined }))]);
+    ...o.moreOrders.map((m, k) => ({ ...o, moreOrders: undefined, id: o.id + "-" + (k + 2), fromEmail: o.id, orderRef: m.orderRef, totalPence: m.totalPence, currency: m.currency || o.currency, items: m.items, itemsCheck: m.itemsCheck, itemCount: undefined, giftCardPence: m.giftCardPence || undefined, cardPaid: (m.giftCardPence && m.cardPaid) || undefined }))]);
   const out = [], groups = new Map();
   const shopFor = new Map(); // order number -> the shop it belongs to, when exactly one shop used it
   for (const o of orders) {
@@ -2113,8 +2215,20 @@ export function mergeOrderEmails(orders, opts = {}) {
     const ids = [...(u.emailIds || [u.id]), o.id].filter(Boolean);
     Object.defineProperty(u, "emailIds", { value: ids, enumerable: false, configurable: true });
   }
+  // (The shopper's own forward of a shop's email, "Fwd: Receipt for your payment to …", read as the shop's: it joins the one
+  // email of the same shop sent before it with the same day, number and money (or none of either), never a second card.
+  // Round 24.)
+  const copyOf = new Map();
+  for (const f of orders) {
+    if (!f.forwardedCopy || isForwarded(f) || !f.orderDate) continue;
+    const fits = sameShopAs(f).filter((o) => o !== f && !o.forwardedCopy && o.kind !== "order_update" && joinStore(o) === joinStore(f) && o.orderDate === f.orderDate &&
+      (o.totalPence ?? null) === (f.totalPence ?? null) && (o.currency || null) === (f.currency || null) && (!o.orderRef || !f.orderRef ? !o.orderRef === !f.orderRef : sameOrderRef(o.orderRef, f.orderRef)) &&
+      (!o.sentAt || !f.sentAt || o.sentAt <= f.sentAt));
+    if (fits.length === 1) copyOf.set(f, fits[0]);
+  }
   for (const o of orders) {
     const forced = opts.keyFor ? opts.keyFor(o) : undefined;
+    if (copyOf.has(o) && forced === undefined) continue;
     if (replacedBy.has(o) && forced === undefined) continue;
     if (folded.has(o) && forced === undefined) {
       const p = folded.get(o);
@@ -2131,7 +2245,7 @@ export function mergeOrderEmails(orders, opts = {}) {
   const score = (o) => (isForwarded(o) ? 0 : 32) + (o.itemsCheck && o.itemsCheck.complete === true ? 16 : 0) + (o.status === "confirmed" ? 8 : 0) + (o.totalPence != null ? 4 : 0) + (o.items || []).filter(i => i.pricePence != null).length * 2 + (o.hasImage ? 1 : 0) +
     // (The shop's own email leads over a payment service's receipt for the same order: its names are whole. Round 11.)
     (o.retailer && o.retailer.via ? 0 : 3);
-  return out.map(g => {
+  const cards = out.map(g => {
     if (!Array.isArray(g)) return g;
     if (g.length === 1) return g[0];
     // (A changed order's email, "We got your changes", never leads: the order's own confirmation keeps its day and number.)
@@ -2155,7 +2269,10 @@ export function mergeOrderEmails(orders, opts = {}) {
     // order to its own later day. A day another email states is used only when none was dated by its sending. Round 17.)
     if (c.orderDateFrom === "email" || !c.orderDate) {
       // (Not a progress email's or a later copy's day: only the order's own emails say when it was placed. Round 19.)
-      const ok = (o) => o.orderDate && /^\d{4}-\d{2}-\d{2}/.test(String(o.orderDate)) && !isForwarded(o) && o.kind !== "return_update" && o.kind !== "refund" && (!later.has(o) || later.size === g.length);
+      const ok = (o) => o.orderDate && /^\d{4}-\d{2}-\d{2}/.test(String(o.orderDate)) && !isForwarded(o) && o.kind !== "return_update" && o.kind !== "refund" && (!later.has(o) || later.size === g.length ||
+        // (Though an email about the order's progress sent before its receipt, an electricals shop's "We're working on your tech order" the
+        // evening before "Here's your receipt", says the order was placed by the day it was sent. Round 24.)
+        (o.progressEmail === true && o.orderDateFrom === "email"));
       const stated = g.filter((o) => ok(o) && o.orderDateFrom !== "email").map((o) => String(o.orderDate)).sort();
       const sent = g.filter((o) => ok(o) && o.orderDateFrom === "email").map((o) => String(o.orderDate)).sort();
       const day = sent[0] || stated[0];
@@ -2267,6 +2384,18 @@ export function mergeOrderEmails(orders, opts = {}) {
     Object.defineProperty(c, "emailIds", { value: [...new Set(g.flatMap(o => o.emailIds || [o.id]))], enumerable: false });
     return c;
   });
+  if (copyOf.size) {
+    const cardOf = new Map();
+    for (const c of cards) for (const id of c.emailIds || [c.id]) cardOf.set(id, c);
+    for (const [f, o] of copyOf) {
+      const c = cardOf.get(o.id);
+      if (!c) continue;
+      const own = Object.getOwnPropertyDescriptor(c, "emailIds");
+      if (own && !own.configurable) { if (!c.emailIds.includes(f.id)) c.emailIds.push(f.id); }
+      else Object.defineProperty(c, "emailIds", { value: [...new Set([...(c.emailIds || [c.id]), ...(f.emailIds || [f.id])])], enumerable: false, configurable: true });
+    }
+  }
+  return cards;
 }
 
 // A shopper's corrections, checked: a shop name, a total in pence (up to £1m), a date that has happened (by `latest`), and
@@ -2659,7 +2788,9 @@ function refundFits(u, o, orders, byTotal) {
   if (u.stage !== "refunded" || !Number.isInteger(u.paidPence) || !/^\d{4}-\d{2}-\d{2}$/.test(u.paidOn || "")) return false;
   const words = (x) => String(x || "").toLowerCase().replace(/\b(?:payments?|uk|ltd|limited|plc|inc|online|the|gb|europe|services?)\b|[^a-z0-9 ]+/g, " ").trim().split(/\s+/).filter(Boolean);
   const fit = (x) => {
-    if (x.kind === "order_update" || x.totalPence !== u.paidPence || !x.orderDate) return false;
+    // (PayPal's authorisation read as the purchase, "You authorised a payment of £64.20": the payment finally taken can be
+    // less, "You originally paid … £62.00", never more. Round 24.)
+    if (x.kind === "order_update" || !x.orderDate || !(x.totalPence === u.paidPence || (x.authorised === true && Number.isInteger(x.totalPence) && u.paidPence > 0 && u.paidPence < x.totalPence))) return false;
     const days = (Date.parse(x.orderDate) - Date.parse(u.paidOn)) / 864e5;
     if (days < -1 || days > 1) return false;
     const a = words(u.retailer && u.retailer.name), b = words(x.retailer && x.retailer.name);
@@ -2706,7 +2837,8 @@ export function attachReturnProgress(orders, deliveries, updates) {
       if (!parcel || (STAGE[d.status] || 0) > (STAGE[parcel.status] || 0)) parcel = { status: d.status, at: d.at || null, carrier: d.carrier || (plan && plan.carrier) || null };
     }
     const mine = (ref ? among(refIx, [ref]).filter(u => u.orderRef && String(u.orderRef).toUpperCase() === ref && (!u.retailer || !u.retailer.domain || storeKey(u) === storeKey(o))) : [])
-      .concat(among(paidIx, [o.totalPence]).filter(u => !u.orderRef && refundFits(u, o, orders, byTotal)));
+      .concat(among(paidIx, [o.totalPence]).filter(u => !u.orderRef && refundFits(u, o, orders, byTotal)))
+      .concat(o.authorised === true ? updates.filter(u => !u.orderRef && u.paidPence !== o.totalPence && refundFits(u, o, orders, null)) : []);
     const received = mine.filter(u => u.stage === "received").sort((a, b) => (a.at || "").localeCompare(b.at || ""))[0] || null;
     const refunded = mine.filter(u => u.stage === "refunded").sort((a, b) => (b.at || "").localeCompare(a.at || ""))[0] || null;
     if (!parcel && !received && !refunded && !t) continue;
@@ -2827,6 +2959,7 @@ async function listReceipts(env, shopperId, timing, opts = {}) {
   const updates = all.filter(x => x.kind === "return_update");
   const cancels = all.filter(x => x.kind === "order_update");
   const bought = all.filter(x => x.kind !== "return_instructions" && x.kind !== "delivery_update" && x.kind !== "return_update" && x.kind !== "order_update" && x.kind !== "order_codes");
+  bought.push(...ordersFromDispatch(deliveries, bought));
   let orders = mergeOrderEmails(bought);
   // The shopper's own "same order" / "different orders" (order-joins.js), applied after the reader's joining every time, so
   // reading every email again never loses or undoes them.
@@ -2870,7 +3003,8 @@ async function listReceipts(env, shopperId, timing, opts = {}) {
   attachDeliveries(orders, deliveries);
   // Each code goes on the receipt of its order (its own email's, or the one order with that number from that shop).
   attachCodes(orders, all, codeRows, sameOrderRef);
-  attachCancellations(orders, cancels.filter(u => u.stage !== "adjusted" && u.stage !== "accepted"));
+  attachCancellations(orders, cancels.filter(u => u.stage !== "adjusted" && u.stage !== "accepted" && u.stage !== "edited"));
+  attachEdits(orders, cancels.filter(u => u.stage === "edited"));
   attachAdjustments(orders, cancels.filter(u => u.stage === "adjusted"));
   attachAccepted(orders, cancels.filter(u => u.stage === "accepted"));
   // What the carrier itself said, where the shopper opened a parcel Relay could track live (parcel-tracking.js).

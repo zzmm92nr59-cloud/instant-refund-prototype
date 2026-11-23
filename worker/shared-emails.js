@@ -65,7 +65,7 @@ const addressGoesOn = (line) => {
 // line (item names, prices, dates) stays. A postcode-like code with no address round it ("Size M1 2XL") is hidden on its own.
 const STREET = /^(?:flat|apartment|apt|unit|suite|floor)\b|^\d+[a-z]?\b|\b(?:street|st|road|rd|avenue|ave|lane|ln|close|drive|dr|way|court|ct|place|pl|crescent|grove|gardens|terrace|square|sq|hill|park|mews|row|walk|green|rise|view|parade|house|cottage|farm|lodge|estate|centre|center|building|wharf|quay|yard|boulevard)\b/i;
 const NAME_OR_TOWN = /^\p{Lu}[\p{L}'’.-]*(?:\s+\p{Lu}[\p{L}'’.-]*){0,2},?$/u;
-const strip = (l) => l.replace(/^[\s|]+|[\s|]+$/g, "");
+const strip = (l) => l.replace(/^[\s|]+|(?<![\s|])[\s|]+$/g, "");
 const BUILDING_WORDS = ["street", "road", "avenue", "lane", "close", "drive", "way", "court", "place", "crescent", "grove", "gardens", "terrace", "square",
   "hill", "mews", "row", "walk", "rise", "parade", "tower", "house", "mansions", "building", "wharf", "quay", "yard", "boulevard"];
 // (Name words start with a capital, so no "any case" flag: with it, a capital would match any letter.)
