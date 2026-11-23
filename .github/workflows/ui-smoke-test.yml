@@ -20,6 +20,7 @@ on:
       - scripts/test-app-speed-ui.mjs
       - scripts/test-receipts-kept-ui.mjs
       - scripts/test-layout-ui.mjs
+      - scripts/test-help-chat-ui.mjs
       - scripts/test-tips-ui.mjs
       - scripts/sample-pictures.mjs
       - scripts/test-swap-ui.mjs
@@ -159,6 +160,8 @@ jobs:
         run: node --import ./scripts/record-app-requests.mjs scripts/test-receipt-titles-ui.mjs
       - name: Test the help chat (an AI that says so, answers, once per tap, plain errors, a person by email)
         run: node --import ./scripts/record-app-requests.mjs scripts/test-support-chat-ui.mjs
+      - name: Test the help chat's look (a tall sheet, bubbles left and right, topics as pills with Back, above the keyboard, bigger text)
+        run: node --import ./scripts/record-app-requests.mjs scripts/test-help-chat-ui.mjs
       - name: Test delivery details and Buy filling in a shop's checkout (what goes to the shop, once per tap, plain words, without details)
         run: node --import ./scripts/record-app-requests.mjs scripts/test-delivery-ui.mjs
       - name: Test return tracking in the app (Needs you and To return show returns in progress, the receipt's timeline with who said so, Refund not seen yet, I've sent it back once per tap, the carrier asked only on opening)

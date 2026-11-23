@@ -271,10 +271,12 @@ process.on("exit", () => { if (REPORT) console.log(JSON.stringify(results, null,
   await page.goto(origin + "/index.html"); await homeReady(page, { timeout: 20000 });
   await page.waitForTimeout(1500);
   await openAccountRow(page, "Contact us");
-  await page.locator("#mePage .rl-chat-in").fill("My receipt from Kick Lane is missing");
-  await page.locator("#mePage .rl-chat-send").click();
+  await page.locator(".rl-hc .rl-chat-in").fill("My receipt from Kick Lane is missing");
+  await page.locator(".rl-hc .rl-chat-send").click();
   await page.locator(".rl-back .rl-sheet[role=alertdialog] button", { hasText: "Send" }).first().click();
-  await page.locator("#mePage .rl-chat-b.note", { hasText: "Sent to Relay's team" }).waitFor();
+  await page.locator(".rl-hc .rl-chat-b.note", { hasText: "Sent to Relay's team" }).waitFor();
+  // The chat closes from its own button, back to Profile.
+  await waitOutDoubleTap(page); await page.locator(".rl-hc").getByRole("button", { name: "Close" }).click(); await page.locator(".rl-hc").waitFor({ state: "detached" });
   // Back, Back (as a person does) to Home.
   for (let i = 0; i < 4 && !(await page.locator("#homePage").count()); i++) { const b = page.locator("#view [data-back]:visible").first(); if (!(await b.count())) break; await waitOutDoubleTap(page); await b.click(); await page.waitForTimeout(300); }
   if (!(await page.locator("#homePage").count())) { await waitOutDoubleTap(page); await page.evaluate(() => window.tabTap("profile")); }

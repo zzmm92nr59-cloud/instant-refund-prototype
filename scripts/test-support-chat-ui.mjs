@@ -1,8 +1,9 @@
 // Browser test: the help chat (Profile, Help & legal). Stubbed Relay server; the assistant's answers are made up here.
 // Checks: the row shows only when Relay says the chat (or a person) is there; the page says it's an AI and that Relay
-// keeps no copy; a suggested question and a typed one get answers, with greyed outlines while it writes; a double tap
-// sends once; errors are plain English and give the question back; "Talk to a person" asks first, then sends the chat;
-// on a phone the box to write in sits above the floating tab bar; with the assistant off it's "Contact us" by email.
+// keeps no copy; a suggested question opens the chat (a tall sheet) and gets an answer, with a typing bubble while it
+// writes; a typed one too; a double tap sends once; errors are plain English and give the question back; "Talk to a
+// person" asks first, then sends the chat; on a phone the Ask tab's box sits above the floating tab bar; with the
+// assistant off it's "Contact us" by email, in the same sheet.
 // Every part passes the polish rules in light and dark.
 import assert from "node:assert/strict";
 import { createRequire } from "node:module"; import { createServer } from "node:http"; import { readFile, mkdir } from "node:fs/promises"; import { resolve, extname } from "node:path";
@@ -106,44 +107,51 @@ await ask.getByText(/Relay keeps no copy of this chat/).waitFor();
 await polished("start", "#askPage");
 // A suggested question: the outline while it writes, then the answer, under the assistant saying it's an AI.
 await ask.getByRole("button", { name: "How does Relay find my receipts?" }).click();
-await ask.locator(".rl-chat-typing").waitFor();
-await ask.getByText("Hi, I'm Relay's assistant. I'm an AI, so I can get things wrong.", { exact: false }).waitFor();
-await ask.getByText(/picks out order emails/).waitFor();
-assert.equal(await ask.locator(".rl-chat-typing").count(), 0);
+const chat = page.locator(".rl-back .rl-hc"); // the chat opens as a tall sheet over the Ask tab
+await chat.locator(".rl-chat-typing").waitFor();
+await chat.getByText("Hi, I'm Relay's assistant. I'm an AI, so I can get things wrong.", { exact: false }).waitFor();
+await chat.getByText(/picks out order emails/).waitFor();
+assert.equal(await chat.locator(".rl-chat-typing").count(), 0);
+assert.equal(await chat.getByText(/Relay keeps no copy of this chat/).count(), 1, "what is kept is said once in the chat");
 assert.deepEqual(st.chats[0], { messages: [{ role: "user", text: "How does Relay find my receipts?" }] });
-assert.equal(await ask.getByRole("button", { name: "A receipt is missing" }).count(), 0, "suggestions go once the chat has started");
+assert.equal(await chat.getByRole("button", { name: "Where's my receipt?" }).count(), 0, "the topics go once a question is asked");
 // The answer's numbered steps show as a numbered list, never as the raw "1." text (Connor, 15 Nov: stars and dashes showed).
-assert.deepEqual(await ask.locator(".rl-chat-b.bot .rl-rich").last().locator("ol li").allInnerTexts(), ["Open Receipts", "Tap a group"], "the steps are a numbered list");
+assert.deepEqual(await chat.locator(".rl-chat-b.bot .rl-rich").last().locator("ol li").allInnerTexts(), ["Open Receipts", "Tap a group"], "the steps are a numbered list");
 // A typed question, sent with a double tap: once.
-const box = ask.getByRole("textbox", { name: "Your question for Relay's assistant" });
+const box = chat.getByRole("textbox", { name: "Your question for Relay's assistant" });
 await box.fill("My total is wrong");
-await ask.getByRole("button", { name: "Send", exact: true }).dblclick();
-await ask.getByText("Open Receipts, tap the receipt, then Fix details.").waitFor();
+await chat.getByRole("button", { name: "Send", exact: true }).dblclick();
+await chat.getByText("Open Receipts, tap the receipt, then Fix details.").waitFor();
 assert.equal(st.chats.length, 2, "a double tap sends once");
 assert.deepEqual(st.chats[1].messages.map(t => t.role), ["user", "assistant", "user"], "the conversation so far goes with it");
 // Errors: plain English, and the question comes back to the box.
 st.fail = { status: 429, error: "too_many_requests" };
 await box.fill("One more thing");
 await box.press("Enter");
-await ask.getByText("That's a lot of messages for one day. Tap Talk to a person, or try again tomorrow.").waitFor();
+await chat.getByText("That's a lot of messages for one day. Tap Talk to a person, or try again tomorrow.").waitFor();
 assert.equal(await box.inputValue(), "One more thing", "the question isn't lost");
 st.fail = { status: 503, error: "chat_off" };
-await ask.getByRole("button", { name: "Send", exact: true }).click();
-await ask.getByText("The assistant is off right now. Tap Talk to a person and Relay's team will email you.").waitFor();
-// On a phone, the box sits above the floating tab bar (once the keyboard is down: while typing, the tab bar steps aside
-// and the box sits on the keyboard).
+await chat.getByRole("button", { name: "Send", exact: true }).click();
+await chat.getByText("The assistant is off right now. Tap Talk to a person and Relay's team will email you.").waitFor();
+await polished("chat", ".rl-hc");
+// On a phone, the Ask tab's box sits above the floating tab bar (once the keyboard is down: while typing, the tab bar
+// steps aside and the box sits on the keyboard). Closing the chat keeps it: Carry on your chat opens it again.
+await chat.getByRole("button", { name: "Close" }).click();
+await chat.waitFor({ state: "detached" });
 await page.evaluate(() => document.activeElement && document.activeElement.blur());
 await page.waitForFunction(() => !document.body.classList.contains("typing"));
 const gap = await page.evaluate(() => { const bar = document.querySelector(".rl-chat-bar").getBoundingClientRect(), nav = document.querySelector(".footnav").getBoundingClientRect(); return nav.top - bar.bottom; });
 assert.ok(gap >= 4, "the box to write in sits above the tab bar (gap " + gap + "px)");
-await polished("chat", "#askPage");
+await ask.getByRole("button", { name: "Try asking. Carry on your chat" }).click();
+await chat.getByText("Open Receipts, tap the receipt, then Fix details.").waitFor();
+assert.equal(await box.inputValue(), "One more thing", "what was written is still in the box");
 console.log("ok - the assistant: says it's an AI, outlines while it writes, answers, sends once, plain errors, above the tab bar");
 
 // 3. Talk to a person: asks first, sends the chat (with what's in the box), and says where the reply will go.
-await ask.getByRole("button", { name: "Talk to a person" }).click();
+await chat.getByRole("button", { name: "Talk to a person" }).click();
 await page.getByText("Send this to Relay's team? They'll reply by email to " + EMAIL + ".").waitFor();
 await page.getByRole("button", { name: "Send", exact: true }).last().click();
-await ask.getByText("Sent to Relay's team. They'll reply by email to " + EMAIL + ".").waitFor();
+await chat.getByText("Sent to Relay's team. They'll reply by email to " + EMAIL + ".").waitFor();
 assert.equal(st.handoffs.length, 1);
 const sent = st.handoffs[0].messages;
 assert.deepEqual(sent[sent.length - 1], { role: "user", text: "One more thing" }, "what was in the box goes too");
@@ -157,14 +165,16 @@ await view.locator(".rl-arow", { hasText: "Settings" }).click();
 const contact = view.locator(".rl-arow", { hasText: "Contact us" });
 await contact.waitFor();
 await contact.click();
-await view.getByText("Write your question and tap send. Relay's team will reply by email to " + EMAIL + ".").waitFor();
-assert.equal(await view.getByRole("button", { name: "Talk to a person" }).count(), 0);
-await view.getByRole("textbox", { name: "Your message to Relay's team" }).fill("Can I use Relay with Yahoo Mail?");
-await view.getByRole("button", { name: "Send to Relay's team" }).click();
+await chat.getByText("Write your question and tap send. Relay's team will reply by email to " + EMAIL + ".").waitFor();
+assert.equal(await chat.locator(".rl-hc-t > span").innerText(), "Relay's team replies by email");
+assert.equal(await chat.getByRole("button", { name: "Talk to a person" }).count(), 0);
+assert.equal(await chat.getByText(/AI assistant|I'm an AI/).count(), 0, "no AI is mentioned when there's no assistant");
+await chat.getByRole("textbox", { name: "Your message to Relay's team" }).fill("Can I use Relay with Yahoo Mail?");
+await chat.getByRole("button", { name: "Send to Relay's team" }).click();
 await page.getByRole("button", { name: "Send", exact: true }).last().click();
-await view.getByText("Sent to Relay's team. They'll reply by email to " + EMAIL + ".").waitFor();
+await chat.getByText("Sent to Relay's team. They'll reply by email to " + EMAIL + ".").waitFor();
 assert.deepEqual(st.handoffs[0], { messages: [{ role: "user", text: "Can I use Relay with Yahoo Mail?" }] });
-await polished("contact", "#mePage .rl-asub");
+await polished("contact", ".rl-hc");
 assert.deepEqual(errors, [], "no page errors");
 console.log("PASS help chat UI: shown only when on, an AI that says so, answers, once per tap, plain errors, a person by email, Contact us without the AI");
 await browser.close(); server.close();

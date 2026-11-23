@@ -27,13 +27,10 @@
   };
   // The app followed the link before this file had loaded.
   if (window.__relayWantHealth) { window.__relayWantHealth = false; wantHealth = true; }
-  // The help chat about one receipt the shopper chose to show it (Ask the assistant on the receipt). Profile opens it.
-  var openChatAbout = null, wantChatAbout = null;
+  // The help chat about one receipt the shopper chose to show it (Ask the assistant on the receipt): it opens over
+  // whatever is on screen.
   window.relayAskAboutReceipt = function (about) {
-    if (askOn() && window.go) { memo.chatAbout = about; window.go("ask"); return; }
-    wantChatAbout = about;
-    if (window.go) window.go("me");
-    setTimeout(function () { if (wantChatAbout && openChatAbout && openChatAbout()) wantChatAbout = null; }, 0);
+    helpChatState().then(function (hc) { if (hc && hc.available) openHelpChat({ about: about }); });
   };
   // Logos Relay keeps for well-known UK shops (logos/<domain>.<type>; see scripts/fetch-logos.mjs). Anything else falls back to a live lookup.
   var STORE_LOGOS = {"1password.com":"svg","abelandcole.co.uk":"png","abercrombie.com":"png","accessorize.com":"png","accor.com":"svg","addisonlee.com":"png","adidas.co.uk":"png","adobe.com":"png","aerlingus.com":"png","aesop.com":"png","airbnb.co.uk":"svg","airfrance.co.uk":"png","aldi.co.uk":"svg","aliexpress.com":"png","allbarone.co.uk":"png","allsaints.com":"svg","altontowers.com":"png","amazon.co.uk":"png","anthropic.com":"svg","ao.com":"png","apple.com":"png","appliancesdirect.co.uk":"png","argos.co.uk":"png","arket.com":"png","asda.com":"png","asics.com":"png","asos.com":"png","astridandmiyu.com":"png","atgtickets.com":"png","audible.co.uk":"png","avantiwestcoast.co.uk":"png","avis.co.uk":"png","axs.com":"png","backmarket.co.uk":"png","barbour.com":"png","beautybay.com":"png","beaverbrooks.co.uk":"png","beerhawk.co.uk":"png","bellaitalia.co.uk":"png","benefitcosmetics.com":"png","bensonsforbeds.co.uk":"png","berghaus.com":"png","bershka.com":"png","better.org.uk":"png","bettys.co.uk":"png","birkenstock.com":"svg","blacks.co.uk":"svg","blackwells.co.uk":"png","bloomandwild.com":"png","bmstores.co.uk":"png","boden.com":"png","bolt.eu":"png","bonmarche.co.uk":"png","boohoo.com":"svg","boohooman.com":"png","booking.com":"png","booths.co.uk":"png","boots.com":"png","bose.co.uk":"png","bowsandwhistles.co.uk":"png","box.co.uk":"png","brewdog.com":"svg","britishairways.com":"svg","brittany-ferries.co.uk":"png","bt.com":"svg","bulk.com":"png","bumble.com":"svg","burberry.com":"png","burgerking.co.uk":"png","burton.co.uk":"png","butternutbox.com":"png","buyagift.co.uk":"svg","cadburygiftsdirect.co.uk":"png","caferouge.com":"png","caffenero.com":"png","calm.com":"png","calvinklein.co.uk":"png","canva.com":"png","cardfactory.co.uk":"svg","carpetright.co.uk":"svg","castore.com":"png","chainreactioncycles.com":"png","charlottetilbury.com":"svg","chemist4u.com":"png","chipotle.co.uk":"png","cineworld.co.uk":"png","clarechampion.ie":"png","clarins.co.uk":"png","clarks.co.uk":"png","classpass.com":"png","clinique.co.uk":"png","coastfashion.com":"png","converse.com":"png","coop.co.uk":"png","cos.com":"png","costa.co.uk":"png","costco.co.uk":"png","cote.co.uk":"png","cotswoldco.com":"png","cotswoldoutdoor.com":"png","coxandcox.co.uk":"png","craghoppers.com":"png","crocs.co.uk":"png","crocus.co.uk":"svg","crosscountrytrains.co.uk":"png","ctshirts.com":"svg","cultbeauty.co.uk":"svg","cultfurniture.com":"png","currys.co.uk":"png","danielwellington.com":"png","davidlloyd.co.uk":"svg","dazn.com":"png","debenhams.com":"png","decathlon.co.uk":"png","deezer.com":"png","deliveroo.co.uk":"png","depop.com":"png","detalecph.com":"png","dfds.com":"png","dfs.co.uk":"png","dice.fm":"svg","discord.com":"png","dishoom.com":"svg","disneyplus.com":"svg","diy.com":"png","dobbies.com":"png","dominos.co.uk":"png","dorothyperkins.com":"png","dreams.co.uk":"png","drmartens.com":"svg","dropbox.com":"png","dulux.co.uk":"png","dunelm.com":"png","dunelondon.com":"svg","duolingo.com":"png","dyson.co.uk":"png","easyjet.com":"png","ebay.co.uk":"png","ebuyer.com":"png","economist.com":"png","ee.co.uk":"png","eflorist.co.uk":"png","elemis.com":"png","elevenlabs.io":"svg","emirates.com":"png","emma-sleep.co.uk":"png","endclothing.com":"png","english-heritage.org.uk":"png","enterprise.co.uk":"png","epicgames.com":"png","ernestjones.co.uk":"png","esteelauder.co.uk":"png","etsy.com":"png","europcar.co.uk":"png","eurostar.com":"png","evans.co.uk":"png","evanscycles.com":"png","eventbrite.co.uk":"png","eventim.co.uk":"png","everymancinema.com":"png","expedia.co.uk":"png","expressvpn.com":"png","farfetch.com":"png","farmfoods.co.uk":"png","farrow-ball.com":"png","fatface.com":"png","fenwick.co.uk":"png","firebox.com":"png","fiveguys.co.uk":"svg","flannels.com":"png","footlocker.co.uk":"png","fortnumandmason.com":"png","foyles.co.uk":"png","fragrancedirect.co.uk":"png","francomanca.co.uk":"png","frankieandbennys.com":"png","fredperry.com":"png","freemans.com":"png","freenow.com":"png","frugi.com":"png","fruugo.co.uk":"png","ft.com":"png","funkypigeon.com":"png","furniturevillage.co.uk":"png","gailsbread.co.uk":"svg","game.co.uk":"png","garmin.com":"svg","gbk.co.uk":"png","giffgaff.com":"png","gigantic.com":"png","github.com":"svg","glassesdirect.co.uk":"png","glossier.com":"png","goldsmiths.co.uk":"svg","google.com":"png","gordonramsayrestaurants.com":"png","gousto.co.uk":"png","graze.com":"png","greatbeanbags.com":"png","greeneking.co.uk":"png","greggs.co.uk":"svg","groupon.co.uk":"png","gruum.com":"png","gucci.com":"png","gumtree.com":"png","gwr.com":"png","gymshark.com":"png","habitat.co.uk":"png","halfords.com":"png","hamleys.com":"png","harrods.com":"png","harvester.co.uk":"png","headspace.com":"png","heals.com":"png","hellofresh.co.uk":"png","hertz.co.uk":"png","hilton.com":"png","hinge.co":"png","hm.com":"png","hmv.com":"png","hobbs.com":"png","hobbycraft.co.uk":"png","holidayextras.co.uk":"png","hollandandbarrett.com":"png","hollisterco.com":"png","hollywoodbowl.co.uk":"png","homary.com":"png","homebargains.co.uk":"svg","homebase.co.uk":"png","homesense.com":"svg","honestburgers.co.uk":"png","hotelchocolat.com":"png","hotels.com":"png","houseoffraser.co.uk":"png","howdens.com":"svg","hsamuel.co.uk":"png","hughes.co.uk":"png","hugoboss.com":"png","hunterboots.com":"png","iceland.co.uk":"png","idmobile.co.uk":"png","iguanas.co.uk":"png","ihg.com":"png","ikea.com":"png","interflora.co.uk":"png","inthestyle.com":"png","itsu.com":"png","itv.com":"png","jackjones.com":"png","jbl.com":"png","jdsports.co.uk":"png","jdwetherspoon.com":"png","jdwilliams.co.uk":"png","jessops.com":"png","jet2.com":"svg","jet2holidays.com":"svg","jigsaw-online.com":"png","johnlewis.com":"svg","jojomamanbebe.co.uk":"png","jollyes.co.uk":"png","jomalone.co.uk":"png","josephjoseph.com":"png","joules.com":"png","just-eat.co.uk":"png","justpark.com":"svg","karaca.co.uk":"png","karenmillen.com":"png","kayak.co.uk":"svg","kfc.co.uk":"png","kikocosmetics.com":"svg","klarna.com":"png","klm.com":"png","kobo.com":"png","krispykreme.co.uk":"png","kurtgeiger.com":"png","kwik-fit.com":"png","lacoste.com":"png","laithwaites.co.uk":"png","lakeland.co.uk":"png","laptopsdirect.co.uk":"png","laredoute.co.uk":"png","lastminute.com":"png","lebara.co.uk":"png","lego.com":"png","legoland.co.uk":"png","leon.co":"png","leshuttle.com":"svg","levi.com":"png","li.me":"png","libertylondon.com":"png","lidl.co.uk":"svg","lights4fun.co.uk":"svg","lilyskitchen.co.uk":"png","lindt.co.uk":"png","linkedin.com":"png","littlewoods.com":"png","lner.co.uk":"png","loaf.com":"png","loganair.co.uk":"png","londontheatredirect.com":"png","lookfantastic.com":"png","louisvuitton.com":"png","loveholidays.com":"png","lufthansa.com":"png","lululemon.com":"png","lush.com":"png","lwtheatres.co.uk":"svg","lycamobile.co.uk":"png","lyleandscott.com":"png","maccosmetics.co.uk":"png","made.com":"png","magnet.co.uk":"svg","majestic.co.uk":"png","mamasandpapas.com":"png","mandmdirect.com":"png","mango.com":"png","marksandspencer.com":"png","marriott.com":"png","massimodutti.com":"png","matalan.co.uk":"png","mcdonalds.com":"png","megabus.com":"png","menkind.co.uk":"png","meta.com":"png","microsoft.com":"png","millets.co.uk":"svg","mindfulchef.com":"png","mintvelvet.co.uk":"png","missguided.co.uk":"png","missoma.com":"png","mobiles.co.uk":"png","moltonbrown.co.uk":"svg","monicavinader.com":"png","monsoon.co.uk":"png","montane.com":"png","moonpig.com":"png","morrisons.com":"svg","moss.co.uk":"png","mothercare.com":"png","mountainwarehouse.com":"png","mrporter.com":"png","mulberry.com":"png","musicmagpie.co.uk":"png","myfitnesspal.com":"svg","myprotein.com":"png","mytheresa.com":"png","mytoggle.io":"png","myvue.com":"png","nakedwines.co.uk":"svg","nandos.co.uk":"png","nastygal.com":"png","nationalexpress.com":"svg","nationalrail.co.uk":"svg","nationaltrust.org.uk":"svg","nealsyardremedies.com":"png","neomwellbeing.com":"png","nespresso.com":"png","net-a-porter.com":"png","netflix.com":"png","newbalance.co.uk":"png","newlook.com":"png","next.co.uk":"png","nike.com":"png","ninjakitchen.co.uk":"png","nintendo.com":"png","nkuku.com":"png","nordvpn.com":"png","northernrailway.co.uk":"png","notcutts.co.uk":"png","notion.so":"png","notonthehighstreet.com":"png","nowtv.com":"png","nuffieldhealth.com":"png","o2.co.uk":"png","oakfurnitureland.co.uk":"png","oasis-stores.com":"png","ocado.com":"png","odeon.co.uk":"png","office.co.uk":"png","ohpolly.com":"png","oliverbonas.com":"png","onbuy.com":"png","onepeloton.co.uk":"png","onthebeach.co.uk":"png","openai.com":"svg","overclockers.co.uk":"svg","pactcoffee.com":"png","pandora.net":"png","papajohns.co.uk":"png","paramountplus.com":"png","patagonia.com":"png","patreon.com":"png","paybyphone.co.uk":"png","peacocks.co.uk":"svg","personalisedgiftsshop.co.uk":"png","petplanet.co.uk":"png","pets-corner.co.uk":"png","petsathome.com":"png","pharmacy2u.co.uk":"png","phase-eight.com":"png","picturehouses.com":"png","pizzaexpress.com":"svg","pizzahut.co.uk":"png","pizzapilgrims.co.uk":"png","playstation.com":"png","plusnet.com":"png","poferries.com":"png","poundland.co.uk":"png","premierinn.com":"png","prestigeflowers.co.uk":"png","pret.co.uk":"svg","prettylittlething.com":"png","prezzo.co.uk":"png","primark.com":"png","primevideo.com":"png","primrose.co.uk":"png","pullandbear.com":"png","puma.com":"png","puregym.com":"png","qatarairways.com":"png","qvcuk.com":"png","rains.com":"png","ralphlauren.co.uk":"png","reddragondarts.com":"png","redletterdays.co.uk":"svg","reebok.co.uk":"png","regatta.com":"png","reiss.com":"png","revolutionbeauty.com":"png","richersounds.com":"png","ring.com":"png","ringgo.co.uk":"png","riverford.co.uk":"png","riverisland.com":"png","robertdyas.co.uk":"png","roblox.com":"png","rohan.co.uk":"png","royalmail.com":"png","ryanair.com":"png","ryman.co.uk":"png","sainsburys.co.uk":"png","samsung.com":"png","scan.co.uk":"png","scotrail.co.uk":"png","screwfix.com":"svg","seasaltcornwall.com":"png","seetickets.com":"png","selfridges.com":"png","sephora.co.uk":"png","serenataflowers.com":"png","sevenoakssoundandvision.co.uk":"png","sharkclean.co.uk":"png","shein.com":"png","showcasecinemas.co.uk":"png","silentnight.co.uk":"png","simbasleep.com":"png","simplybe.co.uk":"png","simplycook.com":"png","sixt.co.uk":"png","size.co.uk":"png","skechers.co.uk":"png","skiddle.com":"png","sky.com":"png","skyscanner.net":"png","slugandlettuce.co.uk":"png","smarty.co.uk":"png","smythstoys.com":"png","sofology.co.uk":"png","sonos.com":"png","southernrailway.com":"png","southwesternrailway.com":"png","spacenk.com":"svg","spar.co.uk":"png","specsavers.co.uk":"png","sportsdirect.com":"png","spotify.com":"png","ssense.com":"png","starbucks.co.uk":"svg","steampowered.com":"png","stenaline.co.uk":"png","stonegatepubs.com":"png","stoneisland.com":"png","stories.com":"png","stradivarius.com":"png","strava.com":"png","stubhub.co.uk":"png","studio.co.uk":"png","superdrug.com":"png","superdry.com":"png","surfshark.com":"png","swarovski.com":"png","sweatybetty.com":"png","swooneditions.com":"png","tacobell.co.uk":"png","talktalk.co.uk":"png","tedbaker.com":"png","telegraph.co.uk":"svg","tempur.com":"svg","temu.com":"png","tesco.com":"png","tescomobile.com":"png","tfl.gov.uk":"png","tgifridays.co.uk":"png","thamesclippers.com":"svg","thameslinkrailway.com":"png","thebodyshop.com":"png","theguardian.com":"svg","thegymgroup.com":"png","theinkeylist.com":"png","thenorthface.co.uk":"png","theordinary.com":"png","theperfumeshop.com":"png","thepihut.com":"png","theproteinworks.com":"png","therange.co.uk":"png","thescentreserve.com":"png","thetimes.co.uk":"png","thetoyshop.com":"png","thewhitecompany.com":"png","theworks.co.uk":"png","thompson-morgan.com":"png","thorntons.co.uk":"png","thorpepark.com":"png","thortful.com":"png","three.co.uk":"png","ticketmaster.co.uk":"png","tidal.com":"png","timberland.co.uk":"png","tinder.com":"png","tkmaxx.com":"png","tmlewin.com":"svg","tobycarvery.co.uk":"png","todaytix.com":"png","tommy.com":"png","toolstation.com":"png","topshop.com":"svg","tortilla.co.uk":"png","trainline.com":"png","travelodge.co.uk":"png","trespass.com":"png","tui.co.uk":"png","turtlebay.co.uk":"png","twitch.tv":"png","uber.com":"png","ubereats.com":"png","ugg.com":"png","underarmour.co.uk":"png","uniqlo.com":"png","vans.co.uk":"png","vapeandgo.co.uk":"png","very.co.uk":"png","victorianplumbing.co.uk":"png","viking-direct.co.uk":"png","vinted.co.uk":"png","virginactive.co.uk":"png","virginatlantic.com":"svg","virginexperiencedays.co.uk":"png","virginmedia.com":"png","virginwines.co.uk":"png","visiondirect.co.uk":"png","vodafone.co.uk":"png","voxi.co.uk":"png","wagamama.com":"png","waitrose.com":"png","wallis.co.uk":"png","warehousefashion.com":"png","waterstones.com":"png","wayfair.co.uk":"png","webuy.com":"png","weekday.com":"png","weirdfish.co.uk":"svg","well.co.uk":"png","wexphotovideo.com":"png","whistles.com":"png","whitestuff.com":"png","whsmith.co.uk":"png","wickes.co.uk":"png","wilko.com":"png","wingstop.co.uk":"png","wizzair.com":"png","wordery.com":"png","worldofbooks.com":"svg","xbox.com":"png","yankeecandle.co.uk":"png","yosushi.com":"png","youtube.com":"png","zalando.co.uk":"svg","zara.com":"png","zavvi.com":"png","zipcar.co.uk":"png","zizzi.co.uk":"png","zooplus.co.uk":"png"};
@@ -815,18 +812,48 @@
     ".rl-asub>div>h2:first-child,.rl-asub>h2:first-child{display:none}" +
     ".rl-anote{font-size:13.5px!important;margin:6px 2px 16px!important}.rl-aterm{color:var(--rl-text)!important}" +
     ".rl-rev-l{display:flex;align-items:center;gap:12px;min-height:56px;padding:10px 14px;box-sizing:border-box}.rl-rev-l+.rl-rev-l{border-top:1px solid var(--rl-line)}" +
-    // The help chat: the assistant's bubbles on the left, yours on the right, and the box to write in kept in view (above
-    // the floating tab bar on a phone, and above the keyboard while typing, when the tab bar steps aside).
-    ".rl-chat{display:flex;flex-direction:column;gap:12px;margin:6px 0 12px}.rl-chat-b{max-width:86%;display:flex;flex-direction:column;gap:4px}" +
-    ".rl-chat-b p{margin:0;padding:11px 14px;border-radius:18px;font-size:16px;line-height:1.45;white-space:pre-wrap;overflow-wrap:anywhere}" +
-    ".rl-chat-b.bot{align-self:flex-start}.rl-chat-b.bot p{background:var(--rl-card);border:1px solid var(--rl-line);color:var(--rl-text);border-bottom-left-radius:6px}.rl-chat-b.bot .rl-rich{background:var(--rl-card);color:var(--rl-text);padding:11px 14px;border-radius:18px;border-bottom-left-radius:6px;font-size:16px;line-height:1.45;overflow-wrap:anywhere}.rl-chat-b.bot .rl-rich p{background:none;border:0;padding:0;border-radius:0;white-space:normal}.rl-chat-b.bot .rl-rich p+p,.rl-chat-b.bot .rl-rich p+ul,.rl-chat-b.bot .rl-rich ul+p,.rl-chat-b.bot .rl-rich p+ol,.rl-chat-b.bot .rl-rich ol+p{margin-top:8px}.rl-rich ul,.rl-rich ol{margin:0;padding:0 0 0 22px}.rl-rich li{margin:2px 0}" +
-    ".rl-chat-b.me{align-self:flex-end}.rl-chat-b.me p{background:var(--rl-accent);color:var(--rl-bg);border-bottom-right-radius:6px}" +
-    ".rl-chat-b.note{align-self:stretch;max-width:none}.rl-chat-b.note p{background:var(--rl-accent-bg);color:var(--rl-text);font-size:15px;text-align:center}" +
-    ".rl-chat-who{font-size:13px;font-weight:600;color:var(--rl-text2);margin:0 4px}" +
-    ".rl-chat-about{border-top:0!important;border-bottom:1px solid var(--rl-line);margin:0 0 10px!important;color:var(--rl-text)!important}" +
-    ".rl-chat-typing{flex-direction:row;gap:6px;padding:6px 0}.rl-chat-typing .rl-skel{display:block;width:72px;height:16px;min-height:0;border-radius:999px}.rl-chat-typing .rl-skel+.rl-skel{width:44px}" +
-    ".rl-chat-chips{display:flex;flex-wrap:wrap;gap:8px}.rl-chat-chips button{all:unset;box-sizing:border-box;cursor:pointer;min-height:44px;display:inline-flex;align-items:center;padding:0 16px;border-radius:999px;background:var(--rl-fill);color:var(--rl-text);font-size:15px;font-weight:600;transition:transform .12s}" +
-    ".rl-chat-chips button:active{transform:scale(.96)}.rl-chat-chips button:focus-visible{outline:2px solid var(--rl-text);outline-offset:2px}" +
+    // The help chat, a tall sheet from the bottom: Relay's logo and name at the top with a round close button; Relay's
+    // messages on the left in grey bubbles under its small logo and name, the shopper's on the right in the accent
+    // colour; topics and questions to tap as outlined pills under Relay's question; the box to write in at the foot,
+    // kept above the keyboard. The Ask tab's own box (below) rests above the floating tab bar.
+    ".rl-chat{display:flex;flex-direction:column;gap:12px;margin:6px 0 12px}" +
+    ".rl-back>.rl-sheet.rl-hc{display:flex;flex-direction:column;box-sizing:border-box;width:100%;max-width:560px;padding:0;overflow:hidden;background:var(--rl-sheet);border-radius:28px 28px 0 0;" +
+      "height:calc(100vh - var(--rl-kb,0px) - 28px);height:calc(100dvh - var(--rl-kb,0px) - max(env(safe-area-inset-top),20px) - 8px);max-height:none}" +
+    "@media(min-width:640px){.rl-back>.rl-sheet.rl-hc{height:min(780px,calc(100vh - 48px - var(--rl-kb,0px)));border-radius:28px}}" +
+    ".rl-back>.rl-sheet.rl-hc:focus{outline:0}" +
+    ".rl-hc-head{flex:none;display:flex;align-items:center;gap:12px;padding:22px 16px 10px 18px}" +
+    ".rl-hc-logo{flex:none;display:grid;place-items:center;overflow:hidden;border-radius:999px;background:#101828;color:#C9D8FF;font-family:Georgia,'Times New Roman',serif;font-weight:700;line-height:1}" +
+    ".rl-hc-t{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}" +
+    ".rl-sheet h2.rl-hc-name{margin:0;font-family:var(--rl-sys);font-size:20px;line-height:25px;font-weight:700;letter-spacing:-.01em;color:var(--rl-text)}" +
+    ".rl-hc-t>span{font-size:15px;line-height:20px;color:var(--rl-text2)}" +
+    ".rl-hc-x{all:unset;box-sizing:border-box;flex:none;cursor:pointer;width:48px;height:48px;border-radius:999px;display:grid;place-items:center;color:var(--rl-text);background:var(--rl-sheet);border:1px solid var(--rl-line);box-shadow:0 2px 8px rgba(16,24,40,.08);-webkit-tap-highlight-color:transparent;transition:transform .12s,background .12s}" +
+    ".rl-hc-x:active{transform:scale(.92);background:var(--rl-fill)}.rl-hc-x:focus-visible{outline:2px solid var(--rl-accent);outline-offset:2px}.rl-hc-x .rl-jic{margin:0;display:grid}" +
+    ".rl-hc .rl-chat-about{flex:none;display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 16px 6px;padding:4px 4px 4px 14px;border-radius:20px;background:var(--rl-accent-bg);font-size:15px;line-height:1.35;color:var(--rl-text)}" +
+    ".rl-hc .rl-chat-about .rl-pill{flex:none;margin:0}" +
+    ".rl-hc-list{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;margin:0;padding:4px 16px 16px;gap:14px}" +
+    ".rl-hc p.rl-hc-priv{margin:0 6px 2px;font-size:13px;line-height:18px;color:var(--rl-text2);text-align:center}" +
+    // (A sheet's own paragraphs are grey and smaller; in the chat, words take their bubble's size and colour.)
+    ".rl-hc .rl-chat-b.bot p{color:inherit;font-size:inherit;line-height:inherit}.rl-hc .rl-hc-foot p.rl-msg{font-size:15px;line-height:1.4}" +
+    ".rl-chat-b{max-width:86%;display:flex;flex-direction:column;gap:6px;min-width:0}" +
+    ".rl-chat-b p{margin:0;white-space:pre-wrap;overflow-wrap:anywhere}" +
+    ".rl-chat-b.bot{align-self:flex-start;box-sizing:border-box;padding:12px 16px 14px;border-radius:22px;background:var(--rl-card);color:var(--rl-text);font-size:17px;line-height:1.45}" +
+    ".rl-hc-who{display:flex;align-items:center;gap:8px;min-width:0;font-size:15px;line-height:20px}.rl-hc-who b{font-weight:600;color:var(--rl-text)}.rl-hc-who .rl-hc-ai{font-size:13px;color:var(--rl-text2)}" +
+    ".rl-chat-b.bot .rl-rich{overflow-wrap:anywhere}.rl-chat-b.bot .rl-rich p{white-space:normal}" +
+    ".rl-rich p+p,.rl-rich p+ul,.rl-rich ul+p,.rl-rich p+ol,.rl-rich ol+p{margin-top:8px}.rl-rich ul,.rl-rich ol{margin:0;padding:0 0 0 22px}.rl-rich li{margin:2px 0}" +
+    ".rl-chat-b.me{align-self:flex-end;align-items:flex-end}.rl-chat-b.me p{padding:12px 18px;border-radius:24px;background:var(--rl-accent);color:var(--rl-bg);font-size:17px;line-height:1.4}" +
+    ".rl-chat-b.note{align-self:stretch;max-width:none}.rl-chat-b.note p{padding:10px 14px;border-radius:16px;background:var(--rl-accent-bg);color:var(--rl-text);font-size:15px;line-height:1.4;text-align:center}" +
+    // While the assistant writes: three soft dots in a grey bubble (greyed-out content, not a spinner).
+    ".rl-chat-typing{flex-direction:row;padding:18px 18px}.rl-hc-dots{display:flex;gap:6px}" +
+    ".rl-hc-dots i{display:block;width:9px;height:9px;border-radius:999px;background:var(--rl-text2);opacity:.3;animation:rl-hc-dot 1.2s infinite ease-in-out}.rl-hc-dots i:nth-child(2){animation-delay:.15s}.rl-hc-dots i:nth-child(3){animation-delay:.3s}" +
+    "@keyframes rl-hc-dot{0%,60%,100%{opacity:.25}30%{opacity:.65}}@media(prefers-reduced-motion:reduce){.rl-hc-dots i{animation:none}}" +
+    ".rl-hc-qr{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:10px;margin:2px 0 0 24px}" +
+    ".rl-hc-qr-b{all:unset;box-sizing:border-box;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:4px;min-height:48px;max-width:100%;padding:10px 18px;border-radius:999px;border:1px solid var(--rl-line);background:var(--rl-sheet);color:var(--rl-accent);font-size:16px;line-height:1.3;font-weight:500;text-align:center;-webkit-tap-highlight-color:transparent;transition:transform .12s,background .12s}" +
+    ".rl-hc-qr-b:active{transform:scale(.96);background:var(--rl-accent-bg)}.rl-hc-qr-b:focus-visible{outline:2px solid var(--rl-accent);outline-offset:2px}.rl-hc-qr-b .rl-jic{margin:0 0 0 -6px;display:grid}" +
+    ".rl-hc-foot{flex:none;padding:8px 16px calc(12px + env(safe-area-inset-bottom));border-top:.5px solid var(--rl-line);background:var(--rl-sheet)}body.typing .rl-hc-foot{padding-bottom:10px}" +
+    ".rl-hc-foot .rl-msg{margin:0 2px 8px}.rl-hc-foot .rl-msg:empty{display:none}" +
+    ".rl-hc .rl-chat-bar{position:static;display:flex;align-items:flex-end;gap:6px;padding:4px;min-height:56px;border:0;border-radius:28px;background:var(--rl-card);box-shadow:none;-webkit-backdrop-filter:none;backdrop-filter:none}" +
+    ".rl-hc .rl-chat-bar:focus-within{box-shadow:0 0 0 2px var(--rl-accent)}" +
+    ".rl-hc .rl-chat-in{min-height:48px;padding:13px 8px 13px 14px;background:transparent;font-size:17px;line-height:22px}.rl-hc .rl-chat-in:focus-visible{outline:0}" +
     ".rl-chat-bar{position:sticky;bottom:12px;z-index:3;display:flex;align-items:flex-end;gap:8px;padding:8px;border-radius:26px;background:var(--rl-card);border:1px solid var(--rl-line);box-shadow:0 6px 20px rgba(0,0,0,.08)}" +
     "@media(max-width:760px){.rl-chat-bar{bottom:calc(env(safe-area-inset-bottom) + 84px)}body.typing .rl-chat-bar{bottom:calc(8px + var(--rl-kb,0px))}}" +
     ".rl-chat-in{flex:1;min-width:0;box-sizing:border-box;min-height:48px;max-height:140px;margin:0;padding:12px 14px;border:0;border-radius:20px;background:var(--rl-fill);color:var(--rl-text);font:inherit;font-size:16px;line-height:1.4;resize:none}" +
@@ -1532,8 +1559,8 @@
     // 874 screen): 115px square tiles 8px apart, 20px headings, 64px rows with a 48px tile. The tiles, drawings,
     // colours and words are Relay's.
     ".rl-chat.rl-ask-open{display:block;margin:0}.rl-ask-rec{margin:0 0 14px}" +
-    ".rl-ask-h,.rl-ask-h2{font-size:20px;line-height:24px;font-weight:700;letter-spacing:-.01em;color:var(--rl-text);font-family:var(--rl-sys)}.rl-ask-h{margin:2px 0 6px}.rl-ask-h2{margin:0 0 14px}.rl-ask-open.no-rec .rl-ask-h2{margin-top:12px}" +
-    ".rl-ask-hb{all:unset;box-sizing:border-box;cursor:pointer;display:inline-flex;align-items:center;gap:8px;min-height:44px;transition:opacity .12s}.rl-ask-hb:active{opacity:.55}.rl-ask-hb:focus-visible{outline:2px solid var(--rl-accent);outline-offset:2px;border-radius:10px}" +
+    ".rl-ask-h2:has(.rl-ask-hc){margin-bottom:4px}.rl-ask-h,.rl-ask-h2{font-size:20px;line-height:24px;font-weight:700;letter-spacing:-.01em;color:var(--rl-text);font-family:var(--rl-sys)}.rl-ask-h{margin:2px 0 6px}.rl-ask-h2{margin:0 0 14px}.rl-ask-open.no-rec .rl-ask-h2{margin-top:12px}" +
+    ".rl-ask-hb,.rl-ask-hc{all:unset;box-sizing:border-box;cursor:pointer;display:inline-flex;align-items:center;gap:8px;min-height:44px;transition:opacity .12s}.rl-ask-hb:active,.rl-ask-hc:active{opacity:.55}.rl-ask-hb:focus-visible,.rl-ask-hc:focus-visible{outline:2px solid var(--rl-accent);outline-offset:2px;border-radius:10px}" +
     ".rl-ask-chev{flex:none;width:20px;height:20px;border-radius:999px;display:grid;place-items:center;background:var(--rl-fill);color:var(--rl-text)}" +
     ".rl-ask-tiles{display:flex;gap:8px;overflow-x:auto;margin:0 -16px;padding:0 16px;scrollbar-width:none;scroll-snap-type:x proximity;scroll-padding-left:16px}.rl-ask-tiles::-webkit-scrollbar{display:none}" +
     ".rl-ask-tile{all:unset;box-sizing:border-box;cursor:pointer;flex:none;display:flex;flex-direction:column;gap:4px;width:115px;scroll-snap-align:start;transition:transform .12s}" +
@@ -1988,6 +2015,8 @@
       var s = load(); if (!s || !s.email) return;
       var d = draftsAll(); d.email = s.email;
       if (!v || !String(v).trim()) delete d.items[key]; else d.items[key] = { v: String(v), at: Date.now() };
+      // With nothing left unsent, nothing is kept.
+      if (!Object.keys(d.items).length) { localStorage.removeItem(DRAFTS_KEY); return; }
       var t = JSON.stringify(d);
       if (t.length < 600000) localStorage.setItem(DRAFTS_KEY, t);
     } catch (e) { /* storage full or blocked: the draft just isn't kept */ }
@@ -5738,176 +5767,273 @@
   }
   // The four questions the Ask tab offers before anything is asked, each with a drawn icon on one of Relay's tile colours.
   var ASK_STARTERS = [["How do I return something?", "ret", "#14918A"], ["How does a swap work?", "swap", "#E0446E"], ["Why is a receipt missing?", "help", "#D47B1F"], ["How does Relay find my receipts?", "mail", "#4F72E0"]];
-  // The help chat's screen (worker/support-chat.js answers it; its rules are there). It is Profile's "Contact us" page while
-  // the assistant is off, and the Ask tab while it is on (opts.tab): same screen, same routes, same wording about who answers.
-  function chatPage(b, opts) {
-      opts = opts || {};
-      var hc = memo.helpChat || {}, ai = Boolean(hc.available);
-      // A chat about a receipt starts afresh, and so does an ordinary one after it (the assistant no longer sees it).
-      var about = ai ? memo.chatAbout || null : null; memo.chatAbout = null;
-      if ((about ? about.id : null) !== (memo.chatLogAbout || null)) { memo.chatLog = []; memo.chatLogAbout = about ? about.id : null; }
-      var log = memo.chatLog || (memo.chatLog = []);
-      var aboutBar = null, foot = null;
-      function noteText() {
-        return !ai ? "Relay's team will see your message and your email address, so they can reply."
-          : about ? "Relay keeps no copy of this chat. Your messages, and what Relay read from this receipt, go to Anthropic, the AI company that answers them, without your email address. Talk to a person emails the chat to Relay's team."
-          : "Relay keeps no copy of this chat. Your messages go to Anthropic, the AI company that answers them, without your receipts or email address. Talk to a person emails the chat to Relay's team.";
-      }
-      // What the box says it is for. In the Ask tab it takes a question, and what was typed can then be looked for in
-      // Receipts instead (the control under the message).
-      var HINT = opts.tab ? "Search receipts or ask about Relay" : "Ask about Relay";
-      function stopAbout() {
-        about = null; if (aboutBar) aboutBar.remove(); aboutBar = null; box.placeholder = HINT;
-        if (foot) foot.textContent = noteText();
-        log.push({ role: "note", text: "The assistant can't see the receipt any more." }); draw();
-      }
-      var list = el("div", { className: "rl-chat", role: "log" });
-      list.setAttribute("aria-live", "polite");
-      var note = el("p", { className: "rl-msg" });
-      var box = el("textarea", { className: "rl-chat-in", rows: 1, maxLength: 1000, placeholder: about ? "Ask about this receipt" : ai ? HINT : "Write your question", value: draftGet("help-chat") });
-      box.setAttribute("aria-label", ai ? "Your question for Relay's assistant" : "Your message to Relay's team");
-      var send = el("button", { type: "button", className: "rl-chat-send", ariaLabel: ai ? "Send" : "Send to Relay's team" }, [jIc("send", opts.tab ? 20 : 22)]);
-      var person = el("button", { type: "button", className: "rl-btn ghost rl-chat-person", text: "Talk to a person" });
-      var busy = false;
-      function bubble(t, findable) {
-        var who = t.role === "user" ? "me" : t.role === "note" ? "note" : "bot";
-        var n = el("div", { className: "rl-chat-b " + who }, [who === "bot" ? richText(t.text) : el("p", { text: t.text })]);
-        // Said once, over its first message: who's answering, and that it's an AI.
-        if (who === "bot" && t.first) n.insertBefore(el("span", { className: "rl-chat-who", text: "Relay's assistant (AI)" }), n.firstChild);
-        // Under the newest thing the shopper typed: look for the same words in Receipts instead.
+  // What happens to what's written in the chat, said once wherever it opens (worker/support-chat.js).
+  function chatNote(ai, about) {
+    return !ai ? "Relay's team will see your message and your email address, so they can reply."
+      : about ? "Relay keeps no copy of this chat. Your messages, and what Relay read from this receipt, go to Anthropic, the AI company that answers them, without your email address. Talk to a person emails the chat to Relay's team."
+      : "Relay keeps no copy of this chat. Your messages go to Anthropic, the AI company that answers them, without your receipts or email address. Talk to a person emails the chat to Relay's team.";
+  }
+  // The chat's topics: tapping one says it as the shopper's message, Relay asks what about it, and the questions under it
+  // go to the assistant. [id, what the shopper taps, what Relay asks next, the questions to tap].
+  var CHAT_TOPICS = [
+    ["receipt", "Where's my receipt?", "What's happening with it?", ["A receipt is missing", "How does Relay find my receipts?", "A receipt has the wrong details"]],
+    ["returns", "How do returns work?", "What would you like to know?", ["How do I return something?", "How long do I have to return something?", "Where's my refund?"]],
+    ["swap", "How does a swap work?", "What would you like to know?", ["How do I swap something?", "Can I swap for a different size?", "How do I sell something I bought?"]],
+    ["else", "Something else", "Write your question below and send it.", []]];
+  var ABOUT_QS = ["The total is wrong", "Some items are missing", "This isn't something I bought"];
+  // The help chat: a tall sheet from the bottom, wherever it's opened (the Ask tab, a receipt's Ask the assistant, or
+  // Profile's Contact us while the assistant is off). worker/support-chat.js answers it; its rules are there.
+  // opts: ask (a question to send at once; typed: the shopper wrote it), about (a receipt the shopper chose to show it),
+  // person (Talk to a person straight away, with text: what was already written), tab (opened from the Ask tab).
+  var chatLayer = null, askRedraw = null;
+  function openHelpChat(opts) {
+    opts = opts || {};
+    if (chatLayer && chatLayer.isConnected) return;
+    var hc = memo.helpChat || {}, ai = Boolean(hc.available), email = (load() || {}).email;
+    // A chat about a receipt starts afresh, and so does an ordinary one after it (the assistant no longer sees it).
+    var about = ai ? opts.about || null : null;
+    if ((about ? about.id : null) !== (memo.chatLogAbout || null)) { memo.chatLog = []; memo.chatLogAbout = about ? about.id : null; }
+    memo.chatAboutNow = about;
+    var log = memo.chatLog || (memo.chatLog = []), busy = false;
+    var sheet = el("div", { className: "rl-sheet rl-hc", role: "dialog", ariaModal: "true", ariaLabel: ai ? "Chat with Relay" : "Contact Relay" });
+    sheet.tabIndex = -1;
+    var layer = el("div", { className: "rl-back" }, [sheet]), born = Date.now();
+    chatLayer = layer;
+    function shut() {
+      if (!layer.isConnected) return;
+      layer.remove(); chatLayer = null; document.removeEventListener("keydown", onKey);
+      if (askRedraw) askRedraw();
+    }
+    // Escape closes the chat, unless something is open on top of it (Send this to Relay's team?).
+    function onKey(e) { var all = document.querySelectorAll(".rl-back"); if (e.key === "Escape" && all[all.length - 1] === layer) shut(); }
+    // Relay's round mark, drawn in its navy and soft blue (the app icon's lime is no longer Relay's colour).
+    function logo(px) { var i = el("span", { className: "rl-hc-logo", text: "R" }); i.setAttribute("aria-hidden", "true"); i.style.width = i.style.height = px + "px"; i.style.fontSize = Math.round(px * 0.56) + "px"; return i; }
+    var close = el("button", { type: "button", className: "rl-hc-x", ariaLabel: "Close", onclick: shut }, [jIc("x", 22)]);
+    var head = el("div", { className: "rl-hc-head" }, [logo(44), el("div", { className: "rl-hc-t" }, [el("h2", { className: "rl-hc-name", text: "Relay" }),
+      el("span", { text: ai ? "The team can also help" : "Relay's team replies by email" })]), close]);
+    var list = el("div", { className: "rl-chat rl-hc-list", role: "log" });
+    list.setAttribute("aria-live", "polite");
+    // Scrolled back through the chat, a drag down scrolls it rather than closing the sheet.
+    // When the keyboard comes up (or the box grows), the chat gets shorter: the newest message stays in sight.
+    var atEnd = true;
+    list.addEventListener("scroll", function () { list.classList.toggle("rl-noswipe", list.scrollTop > 0); atEnd = list.scrollTop + list.clientHeight >= list.scrollHeight - 40; }, { passive: true });
+    try { new ResizeObserver(function () { if (atEnd) list.scrollTop = list.scrollHeight; }).observe(list); } catch (e) {}
+    var note = el("p", { className: "rl-msg" });
+    var box = el("textarea", { className: "rl-chat-in", rows: 1, maxLength: 1000, value: draftGet("help-chat") });
+    var send = el("button", { type: "button", className: "rl-chat-send" }, [jIc("send", 22)]);
+    var aboutBar = null;
+    function stopAbout() {
+      about = null; memo.chatAboutNow = null; memo.chatLogAbout = null;
+      if (aboutBar) aboutBar.remove(); aboutBar = null; priv.textContent = chatNote(ai, null);
+      log.push({ role: "note", text: "The assistant can't see the receipt any more." }); draw();
+    }
+    if (about) aboutBar = el("div", { className: "rl-chat-about" }, [el("span", { text: "About your receipt from " + about.label }),
+      el("button", { type: "button", className: "rl-pill", text: "Stop showing it", onclick: stopAbout })]);
+    var priv = el("p", { className: "rl-hc-priv", text: chatNote(ai, about) });
+    // Where the chat is: "top" (the topics), a topic's id, "person" (writing to Relay's team), or null (after an answer).
+    function level() { var t = log[log.length - 1]; return !ai ? "person" : !t ? "top" : t.role === "prompt" ? t.level : null; }
+    function topic(id) { return CHAT_TOPICS.filter(function (t) { return t[0] === id; })[0]; }
+    function who(first) {
+      var h = el("div", { className: "rl-hc-who" }, [logo(24), el("b", { text: "Relay" })]);
+      if (first && ai) h.appendChild(el("span", { className: "rl-hc-ai", text: "AI assistant" }));
+      return h;
+    }
+    function bubble(t, findable) {
+      if (t.role === "note") return el("div", { className: "rl-chat-b note" }, [el("p", { text: t.text })]);
+      if (t.role === "user" || t.role === "pick") {
+        var n = el("div", { className: "rl-chat-b me" }, [el("p", { text: t.text })]);
+        // Under the newest thing the shopper typed on the Ask tab: look for the same words in Receipts instead.
         if (findable) n.appendChild(el("button", { type: "button", className: "rl-ask-find", text: "Search your receipts for this instead", onclick: function () {
-          window.__relayFindReceipts = String(t.text).replace(/\s+/g, " ").trim().slice(0, 80); if (window.go) window.go("receipts");
+          window.__relayFindReceipts = String(t.text).replace(/\s+/g, " ").trim().slice(0, 80); shut(); if (window.go) window.go("receipts");
         } }));
         return n;
       }
-      // The Ask tab's newest receipts, to ask about one: what the app already has, brought up to date once if that is old.
-      var recHost = null, recRows = (memo.receipts && memo.receipts.rows) || [];
-      function drawTiles() {
-        if (!recHost) return;
-        recHost.textContent = "";
-        var rows = orderRows(recRows).filter(function (x) { return x && x.id; }).sort(function (x, y) { var X = x.orderDate || "", Y = y.orderDate || ""; return X < Y ? 1 : X > Y ? -1 : 0; }).slice(0, 6);
-        recHost.style.display = rows.length ? "" : "none";
-        list.classList.toggle("no-rec", !rows.length);
-        if (!rows.length) return;
-        var head = el("button", { type: "button", className: "rl-ask-hb", onclick: function () { if (window.go) window.go("receipts"); } }, [el("span", { text: "Ask about a receipt" }), accIc("chev", 12, "rl-ask-chev")]);
-        head.setAttribute("aria-label", "Ask about a receipt. See all your receipts");
-        recHost.appendChild(el("h2", { className: "rl-ask-h" }, [head]));
-        var strip = el("div", { className: "rl-ask-tiles" });
-        rows.forEach(function (x) {
-          var shop = (x.retailer && x.retailer.name) || "", when = x.orderDate ? shortDate(x.orderDate) : "";
-          var art = el("span", { className: "h2-art" }); art.setAttribute("aria-hidden", "true"); receiptPic(art, x, 60, 64);
-          var day = el("span", { className: "rl-ask-day", text: when || "\u00a0" }); day.setAttribute("aria-hidden", "true");
-          // The business under its picture, then the day (screen audit, 23 Nov 2026: three tiles that said only "23 Nov").
-          var nm = el("span", { className: "rl-ask-nm", text: bizOf(x).name || shop }); nm.setAttribute("aria-hidden", "true");
-          var tile = el("button", { type: "button", className: "rl-ask-tile", onclick: function () { askAssistantAbout(x, true); } }, [el("span", { className: "rl-ask-sq" }, [art]), nm, day]);
-          tile.setAttribute("aria-label", "Ask about your receipt" + (shop ? " from " + shop : "") + (when ? ", " + when : ""));
-          tile.setAttribute("data-receipt", x.id);
-          if (x.category && x.category !== "shop" && x.category !== "other" && TILE_COLOURS[x.category]) tile.style.setProperty("--h2-ink", TILE_COLOURS[x.category]);
-          strip.appendChild(tile);
-        });
-        recHost.appendChild(strip);
-      }
-      function opening() { return Boolean(opts.tab && ai && !about && !log.length); }
-      function draw() {
-        list.textContent = "";
-        var first = opening();
-        list.classList.toggle("rl-ask-open", first);
-        if (opts.tab) b.classList.toggle("rl-ask-opening", first);
-        recHost = null;
-        if (first) {
-          recHost = el("div", { className: "rl-ask-rec" }); list.appendChild(recHost); drawTiles();
-          list.appendChild(el("h2", { className: "rl-ask-h2", text: "Try asking" }));
-          list.appendChild(el("div", { className: "rl-ask-qs" }, ASK_STARTERS.map(function (q) {
-            var pic = el("span", { className: "rl-ask-qi" }, [ACC_IC[q[1]] ? accIc(q[1], 24, "rl-ask-qi-i") : jIc(q[1], 24)]); pic.setAttribute("aria-hidden", "true"); pic.style.setProperty("--qi", q[2]);
-            return el("button", { type: "button", className: "rl-ask-q", onclick: function () { box.value = q[0]; sendQuestion(true); } }, [pic, el("b", { text: q[0] })]);
-          })));
-          list.appendChild(el("p", { className: "rl-ask-ai", text: "Relay's assistant is an AI, so it can get things wrong." }));
-          return;
-        }
-        list.appendChild(bubble({ role: "bot", first: true, text: about ? "Hi, I'm Relay's assistant. I'm an AI, so I can get things wrong. I can see what Relay read from this receipt. What would you like to know?"
-          : ai ? "Hi, I'm Relay's assistant. I'm an AI, so I can get things wrong. Ask me anything about using Relay, or tap Talk to a person."
-          : "Write your question and tap send. Relay's team will reply by email to " + (load() || {}).email + "." }));
-        if (ai && !log.length) {
-          var chips = el("div", { className: "rl-chat-chips" });
-          (about ? ["The total is wrong", "Some items are missing", "This isn't something I bought"] : ["How does Relay find my receipts?", "A receipt is missing", "How do I mark a gift?"]).forEach(function (q) {
-            chips.appendChild(el("button", { type: "button", text: q, onclick: function () { box.value = q; sendQuestion(true); } }));
-          });
-          list.appendChild(chips);
-        }
-        var newest = -1; if (opts.tab && !about) log.forEach(function (t, i) { if (t.role === "user") newest = i; });
-        log.forEach(function (t, i) { list.appendChild(bubble(t, i === newest && t.typed === true)); });
-      }
-      function turns(extra) {
-        var out = log.filter(function (t) { return t.role === "user" || t.role === "assistant"; }).map(function (t) { return { role: t.role, text: t.text }; });
-        if (extra) out.push({ role: "user", text: extra });
-        return out.slice(-24);
-      }
-      function lock(yes) { busy = yes; send.disabled = yes; person.disabled = yes; }
-      // offered: one of the page's own questions was tapped, not typed (the button and the Enter key pass something else).
-      function sendQuestion(offered) {
-        var q = box.value.replace(/\s+$/, "").trim();
-        if (busy || !q) return;
-        if (!ai) return handoff();
-        say(note, "");
-        log.push({ role: "user", text: q, typed: offered !== true }); box.value = ""; draftSet("help-chat", ""); fit();
-        draw();
-        var typing = el("div", { className: "rl-chat-b bot rl-chat-typing" }, [el("span", { className: "rl-skel" }), el("span", { className: "rl-skel" })]);
-        typing.setAttribute("aria-label", "Relay's assistant is writing");
-        list.appendChild(typing); scrollEnd();
-        lock(true);
-        api("/relay/my/help/chat", { method: "POST", body: Object.assign({ messages: turns() }, about ? { receiptId: about.id } : {}) }).then(function (r) {
-          lock(false); typing.remove();
-          if (r.ok && r.body && r.body.reply) { log.push({ role: "assistant", text: r.body.reply }); draw(); scrollEnd(); return; }
-          log.pop(); box.value = q; fit(); draw();
-          var e = r.body && r.body.error;
-          if (e === "receipt_not_found" && about) { stopAbout(); return say(note, "That receipt isn't in your Receipts any more, so the assistant can't see it. Send your question again to ask without it.", true); }
-          say(note, e === "chat_off" ? "The assistant is off right now. Tap Talk to a person and Relay's team will email you."
-            : r.status === 429 ? "That's a lot of messages for one day. Tap Talk to a person, or try again tomorrow."
-            : "The assistant couldn't answer just now. Try again in a moment, or tap Talk to a person.", true);
-        }, function () { lock(false); typing.remove(); log.pop(); box.value = q; fit(); draw(); say(note, "Couldn't reach Relay. Check your connection and try again.", true); });
-      }
-      function handoff() {
-        var extra = box.value.trim(), msgs = turns(extra || null), email = (load() || {}).email;
-        if (!msgs.some(function (t) { return t.role === "user"; })) { say(note, "Write your question first, then send it.", true); box.focus(); return; }
-        ask("Send this to Relay's team? They'll reply by email to " + email + ".", "Send", function () {
-          lock(true); say(note, "");
-          api("/relay/my/help/handoff", { method: "POST", body: { messages: msgs } }).then(function (r) {
-            lock(false);
-            if (!r.ok) return say(note, r.status === 429 ? "You've already sent a few today. Relay's team will reply by email." : "Couldn't send that. Try again in a moment.", true);
-            if (extra) { log.push({ role: "user", text: extra }); box.value = ""; draftSet("help-chat", ""); fit(); }
-            log.push({ role: "note", text: "Sent to Relay's team. They'll reply by email to " + email + "." });
-            draw(); scrollEnd();
-          }, function () { lock(false); say(note, "Couldn't reach Relay. Check your connection and try again.", true); });
-        });
-      }
-      function fit() { box.style.height = "auto"; box.style.height = Math.min(140, Math.max(opts.tab ? 56 : 48, box.scrollHeight)) + "px"; }
-      function scrollEnd() { try { send.scrollIntoView({ block: "end", behavior: "smooth" }); } catch (e) {} }
-      box.addEventListener("input", function () { draftSet("help-chat", box.value); fit(); });
-      box.addEventListener("keydown", function (e) { if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); sendQuestion(); } });
-      send.onclick = sendQuestion;
-      // Pressing send leaves the cursor in the box: the keyboard stays up for the next question, and the box doesn't
-      // slide away from under a mouse as the page settles back.
-      send.addEventListener("mousedown", function (e) { e.preventDefault(); });
-      person.onclick = handoff;
-      // Which receipt the assistant can see, and a way to stop showing it.
-      if (about) {
-        aboutBar = el("div", { className: "rl-rc-fix rl-chat-about" }, [el("span", { text: "About your receipt from " + about.label }),
-          el("button", { type: "button", className: "rl-pill", text: "Stop showing it", onclick: stopAbout })]);
-        b.appendChild(aboutBar);
-      }
-      // A problem is said just above the box, so it's never hidden behind the tab bar.
-      b.appendChild(list);
-      foot = el("p", { className: "rl-anote", text: noteText() });
-      if (opts.tab) { b.appendChild(foot); if (ai) b.appendChild(person); b.appendChild(note); b.appendChild(el("div", { className: "rl-chat-bar" }, [box, send])); }
-      else { b.appendChild(note); b.appendChild(el("div", { className: "rl-chat-bar" }, [box, send])); if (ai) b.appendChild(person); b.appendChild(foot); }
-      draw(); setTimeout(fit, 0);
-      // The tiles show what the app already has; if that is more than a few minutes old, ask once and redraw them.
-      if (opening() && !memoFresh(memo.receipts)) api("/relay/my/receipts").then(function (r) {
-        if (!r.ok || !r.body || !list.isConnected) return;
-        var rows = r.body.receipts || []; if (JSON.stringify(rows) === JSON.stringify(recRows)) return;
-        recRows = rows; drawTiles();
-      }, function () {});
+      return el("div", { className: "rl-chat-b bot" }, [who(t.first), t.role === "assistant" ? richText(t.text) : el("p", { text: t.text })]);
     }
+    function pill(text, fn, cls) { return el("button", { type: "button", className: "rl-hc-qr-b" + (cls ? " " + cls : ""), text: text, onclick: function () { if (!busy) fn(); } }); }
+    function say2(pick, lv, text) { log.push({ role: "pick", text: pick }, { role: "prompt", level: lv, text: text }); say(note, ""); draw(); }
+    function pills() {
+      var lv = level(), out = [];
+      if (lv === "top") {
+        if (about) ABOUT_QS.forEach(function (q) { out.push(pill(q, function () { askAI(q, false); })); });
+        CHAT_TOPICS.forEach(function (t) { if (!about || t[0] === "else") out.push(pill(t[1], function () { say2(t[1], t[0], t[2]); if (t[0] === "else") box.focus(); })); });
+      } else if (lv && lv !== "person") topic(lv)[3].forEach(function (q) { out.push(pill(q, function () { askAI(q, false); })); });
+      else if (!lv) out.push(pill("Ask something else", function () { say2("Ask something else", "top", "What else can I help with?"); }));
+      if (lv !== "person") out.push(pill("Talk to a person", handoff, "rl-hc-person"));
+      // Back goes up a level: what was last tapped, and Relay's question after it, go.
+      var last = log[log.length - 1];
+      if (last && last.role === "prompt") {
+        var bk = pill("", function () { while (log.length) { if (log.pop().role === "pick") break; } say(note, ""); draw(); }, "rl-hc-back");
+        bk.textContent = ""; bk.appendChild(jIc("back", 18)); bk.appendChild(el("span", { text: "Back" }));
+        out.push(bk);
+      }
+      return out.length ? el("div", { className: "rl-hc-qr" }, out) : null;
+    }
+    function draw() {
+      list.textContent = "";
+      list.appendChild(priv);
+      list.appendChild(bubble({ role: "prompt", first: true, text: about ? "Hi, I'm Relay's assistant. I'm an AI, so I can get things wrong. I can see what Relay read from this receipt. What would you like to know?"
+        : ai ? "Hi, I'm Relay's assistant. I'm an AI, so I can get things wrong. Tap a topic, or write your question below."
+        : "Write your question and tap send. Relay's team will reply by email to " + email + "." }));
+      var newest = -1; if (opts.tab && !about) log.forEach(function (t, i) { if (t.role === "user") newest = i; });
+      log.forEach(function (t, i) { list.appendChild(bubble(t, i === newest && t.typed === true)); });
+      if (busy) {
+        var typing = el("div", { className: "rl-chat-b bot rl-chat-typing" }, [el("span", { className: "rl-hc-dots" }, [el("i"), el("i"), el("i")])]);
+        typing.setAttribute("role", "status"); typing.setAttribute("aria-label", "Relay's assistant is writing");
+        list.appendChild(typing);
+      } else if (ai) { var p = pills(); if (p) list.appendChild(p); }
+      var toTeam = level() === "person";
+      box.placeholder = about ? "Ask about this receipt" : toTeam ? (ai ? "Write to Relay's team" : "Write your question") : "Ask about Relay";
+      box.setAttribute("aria-label", toTeam ? "Your message to Relay's team" : "Your question for Relay's assistant");
+      send.setAttribute("aria-label", toTeam ? "Send to Relay's team" : "Send");
+      scrollEnd();
+    }
+    function scrollEnd() { list.scrollTop = list.scrollHeight; requestAnimationFrame(function () { list.scrollTop = list.scrollHeight; }); }
+    function turns(extra) {
+      var out = log.filter(function (t) { return t.role === "user" || t.role === "assistant"; }).map(function (t) { return { role: t.role, text: t.text }; });
+      if (extra) out.push({ role: "user", text: extra });
+      return out.slice(-24);
+    }
+    function lock(yes) { busy = yes; send.disabled = yes; }
+    function askAI(q, typed) {
+      q = String(q || "").replace(/\s+$/, "").trim();
+      if (busy || !q) return;
+      say(note, "");
+      log.push({ role: "user", text: q, typed: typed === true });
+      if (typed) { box.value = ""; draftSet("help-chat", ""); fit(); }
+      lock(true); draw();
+      api("/relay/my/help/chat", { method: "POST", body: Object.assign({ messages: turns() }, about ? { receiptId: about.id } : {}) }).then(function (r) {
+        lock(false);
+        if (r.ok && r.body && r.body.reply) { log.push({ role: "assistant", text: r.body.reply }); draw(); return; }
+        // The question comes back to the box (and is kept there if the chat is closed), to send again.
+        log.pop(); box.value = q; draftSet("help-chat", q); fit(); draw();
+        var e = r.body && r.body.error;
+        if (e === "receipt_not_found" && about) { stopAbout(); return say(note, "That receipt isn't in your Receipts any more, so the assistant can't see it. Send your question again to ask without it.", true); }
+        say(note, e === "chat_off" ? "The assistant is off right now. Tap Talk to a person and Relay's team will email you."
+          : r.status === 429 ? "That's a lot of messages for one day. Tap Talk to a person, or try again tomorrow."
+          : "The assistant couldn't answer just now. Try again in a moment, or tap Talk to a person.", true);
+      }, function () { lock(false); log.pop(); box.value = q; draftSet("help-chat", q); fit(); draw(); say(note, "Couldn't reach Relay. Check your connection and try again.", true); });
+    }
+    // Talk to a person: with nothing asked yet, Relay asks for the question first; then it asks before sending the chat.
+    function handoff() {
+      if (busy) return;
+      var extra = box.value.trim(), msgs = turns(extra || null);
+      if (!msgs.some(function (t) { return t.role === "user"; })) {
+        if (level() === "person") { say(note, "Write your question first, then send it.", true); box.focus(); return; }
+        say2("Talk to a person", "person", "Write your question below and tap send. Relay's team will reply by email to " + email + ".");
+        box.focus(); return;
+      }
+      ask("Send this to Relay's team? They'll reply by email to " + email + ".", "Send", function () {
+        lock(true); say(note, "");
+        api("/relay/my/help/handoff", { method: "POST", body: { messages: msgs } }).then(function (r) {
+          lock(false);
+          if (!r.ok) return say(note, r.status === 429 ? "You've already sent a few today. Relay's team will reply by email." : "Couldn't send that. Try again in a moment.", true);
+          if (extra) { log.push({ role: "user", text: extra }); box.value = ""; draftSet("help-chat", ""); fit(); }
+          log.push({ role: "note", text: "Sent to Relay's team. They'll reply by email to " + email + "." });
+          draw();
+        }, function () { lock(false); say(note, "Couldn't reach Relay. Check your connection and try again.", true); });
+      });
+    }
+    function sendTyped() { if (busy) return; if (level() === "person") return handoff(); askAI(box.value, true); }
+    function fit() { box.style.height = "auto"; box.style.height = Math.min(140, Math.max(48, box.scrollHeight)) + "px"; }
+    box.addEventListener("input", function () { draftSet("help-chat", box.value); fit(); });
+    box.addEventListener("keydown", function (e) { if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); sendTyped(); } });
+    // With the keyboard up, the newest message stays in sight above the box.
+    box.addEventListener("focus", function () { setTimeout(scrollEnd, 320); });
+    send.onclick = sendTyped;
+    // Pressing send leaves the cursor in the box, so the keyboard stays up for the next question.
+    send.addEventListener("mousedown", function (e) { e.preventDefault(); });
+    sheet.appendChild(head);
+    if (aboutBar) sheet.appendChild(aboutBar);
+    sheet.appendChild(list);
+    sheet.appendChild(el("div", { className: "rl-hc-foot" }, [note, el("div", { className: "rl-chat-bar" }, [box, send])]));
+    // A tap outside closes it, but not the second half of the double tap that opened it.
+    layer.addEventListener("click", function (e) { if (e.target === layer && (!e.isTrusted || Date.now() - born > 400)) shut(); });
+    document.addEventListener("keydown", onKey);
+    document.body.appendChild(layer);
+    try { sheet.focus({ preventScroll: true }); } catch (e) {}
+    draw(); fit();
+    if (opts.ask) askAI(opts.ask, opts.typed === true);
+    else if (opts.person) { if (opts.text) box.value = opts.text; handoff(); }
+  }
+  // The Ask tab: the newest receipts to ask about, questions to tap, and a box to write in. Each opens the chat.
+  function askLanding(b) {
+    var list = el("div", { className: "rl-chat rl-ask-open" });
+    var note = el("p", { className: "rl-msg" });
+    var box = el("textarea", { className: "rl-chat-in", rows: 1, maxLength: 1000, placeholder: "Search receipts or ask about Relay", value: draftGet("help-chat") });
+    box.setAttribute("aria-label", "Your question for Relay's assistant");
+    var send = el("button", { type: "button", className: "rl-chat-send", ariaLabel: "Send" }, [jIc("send", 20)]);
+    var person = el("button", { type: "button", className: "rl-btn ghost rl-chat-person", text: "Talk to a person" });
+    b.classList.add("rl-ask-opening");
+    // The Ask tab's newest receipts, to ask about one: what the app already has, brought up to date once if that is old.
+    var recHost = null, recRows = (memo.receipts && memo.receipts.rows) || [];
+    function drawTiles() {
+      if (!recHost) return;
+      recHost.textContent = "";
+      var rows = orderRows(recRows).filter(function (x) { return x && x.id; }).sort(function (x, y) { var X = x.orderDate || "", Y = y.orderDate || ""; return X < Y ? 1 : X > Y ? -1 : 0; }).slice(0, 6);
+      recHost.style.display = rows.length ? "" : "none";
+      list.classList.toggle("no-rec", !rows.length);
+      if (!rows.length) return;
+      var head = el("button", { type: "button", className: "rl-ask-hb", onclick: function () { if (window.go) window.go("receipts"); } }, [el("span", { text: "Ask about a receipt" }), accIc("chev", 12, "rl-ask-chev")]);
+      head.setAttribute("aria-label", "Ask about a receipt. See all your receipts");
+      recHost.appendChild(el("h2", { className: "rl-ask-h" }, [head]));
+      var strip = el("div", { className: "rl-ask-tiles" });
+      rows.forEach(function (x) {
+        var shop = (x.retailer && x.retailer.name) || "", when = x.orderDate ? shortDate(x.orderDate) : "";
+        var art = el("span", { className: "h2-art" }); art.setAttribute("aria-hidden", "true"); receiptPic(art, x, 60, 64);
+        var day = el("span", { className: "rl-ask-day", text: when || " " }); day.setAttribute("aria-hidden", "true");
+        // The business under its picture, then the day (screen audit, 23 Nov 2026: three tiles that said only "23 Nov").
+        var nm = el("span", { className: "rl-ask-nm", text: bizOf(x).name || shop }); nm.setAttribute("aria-hidden", "true");
+        var tile = el("button", { type: "button", className: "rl-ask-tile", onclick: function () { askAssistantAbout(x, true); } }, [el("span", { className: "rl-ask-sq" }, [art]), nm, day]);
+        tile.setAttribute("aria-label", "Ask about your receipt" + (shop ? " from " + shop : "") + (when ? ", " + when : ""));
+        tile.setAttribute("data-receipt", x.id);
+        if (x.category && x.category !== "shop" && x.category !== "other" && TILE_COLOURS[x.category]) tile.style.setProperty("--h2-ink", TILE_COLOURS[x.category]);
+        strip.appendChild(tile);
+      });
+      recHost.appendChild(strip);
+    }
+    function row(text, icon, colour, fn) {
+      var pic = el("span", { className: "rl-ask-qi" }, [ACC_IC[icon] ? accIc(icon, 24, "rl-ask-qi-i") : jIc(icon, 24)]); pic.setAttribute("aria-hidden", "true"); pic.style.setProperty("--qi", colour);
+      return el("button", { type: "button", className: "rl-ask-q", onclick: fn }, [pic, el("b", { text: text })]);
+    }
+    function draw() {
+      if (!list.isConnected && list.parentNode) return;
+      list.textContent = "";
+      recHost = el("div", { className: "rl-ask-rec" }); list.appendChild(recHost); drawTiles();
+      // The heading's chevron opens the chat itself: its topics to tap, or the chat where it was left.
+      var going = (memo.chatLog || []).some(function (t) { return t.role === "user"; });
+      var open = el("button", { type: "button", className: "rl-ask-hc", onclick: function () { openHelpChat({ tab: true, about: going ? memo.chatAboutNow : null }); } }, [el("span", { text: "Try asking" }), accIc("chev", 12, "rl-ask-chev")]);
+      open.setAttribute("aria-label", going ? "Try asking. Carry on your chat" : "Try asking. Open the chat with Relay");
+      list.appendChild(el("h2", { className: "rl-ask-h2" }, [open]));
+      list.appendChild(el("div", { className: "rl-ask-qs" }, ASK_STARTERS.map(function (q) {
+        return row(q[0], q[1], q[2], function () { openHelpChat({ ask: q[0], tab: true }); });
+      })));
+      list.appendChild(el("p", { className: "rl-ask-ai", text: "Relay's assistant is an AI, so it can get things wrong." }));
+    }
+    askRedraw = function () { if (list.isConnected) draw(); };
+    function sendQuestion() {
+      var q = box.value.replace(/\s+$/, "").trim();
+      if (!q) { box.focus(); return; }
+      box.value = ""; draftSet("help-chat", ""); fit();
+      openHelpChat({ ask: q, typed: true, tab: true });
+    }
+    function fit() { box.style.height = "auto"; box.style.height = Math.min(140, Math.max(56, box.scrollHeight)) + "px"; }
+    box.addEventListener("input", function () { draftSet("help-chat", box.value); fit(); });
+    box.addEventListener("keydown", function (e) { if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); sendQuestion(); } });
+    send.onclick = sendQuestion;
+    send.addEventListener("mousedown", function (e) { e.preventDefault(); });
+    person.onclick = function () { var t = box.value.trim(); box.value = ""; draftSet("help-chat", ""); fit(); openHelpChat({ tab: true, person: true, text: t }); };
+    b.appendChild(list);
+    b.appendChild(el("p", { className: "rl-anote", text: chatNote(true, null) }));
+    b.appendChild(person); b.appendChild(note); b.appendChild(el("div", { className: "rl-chat-bar" }, [box, send]));
+    draw(); setTimeout(fit, 0);
+    // The tiles show what the app already has; if that is more than a few minutes old, ask once and redraw them.
+    if (!memoFresh(memo.receipts)) api("/relay/my/receipts").then(function (r) {
+      if (!r.ok || !r.body || !list.isConnected) return;
+      var rows = r.body.receipts || []; if (JSON.stringify(rows) === JSON.stringify(recRows)) return;
+      recRows = rows; drawTiles();
+    }, function () {});
+  }
   // Whether the assistant is on: asked once each time Relay is opened, and the last answer is remembered on this phone so
   // the tab doesn't turn up late. Signing out forgets it.
   var ASK_KEY = "relay.ask.v1", askAsked = false;
@@ -5941,7 +6067,7 @@
       if (!host.isConnected) return;
       host.textContent = "";
       if (!hc || !hc.available) { host.appendChild(el("p", { className: "rl-calm-none", text: "Relay's assistant is off at the moment. To write to Relay's team, tap your picture at the top, then Help and legal." })); return; }
-      chatPage(host, { tab: true });
+      askLanding(host);
     });
   }
   function signedInView(sheet, email, notice, c) {
@@ -6164,7 +6290,7 @@
 
     // Help and legal
     // The help chat: shown once Relay says it's on (an AI assistant), or that a person can be reached by email.
-    var chatRow = accRow("chat", "Chat with us", "Ask Relay's assistant, or a person", function () { page(chatRow._ai ? "Help chat" : "Contact us", chatPage); });
+    var chatRow = accRow("chat", "Chat with us", "Ask Relay's assistant, or a person", function () { openHelpChat({}); });
     chatRow.style.display = "none";
     (memo.helpChat ? Promise.resolve(memo.helpChat) : api("/relay/my/help/chat").then(function (r) { return r.ok && r.body ? (memo.helpChat = r.body) : null; }, function () { return null; })).then(function (hc) {
       if (!hc || !(hc.available || hc.handoff)) return;
@@ -6172,12 +6298,6 @@
       if (!hc.available) { chatRow.querySelector(".rl-arow-t b").textContent = "Contact us"; chatRow.setDetail("Write to Relay's team. They'll reply by email"); chatRow.style.display = ""; }
       else if (askOn()) chatRow.remove();
       else chatRow.style.display = "";
-      // Asking the assistant about a receipt lands on Profile's first screen and opens the chat from there.
-      openChatAbout = function () {
-        if (!head.isConnected || !hc.available || !wantChatAbout) return false;
-        memo.chatAbout = wantChatAbout; page("Help chat", chatPage); return true;
-      };
-      if (wantChatAbout) setTimeout(function () { if (wantChatAbout && openChatAbout()) wantChatAbout = null; }, 0);
     });
     function helpHub(b) {
       b.appendChild(accGroup("Help and legal", [

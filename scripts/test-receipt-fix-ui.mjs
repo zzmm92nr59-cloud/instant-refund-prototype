@@ -161,14 +161,14 @@ await askShirt.getByRole("button", { name: "Ask the assistant" }).click();
 await page.getByText("Show this receipt to Relay's assistant? It sees what Relay read from it (the shop, date, total, items and return date), not the email itself.").waitFor();
 assert.equal(asks.length, 0, "nothing is sent before they say so");
 await page.getByRole("button", { name: "Show it" }).click();
-const chat = page.locator("#askPage"); // the assistant is the Ask tab
+const chat = page.locator(".rl-back .rl-hc"); // the chat opens as a sheet over the receipt
 await chat.getByText("About your receipt from Larkspur Home", { exact: false }).waitFor();
 await chat.getByText("I can see what Relay read from this receipt. What would you like to know?", { exact: false }).waitFor();
 await chat.getByText("Your messages, and what Relay read from this receipt, go to Anthropic", { exact: false }).waitFor();
 await chat.getByRole("button", { name: "The total is wrong" }).click();
 await chat.getByText(REPLY).waitFor();
 assert.deepEqual(asks[0], { messages: [{ role: "user", text: "The total is wrong" }], receiptId: ID2 });
-await polished("chat about a receipt", "#askPage");
+await polished("chat about a receipt", ".rl-hc");
 await chat.getByRole("button", { name: "Stop showing it" }).click();
 await chat.getByText("The assistant can't see the receipt any more.").waitFor();
 assert.equal(await chat.getByText("About your receipt from", { exact: false }).count(), 0);
