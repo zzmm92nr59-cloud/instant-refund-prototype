@@ -1128,6 +1128,17 @@
     ".rl-bk-row{display:flex;align-items:center;gap:12px;min-height:60px;padding:10px 0;border-top:.5px solid var(--rl-line)}.rl-bk-row:first-child{border-top:0}" +
     "button.rl-bk-row{width:100%;background:none;border-left:0;border-right:0;border-bottom:0;font:inherit;color:inherit;text-align:left;cursor:pointer;transition:opacity .15s}button.rl-bk-row:active{opacity:.55}" +
     ".rl-bk-row.rl-bk-not .rl-bk-t,.rl-bk-row.rl-bk-not .rl-bk-a{opacity:.5}" +
+    // Which cards are yours: a row a card (name and last four digits) with a round tick, then Save.
+    ".rl-bk-pick{margin:16px 0 6px;padding:16px 18px;border-radius:18px;background:var(--rl-card);border:1px solid var(--rl-line)}" +
+    ".rl-bk-pick h3{margin:0;font-size:18px;line-height:1.3;font-weight:700;color:var(--rl-text)}.rl-bk-pick p{margin:6px 0 4px;font-size:15px;line-height:1.45;color:var(--rl-text2)}" +
+    ".rl-bk-pick .rl-btn{margin-top:12px}.rl-bk-pick .rl-msg:empty{display:none}" +
+    ".rl-bk-card{display:flex;align-items:center;gap:12px;width:100%;min-height:56px;padding:8px 0;background:none;border:0;border-top:.5px solid var(--rl-line);font:inherit;color:var(--rl-text);text-align:left;cursor:pointer;transition:opacity .15s;-webkit-tap-highlight-color:transparent}" +
+    ".rl-bk-card:first-child{border-top:0}.rl-bk-card:active{opacity:.55}.rl-bk-card:disabled{cursor:default}" +
+    ".rl-bk-card b{flex:1;min-width:0;font-size:16px;font-weight:600;line-height:1.3;overflow-wrap:anywhere}" +
+    ".rl-bk-tick{flex:none;display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:999px;border:2px solid var(--rl-text2);box-sizing:border-box;color:transparent;transition:background .15s,border-color .15s}" +
+    ".rl-bk-card[aria-checked=true] .rl-bk-tick{background:var(--rl-accent);border-color:var(--rl-accent);color:#fff}" +
+    ".rl-bk-tick-i{display:inline-flex;line-height:0}.rl-bk-tick-i svg{stroke-width:2.6}" +
+    ".rl-bk-cards{margin-top:6px}" +
     ".rl-bk-t{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}.rl-bk-t b{font-size:16px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--rl-text)}.rl-bk-t span,.rl-bk-a span{font-size:14px;color:var(--rl-text2)}" +
     ".rl-bk-a{flex:none;display:flex;flex-direction:column;align-items:flex-end;gap:2px}.rl-bk-a b{font-size:16px;font-weight:600;color:var(--rl-text)}" +
     // A payment that likely should have a receipt, and the sheet for adding a photo of it (receiptPhotoSheet).
@@ -5993,7 +6004,8 @@
         if (!r.ok || !r.body || !r.body.available) return;
         bankRow.style.display = "";
         var n = (r.body.connections || []).length;
-        if (n && bankRow.setDetail) bankRow.setDetail(n === 1 ? (r.body.connections[0].bank || "1 connected") : n + " connected");
+        var asks = (r.body.connections || []).some(function (c) { return c.needsChoice; });
+        if (n && bankRow.setDetail) bankRow.setDetail(asks ? "Choose which cards are yours" : n === 1 ? (r.body.connections[0].bank || "1 connected") : n + " connected");
       }, function () {});
     }
     openBankPage = function () { var note = wantBank; wantBank = null; page("Bank and cards", function (b) { bankPage(b, note); }); return true; };
@@ -6430,16 +6442,71 @@
         if (body.testBanks) { testLine.hidden = false; testLine.textContent = "Test banks only for now. Choose Mock Bank, then sign in with john and doe."; }
         var cs = body.connections || [];
         if (!cs.length) return;
+        // A bank that lists more than one card asks which are yours before any payment is read (worker/bank.js), right here.
+        cs.forEach(function (c) {
+          if (c.needsChoice && c.cards) list.appendChild(cardChooser(c, true, function () { say(note, "Saved. Relay reads payments only from your cards."); load(); }));
+        });
         list.appendChild(accGroup("Connected", cs.map(function (c) {
-          return accRow("card", c.bank || "Bank", c.needsReconnect ? "Connect again to keep reading payments" : when(c.syncedAt) + (c.matched ? ", " + c.matched + (c.matched === 1 ? " receipt matched" : " receipts matched") : ""), function () {
+          var disconnect = function () {
             ask("Disconnect " + (c.bank || "this bank") + "? Relay deletes the payments it read from it.", "Disconnect", function () {
               api("/relay/my/bank/disconnect", { method: "POST", body: { id: c.id } }).then(function (r) {
                 if (!r.ok) return say(note, "Couldn't disconnect it. Try again in a moment.", true);
                 say(note, "Disconnected. The payments read from it are deleted."); load();
               }, function () { say(note, "Couldn't reach Relay. Check your connection and try again.", true); });
             });
+          };
+          var yours = (c.cards || []).filter(function (k) { return k.mine === true; }).length;
+          var detail = c.needsReconnect ? "Connect again to keep reading payments" : c.needsChoice ? "Choose which cards are yours"
+            : when(c.syncedAt) + (c.cards ? ", " + (yours === 1 ? "1 card is yours" : yours + " cards are yours") : "") + (c.matched ? ", " + c.matched + (c.matched === 1 ? " receipt matched" : " receipts matched") : "");
+          return accRow("card", c.bank || "Bank", detail, function () {
+            if (!c.cards) return disconnect();
+            chooseBox(c.bank || "Bank", [["Choose your cards", function () { cardsPage(c); }], ["Disconnect", disconnect]]);
           });
         })));
+        // A card company that sends every card on the account together, without saying which card each payment was on.
+        if (cs.some(function (c) { return c.unsplit; })) list.appendChild(el("p", { className: "rl-anote", text: "American Express sends the payments of every card on your account together, without saying which card each was on. If someone else has a card on it, tap a payment that isn't yours to say so." }));
+      }
+      // "Which of these are yours?": a row a card (its name and last four digits), each ticked on or off, then Save. Shown
+      // on the bank page when it's asked (top) and on its own page when they change it later. done(connection) after saving.
+      function cardChooser(c, top, done) {
+        var box = el("section", { className: "rl-bk-pick" });
+        var picked = {}; c.cards.forEach(function (k) { picked[k.ref] = k.mine === true; });
+        if (top) box.appendChild(el("h3", { text: "Which of these are yours?" }));
+        box.appendChild(el("p", { text: (c.bank || "Your bank") + " shows more than one card. Relay reads payments only from the ones you choose, so nobody sees someone else's spending." }));
+        var rows = el("div", { className: "rl-bk-cards", role: "group", ariaLabel: "Your cards at " + (c.bank || "your bank") });
+        var save = el("button", { type: "button", className: "rl-btn" }), msg = el("p", { className: "rl-msg", role: "status" });
+        var word = function () { save.textContent = c.cards.some(function (k) { return picked[k.ref]; }) ? "Save" : "None of these are mine"; };
+        c.cards.forEach(function (k) {
+          var tick = el("span", { className: "rl-bk-tick" }, [accIc("check", 16, "rl-bk-tick-i")]);
+          var row = el("button", { type: "button", className: "rl-bk-card", role: "checkbox" }, [el("b", { text: k.label }), tick]);
+          var draw = function () { row.setAttribute("aria-checked", picked[k.ref] ? "true" : "false"); };
+          row.onclick = function () { if (save.disabled) return; picked[k.ref] = !picked[k.ref]; draw(); word(); };
+          draw(); rows.appendChild(row);
+        });
+        word();
+        save.onclick = function () {
+          if (save.disabled) return;
+          var buttons = Array.prototype.slice.call(box.querySelectorAll("button"));
+          buttons.forEach(function (x) { x.disabled = true; }); save.textContent = "Saving\u2026"; say(msg, "");
+          var free = function () { buttons.forEach(function (x) { x.disabled = false; }); word(); };
+          api("/relay/my/bank/cards", { method: "POST", body: { id: c.id, cards: c.cards.map(function (k) { return { ref: k.ref, mine: Boolean(picked[k.ref]) }; }) } }).then(function (r) {
+            if (!r.ok) { free(); return say(msg, r.status === 404 ? "This bank's cards have changed. Go back and open it again." : "Couldn't save that. Try again in a moment.", true); }
+            memo.bankPays = null; done(r.body && r.body.connection);
+          }, function () { free(); say(msg, "Couldn't reach Relay. Check your connection and try again.", true); });
+        };
+        box.appendChild(rows); box.appendChild(save); box.appendChild(msg);
+        return box;
+      }
+      // Changing it later: its own page, whose Back returns to Bank and cards.
+      function cardsPage(c) {
+        var prev = backTo;
+        var reopen = function () { backTo = prev; page("Bank and cards", function (b2) { bankPage(b2, null); }); };
+        reopen.word = "Bank and cards";
+        backTo = reopen;
+        page("Your cards", function (b2) {
+          b2.appendChild(cardChooser(c, false, function () { reopen(); }));
+        });
+        backTo = prev;
       }
       function drawPays(body) {
         pays.textContent = "";

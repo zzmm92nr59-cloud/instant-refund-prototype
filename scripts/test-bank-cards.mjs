@@ -214,6 +214,20 @@ assert.equal(k4.needsChoice, undefined); assert.equal(k4.unsplit, true); assert.
 assert.equal(k1.unsplit, undefined, "only said for a card company that sends cards together");
 console.log("ok - payments that don't say their card: nothing guessed, and Relay says it can't tell them apart");
 
+// 9b. Payments read before cards were told apart (older than the 90 days read again, no card): given the card they were
+// saved under; one from the card that isn't hers is deleted; one Relay can't place is never shown, matched or exported.
+const old = (pid, account, desc) => sqlite.prepare(`INSERT INTO bank_payments (shopper_id, payment_id, connection_id, account, paid_on, amount_minor, currency, description, created_at)
+  VALUES (?,?,?,?,?,?,?,?,?)`).run(A, c1.id + ":" + pid, c1.id, account, "2026-07-01", 1500, "GBP", desc, now);
+old("old1", "Amex Gold ending 1004", "MAPLE LANE GIFTS"); old("old2", "Amex Gold ending 2009", "PEBBLE STREET SHOES"); old("old3", "Amex Gold", "QUILL AND INK");
+assert.ok(!(await shops(ava)).some((s) => /pebble|quill/i.test(s)), "not shown even before Relay reads the bank again");
+now += 2 * 3600e3;
+await call("/relay/my/bank/sync", { method: "POST", token: ava });
+assert.deepEqual(await shops(ava), ["Brindle and Co", "Fern Row Books", "Maple Lane Gifts"], "her old payment kept; the others never shown");
+assert.equal(sqlite.prepare("SELECT COUNT(*) AS n FROM bank_payments WHERE description = 'PEBBLE STREET SHOES'").get().n, 0, "the other card's old payment is deleted");
+assert.equal((await call("/relay/my/bank/not-mine", { method: "POST", token: ava, body: { id: c1.id + ":old3", on: true } })).status, 404, "one Relay can't place can't be acted on");
+assert.ok(!(await get("/relay/my/export", ava)).banks.payments.some((p) => /QUILL|PEBBLE/.test(p.description || "")), "nor exported");
+console.log("ok - payments read before cards were told apart: kept for her card, deleted for the other, never shown when Relay can't tell");
+
 // 10. In Download my data; deleted with the account.
 const ex = await get("/relay/my/export", ava);
 assert.deepEqual(ex.banks.cards.map((c) => [c.name, c.last4, c.yours]), [["Amex Gold", "1004", true], ["Amex Gold", "2009", false]]);
