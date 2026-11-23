@@ -173,6 +173,23 @@ jobs:
         run: node --import ./scripts/record-app-requests.mjs scripts/test-tips-ui.mjs
       - name: Test auctions in the shop's dashboard (what happened to each in words, started once, photos made smaller first, plain refusals)
         run: node scripts/test-retailer-auctions-ui.mjs
+      - name: Check everything the app sent passes the server's input rules (worker/validate.js)
+        run: node scripts/test-validation.mjs
+  # The screen check takes about 12 minutes on its own, so it runs beside browser-smoke instead of inside its time limit.
+  screens:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install test browser
+        run: |
+          npm install --no-save playwright
+          npx playwright install --with-deps chromium
+      - name: Record what the app sends to Relay's server during this test
+        run: echo "RELAY_REQUEST_LOG=$RUNNER_TEMP/app-requests.jsonl" >> "$GITHUB_ENV"
       - name: Look at every screen and sheet as a person would (phone, bigger text, desktop) for overlapping text or boxes, anything under the tab bar, sideways scroll, tiny text, small taps and cut-off prices
         run: node --import ./scripts/record-app-requests.mjs scripts/test-screens-ui.mjs
       - name: Check everything the app sent passes the server's input rules (worker/validate.js)
