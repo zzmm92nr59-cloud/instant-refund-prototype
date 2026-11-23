@@ -439,7 +439,21 @@ function togglePersonalise(){
 function personalisationHistory(){return getPurchases().filter(p=>p.demo===true||p.verified===true).concat(receiptBuys)}
 // What Relay has noticed about taste: items from the shopper's own receipts and products they opened or watched. Stored on this device only.
 window.relayNeedCatalog=()=>{if(!catalogReady)needCatalog();return catalogReady};
-window.relayLocalWatches=()=>Object.entries(watch).map(([sku,w])=>{const p=catalog.find(x=>x.sku===sku);if(p&&!w.image&&/^https:\/\//.test(String(p.imageUrl||""))){w.image=p.imageUrl;w.store=storeOf(p);try{localStorage.setItem("relay-radar-v2",JSON.stringify(watch))}catch{}}return{sku,real:/^web:/.test(sku)||!!(p&&!p.testShop&&!p.fixture&&!demo),product:w.name,variation:w.variant,priceMinor:w.baseline,store:p?storeOf(p):(w.store||""),image:p&&/^https:\/\//.test(String(p.imageUrl||""))?p.imageUrl:(w.image||""),nowMinor:p&&Number.isInteger(Number(p.priceMinor))?Number(p.priceMinor):null,currency:p&&p.currency||"GBP"}});
+// Watched things for Home's Watching list. Looked up by sku in one pass (a catalogue of thousands of products, every time
+// Home is drawn, used to be searched once per watched thing), and what was found (photo, shop, its web address, today's
+// price) is kept with the watch, written once, so the list shows at once next time, before the catalogue has come (rule 5).
+let watchIx=null,watchIxOf=null;
+const watchProduct=sku=>{if(watchIxOf!==catalog){watchIxOf=catalog;watchIx=new Map();for(const p of catalog)if(p&&p.sku&&!watchIx.has(p.sku))watchIx.set(p.sku,p)}return watchIx.get(sku)};
+window.relayLocalWatches=()=>{let changed=false;const keep=(w,k,v)=>{if(w[k]!==v){w[k]=v;changed=true}};
+ const out=Object.entries(watch).map(([sku,w])=>{const p=watchProduct(sku),web=/^web:/.test(sku);
+  if(p){const img=/^https:\/\//.test(String(p.imageUrl||""))?p.imageUrl:"";if(img)keep(w,"image",img);keep(w,"store",storeOf(p));keep(w,"dom",String(p.shopDomain||"").toLowerCase().replace(/^www\./,""));
+   keep(w,"now",Number.isInteger(Number(p.priceMinor))?Number(p.priceMinor):null);keep(w,"cur",p.currency||"GBP");keep(w,"real",web||!!(!p.testShop&&!p.fixture))}
+  // Until the catalogue is in: the copy kept with the watch. Once it's in, a shop's product it no longer has is left off.
+  const kept=!catalogReady&&!p;
+  return{sku,real:web||!!(p?!p.testShop&&!p.fixture&&!demo:kept&&w.real===true&&!demo),product:w.name,variation:w.variant,priceMinor:w.baseline,store:p?storeOf(p):(w.store||""),dom:w.dom||"",
+   image:p&&/^https:\/\//.test(String(p.imageUrl||""))?p.imageUrl:(w.image||""),nowMinor:p?(Number.isInteger(Number(p.priceMinor))?Number(p.priceMinor):null):kept&&Number.isInteger(w.now)?w.now:null,currency:p?(p.currency||"GBP"):(w.cur||"GBP"),kept}});
+ if(changed)try{localStorage.setItem("relay-radar-v2",JSON.stringify(watch))}catch{}
+ return out};
 let alertStores=[];
 function loadAlertState(){
  if(!window.RelayAccount||!RelayAccount.signedIn||!RelayAccount.signedIn()||!RelayAccount.alertStatus)return;

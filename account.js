@@ -281,7 +281,10 @@
   // A logo sits on white, like an app icon. When the logo's own picture has a solid background of another colour (a
   // pale grey square, say), its box takes that colour instead, so the picture's square edge never shows inside the box.
   // The new layout's tiles and circles use it (--logo-bg); nothing else does.
+  // (Worked out once per picture: a list of forty rows with the same shop's logo reads its corners once, not forty times.)
+  var logoBacks = {};
   function logoBack(box, pic) {
+    if (pic.src && logoBacks[pic.src]) return box.style.setProperty("--logo-bg", logoBacks[pic.src]);
     var back = "#fff";
     try {
       var c = document.createElement("canvas"); c.width = c.height = 8;
@@ -290,6 +293,7 @@
       var k = [at(0, 0), at(7, 0), at(0, 7), at(7, 7)];
       if (k.every(function (q) { return q[3] > 250 && Math.abs(q[0] - k[0][0]) + Math.abs(q[1] - k[0][1]) + Math.abs(q[2] - k[0][2]) < 12; })) back = "rgb(" + k[0][0] + "," + k[0][1] + "," + k[0][2] + ")";
     } catch (e) { back = "#fff"; }
+    if (pic.src) logoBacks[pic.src] = back;
     box.style.setProperty("--logo-bg", back);
   }
   function shopLogo(box, dom, px, onMiss) {
@@ -1387,6 +1391,20 @@
     ".hl-pic{position:relative;flex:none;width:64px;height:64px;border-radius:14px;overflow:hidden;background:var(--rl-fill)}.hl-pic .h2-art svg{max-width:52px;max-height:52px}" +
     ".hl-mid{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}.hl-mid b{font-size:16px;line-height:21px;color:var(--rl-text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.hl-mid span{font-size:14px;line-height:19px;color:var(--rl-text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.hl-mid em{font-style:normal;font-size:14px;line-height:19px;font-weight:600;color:var(--rl-text)}.hl-mid em.urgent{color:#b42318}.hl-mid em.soon{color:#93540a}" +
     ".hl-row .rl-arow-c{flex:none;color:var(--rl-text2)}" +
+    // Watching: one list of rows (Receipts' look), each row one tap. Rows far below the screen skip layout and painting
+    // until they come near it (content-visibility), so a long list opens and scrolls quickly. Nothing on it is a snap point.
+    ".wl-list{background:var(--rl-card);border-radius:22px;overflow:hidden;margin:0 0 18px}" +
+    ".wl-row{all:unset;box-sizing:border-box;cursor:pointer;width:100%;display:flex;align-items:center;gap:14px;padding:12px 16px;min-height:104px;border-top:1px solid var(--rl-line);-webkit-tap-highlight-color:transparent;transition:background .12s;content-visibility:auto;contain-intrinsic-size:auto 120px;scroll-snap-align:none}" +
+    ".wl-row:first-child{border-top:0}.wl-row:active{background:var(--rl-fill)}.wl-row:focus-visible{outline:2px solid var(--rl-text);outline-offset:-2px}" +
+    ".wl-pic{position:relative;flex:none;width:80px;height:80px;border-radius:14px;overflow:hidden;background:var(--rl-fill)}.wl-pic>img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center top;display:block}.wl-pic .h2-art svg{max-width:56px;max-height:56px}" +
+    ".wl-mid{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}" +
+    ".wl-n{font-size:16px;line-height:21px;font-weight:600;color:var(--rl-text);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}" +
+    ".wl-shop{display:flex;align-items:center;gap:6px;min-width:0}.wl-shop-n{font-size:14px;line-height:19px;color:var(--rl-text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}" +
+    ".wl-logo{flex:none;width:24px;height:24px;border-radius:50%;overflow:hidden;display:none;place-items:center;background:var(--logo-bg,#fff);box-shadow:inset 0 0 0 1px var(--rl-line)}.wl-logo.rl-has-logo{display:grid}.wl-logo>img{width:18px!important;height:18px!important;object-fit:contain}" +
+    ".wl-p{font-size:16px;line-height:21px;font-weight:700;color:var(--rl-text)}.wl-ch{font-size:14px;line-height:19px;color:var(--rl-text2)}.wl-ch.down{color:var(--rl-accent);font-weight:600}" +
+    ".h2-feed>.wl-list,.h2-feed>.wl-note{scroll-snap-align:none}.wl-bone{cursor:default}.wl-bone .wl-mid{gap:8px}" +
+    ".wl-note{all:unset;box-sizing:border-box;cursor:pointer;width:100%;display:flex;align-items:center;gap:12px;min-height:56px;padding:8px 16px;margin:0 0 12px;border-radius:18px;background:var(--rl-card);color:var(--rl-text);transition:background .12s}.wl-note:active{background:var(--rl-fill)}.wl-note:focus-visible{outline:2px solid var(--rl-text);outline-offset:2px}" +
+    ".wl-note-i{flex:none;width:36px;height:36px;border-radius:50%;display:grid;place-items:center;background:var(--rl-fill)}.wl-note-t{flex:1;min-width:0;font-size:15px;line-height:20px}.wl-note .rl-arow-c{flex:none;color:var(--rl-text2)}" +
     ".hl-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px 12px;margin:10px 0 18px}@media(min-width:720px){.hl-grid{grid-template-columns:repeat(4,minmax(0,1fr))}}" +
     ".hl-sq{all:unset;box-sizing:border-box;cursor:pointer;display:flex;flex-direction:column;min-width:0;transition:transform .12s}.hl-sq:active{transform:scale(.97)}.hl-sq:focus-visible{outline:2px solid var(--rl-text);outline-offset:3px;border-radius:18px}" +
     ".hl-sqpic{position:relative;display:block;width:100%;aspect-ratio:1/1;border-radius:18px;overflow:hidden;background:var(--rl-fill)}.hl-sqpic .h2-art svg{max-width:62%;max-height:62%}" +
@@ -1405,6 +1423,9 @@
     // price on each; one thing has its square on the left and its name and price beside it.
     ".h2-tiles{display:flex;gap:8px;overflow-x:auto;margin:0 -16px;padding:0 16px;scrollbar-width:none;scroll-snap-type:x proximity;scroll-padding-left:16px}.h2-tiles::-webkit-scrollbar{display:none}" +
     ".h2-pic{position:relative;flex:none;display:block;width:140px;height:140px;border-radius:22px;overflow:hidden;background:var(--rl-fill);scroll-snap-align:start}" +
+    // (A single picture beside its words is not in a sideways row: it is never a stopping point for the page's own
+    // up-and-down snapping, which used to catch on every photo in a list and pull cards up under Home's pinned chips.)
+    ".h2-one .h2-pic{scroll-snap-align:none}" +
     ".h2-art{position:absolute;inset:0;display:grid;place-items:center}.h2-art>img{position:absolute;left:0;top:0;width:100%!important;height:100%!important;object-fit:cover;object-position:center}" +
     ".h2-art.rl-has-logo{background:var(--logo-bg,#fff)!important;box-shadow:none}.h2-art>img.rl-logo-img{left:16px;top:16px;width:calc(100% - 32px)!important;height:calc(100% - 32px)!important;object-fit:contain}" +
     // Receipts and other lists in the new layout: a logo sits whole on white (or its own colour), no pale ring, as on Home.
@@ -11087,6 +11108,28 @@
       accIc("chev", 16, "rl-arow-c")]);
     return r;
   }
+  // Watching: a row per watched thing. Its photo as a square (filling it, a tall photo showing its top), what it is (two lines
+  // at most), the shop with its own logo when Relay has one (never a letter in a circle), today's price, and one plain line
+  // on how the price has moved since watching started. The photo is sized, loaded only as it comes near the screen and
+  // decoded off the main thread, so a long list stays smooth to scroll.
+  function watchRow(w) {
+    var cur = w.currency || "GBP", now = Number.isInteger(w.nowMinor) ? w.nowMinor : null, was = Number.isInteger(w.priceMinor) && w.priceMinor > 0 ? w.priceMinor : null;
+    var full = w.product + (w.variation && !/^(default title|one size)$/i.test(w.variation) ? ", " + w.variation : ""), name = cleanName(full, w.store) || full;
+    var drop = now !== null && was !== null && now < was;
+    var change = drop ? money(was - now, cur) + " less than when you started watching" : "Watching the price";
+    var pic = el("span", { className: "wl-pic" });
+    var img = el("img", { alt: "", width: 80, height: 80, loading: "lazy", decoding: "async", referrerPolicy: "no-referrer" });
+    img.onerror = function () { img.remove(); var art = el("span", { className: "h2-art" }); pic.appendChild(art); illustrate(art, { items: [{ name: w.product }], retailer: { name: w.store || "" }, category: "other" }, 56); };
+    img.src = w.image; pic.appendChild(img);
+    var shop = el("span", { className: "wl-shop" });
+    if (w.dom && !/\.myshopify\.com$/.test(w.dom)) { var logo = el("span", { className: "wl-logo" }); logo.setAttribute("aria-hidden", "true"); shopLogo(logo, w.dom, 18, function () { logo.remove(); }); shop.appendChild(logo); }
+    shop.appendChild(el("span", { className: "wl-shop-n", text: w.store }));
+    var mid = el("span", { className: "wl-mid" }, [el("span", { className: "wl-n", text: name }), shop]
+      .concat(now !== null ? [el("span", { className: "wl-p", text: money(now, cur) })] : [])
+      .concat([el("span", { className: "wl-ch" + (drop ? " down" : ""), text: change })]));
+    return el("button", { type: "button", className: "wl-row", "data-sku": w.sku, ariaLabel: [name, w.store, now !== null ? money(now, cur) : "", change].filter(Boolean).join(". "),
+      onclick: tapOnce(function () { if (window.relayOpenProduct) window.relayOpenProduct(w.sku, w.product); }) }, [pic, mid]);
+  }
   // Wallet: the thing as a big square, a label on it only when something is happening, then the shop, what it is and the price.
   // A product's name as a person would say it under its picture (Connor, 17 Nov 2026: Home showed "lululemon
   // lululemon Align™ High-R…", "Nespresso Nespresso" and "W Restfeel Slide TOPK/TOPK…"): no shop name in front of it, no
@@ -11294,7 +11337,10 @@
     // An inbox this phone knows is connected counts as connected until Relay says otherwise (so its answer, the same, draws nothing).
     var state = { both: null, mail: [], wins: [], connected: memo.gmail && memo.gmail.r && memo.gmail.r.body ? Boolean(memo.gmail.r.body.connected) : hasMailbox() ? true : null, pick: memo.homeChip || "you" };
     // Watching: real products only (a shop's website, or a shop on Relay that isn't one of Relay's test shops), newest first.
-    var watches = function () { try { return (window.relayLocalWatches ? window.relayLocalWatches() : []).filter(function (w) { return w && w.sku && w.product && w.real; }).reverse(); } catch (e) { return []; } };
+    // (state.watchWaiting: some watched things have nothing kept on this phone yet and wait for the shops' products.)
+    var watches = function () { try { var all = window.relayLocalWatches ? window.relayLocalWatches() : [];
+      state.watchWaiting = all.some(function (w) { return w && w.kept && !w.real && !/^web:/.test(w.sku); });
+      return all.filter(function (w) { return w && w.sku && w.product && w.real; }).reverse(); } catch (e) { return []; } };
     // A brand-new account: one card that says what to do first.
     var startCard = function () {
       return el("div", { className: "rl-po h2-start", style: "margin:0;border:1.5px solid #c7d5f5;background:var(--rl-accent-bg)" }, [
@@ -11309,7 +11355,7 @@
       if (!state.both || !document.body.contains(feed)) return;
       var watched = watches();
       var key = [homeIds(state.both[0]), homeIds(state.both[1]), homeIds(memo.needReceipt), state.connected, state.mail.length, state.wins.length, state.pick, homeLook(), homeFocus(),
-        watched.map(function (w) { return w.sku + ":" + w.nowMinor + ":" + (w.image ? 1 : 0) + ":" + (w.store || ""); }).join(",")].join("|");
+        watched.map(function (w) { return w.sku + ":" + w.nowMinor + ":" + (w.image ? 1 : 0) + ":" + (w.store || "") + ":" + (w.dom || ""); }).join(","), state.watchWaiting ? 1 : 0].join("|");
       if (!force && key === drawnKey && feed.firstChild && !feed.querySelector(".rl-skel")) return;
       drawnKey = key;
       var all = homeFeedEntries(state.both[0], state.both[1]);
@@ -11344,30 +11390,10 @@
       });
       chips.style.display = "";
       feed.textContent = "";
-      var look = homeLook(); feed.classList.toggle("hl", look !== "cards");
+      var look = homeLook(); feed.classList.toggle("hl", look !== "cards" || state.pick === "watch");
       // For you leads with what the chosen focus puts first (Settings, Home layout: Receipts first or Orders first).
       if (state.pick === "you") { if (homeFocus() === "orders") drawOrders(all); else drawReceipts(all, watched); }
-      if (state.pick === "watch" && !watched.length) feed.appendChild(el("p", { className: "rl-calm-none h2-none", text: "Nothing watched yet. Tap the heart on something in Browse and Relay tells you when its price drops." }));
-      // Watched things without a photo yet: Browse's products give it (asked once, only when Watching is opened).
-      if (state.pick === "watch" && watched.some(function (w) { return !w.image; }) && window.relayNeedCatalog && !memo.watchPicsAsked) {
-        memo.watchPicsAsked = true;
-        if (!window.relayNeedCatalog()) window.addEventListener("relay-catalogue", function () { if (state.pick === "watch" && feed.isConnected) draw(true); }, { once: true }); }
-      // Only real products from the shops, with their own photo and the shop's name (Connor, 18 Nov 2026: "It should be real
-      // products with real photos from the stores we have and the ones I've clicked watch"). One a shop's website no longer
-      // has is left off, with one line saying so once the shops' products are in.
-      var shownWatch = watched.filter(function (w) { return w.image && /^https:\/\//.test(w.image) && w.store; }), gone = watched.length - shownWatch.length;
-      if (state.pick === "watch" && gone && window.relayNeedCatalog && window.relayNeedCatalog()) feed.appendChild(feedCard({ small: true, icon: "bell",
-        line: gone === 1 ? "1 thing you watched isn't on its shop's website any more" : gone + " things you watched aren't on their shops' websites any more",
-        open: function () { if (window.go) window.go("radar"); } }));
-      if (state.pick === "watch") shownWatch.slice(0, 12).forEach(function (w) {
-        var now = Number.isInteger(w.nowMinor) ? w.nowMinor : null, was = Number.isInteger(w.priceMinor) ? w.priceMinor : null, drop = now !== null && was !== null && now < was;
-        feed.appendChild(feedCard({ shop: w.store || "Watching", cat: null, tiles: [{ name: w.product + (w.variation ? ", " + w.variation : ""), price: now !== null ? money(now, w.currency || "GBP") : "",
-            draw: function (box) { var drawIt = function () { illustrate(box, { items: [{ name: w.product }], retailer: { name: w.store || "" }, category: "other" }, 96); };
-              // The shop's own photo of what's watched (Connor, 17 Nov 2026), or a drawing when there isn't one.
-              if (w.image && /^https:\/\//.test(w.image)) { var ph = el("img", { src: w.image, alt: "", referrerPolicy: "no-referrer" }); ph.onerror = function () { ph.remove(); box.classList.remove("rl-has-photo"); drawIt(); }; box.classList.add("rl-has-photo"); box.appendChild(ph); } else drawIt(); } }],
-          line: drop ? "Down " + money(was - now, w.currency || "GBP") + " since you started watching" : now !== null ? "Watching the price" : was !== null ? "Watching since it was " + money(was, w.currency || "GBP") : "Watching the price",
-          open: function () { if (window.relayOpenProduct) window.relayOpenProduct(w.sku, w.product); } }));
-      });
+      if (state.pick === "watch") drawWatching(watched);
       else if (state.pick !== "you") {
         // The other chips: that list, about twelve of it.
         var list = sets[state.pick], shown = list.slice(0, 12);
@@ -11378,8 +11404,34 @@
         } else shown.forEach(function (e) { feed.appendChild(feedCard(e)); });
         if (!list.length && state.connected !== false && !isReview()) feed.appendChild(el("p", { className: "rl-calm-none h2-none", text: "What you buy shows up here as Relay finds the receipts." }));
       }
-      if (state.both[1].length || state.both[0].length) feed.appendChild(feedCard({ small: true, icon: "doc", line: "All receipts", open: function () { if (window.go) window.go("receipts"); } }));
+      if (state.pick !== "watch" && (state.both[1].length || state.both[0].length)) feed.appendChild(feedCard({ small: true, icon: "doc", line: "All receipts", open: function () { if (window.go) window.go("receipts"); } }));
       firstScreen();
+    };
+    // Watching (Connor, 23 Nov 2026: "this page layout is awful. Boxes overlap options etc and it's very laggy"): one list,
+    // a row per watched thing, the whole row one tap to its page. Only real products from the shops, with their own photo
+    // and the shop's name (Connor, 18 Nov 2026); one a shop's website no longer has is left off, with one line saying so
+    // once the shops' products are in. What was kept on this phone shows at once; the shops' products are asked for once
+    // (only when Watching is opened) and the list is drawn again when they come.
+    var drawWatching = function (watched) {
+      var ready = window.relayNeedCatalog ? window.relayNeedCatalog() : true;
+      if (!ready && !memo.watchWait) { memo.watchWait = true; window.addEventListener("relay-catalogue", function () { memo.watchWait = false; if (state.pick === "watch" && feed.isConnected) draw(true); }, { once: true }); }
+      var shown = watched.filter(function (w) { return w.image && /^https:\/\//.test(w.image) && w.store; }), gone = watched.length - shown.length;
+      if (ready && gone) {
+        var note = el("button", { type: "button", className: "wl-note", onclick: tapOnce(function () { if (window.go) window.go("radar"); }) }, [
+          el("span", { className: "wl-note-i" }, [accIc("bell", 18)]),
+          el("span", { className: "wl-note-t", text: gone === 1 ? "1 thing you watched isn't on its shop's website any more" : gone + " things you watched aren't on their shops' websites any more" }),
+          accIc("chev", 16, "rl-arow-c")]);
+        feed.appendChild(note);
+      }
+      // Plain rounded corners on this list (data-round="plain", relay-corners.js): clipping a list as tall as forty rows,
+      // and each photo in it, to a drawn shape made every scroll and every visit to Watching slower on a phone.
+      if (shown.length) feed.appendChild(el("div", { className: "wl-list", "data-round": "plain" }, shown.map(watchRow)));
+      else if (!ready && (state.watchWaiting || watched.length)) {
+        // Still waiting for the shops' products, with nothing kept on this phone yet: greyed outlines of the rows (rule 7).
+        var bones = el("div", { className: "wl-list" });
+        for (var k = 0; k < 3; k++) bones.appendChild(el("div", { className: "wl-row wl-bone" }, [el("span", { className: "wl-pic rl-skel" }), el("span", { className: "wl-mid" }, [el("span", { className: "rl-skel", style: "height:16px;width:80%;border-radius:8px" }), el("span", { className: "rl-skel", style: "height:14px;width:45%;border-radius:7px" }), el("span", { className: "rl-skel", style: "height:16px;width:30%;border-radius:8px" })])]));
+        feed.appendChild(bones);
+      } else if (!gone) feed.appendChild(el("p", { className: "rl-calm-none h2-none", text: "Nothing watched yet. Tap the heart on something in Browse and Relay tells you when its price drops." }));
     };
     // Home's parts: a heading, and things drawn the way Home looks (Wallet squares or Cards).
     var heading = function (text) { feed.appendChild(el("h2", { className: "hl-h h2-sec", text: text })); };
