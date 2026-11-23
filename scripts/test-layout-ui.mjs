@@ -160,6 +160,7 @@ assert.equal(await page.locator(".rl-ask-tile").first().getAttribute("aria-label
 assert.equal((await page.locator(".rl-ask-tile .rl-ask-day").first().innerText()).trim(), await dayWords(newest[0].orderDate), "each tile has the day it was bought under it");
 assert.equal((await page.locator(".rl-ask-h2").innerText()).trim(), "Try asking");
 assert.deepEqual(await page.locator(".rl-ask-q").evaluateAll(qs => qs.map(q => q.innerText.trim())), ["How do I return something?", "How does a swap work?", "Why is a receipt missing?", "How does Relay find my receipts?"], "the same four questions, with no second line");
+assert.equal(await page.getByRole("button", { name: "Try asking. Open the chat with Relay" }).count(), 1, "the heading's chevron opens the chat itself");
 assert.equal((await page.locator(".rl-ask-ai").innerText()).trim(), "Relay's assistant is an AI, so it can get things wrong.");
 assert.ok(await page.locator(".rl-ask-ai").isVisible(), "the AI line shows before anything is asked");
 assert.match(await page.locator("#askPage .rl-anote").innerText(), /^Relay keeps no copy of this chat\. Your messages go to Anthropic/, "what is kept is still said");
@@ -190,18 +191,21 @@ console.log("ok - Ask before anything is asked: newest receipts as tiles, four q
   assert.match(await sheet.innerText(), new RegExp("^Show Relay's assistant your receipt from " + label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\? It sees what Relay read from it \\(the shop, date, total, items and return date\\), not the email itself\\."), "the sheet names the receipt and says what the assistant will see");
   assert.equal(await page.locator(".rl-chat-about").count(), 0, "nothing is attached until Show it");
   await sheet.getByRole("button", { name: "Show it" }).click();
-  await page.locator(".rl-chat-about").waitFor();
-  assert.equal((await page.locator(".rl-chat-about span").first().innerText()).trim(), "About your receipt from " + label, "Ask opens with that receipt attached");
-  assert.equal(await page.locator("#askPage .rl-chat-in").getAttribute("placeholder"), "Ask about this receipt");
+  await page.locator(".rl-hc .rl-chat-about").waitFor();
+  assert.equal((await page.locator(".rl-chat-about span").first().innerText()).trim(), "About your receipt from " + label, "the chat opens with that receipt attached");
+  assert.equal(await page.locator(".rl-hc .rl-chat-in").getAttribute("placeholder"), "Ask about this receipt");
   await page.waitForTimeout(600);
   assert.deepEqual(asked.slice(n0), [], "tapping a tile and showing the receipt asks Relay's server nothing");
   assert.equal(chats.length, c0, "nothing is sent to the assistant until a question is");
   await bothSchemes("Ask with a receipt attached");
-  await page.locator(".rl-chat-chips button", { hasText: "The total is wrong" }).click();
+  assert.deepEqual(await page.locator(".rl-hc .rl-hc-qr-b").allInnerTexts(), ["The total is wrong", "Some items are missing", "This isn't something I bought", "Something else", "Talk to a person"], "questions about the receipt to tap");
+  await page.locator(".rl-hc .rl-hc-qr-b", { hasText: "The total is wrong" }).click();
   await page.locator(".rl-chat-b.bot", { hasText: "A stand-in answer from the test." }).waitFor();
   assert.deepEqual(chats.slice(c0), [{ messages: [{ role: "user", text: "The total is wrong" }], receiptId: pick.id }], "the question goes with that receipt, and only that one");
   assert.equal(await page.locator(".rl-ask-find").count(), 0, "a question about a receipt isn't offered as a search");
   await page.getByRole("button", { name: "Stop showing it" }).click();
+  assert.equal(await page.locator(".rl-hc .rl-chat-in").getAttribute("placeholder"), "Ask about Relay");
+  await page.locator(".rl-hc").getByRole("button", { name: "Close" }).click();
   assert.equal(await page.locator("#askPage .rl-chat-in").getAttribute("placeholder"), "Search receipts or ask about Relay"); }
 console.log("ok - a tile asks first, attaches exactly that receipt, and sends nothing until a question is sent");
 
@@ -210,25 +214,27 @@ console.log("ok - a tile asks first, attaches exactly that receipt, and sends no
   const keys0 = await page.evaluate(() => Object.keys(localStorage).concat(Object.keys(sessionStorage)).sort()), c0 = chats.length;
   await page.locator("#askPage .rl-chat-in").fill("brown cord trousers");
   await page.locator("#askPage .rl-chat-send").click();
-  await page.locator(".rl-chat-b.bot", { hasText: "A stand-in answer from the test." }).waitFor();
+  await page.locator(".rl-hc .rl-chat-b.bot", { hasText: "A stand-in answer from the test." }).waitFor();
   assert.deepEqual(chats.slice(c0), [{ messages: [{ role: "user", text: "brown cord trousers" }] }], "the question goes to the assistant with no receipt");
+  assert.equal(await page.locator("#askPage .rl-chat-in").inputValue(), "", "the Ask tab's box is emptied once the question is in the chat");
   const find = page.locator(".rl-chat-b.me .rl-ask-find");
   assert.equal(await find.count(), 1, "one control, under the shopper's own message");
   const look = await find.evaluate(e => { const c = getComputedStyle(e), probe = document.createElement("span"); probe.style.color = "var(--rl-accent)"; document.body.appendChild(probe); const accent = getComputedStyle(probe).color; probe.remove();
     return { text: e.innerText.trim(), tall: e.getBoundingClientRect().height >= 44, accent: c.color === accent, underline: c.textDecorationLine, font: c.fontSize }; });
   assert.deepEqual(look, { text: "Search your receipts for this instead", tall: true, accent: true, underline: "none", font: "15px" }, "quiet: accent colour, no underline, 44px to tap");
-  assert.ok(await page.locator("#askPage .rl-chat-person", { hasText: "Talk to a person" }).isVisible() && /^Relay keeps no copy of this chat/.test(await page.locator("#askPage .rl-anote").innerText()), "Talk to a person and what is kept are still there once a chat is under way");
+  assert.ok(await page.locator(".rl-hc .rl-hc-person", { hasText: "Talk to a person" }).isVisible() && /^Relay keeps no copy of this chat/.test(await page.locator(".rl-hc .rl-hc-priv").innerText()), "Talk to a person and what is kept are still there once a chat is under way");
   await bothSchemes("Ask after a question");
   await page.screenshot({ path: "/tmp/shots/layout-preview-ask-sent.png" });
   // A second typed question: the control moves to the newest one.
-  await page.locator("#askPage .rl-chat-in").fill("tall desk lamp"); await page.keyboard.press("Enter");
-  await page.waitForFunction(() => document.querySelectorAll("#askPage .rl-chat-b.bot").length === 3);
+  await page.locator(".rl-hc .rl-chat-in").fill("tall desk lamp"); await page.keyboard.press("Enter");
+  await page.waitForFunction(() => document.querySelectorAll(".rl-hc .rl-chat-b.bot").length === 3);
   assert.deepEqual(await page.locator(".rl-chat-b.me").evaluateAll(bs => bs.map(b => [b.querySelector("p").innerText, Boolean(b.querySelector(".rl-ask-find"))])), [["brown cord trousers", false], ["tall desk lamp", true]], "only the newest typed question carries it");
   // Nothing about the chat is put on the phone.
   const keys1 = await page.evaluate(() => Object.keys(localStorage).concat(Object.keys(sessionStorage)).sort());
   assert.deepEqual(keys1.filter(k => !keys0.includes(k)), [], "a chat adds nothing to what the phone keeps");
   assert.equal(await page.evaluate(() => Object.values(localStorage).concat(Object.values(sessionStorage)).some(v => /brown cord trousers|tall desk lamp|stand-in answer/i.test(String(v)))), false, "no copy of the chat is kept on the phone");
   await Promise.all([page.locator("#receiptsPage").waitFor(), find.click()]);
+  assert.equal(await page.locator(".rl-hc").count(), 0, "the chat closes on the way to Receipts");
   assert.equal(await page.getByRole("searchbox", { name: "Search your receipts" }).inputValue(), "tall desk lamp", "Receipts opens with those words in its search");
   assert.equal(await page.locator('#foot button[aria-current="page"]').getAttribute("data-tab"), "receipts", "on the Receipts tab"); }
 console.log("ok - a typed question can be looked for in Receipts instead, and a chat puts nothing on the phone");
@@ -236,8 +242,9 @@ console.log("ok - a typed question can be looked for in Receipts instead, and a 
 // 13. A question the page offered is sent as it is, with no search under it; the heading's chevron opens Receipts.
 { await openAsk(); const c0 = chats.length;
   await page.locator(".rl-ask-q", { hasText: "How does a swap work?" }).dblclick(); // a double tap asks once
-  await page.locator(".rl-chat-b.bot", { hasText: "A stand-in answer from the test." }).waitFor();
+  await page.locator(".rl-hc .rl-chat-b.bot", { hasText: "A stand-in answer from the test." }).waitFor();
   await page.waitForTimeout(400);
+  assert.equal(await page.locator(".rl-hc").count(), 1, "one chat, still open after the second tap");
   assert.deepEqual(chats.slice(c0), [{ messages: [{ role: "user", text: "How does a swap work?" }] }], "an offered question is sent once, even on a double tap");
   assert.equal(await page.locator(".rl-ask-find").count(), 0, "an offered question isn't offered as a search");
   await openAsk();
