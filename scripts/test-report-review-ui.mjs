@@ -53,7 +53,7 @@ await sheet.getByText("Looks like a counterfeit").waitFor();
 // 1. A listing reported from Browse: the listing as members see it, never who listed or reported it.
 const listing = sheet.locator(".rl-order", { hasText: "Looks like a counterfeit" });
 const text = await listing.innerText();
-for (const s of ["Silk Scarf · Brindle & Co", "A member reported this listing. Reports against this seller: 2.", "Size M · Good · £25.00 · On sale", "Seller's note: “Barely worn”"]) assert.ok(text.includes(s), "shows: " + s);
+for (const s of ["Silk Scarf from Brindle & Co", "A member reported this listing. Reports against this seller: 2.", "Size M · Good · £25.00 · On sale", "Seller's note: “Barely worn”"]) assert.ok(text.includes(s), "shows: " + s);
 assert.ok(!/@|ops\.tester/.test(text), "never an email address");
 // 2. A reported conversation shows its messages.
 const talk = sheet.locator(".rl-order", { hasText: "Asked for a bank transfer up front" });
