@@ -169,7 +169,10 @@
     if (s && s.token) headers.Authorization = "Bearer " + s.token;
     if (bookmark) headers["X-D1-Bookmark"] = bookmark;
     var key = method === "GET" ? (s && s.token ? s.token.slice(-10) : "-") + " " + path : null, hit = key && reads[key];
-    if (hit && !opts.fresh && (hit.waiting || Date.now() - hit.at < (OWN_READS[path] ? OWN_REUSE_MS : READ_REUSE_MS))) return current(hit.answer.then(copyAnswer));
+    // (Receipts from Relay's own test shops, which the server marks testShop, come only with the testing tools on: CLAUDE.md
+    // rule 15. Taken out here, so every list of receipts leaves them out.)
+    var shown = method === "GET" && /^\/relay\/my\/receipts(?:\?|$)/.test(path) ? withoutTestShops : function (r) { return r; };
+    if (hit && !opts.fresh && (hit.waiting || Date.now() - hit.at < (OWN_READS[path] ? OWN_REUSE_MS : READ_REUSE_MS))) return current(hit.answer.then(copyAnswer)).then(shown);
     inflight++;
     var answer = fetch(API + path, { method: method, headers: headers, body: opts.body ? JSON.stringify(opts.body) : undefined })
       .then(function (r) {
@@ -187,7 +190,7 @@
       answer.then(function (r) { entry.waiting = false; entry.at = Date.now(); if (!r.ok && reads[key] === entry) delete reads[key]; },
         function () { if (reads[key] === entry) delete reads[key]; });
     }
-    return current(answer.then(copyAnswer));
+    return current(answer.then(copyAnswer)).then(shown);
   }
   // How many requests are on their way, so pull to refresh knows when the screen has its new copy.
   var inflight = 0, idleWaiters = [];
@@ -221,6 +224,11 @@
   // On Receipts, pulling down also checks the inbox now, as "Check now" does.
   function checkInbox() { if (window.__relayCheckNow && document.querySelector("#receiptsPage")) window.__relayCheckNow(); }
   // Each caller gets its own copy, so one screen changing what it was given can't change another's.
+  function withoutTestShops(r) {
+    if (!r || !r.body || !Array.isArray(r.body.receipts) || testToolsOn() || !r.body.receipts.some(function (x) { return x && x.testShop; })) return r;
+    r.body.receipts = r.body.receipts.filter(function (x) { return !(x && x.testShop); });
+    return r;
+  }
   function copyAnswer(r) { var j = {}; try { j = r.text ? JSON.parse(r.text) : {}; } catch (e) { j = {}; } return { ok: r.ok, status: r.status, body: j, raw: r.text || "" }; }
   // Fetches a signed-in image and returns a local address for it (or null).
   function apiBlob(path) {
@@ -3674,7 +3682,7 @@
     var who = (x.retailer && (x.retailer.name || x.retailer.domain)) || "Unknown store";
     var names = (x.items || []).map(function (i) { return i.qty + " × " + i.name + (i.variant ? " (" + i.variant + ")" : ""); }).join(", ");
     var card = el("div", { className: "rl-order" }, [el("b", { text: who + (x.orderRef ? ", order " + String(x.orderRef).replace(/^#/, "") : "") }),
-      el("span", { text: [names, x.totalPence == null ? "No total in the email" : totalText(x), /^\d{4}-\d{2}-\d{2}$/.test(x.orderDate || "") ? shortDate(x.orderDate + "T12:00:00Z") : null].filter(Boolean).join(". ") })]);
+      el("span", { text: [names, x.totalPence == null ? (x.detailsInAttachment ? "The amount is in the email's " + (x.detailsInAttachment === "image" ? "photo" : "PDF") : "No total in the email") : totalText(x), /^\d{4}-\d{2}-\d{2}$/.test(x.orderDate || "") ? shortDate(x.orderDate + "T12:00:00Z") : null].filter(Boolean).join(". ") })]);
     if (slim) { card.removeChild(card.firstChild); card.removeChild(card.firstChild); card.style.margin = "0"; card.style.padding = "0"; card.style.border = "0"; card.style.boxShadow = "none"; card.style.background = "none"; }
     if (!slim && x.hasImage && x.id) {
       var ph = el("img", { alt: "", style: "float:right;width:64px;height:64px;object-fit:cover;border-radius:12px;margin:0 0 8px 10px;background:var(--rl-fill)" });
@@ -3728,8 +3736,12 @@
     }
     // A subscription that ends (Google Play "your subscription will be cancelled"): when, and that nothing comes back.
     if (x.subscriptionEnds && x.subscriptionEnds.on) card.appendChild(el("p", { className: "rl-po-now", text: "This subscription ends on " + longDate(x.subscriptionEnds.on) + " " + String(x.subscriptionEnds.on).slice(0, 4) + (x.subscriptionEnds.refund === false ? ", with no refund." : ".") }));
-    // Paid with a gift card (Amazon): the total is what was left to pay.
-    if (Number.isInteger(x.giftCardPence) && x.giftCardPence > 0) card.appendChild(el("p", { className: "rl-po-now", text: money(x.giftCardPence, "GBP") + " was paid with a gift card." }));
+    // Paid partly with a gift card (Amazon): the total is the whole order; the email's own figures say how much the gift card
+    // paid and how much the card ("Visa (£40.75)").
+    if (Number.isInteger(x.giftCardPence) && x.giftCardPence > 0) {
+      var cp = x.cardPaid && Number.isInteger(x.cardPaid.pence) && x.cardPaid.pence > 0 && typeof x.cardPaid.label === "string" ? x.cardPaid : null;
+      card.appendChild(el("p", { className: "rl-po-now", text: money(x.giftCardPence, "GBP") + " was paid with a gift card" + (cp ? " and " + money(cp.pence, "GBP") + " with " + cp.label.slice(0, 30) + "." : ".") }));
+    }
     // What the email added for delivery, shipping or service ("Service fee £0.82"), each as the shop labelled it, beside the
     // money it took off, so the lines add up: the items, plus what was added, less what was taken off, is what was paid.
     // Only what the receipt has (worker/receipt-parser.js "fees"); nothing is worked out or guessed.
@@ -4272,7 +4284,8 @@
         };
         giftMark();
         // (A stay paid at the hotel says so in the line under its name, "pay at the hotel", so its amount keeps its room.)
-        var end = el("span", { className: "rl-rr-end" }, [el("b", { text: row.totalPence == null ? "" : money(row.totalPence, row.currency) })]);
+        // (No amount in the email itself, only in its PDF: it says so, never a blank. Round 24.)
+        var end = el("span", { className: "rl-rr-end" }, [el("b", { text: row.totalPence == null ? (row.detailsInAttachment === "image" ? "In the photo" : row.detailsInAttachment ? "In the PDF" : "") : money(row.totalPence, row.currency) })]);
         var left = daysLeft(statedDeadline(row));
         if (left !== null && left >= 0) end.appendChild(el("span", { className: "rl-rr-chip " + (left <= 2 ? "red" : left <= 7 ? "amber" : "green"), text: left === 0 ? "Return today" : left + " day" + (left === 1 ? "" : "s") + " left" }));
         btn.appendChild(picw);
