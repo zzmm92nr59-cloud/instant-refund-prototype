@@ -227,7 +227,7 @@ screen("new-inboxes", "new", async (page, cfg) => { await tabTo(page, "profile")
 const CHIPS = ["For you", "Watching", "To return", "On the way", "Swaps and returns"];
 for (const c of CHIPS) screen("home-" + c.toLowerCase().replace(/\W+/g, "-"), "full", async (page, cfg) => {
   await homeReady(page); const chip = page.locator("#view .h2-chip", { hasText: c }).first();
-  if (!(await chip.count())) { problems.push(cfg.name + " home chip missing: " + c); return; }
+  if (!(await chip.waitFor({ timeout: 15000 }).then(() => true, () => false))) { problems.push(cfg.name + " home chip missing: " + c); return; }
   await unbig(page); await waitOutDoubleTap(page); await chip.click(); await settle(page, 900); await look(page, cfg, "home-" + c.toLowerCase().replace(/\W+/g, "-"));
 });
 screen("ask", "full", async (page, cfg) => { await tabTo(page, "ask"); await look(page, cfg, "ask"); });

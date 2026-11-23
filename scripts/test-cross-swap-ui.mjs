@@ -181,7 +181,7 @@ console.log("ok - the reference, each shop's part, and the second shop's own che
 await page.evaluate(() => window.go("returns"));
 const card = page.locator(".rl-po").filter({ hasText: "Swapping for Linen Shirt (M) from Birch Lane" });
 await card.waitFor();
-assert.match(await card.innerText(), /Return started · ref RLY-ABCD-EFGH/);
+assert.match(await card.innerText(), /Return started, reference RLY-ABCD-EFGH/);
 assert.equal(await card.getByRole("link", { name: "Buy it from Birch Lane" }).getAttribute("href"), "https://birch-lane.myshopify.com/cart/21:1");
 assert.equal(await card.getByRole("button", { name: /^(Swap|Return|Swap with another shop)$/ }).count(), 0, "can't be returned or swapped again");
 assert.ok(!SHOPPER_NEVER_SEES.test(await card.innerText()));
@@ -193,7 +193,7 @@ await card.getByRole("button", { name: "Stop the swap" }).click();
 const confirmBox = page.getByRole("alertdialog");
 await confirmBox.getByText("Stop swapping for Linen Shirt (M) from Birch Lane? Your return to Oak & Thread still goes ahead, and Oak & Thread refunds you as usual.").waitFor();
 await confirmBox.getByRole("button", { name: "Stop the swap" }).dblclick();
-await page.locator(".rl-po").filter({ hasText: "Return started · ref RLY-ABCD-EFGH" }).filter({ hasNotText: "Swapping for" }).waitFor();
+await page.locator(".rl-po").filter({ hasText: "Return started, reference RLY-ABCD-EFGH" }).filter({ hasNotText: "Swapping for" }).waitFor();
 assert.deepEqual(st.posts.filter(x => /cancel$/.test(x[0])).map(x => x[0]), ["/relay/my/cross-swap/" + SWAP + "/cancel"], "stopped once for a double tap");
 console.log("ok - stopping a swap asks first, keeps the return, and is sent once");
 st.phase = "waiting";

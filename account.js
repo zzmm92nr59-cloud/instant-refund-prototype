@@ -2990,8 +2990,8 @@
     return stripeLoading.then(function () { return window.Stripe(pk); });
   }
   function cardText(c) {
-    var w = c.wallet === "apple_pay" ? "Apple Pay, " : c.wallet === "google_pay" ? "Google Pay, " : "";
-    return w + (c.brand ? c.brand.charAt(0).toUpperCase() + c.brand.slice(1) : "Card") + " ending " + c.last4;
+    var w = c.wallet === "apple_pay" ? " in Apple Pay" : c.wallet === "google_pay" ? " in Google Pay" : "";
+    return (c.brand ? c.brand.charAt(0).toUpperCase() + c.brand.slice(1) : "Card") + " ending " + c.last4 + w;
   }
   function addCard(box, onSaved) {
     var note = el("div", { className: "rl-msg" });

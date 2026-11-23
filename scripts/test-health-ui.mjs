@@ -189,7 +189,7 @@ assert.match(await cols.nth(10).getAttribute("aria-label"), /: 9 receipts found,
 await cols.nth(10).click();
 const tip = view.locator(".rl-hp-tip");
 await tip.waitFor();
-assert.match(await tip.innerText(), /9 receipts · 22 skipped/);
+assert.match(await tip.innerText(), /9 receipts, 22 skipped/);
 assert.equal(await view.locator(".rl-hp-table").isVisible(), false, "the table stays folded away until asked for");
 await view.getByText("See the numbers").click();
 assert.equal(await view.locator(".rl-hp-table").isVisible(), true);
