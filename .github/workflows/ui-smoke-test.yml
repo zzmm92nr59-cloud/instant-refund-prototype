@@ -113,6 +113,8 @@ jobs:
         run: node --import ./scripts/record-app-requests.mjs scripts/test-ai-help-ui.mjs
       - name: Bank and cards
         run: node --import ./scripts/record-app-requests.mjs scripts/test-bank-ui.mjs
+      - name: Which cards are yours (asked before payments show, exact ticks saved once, changed later on its own page)
+        run: node --import ./scripts/record-app-requests.mjs scripts/test-bank-cards-ui.mjs
       - name: Receipt photos (Home card, the sheet, outlines while reading, sent once, Receipt from your photo with both totals)
         run: node --import ./scripts/record-app-requests.mjs scripts/test-receipt-photo-ui.mjs
       - name: Receipt items (+ N more on Home, item counts, "may have missed some items" with Read it again once per tap and See the email)

@@ -79,6 +79,7 @@ jobs:
           node scripts/test-item-kinds-accuracy.mjs
           node scripts/test-item-kinds-corpus.mjs
           node scripts/test-bank.mjs
+          node scripts/test-bank-cards.mjs
           node scripts/test-receipt-photo.mjs
           node scripts/test-shop-directory.mjs
           node scripts/test-parcel-tracking.mjs

@@ -94,6 +94,8 @@ const ROUTES = new Map(Object.entries({
   "/relay/my/ai-reading": { fields: { on: bool } },
   "/relay/my/item-kinds": { fields: { on: bool } },
   "/relay/my/bank/disconnect": { fields: { id: str(36) } },
+  // Which of one of the shopper's own connections' cards are theirs (bank.js checks each ref is one of that connection's).
+  "/relay/my/bank/cards": { fields: { id: str(36), cards: list(40, obj({ ref: str(36), mine: bool })) } },
   "/relay/my/bank/not-mine": { fields: { id: str(200), on: bool, everyFromShop: bool, reason: one("no_receipt") } },
   // A photo of the paper receipt for one of the shopper's own payments, made smaller on the phone first (bank.js checks it
   // really is a picture of at most 1.1 MB).

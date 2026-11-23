@@ -15,7 +15,22 @@
 //
 // Routes: GET /relay/my/bank, POST /relay/my/bank/connect, GET /relay/bank/callback (the bank's page sends the browser back
 // here), POST /relay/my/bank/sync, GET /relay/my/bank/payments, POST /relay/my/bank/disconnect { id },
-// POST /relay/my/bank/not-mine { id, on, everyFromShop, reason }, POST /relay/my/bank/receipt-photo { id, image }.
+// POST /relay/my/bank/not-mine { id, on, everyFromShop, reason }, POST /relay/my/bank/receipt-photo { id, image },
+// POST /relay/my/bank/cards { id, cards: [{ ref, mine }] } (which of a connection's cards and accounts are the shopper's).
+//
+// Which cards are yours (Connor, 23 Nov 2026: he and his girlfriend share an Amex account with a card each, and both have
+// Relay accounts, so connecting it can list both cards, and each would see the other's spending):
+//  * A connection that lists more than one card or account asks "Which of these are yours?" before any payment is read.
+//    One card or account alone is taken as the shopper's, with no question.
+//  * A card that isn't theirs is never read, kept, shown, matched or counted; ticking it off deletes what was read from it.
+//  * The answer is kept per connection per card (bank_cards), and carried to a new connection of the same shopper for the
+//    same card (TrueLayer's account id, or the same bank and last four digits). Never to or from anyone else.
+//  * Some card companies send every card on one account under the main card. TrueLayer's card transactions can say which
+//    card each was: "meta ... changes based on provider. For example, when returning transactions for an American Express
+//    card, meta also contains a supplementary_card_id", and its examples show a masked meta.cardNumber ("1234********5678")
+//    (docs.truelayer.com/docs/card-data-requests, read 23 Nov 2026; the card object's own last four is
+//    partial_card_number). When a card's payments carry either, they're split into one choice a card (txCardMark). When
+//    they carry neither, Relay can't tell whose a payment is and doesn't guess: for an Amex card it says so (unsplit).
 import { sealToken, openToken, receiptTotals, ensureGmailTables } from "./gmail.js";
 import { isAdmin, isTester } from "./resale-admin.js";
 import { decodePhoto, MAX_RECEIPT_PHOTO_BYTES } from "./photos.js";
@@ -42,15 +57,23 @@ const redirectUri = (env, url) => env.TRUELAYER_REDIRECT_URI || `${url.origin}/r
 export const BANK_SQL = [
   `CREATE TABLE IF NOT EXISTS bank_link_states (state_hash TEXT PRIMARY KEY, shopper_id TEXT NOT NULL, expires_at INTEGER NOT NULL, used_at INTEGER)`,
   `CREATE TABLE IF NOT EXISTS bank_links (id TEXT PRIMARY KEY, shopper_id TEXT NOT NULL, bank TEXT, token_iv TEXT NOT NULL, token_data TEXT NOT NULL,
-    connected_at INTEGER NOT NULL, synced_at INTEGER, status TEXT NOT NULL DEFAULT 'ok')`,
+    connected_at INTEGER NOT NULL, synced_at INTEGER, status TEXT NOT NULL DEFAULT 'ok', unsplit INTEGER)`,
   `CREATE TABLE IF NOT EXISTS bank_payments (shopper_id TEXT NOT NULL, payment_id TEXT NOT NULL, connection_id TEXT NOT NULL, account TEXT,
     paid_on TEXT NOT NULL, amount_minor INTEGER NOT NULL, currency TEXT NOT NULL, description TEXT, merchant TEXT, receipt_id TEXT, match TEXT,
-    created_at INTEGER NOT NULL, classification TEXT, PRIMARY KEY (shopper_id, payment_id))`,
+    created_at INTEGER NOT NULL, classification TEXT, card_ref TEXT, PRIMARY KEY (shopper_id, payment_id))`,
   // "Not mine" (a shared card: Connor, 17 Nov 2026): one payment (kind 'payment', key = its id), or everything from a shop
   // (kind 'shop', key = the shop's name, lower case). Not matched to receipts, shown apart. Kind 'no_receipt' (key = the
   // payment's id): "This wasn't a shop purchase", so Relay stops asking for its receipt; it's still matched as usual.
   `CREATE TABLE IF NOT EXISTS bank_not_mine (shopper_id TEXT NOT NULL, kind TEXT NOT NULL, key TEXT NOT NULL, created_at INTEGER NOT NULL,
-    PRIMARY KEY (shopper_id, kind, key))`
+    PRIMARY KEY (shopper_id, kind, key))`,
+  // Which of a connection's cards and accounts are the shopper's. card_key: "a:<TrueLayer account id>" or "c:<card id>";
+  // a card split by its payments (one account, several cards) has a row a card: "<parent key>|self" (the card itself) and
+  // "<parent key>|n:<last four>" or "|s:<supplementary card id>"; the parent then only says whether to read it at all.
+  // mine: 1 yes, 0 no, null not answered yet (nothing read). auto: 1 when it was the only one, so not asked. ref: the id
+  // the app uses for it.
+  `CREATE TABLE IF NOT EXISTS bank_cards (shopper_id TEXT NOT NULL, connection_id TEXT NOT NULL, card_key TEXT NOT NULL, ref TEXT NOT NULL,
+    parent_key TEXT, provider_id TEXT, bank TEXT, name TEXT, last4 TEXT, mine INTEGER, auto INTEGER NOT NULL DEFAULT 0, seen_at INTEGER NOT NULL,
+    PRIMARY KEY (shopper_id, connection_id, card_key))`
 ];
 // Columns added after the tables were first made (tried once per copy of the Worker; "already there" is fine).
 // classification: TrueLayer's own label for the payment, as a short JSON list of words (17 Nov 2026, shop-directory.js).
@@ -59,12 +82,18 @@ let bankColumnsReady = false;
 export async function ensureBankColumns(db) {
   if (bankColumnsReady) return;
   try { await db.prepare("ALTER TABLE bank_payments ADD COLUMN classification TEXT").run(); } catch { /* already there, or no table yet (it's made with it) */ }
+  // card_ref: which of the connection's cards (bank_cards.ref) the payment was on (23 Nov 2026). unsplit: 1 when an Amex
+  // card's payments came with nothing saying which card each was on, so the app can say Relay can't tell them apart.
+  try { await db.prepare("ALTER TABLE bank_payments ADD COLUMN card_ref TEXT").run(); } catch { /* already there */ }
+  try { await db.prepare("ALTER TABLE bank_links ADD COLUMN unsplit INTEGER").run(); } catch { /* already there */ }
+  // bank_cards is read with every payment (visibleSql), including by receiptsToAdd, which doesn't make the tables.
+  try { await db.prepare(BANK_SQL[BANK_SQL.length - 1]).run(); } catch { /* no database binding: nothing to read anyway */ }
   bankColumnsReady = true;
 }
 export async function ensureBankTables(db) { await db.batch(BANK_SQL.map((s) => db.prepare(s))); await ensureBankColumns(db); }
 // For account deletion (auth.js): everything bank-related for one shopper.
 export function bankDeleteStatements(db, shopperId) {
-  return ["bank_payments", "bank_links", "bank_link_states", "bank_not_mine"].map((t) => db.prepare(`DELETE FROM ${t} WHERE shopper_id = ?`).bind(shopperId));
+  return ["bank_payments", "bank_links", "bank_link_states", "bank_not_mine", "bank_cards"].map((t) => db.prepare(`DELETE FROM ${t} WHERE shopper_id = ?`).bind(shopperId));
 }
 
 async function sha256Hex(text) { const h = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text)); return [...new Uint8Array(h)].map((b) => b.toString(16).padStart(2, "0")).join(""); }
@@ -181,7 +210,69 @@ export function shopName(description, merchant) {
 const bankName = (n) => { const s = String(n || "").trim(); if (!s) return null; return /^mock$/i.test(s) ? "Mock Bank" : s.charAt(0).toUpperCase() + s.slice(1); };
 const clip = (s, n) => (typeof s === "string" ? s.replace(/\s+/g, " ").trim().slice(0, n) : null) || null;
 
-// Reads a connection's payments for the last 90 days. Returns { ok } or { gone } (the bank's permission has ended).
+// ---- Which cards are yours ------------------------------------------------------------------------------------------------
+// What a card payment says about which card it was on (TrueLayer's documentation is quoted at the top of this file): the last
+// four digits of a masked meta.cardNumber, or else meta.supplementary_card_id. null when it says neither: then Relay
+// can't tell, and doesn't guess.
+export function txCardMark(x) {
+  const m = x && x.meta && typeof x.meta === "object" ? x.meta : {};
+  const num = typeof m.cardNumber === "string" ? /(\d{4})\s*$/.exec(m.cardNumber) : null;
+  if (num) return "n:" + num[1];
+  const sup = m.supplementary_card_id;
+  if ((typeof sup === "string" || typeof sup === "number") && /^[A-Za-z0-9_-]{1,64}$/.test(String(sup))) return "s:" + String(sup);
+  return null;
+}
+export const cardLabel = (name, last4) => String(name || "Card") + (last4 && !String(name || "").includes(last4) ? " ending " + last4 : "");
+const isAmex = (bank) => /american express|\bamex\b/i.test(String(bank || ""));
+async function cardRows(db, shopperId, connId) {
+  return (await db.prepare("SELECT * FROM bank_cards WHERE shopper_id = ? AND connection_id = ? ORDER BY rowid").bind(shopperId, connId).all()).results || [];
+}
+// The shopper's own answer for the same card on another of their connections (when they connect it again): the same
+// TrueLayer id, or else the same bank, kind and last four digits. Only ever this shopper's.
+async function earlierAnswer(db, shopperId, connId, bank, c) {
+  const byId = await db.prepare("SELECT mine, auto FROM bank_cards WHERE shopper_id = ? AND connection_id != ? AND card_key = ? AND mine IS NOT NULL ORDER BY seen_at DESC LIMIT 1")
+    .bind(shopperId, connId, c.card_key).first();
+  if (byId || !c.last4) return byId;
+  return db.prepare(`SELECT mine, auto FROM bank_cards WHERE shopper_id = ? AND connection_id != ? AND last4 = ? AND IFNULL(bank, '') = ? AND substr(card_key, 1, 2) = ?
+    AND mine IS NOT NULL ORDER BY seen_at DESC LIMIT 1`).bind(shopperId, connId, c.last4, bank || "", c.card_key.slice(0, 2)).first();
+}
+// Makes sure a card has its row (have: this connection's rows by card_key), carrying an earlier answer over; start: the
+// answer a new row starts with when there's none (null: ask).
+async function ensureCard(db, shopperId, row, have, c, now, start) {
+  const was = have.get(c.card_key);
+  if (was) {
+    if (was.name !== c.name || was.last4 !== c.last4 || now - was.seen_at > 36e5) {
+      await db.prepare("UPDATE bank_cards SET name = ?, last4 = ?, seen_at = ? WHERE shopper_id = ? AND connection_id = ? AND card_key = ?").bind(c.name, c.last4, now, shopperId, row.id, c.card_key).run();
+      Object.assign(was, { name: c.name, last4: c.last4, seen_at: now });
+    }
+    return was;
+  }
+  const before = await earlierAnswer(db, shopperId, row.id, row.bank, c);
+  const fresh = { shopper_id: shopperId, connection_id: row.id, card_key: c.card_key, ref: crypto.randomUUID(), parent_key: c.parent_key || null, provider_id: c.provider_id || null,
+    bank: row.bank || null, name: c.name, last4: c.last4 || null, mine: before ? before.mine : start == null ? null : start, auto: before ? before.auto || 0 : 0, seen_at: now };
+  await db.prepare(`INSERT OR IGNORE INTO bank_cards (shopper_id, connection_id, card_key, ref, parent_key, provider_id, bank, name, last4, mine, auto, seen_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`)
+    .bind(shopperId, row.id, fresh.card_key, fresh.ref, fresh.parent_key, fresh.provider_id, fresh.bank, fresh.name, fresh.last4, fresh.mine, fresh.auto, now).run();
+  have.set(c.card_key, fresh);
+  return fresh;
+}
+// What the app is told about a connection's cards: one choice a card (a card split by its payments shows its cards, not
+// itself). Only when there's more than one to choose from.
+function cardsView(rows) {
+  const parents = new Set(rows.filter((r) => r.parent_key).map((r) => r.parent_key));
+  const leaves = rows.filter((r) => !parents.has(r.card_key));
+  if (leaves.length < 2) return {};
+  return { cards: leaves.map((r) => ({ ref: r.ref, label: cardLabel(r.name, r.last4), mine: r.mine === 1 ? true : r.mine === 0 ? false : null })),
+    ...(leaves.some((r) => r.mine == null) ? { needsChoice: true } : {}) };
+}
+
+// Only payments on a card the shopper said is theirs (or from a connection with nothing to choose): a payment whose card
+// isn't theirs, isn't answered yet, or can't be told (no card_ref on a connection that has cards) is never shown, matched,
+// counted or exported. t: the table's name or alias in the query.
+export const visibleSql = (t) => `(${t}.card_ref IN (SELECT k.ref FROM bank_cards k WHERE k.shopper_id = ${t}.shopper_id AND k.connection_id = ${t}.connection_id AND k.mine = 1)
+  OR (${t}.card_ref IS NULL AND NOT EXISTS (SELECT 1 FROM bank_cards k WHERE k.shopper_id = ${t}.shopper_id AND k.connection_id = ${t}.connection_id)))`;
+
+// Reads a connection's payments for the last 90 days, from the cards and accounts that are the shopper's. Returns { ok }
+// or { gone } (the bank's permission has ended).
 async function readConnection(env, db, shopperId, row, now, f) {
   let t = await openTokens(env, row); if (!t) return { gone: true };
   if (!t.access || !t.expires || t.expires < now + 60e3) {
@@ -194,7 +285,9 @@ async function readConnection(env, db, shopperId, row, now, f) {
   const rows = [];
   // What was read and why things were left out, for Relay's logs: counts, the bank's category words and the names of the
   // fields it sends (not their values), never a payment, amount, name or account.
-  const seen = { accounts: 0, cards: 0, failedLists: 0, failedTx: 0, tx: 0, debits: 0, keptDebits: 0, credits: 0, leftOutType: {}, leftOutWord: {}, fields: {} };
+  const seen = { accounts: 0, cards: 0, failedLists: 0, failedTx: 0, tx: 0, debits: 0, keptDebits: 0, credits: 0, notChosen: 0, otherCard: 0, marked: 0, leftOutType: {}, leftOutWord: {}, fields: {} };
+  // 1. What the connection lists, and which of it is the shopper's (asked when there's more than one).
+  const listed = [];
   for (const [list, kind] of [["/data/v1/accounts", "accounts"], ["/data/v1/cards", "cards"]]) {
     const got = await apiGet(env, t.access, list, f);
     if (got.gone) return { gone: true };
@@ -203,43 +296,95 @@ async function readConnection(env, db, shopperId, row, now, f) {
     for (const a of got.results.slice(0, 10)) {
       const id = String(a.account_id || "");
       if (!/^[A-Za-z0-9_-]{1,100}$/.test(id)) continue;
-      const name = clip(a.display_name, 60) || (kind === "cards" ? "Card" : "Account");
-      const last4 = clip(a.partial_card_number, 4);
-      const label = name + (last4 && !name.includes(last4) ? " ending " + last4 : "");
-      const tx = await apiGet(env, t.access, `/data/v1/${kind}/${id}/transactions${q}`, f);
-      if (tx.gone) return { gone: true };
-      if (tx.failed) { seen.failedTx++; continue; }
-      seen.tx += tx.results.length;
-      for (const x of tx.results.slice(0, 1000)) {
-        const pid = String(x.transaction_id || ""), when = String(x.timestamp || "").slice(0, 10);
-        if (!pid || pid.length > 120 || !/^\d{4}-\d{2}-\d{2}$/.test(when)) continue;
-        const debit = String(x.transaction_type || "").toUpperCase() === "DEBIT" || (!x.transaction_type && Number(x.amount) < 0);
-        if (debit) seen.debits++; else seen.credits++;
-        for (const k of Object.keys(x)) seen.fields[k] = (seen.fields[k] || 0) + 1;
-        for (const k of Object.keys((x && x.meta) || {})) seen.fields["meta." + k] = (seen.fields["meta." + k] || 0) + 1;
-        if (debit && !isShopping(x)) {
-          const cat = String(x.transaction_category || "").toUpperCase();
-          if (NOT_SHOPPING_TYPES.has(cat)) seen.leftOutType[cat] = (seen.leftOutType[cat] || 0) + 1;
-          else { const w = (NOT_SHOPPING.exec(String(x.description || "") + " " + String(merchantOf(x) || "")) || ["?"])[0].toLowerCase().slice(0, 20); seen.leftOutWord[w] = (seen.leftOutWord[w] || 0) + 1; }
-          continue;
-        }
-        if (debit) seen.keptDebits++;
-        const amount = minor(x.amount); if (!amount) continue;
-        rows.push({ payment_id: row.id + ":" + pid, account: label, paid_on: when, amount_minor: debit ? amount : -amount,
-          currency: /^[A-Z]{3}$/.test(String(x.currency || "")) ? x.currency : "GBP", description: clip(x.description, 140), merchant: clip(merchantOf(x), 80),
-          classification: classificationToKeep(x) });
-      }
+      listed.push({ kind, id, card_key: (kind === "cards" ? "c:" : "a:") + id, provider_id: id, name: clip(a.display_name, 60) || (kind === "cards" ? "Card" : "Account"), last4: clip(a.partial_card_number, 4) });
     }
   }
+  const have = new Map((await cardRows(db, shopperId, row.id)).map((r) => [r.card_key, r]));
+  for (const c of listed) await ensureCard(db, shopperId, row, have, c, now, null);
+  const top = [...have.values()].filter((r) => !r.parent_key);
+  // One card or account alone is the shopper's, without asking.
+  if (listed.length === 1 && top.length === 1 && top[0].mine == null) {
+    await db.prepare("UPDATE bank_cards SET mine = 1, auto = 1 WHERE shopper_id = ? AND connection_id = ? AND card_key = ?").bind(shopperId, row.id, top[0].card_key).run();
+    top[0].mine = 1; top[0].auto = 1;
+  }
+  // 2. The payments of each that is theirs. Not theirs, or not answered yet: not read at all.
+  let marksSeen = false, amexCardRead = false;
+  for (const c of listed) {
+    const card = have.get(c.card_key);
+    if (card.mine !== 1) { seen.notChosen++; continue; }
+    const tx = await apiGet(env, t.access, `/data/v1/${c.kind}/${c.id}/transactions${q}`, f);
+    if (tx.gone) return { gone: true };
+    if (tx.failed) { seen.failedTx++; continue; }
+    seen.tx += tx.results.length;
+    if (c.kind === "cards" && isAmex(row.bank)) amexCardRead = true;
+    // Which card each payment was on, when the card company says (one account, several cards). A payment that names no
+    // card, or names this card's own last four, is this card's.
+    const list = tx.results.slice(0, 1000);
+    const marks = list.map((x) => { const m = c.kind === "cards" ? txCardMark(x) : null; return m && m !== "n:" + c.last4 ? m : null; });
+    if (list.some((x) => c.kind === "cards" && txCardMark(x))) marksSeen = true;
+    const children = () => [...have.values()].filter((r) => r.parent_key === c.card_key);
+    const split = marks.some(Boolean) || children().length > 0;
+    const bucket = new Map();   // mark ("self" for the card itself) -> its row
+    if (split) {
+      // The card itself starts ticked only if the shopper chose it (not if it was simply the only one): asked again.
+      bucket.set("self", await ensureCard(db, shopperId, row, have, { card_key: c.card_key + "|self", parent_key: c.card_key, provider_id: c.provider_id, name: c.name, last4: c.last4 }, now, card.auto ? null : 1));
+      for (const m of new Set(marks.filter(Boolean))) {
+        const key = c.card_key + "|" + m;
+        const others = children().filter((r) => r.card_key.startsWith(c.card_key + "|s:")).length;
+        const name = m.startsWith("n:") ? c.name : "Another card on " + c.name + (others && !have.has(key) ? " (" + (others + 1) + ")" : "");
+        const was = have.get(key);
+        bucket.set(m, await ensureCard(db, shopperId, row, have, { card_key: key, parent_key: c.card_key, provider_id: c.provider_id, name: was ? was.name : name, last4: m.startsWith("n:") ? m.slice(2) : null }, now, null));
+      }
+    }
+    list.forEach((x, i) => {
+      const pid = String(x.transaction_id || ""), when = String(x.timestamp || "").slice(0, 10);
+      if (!pid || pid.length > 120 || !/^\d{4}-\d{2}-\d{2}$/.test(when)) return;
+      const on = split ? bucket.get(marks[i] || "self") : card;
+      if (on.mine !== 1) { seen.otherCard++; return; }   // another card's payment, not the shopper's (or not answered): not kept
+      if (marks[i]) seen.marked++;
+      const debit = String(x.transaction_type || "").toUpperCase() === "DEBIT" || (!x.transaction_type && Number(x.amount) < 0);
+      if (debit) seen.debits++; else seen.credits++;
+      for (const k of Object.keys(x)) seen.fields[k] = (seen.fields[k] || 0) + 1;
+      for (const k of Object.keys((x && x.meta) || {})) seen.fields["meta." + k] = (seen.fields["meta." + k] || 0) + 1;
+      if (debit && !isShopping(x)) {
+        const cat = String(x.transaction_category || "").toUpperCase();
+        if (NOT_SHOPPING_TYPES.has(cat)) seen.leftOutType[cat] = (seen.leftOutType[cat] || 0) + 1;
+        else { const w = (NOT_SHOPPING.exec(String(x.description || "") + " " + String(merchantOf(x) || "")) || ["?"])[0].toLowerCase().slice(0, 20); seen.leftOutWord[w] = (seen.leftOutWord[w] || 0) + 1; }
+        return;
+      }
+      if (debit) seen.keptDebits++;
+      const amount = minor(x.amount); if (!amount) return;
+      rows.push({ payment_id: row.id + ":" + pid, account: cardLabel(on.name, on.last4), card_ref: on.ref, paid_on: when, amount_minor: debit ? amount : -amount,
+        currency: /^[A-Z]{3}$/.test(String(x.currency || "")) ? x.currency : "GBP", description: clip(x.description, 140), merchant: clip(merchantOf(x), 80),
+        classification: classificationToKeep(x) });
+    });
+  }
   console.log("bank: read", JSON.stringify(seen));
+  // A card ticked off while this was reading stays off: only cards still the shopper's are kept.
+  const nowRows = await cardRows(db, shopperId, row.id);
+  const still = new Set(nowRows.filter((r) => r.mine === 1).map((r) => r.ref));
+  const keep = rows.filter((r) => still.has(r.card_ref));
+  // Payments read before cards were told apart (no card_ref; older than this read's 90 days) are given the card they were
+  // saved under, by its name; a card that isn't theirs loses them. One saved under a card split by its payments was on
+  // either card: Relay can't tell whose, so it goes. Any left without a card are never shown (visibleSql).
+  const kidsOf = new Set(nowRows.filter((r) => r.parent_key).map((r) => r.parent_key));
+  const legacy = [];
+  for (const r of nowRows.filter((x) => !x.parent_key)) {
+    const args = [shopperId, row.id, cardLabel(r.name, r.last4)];
+    legacy.push(kidsOf.has(r.card_key) || r.mine === 0
+      ? db.prepare("DELETE FROM bank_payments WHERE shopper_id = ? AND connection_id = ? AND card_ref IS NULL AND account = ?").bind(...args)
+      : db.prepare("UPDATE bank_payments SET card_ref = ? WHERE shopper_id = ? AND connection_id = ? AND card_ref IS NULL AND account = ?").bind(r.ref, ...args));
+  }
+  if (legacy.length) await db.batch(legacy);
   // A full read of the last 90 days replaces what was read before for those days (so anything Relay no longer keeps goes).
   await db.prepare("DELETE FROM bank_payments WHERE shopper_id = ? AND connection_id = ? AND paid_on >= ?").bind(shopperId, row.id, new Date(now - LOOK_BACK_DAYS * DAY).toISOString().slice(0, 10)).run();
-  if (rows.length) await db.batch(rows.map((r) => db.prepare(`INSERT INTO bank_payments (shopper_id, payment_id, connection_id, account, paid_on, amount_minor, currency, description, merchant, classification, created_at)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(shopper_id, payment_id) DO UPDATE SET account = excluded.account, description = excluded.description, merchant = excluded.merchant,
-      classification = excluded.classification`)
-    .bind(shopperId, r.payment_id, row.id, r.account, r.paid_on, r.amount_minor, r.currency, r.description, r.merchant, r.classification, now)));
-  await db.prepare("UPDATE bank_links SET synced_at = ?, status = 'ok' WHERE id = ?").bind(now, row.id).run();
-  return { ok: true, read: rows.length };
+  if (keep.length) await db.batch(keep.map((r) => db.prepare(`INSERT INTO bank_payments (shopper_id, payment_id, connection_id, account, paid_on, amount_minor, currency, description, merchant, classification, card_ref, created_at)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(shopper_id, payment_id) DO UPDATE SET account = excluded.account, description = excluded.description, merchant = excluded.merchant,
+      classification = excluded.classification, card_ref = excluded.card_ref`)
+    .bind(shopperId, r.payment_id, row.id, r.account, r.paid_on, r.amount_minor, r.currency, r.description, r.merchant, r.classification, r.card_ref, now)));
+  // An Amex card whose payments said nothing about which card each was on: the app says Relay can't tell them apart.
+  await db.prepare("UPDATE bank_links SET synced_at = ?, status = 'ok', unsplit = ? WHERE id = ?").bind(now, amexCardRead && !marksSeen ? 1 : 0, row.id).run();
+  return { ok: true, read: keep.length };
 }
 
 // Reads every connection of a shopper (at most once every 10 minutes unless forced), then matches payments to receipts.
@@ -258,7 +403,7 @@ export async function syncBank(env, shopperId, now, f, force, matchOnly) {
   // Payments older than 13 months go.
   await db.prepare("DELETE FROM bank_payments WHERE shopper_id = ? AND paid_on < ?").bind(shopperId, new Date(now - 400 * DAY).toISOString().slice(0, 10)).run();
   const not = await notMineOf(db, shopperId);
-  const payments = ((await db.prepare("SELECT payment_id, paid_on, amount_minor, currency, description, merchant FROM bank_payments WHERE shopper_id = ?").bind(shopperId).all()).results || [])
+  const payments = ((await db.prepare("SELECT payment_id, paid_on, amount_minor, currency, description, merchant FROM bank_payments WHERE shopper_id = ? AND " + visibleSql("bank_payments")).bind(shopperId).all()).results || [])
     .filter((p) => !isNotMine(not, p.payment_id, shopName(p.description, p.merchant)));
   // A receipt made from the shopper's own photo belongs to the payment it was added for, whatever the amounts say.
   const receipts = await receiptTotals(env, shopperId);
@@ -324,7 +469,7 @@ export async function receiptsToAdd(env, shopperId, now) {
     const since = new Date((now || Date.now()) - 30 * DAY).toISOString().slice(0, 10);
     await ensureBankColumns(env.RELAY_DB);
     const rows = (await env.RELAY_DB.prepare(`SELECT payment_id, account, paid_on, amount_minor, currency, description, merchant, classification, receipt_id FROM bank_payments
-      WHERE shopper_id = ? AND receipt_id IS NULL AND amount_minor >= ? AND paid_on >= ? ORDER BY paid_on DESC, payment_id LIMIT 200`).bind(shopperId, RECEIPT_MIN_PENCE, since).all()).results || [];
+      WHERE shopper_id = ? AND receipt_id IS NULL AND amount_minor >= ? AND paid_on >= ? AND ${visibleSql("bank_payments")} ORDER BY paid_on DESC, payment_id LIMIT 200`).bind(shopperId, RECEIPT_MIN_PENCE, since).all()).results || [];
     if (!rows.length) return [];
     const not = await notMineOf(env.RELAY_DB, shopperId), dir = await loadShopDirectory(env.RELAY_DB);
     // photoRead: whether Relay can read a photo of the receipt (the AI reader is on), so the app says what will happen.
@@ -408,17 +553,25 @@ async function providers(env, now, fetchImpl) {
   return providerList ? providerList.list : null;
 }
 
+// One connection as the app sees it: its bank, when it was read, what was found, and which of its cards are the shopper's.
+async function connectionView(db, shopperId, c) {
+  return { id: c.id, bank: bankName(c.bank), connectedAt: new Date(c.connected_at).toISOString(), syncedAt: c.synced_at ? new Date(c.synced_at).toISOString() : null,
+    needsReconnect: c.status === "reconnect", payments: Number(c.payments) || 0, matched: Number(c.matched) || 0,
+    ...cardsView(await cardRows(db, shopperId, c.id)), ...(c.unsplit === 1 ? { unsplit: true } : {}) };
+}
+
 export async function handleBankRoute(path, method, request, env, url, cors, shopper, o) {
   if (!path.startsWith("/relay/my/bank")) return null;
   const db = env.RELAY_DB; await ensureBankTables(db);
   const ok = await allowed(env, shopper);
   if (path === "/relay/my/bank" && method === "GET") {
     if (!ok) return json({ available: false, connections: [] }, 200, cors);
-    const conns = (await db.prepare(`SELECT c.id, c.bank, c.connected_at, c.synced_at, c.status, COUNT(p.payment_id) AS payments, SUM(CASE WHEN p.receipt_id IS NOT NULL THEN 1 ELSE 0 END) AS matched
-      FROM bank_links c LEFT JOIN bank_payments p ON p.connection_id = c.id AND p.shopper_id = c.shopper_id WHERE c.shopper_id = ? GROUP BY c.id ORDER BY c.connected_at`).bind(shopper.id).all()).results || [];
+    const conns = (await db.prepare(`SELECT c.id, c.bank, c.connected_at, c.synced_at, c.status, c.unsplit, COUNT(p.payment_id) AS payments, SUM(CASE WHEN p.receipt_id IS NOT NULL THEN 1 ELSE 0 END) AS matched
+      FROM bank_links c LEFT JOIN bank_payments p ON p.connection_id = c.id AND p.shopper_id = c.shopper_id AND ${visibleSql("p")} WHERE c.shopper_id = ? GROUP BY c.id ORDER BY c.connected_at`).bind(shopper.id).all()).results || [];
     const choices = await choicesOffered(env, o.now, o.fetchImpl);
-    return json({ available: true, testBanks: !bankLive(env), ...(choices ? { choices } : {}), connections: conns.map((c) => ({ id: c.id, bank: bankName(c.bank), connectedAt: new Date(c.connected_at).toISOString(),
-      syncedAt: c.synced_at ? new Date(c.synced_at).toISOString() : null, needsReconnect: c.status === "reconnect", payments: Number(c.payments) || 0, matched: Number(c.matched) || 0 })) }, 200, cors);
+    const views = [];
+    for (const c of conns) views.push(await connectionView(db, shopper.id, c));
+    return json({ available: true, testBanks: !bankLive(env), ...(choices ? { choices } : {}), connections: views }, 200, cors);
   }
   if (!ok) return json({ error: "not_found" }, 404, cors);
   if (path === "/relay/my/bank/connect" && method === "POST") {
@@ -438,7 +591,7 @@ export async function handleBankRoute(path, method, request, env, url, cors, sho
   if (path === "/relay/my/bank/sync" && method === "POST") return json(await syncBank(env, shopper.id, o.now, o.fetchImpl, false), 200, cors);
   if (path === "/relay/my/bank/payments" && method === "GET") {
     const rows = (await db.prepare(`SELECT payment_id, account, paid_on, amount_minor, currency, description, merchant, classification, receipt_id, match FROM bank_payments
-      WHERE shopper_id = ? AND amount_minor > 0 ORDER BY paid_on DESC, payment_id LIMIT 200`).bind(shopper.id).all()).results || [];
+      WHERE shopper_id = ? AND amount_minor > 0 AND ${visibleSql("bank_payments")} ORDER BY paid_on DESC, payment_id LIMIT 200`).bind(shopper.id).all()).results || [];
     const not = await notMineOf(db, shopper.id), dir = rows.length ? await loadShopDirectory(db) : null;
     return json({ photoRead: aiAvailable(env), payments: rows.map((r) => { const shop = shopName(r.description, r.merchant); return { id: r.payment_id, account: r.account, date: r.paid_on, amountPence: r.amount_minor, currency: r.currency,
       description: r.description, merchant: r.merchant, shop, receiptId: r.receipt_id || null, match: r.match || null,
@@ -451,7 +604,7 @@ export async function handleBankRoute(path, method, request, env, url, cors, sho
   if (path === "/relay/my/bank/not-mine" && method === "POST") {
     const b = await request.json().catch(() => null);
     if (!b || typeof b.id !== "string" || !b.id || b.id.length > 200 || typeof b.on !== "boolean" || (b.reason != null && b.reason !== "no_receipt")) return json({ error: "invalid_request" }, 400, cors);
-    const p = await db.prepare("SELECT payment_id, description, merchant FROM bank_payments WHERE shopper_id = ? AND payment_id = ?").bind(shopper.id, b.id).first();
+    const p = await db.prepare("SELECT payment_id, description, merchant FROM bank_payments WHERE shopper_id = ? AND payment_id = ? AND " + visibleSql("bank_payments")).bind(shopper.id, b.id).first();
     if (!p) return json({ error: "not_found" }, 404, cors);
     if (b.reason === "no_receipt") {
       await (b.on ? db.prepare("INSERT OR IGNORE INTO bank_not_mine (shopper_id, kind, key, created_at) VALUES (?, 'no_receipt', ?, ?)").bind(shopper.id, p.payment_id, o.now || Date.now())
@@ -469,12 +622,55 @@ export async function handleBankRoute(path, method, request, env, url, cors, sho
     return json({ ok: true, matched: r.matched }, 200, cors);
   }
   if (path === "/relay/my/bank/receipt-photo" && method === "POST") return addReceiptPhoto(env, request, cors, shopper, o);
+  // POST { id, cards: [{ ref, mine }] }: which of one of their own connection's cards and accounts are theirs. A card ticked
+  // off: its payments are deleted (and what was said about them) and it's never read again; one ticked on is read now.
+  if (path === "/relay/my/bank/cards" && method === "POST") {
+    const b = await request.json().catch(() => null);
+    const uuid = (v) => typeof v === "string" && /^[0-9a-f-]{36}$/.test(v);
+    if (!b || !uuid(b.id) || !Array.isArray(b.cards) || !b.cards.length || b.cards.length > 40
+      || !b.cards.every((c) => c && uuid(c.ref) && typeof c.mine === "boolean")) return json({ error: "invalid_request" }, 400, cors);
+    const conn = await db.prepare("SELECT * FROM bank_links WHERE id = ? AND shopper_id = ?").bind(b.id, shopper.id).first();
+    if (!conn) return json({ error: "not_found" }, 404, cors);
+    const rows = await cardRows(db, shopper.id, conn.id), byRef = new Map(rows.map((r) => [r.ref, r]));
+    const parents = new Set(rows.filter((r) => r.parent_key).map((r) => r.parent_key));
+    if (!b.cards.every((c) => byRef.has(c.ref) && !parents.has(byRef.get(c.ref).card_key))) return json({ error: "not_found" }, 404, cors);
+    const st = [], on = [];
+    for (const c of b.cards) {
+      const r = byRef.get(c.ref);
+      if (c.mine && r.mine !== 1) on.push(r);
+      st.push(db.prepare("UPDATE bank_cards SET mine = ?, auto = 0 WHERE shopper_id = ? AND connection_id = ? AND ref = ?").bind(c.mine ? 1 : 0, shopper.id, conn.id, r.ref));
+      r.mine = c.mine ? 1 : 0;
+      if (!c.mine) {
+        // Its payments go, and what the shopper said about them. (Payments read before cards were told apart have no
+        // card_ref: they're found by the card's name, as they were saved.)
+        const which = "shopper_id = ? AND connection_id = ? AND (card_ref = ? OR (card_ref IS NULL AND account = ?))";
+        const args = [shopper.id, conn.id, r.ref, cardLabel(r.name, r.last4)];
+        st.push(db.prepare(`DELETE FROM bank_not_mine WHERE shopper_id = ? AND kind IN ('payment', 'no_receipt') AND key IN (SELECT payment_id FROM bank_payments WHERE ${which})`).bind(shopper.id, ...args));
+        st.push(db.prepare(`DELETE FROM bank_payments WHERE ${which}`).bind(...args));
+      }
+    }
+    // A card split into its cards is read while any of them is (or may be) the shopper's.
+    for (const pk of parents) {
+      const kids = rows.filter((r) => r.parent_key === pk);
+      st.push(db.prepare("UPDATE bank_cards SET mine = ? WHERE shopper_id = ? AND connection_id = ? AND card_key = ?").bind(kids.some((k) => k.mine !== 0) ? 1 : 0, shopper.id, conn.id, pk));
+    }
+    await db.batch(st);
+    if (on.length) {
+      const r = await readConnection(env, db, shopper.id, conn, o.now || Date.now(), o.fetchImpl);
+      if (r.gone) await db.prepare("UPDATE bank_links SET status = 'reconnect' WHERE id = ?").bind(conn.id).run();
+    }
+    await syncBank(env, shopper.id, o.now, o.fetchImpl, false, true);
+    const view = await db.prepare(`SELECT c.id, c.bank, c.connected_at, c.synced_at, c.status, c.unsplit, COUNT(p.payment_id) AS payments, SUM(CASE WHEN p.receipt_id IS NOT NULL THEN 1 ELSE 0 END) AS matched
+      FROM bank_links c LEFT JOIN bank_payments p ON p.connection_id = c.id AND p.shopper_id = c.shopper_id AND ${visibleSql("p")} WHERE c.id = ? AND c.shopper_id = ? GROUP BY c.id`).bind(conn.id, shopper.id).first();
+    return json({ ok: true, connection: await connectionView(db, shopper.id, view) }, 200, cors);
+  }
   if (path === "/relay/my/bank/disconnect" && method === "POST") {
     const b = await request.json().catch(() => null);
     if (!b || typeof b.id !== "string" || !/^[0-9a-f-]{36}$/.test(b.id)) return json({ error: "invalid_request" }, 400, cors);
     const own = await db.prepare("SELECT 1 AS x FROM bank_links WHERE id = ? AND shopper_id = ?").bind(b.id, shopper.id).first();
     if (!own) return json({ error: "not_found" }, 404, cors);
     await db.batch([db.prepare("DELETE FROM bank_payments WHERE shopper_id = ? AND connection_id = ?").bind(shopper.id, b.id),
+      db.prepare("DELETE FROM bank_cards WHERE shopper_id = ? AND connection_id = ?").bind(shopper.id, b.id),
       db.prepare("DELETE FROM bank_links WHERE id = ? AND shopper_id = ?").bind(b.id, shopper.id)]);
     return json({ ok: true }, 200, cors);
   }
@@ -507,7 +703,7 @@ async function addReceiptPhoto(env, request, cors, shopper, o) {
   const photo = decodePhoto(b.image, MAX_RECEIPT_PHOTO_BYTES);
   if (photo && photo.error) return json({ error: "photo_too_big" }, 413, cors);
   if (!photo) return json({ error: "bad_photo" }, 400, cors);
-  const p = await db.prepare("SELECT payment_id, account, paid_on, amount_minor, currency, description, merchant, receipt_id FROM bank_payments WHERE shopper_id = ? AND payment_id = ?")
+  const p = await db.prepare("SELECT payment_id, account, paid_on, amount_minor, currency, description, merchant, receipt_id FROM bank_payments WHERE shopper_id = ? AND payment_id = ? AND " + visibleSql("bank_payments"))
     .bind(shopper.id, b.id).first();
   if (!p || !(p.amount_minor > 0)) return json({ error: "not_found" }, 404, cors);
   await ensureGmailTables(db);
