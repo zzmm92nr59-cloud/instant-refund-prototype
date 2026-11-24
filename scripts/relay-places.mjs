@@ -43,7 +43,7 @@ export async function closeSheet(page) {
 // (Connor, 17 Nov 2026: Profile like Shop's: everything but your inboxes and banks is in Settings, Sign out too.)
 const UNDER = {
   "Settings": ["Delivery details", "Your interests", "Home layout", "Notifications", "Face ID & passkeys", "Phone number", "Two-step sign-in", "Devices", "Card for swaps",
-    "Email permission", "Download my data", "Delete my account", "Help", "Chat with us", "Contact us", "Show the tips again", "Terms of use", "Privacy policy",
+    "Email permission", "Blocked members", "Download my data", "Delete my account", "Help", "Chat with us", "Contact us", "Show the tips again", "Terms of use", "Privacy policy",
     "Relay health", "Emails shoppers sent", "Review reports", "Sign-in for app reviewers", "Testers", "See getting started again", "Sign in again for team tools"]
 };
 // What used to be a section on Profile and is now part of Settings.

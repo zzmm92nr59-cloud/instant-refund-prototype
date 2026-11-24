@@ -14,6 +14,7 @@ import { ADMIN_TABLE_SQL, handleResaleAdminRoute, isBlocked } from "./resale-adm
 import { ensureOnce, runAll } from "./once.js";
 import { categorise, storeKey } from "./receipt-category.js";
 import { decodePhoto } from "./photos.js";
+import { ensurePushTables, sendPush, subsOf } from "./push.js";
 
 // What can be resold: physical goods only. Food & drink, travel and digital purchases can't be handed to
 // someone else, and receipt lines like "You've saved" or "Delivery" aren't products at all.
@@ -65,11 +66,19 @@ async function ensureResaleTablesRun(db) {
        id TEXT PRIMARY KEY, listing_id TEXT NOT NULL, reporter_id TEXT NOT NULL, reason TEXT, created_at INTEGER NOT NULL, UNIQUE (listing_id, reporter_id))`,
     // The seller's own photos of what they're selling (up to 4, made smaller on their phone first).
     `CREATE TABLE IF NOT EXISTS resale_photos (listing_id TEXT NOT NULL, n INTEGER NOT NULL, type TEXT NOT NULL, data TEXT NOT NULL, PRIMARY KEY (listing_id, n))`,
+    // When each member last read a conversation, so new messages from the other person can be counted (the red number).
+    `CREATE TABLE IF NOT EXISTS resale_reads (shopper_id TEXT NOT NULL, request_id TEXT NOT NULL, read_at INTEGER NOT NULL, PRIMARY KEY (shopper_id, request_id))`,
+    // A member's own block of another member (separate from Relay's team blocking someone, and from reports). The blocker only
+    // ever sees the item they were talking about; the id is the block's own, never the other member's.
+    `CREATE TABLE IF NOT EXISTS resale_member_blocks (id TEXT PRIMARY KEY, blocker_id TEXT NOT NULL, blocked_id TEXT NOT NULL, about TEXT, created_at INTEGER NOT NULL, UNIQUE (blocker_id, blocked_id))`,
+    `CREATE INDEX IF NOT EXISTS idx_resale_mblock_blocked ON resale_member_blocks(blocked_id)`,
     ...ADMIN_TABLE_SQL
   ];
   await runAll(db, statements);
   // Added later: how the item changes hands, and the area for collection (only the first half of a postcode, never an address).
-  for (const sql of ["ALTER TABLE resale_listings ADD COLUMN handover TEXT", "ALTER TABLE resale_listings ADD COLUMN area TEXT", "ALTER TABLE resale_listings ADD COLUMN photos INTEGER NOT NULL DEFAULT 0"]) {
+  for (const sql of ["ALTER TABLE resale_listings ADD COLUMN handover TEXT", "ALTER TABLE resale_listings ADD COLUMN area TEXT", "ALTER TABLE resale_listings ADD COLUMN photos INTEGER NOT NULL DEFAULT 0",
+    // Whether the seller has seen a request yet (Yours shows it), for the red number.
+    "ALTER TABLE resale_requests ADD COLUMN seller_seen INTEGER NOT NULL DEFAULT 0"]) {
     try { await db.prepare(sql).run(); } catch { /* already there */ }
   }
 }
@@ -83,6 +92,8 @@ export function resaleDeleteStatements(db, shopperId) {
     // (Their own messages go even from a conversation whose request is already gone.)
     db.prepare("DELETE FROM resale_messages WHERE sender_id = ? OR request_id IN " + MY_REQUESTS).bind(shopperId, shopperId, shopperId),
     db.prepare("DELETE FROM resale_reports WHERE reporter_id = ? OR request_id IN " + MY_REQUESTS).bind(shopperId, shopperId, shopperId),
+    db.prepare("DELETE FROM resale_reads WHERE shopper_id = ? OR request_id IN " + MY_REQUESTS).bind(shopperId, shopperId, shopperId),
+    db.prepare("DELETE FROM resale_member_blocks WHERE blocker_id = ? OR blocked_id = ?").bind(shopperId, shopperId),
     db.prepare("DELETE FROM resale_listing_reports WHERE reporter_id = ? OR listing_id IN (SELECT id FROM resale_listings WHERE seller_id = ?)").bind(shopperId, shopperId),
     db.prepare("DELETE FROM resale_requests WHERE asker_id = ? OR listing_id IN (SELECT id FROM resale_listings WHERE seller_id = ?) OR offered_listing_id IN (SELECT id FROM resale_listings WHERE seller_id = ?)").bind(shopperId, shopperId, shopperId),
     db.prepare("DELETE FROM resale_photos WHERE listing_id IN (SELECT id FROM resale_listings WHERE seller_id = ?)").bind(shopperId),
@@ -190,44 +201,162 @@ async function feed(env, shopper) {
   const rows = await env.RELAY_DB.prepare(
     `SELECT l.* FROM resale_listings l WHERE l.status = 'active' AND l.seller_id != ?
        AND l.id NOT IN (SELECT listing_id FROM resale_listing_reports WHERE reporter_id = ?)
-       ORDER BY l.created_at DESC LIMIT 60`).bind(shopper.id, shopper.id).all();
+       AND l.seller_id NOT IN (SELECT blocked_id FROM resale_member_blocks WHERE blocker_id = ? UNION SELECT blocker_id FROM resale_member_blocks WHERE blocked_id = ?)
+       ORDER BY l.created_at DESC LIMIT 60`).bind(shopper.id, shopper.id, shopper.id, shopper.id).all();
   const mine = await env.RELAY_DB.prepare("SELECT id, listing_id, kind, status FROM resale_requests WHERE asker_id = ?").bind(shopper.id).all();
   const asked = new Map((mine.results || []).map(r => [r.listing_id, r]));
   return (rows.results || []).map(r => ({ ...publicListing(r, false), myRequest: asked.has(r.id) ? { id: asked.get(r.id).id, kind: asked.get(r.id).kind, status: asked.get(r.id).status } : null }));
 }
 
-async function myStuff(env, shopper) {
+// ---- What's new for a member: requests on their listings they haven't seen, and messages they haven't read --------------
+// Counted from the database when asked (opening Relay, opening Swap & resell, pulling down), never on a timer.
+const UNREAD = `SELECT q.id AS request_id, COUNT(m.id) AS n FROM resale_requests q JOIN resale_listings l ON l.id = q.listing_id
+    JOIN resale_messages m ON m.request_id = q.id LEFT JOIN resale_reads r ON r.shopper_id = ? AND r.request_id = q.id
+   WHERE (q.asker_id = ? OR l.seller_id = ?) AND q.status IN ('pending','accepted') AND m.sender_id != ? AND m.created_at > COALESCE(r.read_at, 0)
+   GROUP BY q.id`;
+async function unreadByRequest(env, shopperId) {
+  const rows = await env.RELAY_DB.prepare(UNREAD).bind(shopperId, shopperId, shopperId, shopperId).all();
+  return new Map((rows.results || []).map(r => [r.request_id, Number(r.n) || 0]));
+}
+async function news(env, shopperId) {
+  const fresh = await env.RELAY_DB.prepare(`SELECT COUNT(*) AS n FROM resale_requests q JOIN resale_listings l ON l.id = q.listing_id
+     WHERE l.seller_id = ? AND l.status = 'active' AND q.status = 'pending' AND q.kind != 'chat' AND q.seller_seen = 0`).bind(shopperId).first();
+  let messages = 0; for (const n of (await unreadByRequest(env, shopperId)).values()) messages += n;
+  // Whether there's anything that could bring news: a listing up, or a request waiting or accepted. The app stops asking when not.
+  const live = await env.RELAY_DB.prepare(`SELECT EXISTS (SELECT 1 FROM resale_listings WHERE seller_id = ? AND status IN ('active','matched'))
+      OR EXISTS (SELECT 1 FROM resale_requests WHERE asker_id = ? AND status IN ('pending','accepted')) AS x`).bind(shopperId, shopperId).first();
+  const requests = Number(fresh && fresh.n || 0);
+  return { requests, messages, total: requests + messages, active: Boolean(live && live.x) };
+}
+
+async function myStuff(env, shopper, markSeen) {
+  const unread = await unreadByRequest(env, shopper.id);
   const listings = await env.RELAY_DB.prepare(
     "SELECT * FROM resale_listings WHERE seller_id = ? AND status IN ('active','matched') ORDER BY created_at DESC LIMIT 60").bind(shopper.id).all();
   const out = [];
   for (const l of listings.results || []) {
     const reqs = await env.RELAY_DB.prepare(
-      "SELECT id, kind, offered_listing_id, message, status, created_at, asker_id FROM resale_requests WHERE listing_id = ? ORDER BY created_at ASC, rowid ASC LIMIT 50").bind(l.id).all();
+      `SELECT id, kind, offered_listing_id, message, status, created_at, asker_id, seller_seen,
+         (SELECT COUNT(*) FROM resale_messages m WHERE m.request_id = resale_requests.id) AS said
+         FROM resale_requests WHERE listing_id = ? ORDER BY created_at ASC, rowid ASC LIMIT 50`).bind(l.id).all();
     const requests = [];
     let n = 0;
     for (const q of reqs.results || []) {
+      // A chat someone opened but hasn't written in yet isn't anything for the seller to see.
+      if (q.kind === "chat" && !q.said) continue;
       n++;
       let offered = null;
       if (q.offered_listing_id) {
         const o = await env.RELAY_DB.prepare("SELECT title, store, size, condition FROM resale_listings WHERE id = ?").bind(q.offered_listing_id).first();
         if (o) offered = { title: o.title, store: o.store, size: o.size, condition: o.condition };
       }
-      requests.push({ id: q.id, who: "Member " + n, kind: q.kind, message: q.message, status: q.status, createdAt: q.created_at, offered });
+      requests.push({ id: q.id, who: "Member " + n, kind: q.kind, message: q.message, status: q.status, createdAt: q.created_at, offered,
+        new: q.status === "pending" && q.kind !== "chat" && !q.seller_seen, unread: unread.get(q.id) || 0, messages: Number(q.said) || 0 });
     }
     out.push({ ...publicListing(l, true), requests });
   }
   const asked = await env.RELAY_DB.prepare(
-    `SELECT q.id, q.kind, q.status, q.created_at, l.title, l.store FROM resale_requests q JOIN resale_listings l ON l.id = q.listing_id
+    `SELECT q.id, q.kind, q.status, q.created_at, l.title, l.store, l.status AS listing_status FROM resale_requests q JOIN resale_listings l ON l.id = q.listing_id
        WHERE q.asker_id = ? ORDER BY q.created_at DESC LIMIT 40`).bind(shopper.id).all();
-  return { listings: out, myRequests: (asked.results || []).map(r => ({ id: r.id, kind: r.kind, status: r.status, createdAt: r.created_at, title: r.title, store: r.store })) };
+  // Opening Yours shows every request on the member's listings, so they count as seen from now on (this answer still says which were new).
+  if (markSeen) await env.RELAY_DB.prepare("UPDATE resale_requests SET seller_seen = 1 WHERE seller_seen = 0 AND listing_id IN (SELECT id FROM resale_listings WHERE seller_id = ?)").bind(shopper.id).run();
+  return { listings: out, myRequests: (asked.results || []).map(r => ({ id: r.id, kind: r.kind, status: r.status, createdAt: r.created_at, title: r.title, store: r.store, unread: unread.get(r.id) || 0,
+      ...(r.status !== "accepted" && r.listing_status !== "active" ? { itemGone: true } : {}) })),
+    news: await news(env, shopper.id) };
 }
 
-async function ask(env, shopper, listingId, body, now) {
+// ---- Telling someone on their phone (the price alerts' notifications, push.js), only for devices they turned them on for ----
+// Never the other member's words or who they are: just that there's something to look at.
+async function tell(env, shopperId, message, o = {}) {
+  if (!shopperId) return;
+  try {
+    await ensurePushTables(env.RELAY_DB);
+    for (const sub of await subsOf(env.RELAY_DB, shopperId)) { try { await sendPush(env, sub, message, o); } catch { /* one device failing never stops the rest */ } }
+  } catch { /* a notification is a nicety: the request itself has worked */ }
+}
+
+// ---- Blocking another member (their own choice, separate from Relay's team blocking someone and from reports) -----------
+async function blockedBetween(env, a, b) {
+  const r = await env.RELAY_DB.prepare("SELECT 1 AS x FROM resale_member_blocks WHERE (blocker_id = ? AND blocked_id = ?) OR (blocker_id = ? AND blocked_id = ?)").bind(a, b, b, a).first();
+  return Boolean(r);
+}
+// From a conversation or a request: the other member can no longer message them or ask about their listings, and neither
+// sees the other's listings. Every conversation between them ends (an item matched between them goes back on sale) and
+// requests between them are declined. Nothing is reported: reporting stays its own thing.
+async function blockMember(env, shopper, requestId, now) {
+  const q = await party(env, shopper, requestId);
+  if (!q) return { status: 404, body: { error: "not_found" } };
+  const other = q.iAmSeller ? q.asker_id : q.seller_id;
+  if (!other || other === shopper.id) return { status: 404, body: { error: "not_found" } };
+  const me = shopper.id;
+  const between = `(asker_id = ? AND listing_id IN (SELECT id FROM resale_listings WHERE seller_id = ?)) OR (asker_id = ? AND listing_id IN (SELECT id FROM resale_listings WHERE seller_id = ?))`;
+  await env.RELAY_DB.batch([
+    env.RELAY_DB.prepare("INSERT OR IGNORE INTO resale_member_blocks (id, blocker_id, blocked_id, about, created_at) VALUES (?,?,?,?,?)").bind(uuid(), me, other, clean(q.title, 120) || null, now),
+    env.RELAY_DB.prepare("UPDATE resale_listings SET status = 'active' WHERE status = 'matched' AND id IN (SELECT listing_id FROM resale_requests WHERE status = 'accepted' AND (" + between + "))").bind(other, me, me, other),
+    env.RELAY_DB.prepare("UPDATE resale_requests SET status = 'closed' WHERE status = 'accepted' AND (" + between + ")").bind(other, me, me, other),
+    env.RELAY_DB.prepare("UPDATE resale_requests SET status = 'declined' WHERE status = 'pending' AND (" + between + ")").bind(other, me, me, other)
+  ]);
+  return { status: 200, body: { ok: true } };
+}
+async function myBlocks(env, shopper) {
+  const rows = await env.RELAY_DB.prepare("SELECT id, about, created_at FROM resale_member_blocks WHERE blocker_id = ? ORDER BY created_at DESC LIMIT 100").bind(shopper.id).all();
+  return (rows.results || []).map(r => ({ id: r.id, about: r.about || null, createdAt: r.created_at }));
+}
+
+// ---- Changing a listing: only its seller, only while it's on sale. Price, condition, note and photos; the title and shop
+// still only ever come from the receipt. Anyone else is told it doesn't exist.
+async function editListing(env, shopper, listingId, body, now) {
+  const l = await env.RELAY_DB.prepare("SELECT id, receipt_id, status FROM resale_listings WHERE id = ? AND seller_id = ? AND status IN ('active','matched')").bind(listingId, shopper.id).first();
+  if (!l) return { status: 404, body: { error: "not_found" } };
+  if (l.status !== "active") return { status: 409, body: { error: "listing_matched" } };
+  const sets = [], vals = [];
+  if (body.condition != null) {
+    if (!CONDITIONS.includes(body.condition)) return { status: 400, body: { error: "invalid_condition" } };
+    sets.push("condition = ?"); vals.push(body.condition);
+  }
+  if (body.offers === true) { sets.push("ask_pence = ?"); vals.push(null); }
+  else if (body.askPence != null) {
+    if (!Number.isInteger(body.askPence) || body.askPence < 0 || body.askPence > MAX_ASK_PENCE) return { status: 400, body: { error: "invalid_price" } };
+    sets.push("ask_pence = ?"); vals.push(body.askPence);
+  }
+  if (typeof body.note === "string") { sets.push("note = ?"); vals.push(clean(body.note, 200) || null); }
+  let photos = null;
+  if (Array.isArray(body.photos) && body.photos.length) {
+    photos = [];
+    for (const raw of body.photos.slice(0, MAX_PHOTOS + 1)) {
+      const ph = decodePhoto(raw);
+      if (!ph || ph.error) return { status: 400, body: { error: ph && ph.error ? ph.error : "bad_photo" } };
+      photos.push(ph);
+    }
+    if (photos.length > MAX_PHOTOS) return { status: 400, body: { error: "too_many_photos" } };
+  } else if (body.removePhotos === true) photos = [];
+  if (!sets.length && !photos) return { status: 400, body: { error: "nothing_to_change" } };
+  const stmts = [];
+  if (sets.length) stmts.push(env.RELAY_DB.prepare("UPDATE resale_listings SET " + sets.join(", ") + " WHERE id = ? AND seller_id = ?").bind(...vals, listingId, shopper.id));
+  if (photos) {
+    // Without photos of their own, the receipt's photo stands in as before (only when the order had one item).
+    let fallback = 0;
+    if (!photos.length) {
+      const r = await env.RELAY_DB.prepare("SELECT details FROM captured_receipts WHERE id = ? AND shopper_id = ?").bind(l.receipt_id, shopper.id).first();
+      try { const d = r ? JSON.parse(r.details) : null; fallback = d && d.hasImage && Array.isArray(d.items) && d.items.length === 1 ? 1 : 0; } catch { fallback = 0; }
+    }
+    stmts.push(env.RELAY_DB.prepare("DELETE FROM resale_photos WHERE listing_id = ?").bind(listingId),
+      ...photos.map((ph, k) => env.RELAY_DB.prepare("INSERT INTO resale_photos (listing_id, n, type, data) VALUES (?,?,?,?)").bind(listingId, k + 1, ph.type, ph.data)),
+      env.RELAY_DB.prepare("UPDATE resale_listings SET photos = ?, has_image = ? WHERE id = ? AND seller_id = ?").bind(photos.length, photos.length ? 1 : fallback, listingId, shopper.id));
+  }
+  await env.RELAY_DB.batch(stmts);
+  void now;
+  return { status: 200, body: { ok: true } };
+}
+
+async function ask(env, shopper, listingId, body, now, o) {
   const kind = body && body.kind === "swap" ? "swap" : body && body.kind === "buy" ? "buy" : "";
   if (!kind) return { status: 400, body: { error: "invalid_request" } };
-  const l = await env.RELAY_DB.prepare("SELECT id, seller_id, swap_ok FROM resale_listings WHERE id = ? AND status = 'active'").bind(listingId).first();
+  const l = await env.RELAY_DB.prepare("SELECT id, seller_id, swap_ok, title FROM resale_listings WHERE id = ? AND status = 'active'").bind(listingId).first();
   if (!l) return { status: 404, body: { error: "not_found" } };
   if (l.seller_id === shopper.id) return { status: 400, body: { error: "own_listing" } };
+  // A member who blocked them (or whom they blocked): as if the listing weren't there.
+  if (await blockedBetween(env, shopper.id, l.seller_id)) return { status: 404, body: { error: "not_found" } };
   let offered = null;
   if (kind === "swap") {
     if (!l.swap_ok) return { status: 400, body: { error: "swap_not_offered" } };
@@ -237,22 +366,54 @@ async function ask(env, shopper, listingId, body, now) {
   }
   const today = await env.RELAY_DB.prepare("SELECT COUNT(*) AS n FROM resale_requests WHERE asker_id = ? AND created_at > ?").bind(shopper.id, now - DAY).first();
   if (today && today.n >= MAX_REQUESTS_PER_DAY) return { status: 429, body: { error: "too_many_requests" } };
-  try {
+  // Already chatting with the seller about it: the chat becomes the request (the same conversation carries on).
+  const chatting = await env.RELAY_DB.prepare("SELECT id FROM resale_requests WHERE listing_id = ? AND asker_id = ? AND kind = 'chat' AND status = 'pending'").bind(listingId, shopper.id).first();
+  if (chatting) {
+    await env.RELAY_DB.prepare("UPDATE resale_requests SET kind = ?, offered_listing_id = ?, message = ?, seller_seen = 0 WHERE id = ?").bind(kind, offered, clean(body.message, 200) || null, chatting.id).run();
+  } else try {
     await env.RELAY_DB.prepare(
       "INSERT INTO resale_requests (id, listing_id, asker_id, kind, offered_listing_id, message, status, created_at) VALUES (?,?,?,?,?,?,'pending',?)")
       .bind(uuid(), listingId, shopper.id, kind, offered, clean(body.message, 200) || null, now).run();
   } catch (e) {
     return { status: 409, body: { error: "already_asked" } };
   }
+  await tell(env, l.seller_id, { title: kind === "swap" ? "Someone offered a swap" : "Someone would like to buy this",
+    body: "A member asked about your " + l.title + ". Open Relay to answer.", url: "./#open=market&tab=mine" }, o);
   return { status: 200, body: { ok: true } };
+}
+
+// Free chats (Connor, 24 Nov 2026): any member can message the seller about a listing on sale before asking for it. Each
+// member gets their own conversation with the seller (a request of kind "chat", which becomes their request if they ask
+// for it later). Same rules as every conversation: only the two of them, no contact details, report and block, and the
+// seller only ever sees "Member N". Opening it again gives the same conversation.
+async function startChat(env, shopper, listingId, now) {
+  const l = await env.RELAY_DB.prepare("SELECT id, seller_id FROM resale_listings WHERE id = ? AND status = 'active'").bind(listingId).first();
+  if (!l) return { status: 404, body: { error: "not_found" } };
+  if (l.seller_id === shopper.id) return { status: 400, body: { error: "own_listing" } };
+  if (await blockedBetween(env, shopper.id, l.seller_id)) return { status: 404, body: { error: "not_found" } };
+  const had = await env.RELAY_DB.prepare("SELECT id, status FROM resale_requests WHERE listing_id = ? AND asker_id = ?").bind(listingId, shopper.id).first();
+  if (had) return { status: 200, body: { ok: true, requestId: had.id } };
+  const today = await env.RELAY_DB.prepare("SELECT COUNT(*) AS n FROM resale_requests WHERE asker_id = ? AND created_at > ?").bind(shopper.id, now - DAY).first();
+  if (today && today.n >= MAX_REQUESTS_PER_DAY) return { status: 429, body: { error: "too_many_requests" } };
+  const id = uuid();
+  try {
+    await env.RELAY_DB.prepare("INSERT INTO resale_requests (id, listing_id, asker_id, kind, offered_listing_id, message, status, created_at) VALUES (?,?,?,'chat',NULL,NULL,'pending',?)").bind(id, listingId, shopper.id, now).run();
+  } catch {
+    const again = await env.RELAY_DB.prepare("SELECT id FROM resale_requests WHERE listing_id = ? AND asker_id = ?").bind(listingId, shopper.id).first();
+    if (again) return { status: 200, body: { ok: true, requestId: again.id } };
+    return { status: 409, body: { error: "already_asked" } };
+  }
+  return { status: 200, body: { ok: true, requestId: id } };
 }
 
 async function decide(env, shopper, requestId, accept) {
   // Only the listing's seller can decide, and only while the request is pending.
   const q = await env.RELAY_DB.prepare(
-    `SELECT q.id, q.listing_id FROM resale_requests q JOIN resale_listings l ON l.id = q.listing_id
+    `SELECT q.id, q.listing_id, q.kind FROM resale_requests q JOIN resale_listings l ON l.id = q.listing_id
        WHERE q.id = ? AND l.seller_id = ? AND q.status = 'pending'`).bind(requestId, shopper.id).first();
   if (!q) return { status: 404, body: { error: "not_found" } };
+  // A chat isn't a request for the item: only someone who asked for it (to buy or swap) can be matched with it.
+  if (accept && q.kind === "chat") return { status: 409, body: { error: "not_asked_yet" } };
   if (!accept) {
     await env.RELAY_DB.prepare("UPDATE resale_requests SET status = 'declined' WHERE id = ?").bind(requestId).run();
     return { status: 200, body: { ok: true } };
@@ -266,31 +427,44 @@ async function decide(env, shopper, requestId, accept) {
 }
 
 
-// ---- Messages between a seller and the member whose request they accepted ----------------
-// Only those two can read or write a thread, only while the request is accepted. Contact details are
-// refused so people stay anonymous to each other until payments and handover exist.
+// ---- Messages between a seller and a member about one listing ------------------------------
+// Only those two can read or write a thread. It's open while the item is on sale (a chat or a request waiting for an
+// answer) and, once matched, only for the member it was matched with: everyone else's conversation about it stays
+// readable but says plainly the item has gone, and nothing more can be sent in it (the simpler, safer choice: no general
+// chat carries on about an item that isn't for sale). Contact details are refused so people stay anonymous to each
+// other until payments and handover exist.
 const MAX_MESSAGE = 500, MAX_THREAD = 200, MAX_MESSAGES_PER_HOUR = 20;
 const CONTACT = [/[A-Za-z0-9._%+-]+\s*(?:@|\(at\)| at )\s*[A-Za-z0-9-]+\s*(?:\.|\(dot\)| dot )\s*[A-Za-z]{2,}/i, /(?:\+?\d[\s().-]*){9,}/, /https?:\/\/|www\./i];
 
 async function party(env, shopper, requestId) {
   const q = await env.RELAY_DB.prepare(
-    `SELECT q.id, q.status, q.asker_id, l.seller_id, l.title, l.id AS listing_id FROM resale_requests q JOIN resale_listings l ON l.id = q.listing_id WHERE q.id = ?`).bind(requestId).first();
+    `SELECT q.id, q.status, q.kind, q.asker_id, l.seller_id, l.title, l.id AS listing_id, l.status AS listing_status FROM resale_requests q JOIN resale_listings l ON l.id = q.listing_id WHERE q.id = ?`).bind(requestId).first();
   if (!q || (q.asker_id !== shopper.id && q.seller_id !== shopper.id)) return null;
-  return { ...q, iAmSeller: q.seller_id === shopper.id };
+  const open = q.status === "accepted" || (q.status === "pending" && q.listing_status === "active");
+  // The item went to someone else, or was taken down: say so, rather than only "ended".
+  const gone = !open && q.status !== "accepted" && q.status !== "closed" && q.listing_status !== "active";
+  return { ...q, iAmSeller: q.seller_id === shopper.id, open, gone };
 }
 
 async function readThread(env, shopper, requestId) {
   const q = await party(env, shopper, requestId);
   if (!q) return { status: 404, body: { error: "not_found" } };
   const rows = await env.RELAY_DB.prepare("SELECT sender_id, body, created_at FROM resale_messages WHERE request_id = ? ORDER BY created_at ASC, rowid ASC LIMIT 200").bind(requestId).all();
-  return { status: 200, body: { title: q.title, status: q.status, with: q.iAmSeller ? "Buyer" : "Seller", open: q.status === "accepted",
-    messages: (rows.results || []).map(m => ({ mine: m.sender_id === shopper.id, body: m.body, createdAt: m.created_at })) } };
+  // Read now: the other person's messages so far stop counting as new.
+  const last = (rows.results || []).reduce((t, m) => Math.max(t, m.created_at), 0);
+  if (last) await env.RELAY_DB.prepare("INSERT INTO resale_reads (shopper_id, request_id, read_at) VALUES (?,?,?) ON CONFLICT (shopper_id, request_id) DO UPDATE SET read_at = MAX(read_at, excluded.read_at)").bind(shopper.id, requestId, last).run();
+  return { status: 200, body: { title: q.title, status: q.status, with: q.iAmSeller ? "Buyer" : "Seller", open: q.open, ...(q.gone ? { itemGone: true } : {}), matched: q.status === "accepted",
+    messages: (rows.results || []).map(m => ({ mine: m.sender_id === shopper.id, body: m.body, createdAt: m.created_at })),
+    // What's still new for them elsewhere, so the red number goes down as soon as this is read.
+    news: await news(env, shopper.id) } };
 }
 
-async function sendMessage(env, shopper, requestId, body, now) {
+async function sendMessage(env, shopper, requestId, body, now, o) {
   const q = await party(env, shopper, requestId);
   if (!q) return { status: 404, body: { error: "not_found" } };
-  if (q.status !== "accepted") return { status: 409, body: { error: "conversation_closed" } };
+  if (!q.open) return { status: 409, body: { error: q.gone ? "item_gone" : "conversation_closed" } };
+  const other = q.iAmSeller ? q.asker_id : q.seller_id;
+  if (await blockedBetween(env, shopper.id, other)) return { status: 409, body: { error: "conversation_closed" } };
   const text = clean(body && body.body, MAX_MESSAGE);
   if (!text) return { status: 400, body: { error: "empty_message" } };
   if (CONTACT.some(re => re.test(text))) return { status: 400, body: { error: "no_contact_details" } };
@@ -298,15 +472,20 @@ async function sendMessage(env, shopper, requestId, body, now) {
   if (n && n.n >= MAX_THREAD) return { status: 429, body: { error: "thread_full" } };
   const recent = await env.RELAY_DB.prepare("SELECT COUNT(*) AS n FROM resale_messages WHERE sender_id = ? AND created_at > ?").bind(shopper.id, now - 60 * 60 * 1000).first();
   if (recent && recent.n >= MAX_MESSAGES_PER_HOUR) return { status: 429, body: { error: "too_many_messages" } };
+  // One phone notification per batch of new messages: only when the other person had read everything before this one.
+  const waiting = await env.RELAY_DB.prepare(`SELECT COUNT(*) AS n FROM resale_messages m LEFT JOIN resale_reads r ON r.shopper_id = ? AND r.request_id = m.request_id
+      WHERE m.request_id = ? AND m.sender_id = ? AND m.created_at > COALESCE(r.read_at, 0)`).bind(other, requestId, shopper.id).first();
   await env.RELAY_DB.prepare("INSERT INTO resale_messages (id, request_id, sender_id, body, created_at) VALUES (?,?,?,?,?)").bind(uuid(), requestId, shopper.id, text, now).run();
+  if (!(waiting && waiting.n)) await tell(env, other, { title: "New message", body: "About " + q.title + ". Open Relay to read it.", url: "./#open=market&chat=" + requestId }, o);
   return { status: 200, body: { ok: true } };
 }
 
-// Either side can end a conversation. The listing goes back on sale, and a report is kept for review.
+// Either side can end a conversation (a report ends it too, and is kept for review). Once matched, the listing goes back
+// on sale; a chat before that just ends.
 async function endConversation(env, shopper, requestId, reason, now) {
   const q = await party(env, shopper, requestId);
   if (!q) return { status: 404, body: { error: "not_found" } };
-  if (q.status !== "accepted") return { status: 409, body: { error: "conversation_closed" } };
+  if (!q.open) return { status: 409, body: { error: "conversation_closed" } };
   const stmts = [
     env.RELAY_DB.prepare("UPDATE resale_requests SET status = 'closed' WHERE id = ?").bind(requestId),
     env.RELAY_DB.prepare("UPDATE resale_listings SET status = 'active' WHERE id = ? AND status = 'matched'").bind(q.listing_id)
@@ -339,17 +518,29 @@ export async function handleResaleRoute(request, env, url, cors, shopper, opts) 
   const adminResponse = await handleResaleAdminRoute(path, m, request, env, cors, shopper, opts.now);
   if (adminResponse) return adminResponse;
   // A blocked member can still read and withdraw, but cannot list, ask or message.
-  if (m === "POST" && /\/resale\/(listings|listings\/[0-9a-f-]{36}\/ask|requests\/[0-9a-f-]{36}\/messages)$/.test(path) && await isBlocked(env, shopper))
+  if (m === "POST" && /\/resale\/(listings|listings\/[0-9a-f-]{36}\/(ask|edit|chat)|requests\/[0-9a-f-]{36}\/messages)$/.test(path) && await isBlocked(env, shopper))
     return json({ error: "account_restricted" }, 403, cors);
   // A new listing carries up to 4 photos (each up to 450 KB, made smaller on the phone first), so it may be as big as
   // validate.js lets it be; everything else here is a few words. (Until 24 Nov 2026 every body was cut off at 5,000
   // characters, so a listing with a real photo always failed.)
-  const most = path === "/relay/my/resale/listings" ? 2600 * 1024 : 5000;
+  const most = path === "/relay/my/resale/listings" || /^\/relay\/my\/resale\/listings\/[0-9a-f-]{36}\/edit$/.test(path) ? 2600 * 1024 : 5000;
   const body = async () => { const t = await request.text(); if (t.length > most) return null; try { return JSON.parse(t || "{}"); } catch (e) { return null; } };
   const send = r => json(r.body, r.status, cors);
   if (path === "/relay/my/resale/items" && m === "GET") return json({ items: await listable(env, shopper.id, opts.now) }, 200, cors);
   if (path === "/relay/my/resale/feed" && m === "GET") return json({ listings: await feed(env, shopper) }, 200, cors);
-  if (path === "/relay/my/resale/mine" && m === "GET") return json(await myStuff(env, shopper), 200, cors);
+  if (path === "/relay/my/resale/mine" && m === "GET") return json(await myStuff(env, shopper, url.searchParams.get("seen") === "1"), 200, cors);
+  if (path === "/relay/my/resale/news" && m === "GET") return json(await news(env, shopper.id), 200, cors);
+  if (path === "/relay/my/resale/blocks" && m === "GET") return json({ blocks: await myBlocks(env, shopper) }, 200, cors);
+  const unblock = /^\/relay\/my\/resale\/blocks\/([0-9a-f-]{36})\/remove$/.exec(path);
+  if (unblock && m === "POST") {
+    const r = await env.RELAY_DB.prepare("DELETE FROM resale_member_blocks WHERE id = ? AND blocker_id = ? RETURNING id").bind(unblock[1], shopper.id).first();
+    return r ? json({ ok: true }, 200, cors) : json({ error: "not_found" }, 404, cors);
+  }
+  const edit = /^\/relay\/my\/resale\/listings\/([0-9a-f-]{36})\/edit$/.exec(path);
+  if (edit && m === "POST") {
+    const b = await body(); if (!b) return json({ error: "invalid_request" }, 400, cors);
+    return send(await editListing(env, shopper, edit[1], b, opts.now));
+  }
   if (path === "/relay/my/resale/listings" && m === "POST") {
     const b = await body(); if (!b) return json({ error: "invalid_request" }, 400, cors);
     return send(await createListing(env, shopper, b, opts.now));
@@ -368,17 +559,21 @@ export async function handleResaleRoute(request, env, url, cors, shopper, opts) 
     const b = await body(); if (!b) return json({ error: "invalid_request" }, 400, cors);
     return send(await reportListing(env, shopper, reported[1], b.reason, opts.now));
   }
+  const chat = /^\/relay\/my\/resale\/listings\/([0-9a-f-]{36})\/chat$/.exec(path);
+  if (chat && m === "POST") return send(await startChat(env, shopper, chat[1], opts.now));
   const interest = /^\/relay\/my\/resale\/listings\/([0-9a-f-]{36})\/ask$/.exec(path);
   if (interest && m === "POST") {
     const b = await body(); if (!b) return json({ error: "invalid_request" }, 400, cors);
-    return send(await ask(env, shopper, interest[1], b, opts.now));
+    return send(await ask(env, shopper, interest[1], b, opts.now, opts));
   }
+  const blockFrom = /^\/relay\/my\/resale\/requests\/([0-9a-f-]{36})\/block$/.exec(path);
+  if (blockFrom && m === "POST") return send(await blockMember(env, shopper, blockFrom[1], opts.now));
   const thread = /^\/relay\/my\/resale\/requests\/([0-9a-f-]{36})\/(messages|end|report)$/.exec(path);
   if (thread) {
     if (thread[2] === "messages" && m === "GET") return send(await readThread(env, shopper, thread[1]));
     if (m === "POST") {
       const b = await body(); if (!b) return json({ error: "invalid_request" }, 400, cors);
-      if (thread[2] === "messages") return send(await sendMessage(env, shopper, thread[1], b, opts.now));
+      if (thread[2] === "messages") return send(await sendMessage(env, shopper, thread[1], b, opts.now, opts));
       return send(await endConversation(env, shopper, thread[1], thread[2] === "report" ? clean(b.reason, 200) : null, opts.now));
     }
   }
