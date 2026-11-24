@@ -87,6 +87,7 @@
     var c = diskRead(); if (!c) return;
     if (Array.isArray(c.receipts)) memo.receipts = keptRows(c.receipts, 0);
     if (Array.isArray(c.purchases)) memo.walletPurchases = c.purchases;
+    if (Array.isArray(c.bag)) memo.bag = { at: 0, items: c.bag };
     if (Array.isArray(c.needReceipt)) memo.needReceipt = c.needReceipt;
     if (!Array.isArray(c.receipts) && c.receiptsKept) {
       keptWaiting = true;
@@ -131,7 +132,7 @@
   function mailOwner() { return mailName() === "Outlook" ? "Microsoft" : "Google"; }
   // An email Relay can open again: its id in Gmail or in Outlook.
   function mailRef(x) { return x && (/^[A-Za-z0-9]{6,40}$/.test(x.gmailId || "") || /^[A-Za-z0-9_=+\/-]{16,512}$/.test(x.outlookId || "")); }
-  function save(v) { reads = {}; var was = load(); if (!v || (was && was.email !== v.email)) memoReset(); if (!v) { try { localStorage.removeItem(MAILBOX_KEY); localStorage.removeItem(PROFILE_KEY); localStorage.removeItem("relay.drafts.v1"); localStorage.removeItem("relay.pending-watches.v1"); localStorage.removeItem("relay.auctions.v1"); logoMisses = {}; window.__relayPayDue = 0; } catch (e) {} } try { v ? localStorage.setItem(KEY, JSON.stringify(v)) : localStorage.removeItem(KEY); } catch (e) {} if (!v) paintAvatars();
+  function save(v) { reads = {}; var was = load(); if (!v || (was && was.email !== v.email)) memoReset(); if (!v) { try { localStorage.removeItem(MAILBOX_KEY); localStorage.removeItem(PROFILE_KEY); localStorage.removeItem("relay.drafts.v1"); localStorage.removeItem("relay.pending-watches.v1"); localStorage.removeItem("relay.auctions.v1"); localStorage.removeItem("relay.bag.ask.v1"); logoMisses = {}; window.__relayPayDue = 0; } catch (e) {} } try { v ? localStorage.setItem(KEY, JSON.stringify(v)) : localStorage.removeItem(KEY); } catch (e) {} if (!v) paintAvatars();
     if (((was && was.token) || null) !== ((v && v.token) || null)) { try { window.dispatchEvent(new Event("relay:session")); } catch (e) {} } }
   // Reads are shared and briefly remembered: two parts of a screen asking for the same thing make one request, and going
   // back to a tab within a minute reuses what was just loaded instead of asking Relay again. Any change (a POST) forgets
@@ -1459,6 +1460,18 @@
     ".wl-sh-head{display:flex;align-items:flex-start;gap:14px;margin:6px 0 16px}.wl-sh-head .wl-mid{padding-top:0}.wl-sh-head .wl-n{font-size:20px;line-height:25px;font-weight:700;display:block;-webkit-line-clamp:unset;overflow:visible}" +
     ".wl-sh-facts{background:var(--rl-card);border-radius:18px;padding:4px 16px;margin:0 0 14px}.wl-sh-f{display:flex;align-items:baseline;justify-content:space-between;gap:12px;min-height:44px;padding:11px 0;box-sizing:border-box;border-top:1px solid var(--rl-line);font-size:16px;line-height:21px}.wl-sh-f:first-child{border-top:0}.wl-sh-f span{color:var(--rl-text2)}.wl-sh-f b{color:var(--rl-text);text-align:right}" +
     ".wl-sh-f b.wl-sh-down{color:var(--rl-accent)}" +
+    // The bag: each shop's logo and name, its things as cards, its subtotal and its Pay button.
+    ".bg-intro{font-size:15px;line-height:21px;color:var(--rl-text2);margin:0 0 16px}.bg-group{margin:0 0 26px}" +
+    ".bg-shop{display:flex;align-items:center;gap:10px;margin:0 0 10px}.bg-shop-n{margin:0;font-size:19px;line-height:24px;font-weight:700;color:var(--rl-text);overflow-wrap:anywhere}" +
+    ".bg-logo{flex:none;width:34px;height:34px;border-radius:50%;display:grid;place-items:center;overflow:hidden;background:var(--logo-bg,#fff);box-shadow:inset 0 0 0 1px var(--rl-line);font-size:15px;font-weight:700;color:#101828}.bg-logo img{width:22px!important;height:22px!important}" +
+    ".bg-v{font-size:14px;line-height:19px;color:var(--rl-text2);overflow-wrap:anywhere}.bg-out{font-size:14px;line-height:19px;font-weight:600;color:var(--rl-danger)}" +
+    ".bg-sub{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:12px 4px;font-size:16px;line-height:21px;color:var(--rl-text)}.bg-sub b{font-size:17px}" +
+    ".bg-pay,.bg-go{min-height:50px;box-sizing:border-box;text-align:center;text-decoration:none;transition:transform .12s,filter .12s}.bg-pay:active,.bg-go:active{transform:scale(.97);filter:brightness(1.25)}.bg-pay:disabled{opacity:.7}a.bg-go{display:flex;align-items:center;justify-content:center;margin:0 0 10px}" +
+    ".bg-step{display:flex;align-items:center;justify-content:space-between;gap:12px;background:var(--rl-card);border-radius:18px;padding:6px 6px 6px 16px;margin:0 0 6px}.bg-step-l{font-size:16px;color:var(--rl-text)}.bg-step-c{display:flex;align-items:center;gap:6px}" +
+    ".bg-qb{all:unset;box-sizing:border-box;width:44px;height:44px;border-radius:50%;display:grid;place-items:center;background:var(--rl-fill);color:var(--rl-text);cursor:pointer;-webkit-tap-highlight-color:transparent;transition:transform .12s}.bg-qb:active{transform:scale(.9)}.bg-qb:disabled{opacity:.4;cursor:default}.bg-qb:focus-visible{outline:2px solid var(--rl-text);outline-offset:2px}" +
+    ".bg-qn{min-width:30px;text-align:center;font-size:18px;font-weight:700;color:var(--rl-text)}" +
+    ".bg-msgs{background:var(--rl-card);border-radius:18px;padding:2px 16px;margin:0 0 14px}.bg-msgs p{margin:0;padding:12px 0;border-top:1px solid var(--rl-line);font-size:15px;line-height:21px;color:var(--rl-text)}.bg-msgs p:first-child{border-top:0}" +
+    ".bg-p{font-size:15px;line-height:21px;color:var(--rl-text2);margin:0 0 14px}" +
     ".hl-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px 12px;margin:10px 0 18px}@media(min-width:720px){.hl-grid{grid-template-columns:repeat(4,minmax(0,1fr))}}" +
     ".hl-sq{all:unset;box-sizing:border-box;cursor:pointer;display:flex;flex-direction:column;min-width:0;transition:transform .12s}.hl-sq:active{transform:scale(.97)}.hl-sq:focus-visible{outline:2px solid var(--rl-text);outline-offset:3px;border-radius:18px}" +
     ".hl-sqpic{position:relative;display:block;width:100%;aspect-ratio:1/1;border-radius:18px;overflow:hidden;background:var(--rl-fill)}.hl-sqpic .h2-art svg{max-width:62%;max-height:62%}" +
@@ -2071,6 +2084,7 @@
     phone: '<rect x="7" y="2.5" width="10" height="19" rx="2.6"/><path d="M10.5 18.5h3"/>',
     ret: '<path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/>',
     plus: '<path d="M12 5v14M5 12h14"/>',
+    minus: '<path d="M5 12h14"/>',
     card: '<rect x="3" y="5.5" width="18" height="13" rx="2.5"/><path d="M3 10h18M7 15h3"/>',
     ext: '<path d="M14 4.5h5.5V10"/><path d="m19.5 4.5-8 8"/><path d="M18 14v4a1.5 1.5 0 0 1-1.5 1.5h-10A1.5 1.5 0 0 1 5 18V8a1.5 1.5 0 0 1 1.5-1.5H10"/>',
     parcel: '<path d="M12 3.5 19.5 7.5v9L12 20.5 4.5 16.5v-9z"/><path d="m4.5 7.5 7.5 4 7.5-4M12 11.5v9"/>',
@@ -10439,6 +10453,242 @@
       sheet.appendChild(el("button", { type: "button", className: "rl-btn ghost", text: "Not now", onclick: close }));
     }
   }
+  // ---- The shopping bag (worker/bag.js). Things picked in Browse, kept with the account (so the bag survives updates and
+  // follows the shopper to their other phones), grouped by shop. Relay never takes or moves the money: "Pay at <shop>" checks
+  // the prices at the shop first, then opens the shop's own checkout with the things already in its basket (Shopify's cart
+  // link: https://<shop>/cart/<variant>:<quantity>,<variant>:<quantity>), one shop after another. Coming back, it asks once
+  // whether they finished paying there. A copy is kept on the phone (removed on sign-out), so the bag shows at once.
+  var BAG_ASK_KEY = "relay.bag.ask.v1";
+  function bagNow() { return memo.bag ? memo.bag.items : []; }
+  function bagCount() { return bagNow().reduce(function (n, x) { return n + (x.qty || 0); }, 0); }
+  function bagKeep(items) {
+    memo.bag = { at: Date.now(), items: Array.isArray(items) ? items : [] }; diskWrite("bag", memo.bag.items);
+    try { window.dispatchEvent(new Event("relay:bag")); } catch (e) {}
+  }
+  // The bag as Relay has it: the copy just loaded when it's recent, otherwise asked for (when a screen that shows it opens).
+  function bagLoad(fresh) {
+    if (!load()) return Promise.resolve([]);
+    if (!fresh && memoFresh(memo.bag)) return Promise.resolve(bagNow());
+    return api("/relay/my/bag", fresh ? { fresh: true } : {}).then(function (r) { if (r.ok && r.body && Array.isArray(r.body.items)) bagKeep(r.body.items); return bagNow(); }, function () { return bagNow(); });
+  }
+  function bagProblem(r) {
+    var e = r && r.body && r.body.error;
+    if (e === "bag_full") return "Your bag is full. Pay for something or take something out first.";
+    if (e === "sold_out") return "This one has sold out at the shop.";
+    if (r && r.status === 404) return "Relay can't put this one in your bag right now. You can still buy it at the shop.";
+    return "Couldn't change your bag. Try again in a moment.";
+  }
+  // Changes the bag: add (more of the same adds up), or set how many (0 takes it out). Resolves to null, or what went wrong.
+  function bagSend(sku, qty, add) {
+    return api("/relay/my/bag", { method: "POST", body: add ? { sku: sku, qty: qty, add: true } : { sku: sku, qty: qty } }).then(function (r) {
+      if (r.ok && r.body && Array.isArray(r.body.items)) { bagKeep(r.body.items); return null; }
+      return bagProblem(r);
+    }, function () { return "Couldn't reach Relay. Check your connection and try again."; });
+  }
+  function bagGroups(items) {
+    var map = {}, order = [];
+    items.forEach(function (x) { if (!map[x.shopKey]) { map[x.shopKey] = { key: x.shopKey, shop: x.shop, items: [] }; order.push(map[x.shopKey]); } map[x.shopKey].items.push(x); });
+    return order;
+  }
+  function bagLine(x) { return (Number(x.priceMinor) || 0) * (x.qty || 0); }
+  function bagName(x) { return cleanName(x.product, x.shop) || x.product || "Item"; }
+  function bagShops(shop) { return /['’]s$|s'$/i.test(shop) ? shop : /s$/i.test(shop) ? shop + "'" : shop + "'s"; }
+  // A shop's own checkout with these in its basket (Shopify's cart link). null when there's nothing it can hold.
+  function bagCartUrl(origin, lines) {
+    if (!/^https:\/\/[A-Za-z0-9.-]+(:\d+)?$/.test(String(origin || ""))) return null;
+    var parts = (lines || []).filter(function (l) { return l && /^\d{1,20}$/.test(String(l.variantId)) && l.qty > 0; })
+      .map(function (l) { return l.variantId + ":" + Math.min(10, l.qty); });
+    return parts.length ? origin + "/cart/" + parts.join(",") : null;
+  }
+  function bagPic(x, px) {
+    if (x.imageUrl) return watchPic({ image: x.imageUrl, product: x.product, store: x.shop }, px);
+    var pic = el("span", { className: "wl-pic" }), art = el("span", { className: "h2-art" }); pic.appendChild(art);
+    illustrate(art, { items: [{ name: x.product }], retailer: { name: x.shop || "" }, category: "other" }, 96);
+    return pic;
+  }
+  function bagShopHead(g) {
+    var logo = el("span", { className: "bg-logo", text: String(g.shop || "?").charAt(0).toUpperCase() }); logo.setAttribute("aria-hidden", "true");
+    var dom = String(g.key || "").replace(/^www\./, "");
+    if (!/\.myshopify\.com$/.test(dom)) shopLogo(logo, dom, 22);
+    return el("div", { className: "bg-shop" }, [logo, el("h2", { className: "bg-shop-n", text: g.shop })]);
+  }
+  // One thing in the bag: a card, one tap to its page (rule 16).
+  var bagQuietUntil = 0;
+  function bagCard(x) {
+    var kids = [el("span", { className: "wl-n", text: bagName(x) })];
+    if (x.variation) kids.push(el("span", { className: "bg-v", text: x.variation }));
+    kids.push(el("span", { className: "bg-v", text: "Quantity " + x.qty }));
+    kids.push(el("span", { className: "wl-p", text: money(bagLine(x), "GBP") }));
+    if (x.qty > 1) kids.push(el("span", { className: "bg-v", text: money(x.priceMinor, "GBP") + " each" }));
+    if (x.soldOut) kids.push(el("span", { className: "bg-out", text: "Sold out at " + x.shop }));
+    return el("button", { type: "button", className: "wl-card bg-card", "data-sku": x.sku,
+      ariaLabel: [bagName(x), x.variation, "quantity " + x.qty, money(bagLine(x), "GBP"), x.soldOut ? "sold out" : ""].filter(Boolean).join(", "),
+      onclick: tapOnce(function () { if (Date.now() < bagQuietUntil) return; bagItemSheet(x); }) }, [bagPic(x, 140), el("span", { className: "wl-mid" }, kids)]);
+  }
+  // A thing's page: how many (one more, one fewer), see it in Browse, take it out.
+  function bagItemSheet(x) {
+    open(function (sheet) {
+      sheet.setAttribute("aria-label", bagName(x));
+      sheet.appendChild(el("div", { className: "wl-sh-head" }, [bagPic(x, 140), el("span", { className: "wl-mid" }, [el("h2", { className: "wl-n", text: bagName(x) }), el("span", { className: "wl-shop-n", text: x.shop })])]));
+      var facts = [el("div", { className: "wl-sh-f" }, [el("span", { text: "Price" }), el("b", { text: money(x.priceMinor, "GBP") + (x.qty > 1 ? " each" : "") })])];
+      if (x.variation) facts.push(el("div", { className: "wl-sh-f" }, [el("span", { text: "Size or colour" }), el("b", { text: x.variation })]));
+      if (x.soldOut) facts.push(el("div", { className: "wl-sh-f" }, [el("span", { text: "At " + x.shop }), el("b", { className: "bg-out", text: "Sold out" })]));
+      sheet.appendChild(el("div", { className: "wl-sh-facts" }, facts));
+      var n = x.qty, count = el("span", { className: "bg-qn", text: String(n) }); count.setAttribute("aria-live", "polite");
+      var less = el("button", { type: "button", className: "bg-qb", ariaLabel: "One fewer" }), more = el("button", { type: "button", className: "bg-qb", ariaLabel: "One more" });
+      less.appendChild(accIc("minus", 20)); more.appendChild(accIc("plus", 20));
+      var note = el("div", { className: "rl-msg", role: "status" }), busy = false;
+      var fit = function () { less.disabled = busy || n <= 1; more.disabled = busy || n >= 10; count.textContent = String(n); };
+      var step = function (d) {
+        if (busy) return; var want = Math.max(1, Math.min(10, n + d)); if (want === n) return;
+        busy = true; fit(); say(note, "");
+        bagSend(x.sku, want, false).then(function (bad) { busy = false; if (!bad) { n = want; x.qty = want; } else say(note, bad, true); fit(); });
+      };
+      less.onclick = function () { step(-1); }; more.onclick = function () { step(1); };
+      fit();
+      sheet.appendChild(el("div", { className: "bg-step" }, [el("span", { className: "bg-step-l", text: "How many" }), el("span", { className: "bg-step-c" }, [less, count, more])]));
+      sheet.appendChild(note);
+      var gone = false, rows = [];
+      if (window.relayOpenProduct) rows.push(accRow("bag", "See it in Browse", "", tapOnce(function () { close(); window.relayOpenProduct(x.sku, x.product); })));
+      rows.push(accRow("trash", "Take it out of your bag", "", function () {
+        if (gone) return; gone = true;
+        bagSend(x.sku, 0, false).then(function (bad) { if (bad) { gone = false; return say(note, bad, true); } bagQuietUntil = Date.now() + 500; close(); });
+      }, { danger: true }));
+      sheet.appendChild(accGroup("", rows));
+      sheet.appendChild(el("button", { type: "button", className: "rl-btn ghost", text: "Close", style: "margin-top:14px", onclick: close }));
+    });
+  }
+  // "Pay at <shop>": the prices are checked at the shop first, then its page says what changed and opens its checkout.
+  function bagPay(key, shop, btn) {
+    if (btn.disabled) return;
+    btn.disabled = true; btn.textContent = "Checking prices at " + shop;
+    var done = function () { btn.disabled = false; btn.textContent = "Pay at " + shop; };
+    api("/relay/my/bag/check", { method: "POST", body: { shop: key } }).then(function (r) {
+      done();
+      if (r.ok && r.body && Array.isArray(r.body.items)) bagKeep(r.body.items);
+      bagPaySheet(key, shop, r.ok ? r.body : null, r.ok ? "" : r.status === 429 ? "many" : "unchecked");
+    }, function () { done(); bagPaySheet(key, shop, null, "unchecked"); });
+  }
+  function bagPaySheet(key, shop, res, why) {
+    var items = bagNow().filter(function (x) { return x.shopKey === key; });
+    if (!items.length) return;
+    var shops = bagShops(shop), results = {};
+    ((res && res.results) || []).forEach(function (r) { results[r.sku] = r; });
+    var cart = items.every(function (x) { return x.cart && x.variantId; }) && !(res && res.cart === false);
+    open(function (sheet) {
+      sheet.setAttribute("aria-label", "Pay at " + shop);
+      sheet.appendChild(el("h2", { text: "Pay at " + shop }));
+      if (!cart) {
+        // A shop whose basket Relay can't fill: each thing's own page at the shop, to add there.
+        sheet.appendChild(el("p", { className: "bg-p", text: "Relay can't fill " + shops + " basket for you. Open each one on " + shops + " website and add it to the basket there. You pay " + shop + ", not Relay." }));
+        sheet.appendChild(accGroup("", items.filter(function (x) { return /^https:\/\//.test(x.productUrl || ""); }).map(function (x) {
+          var row = accRow("bag", bagName(x), (x.variation ? x.variation + ", quantity " : "Quantity ") + x.qty, null, { href: x.productUrl });
+          row.target = "_blank"; row.rel = "noopener noreferrer"; row.addEventListener("click", function () { bagAskLater(key, shop); });
+          return row;
+        })));
+        sheet.appendChild(el("button", { type: "button", className: "rl-btn ghost", text: "Close", style: "margin-top:14px", onclick: close }));
+        return;
+      }
+      var lines = [], buy = [], unchecked = Boolean(why);
+      items.forEach(function (x) {
+        var r = results[x.sku];
+        if (r && !r.checked) unchecked = true;
+        var out = (r && r.checked && r.available === false) || (!r && x.soldOut);
+        if (out) { lines.push(bagName(x) + (x.variation ? " (" + x.variation + ")" : "") + " has sold out at " + shop + ", so it's left out."); return; }
+        if (r && r.checked && r.was && r.priceMinor !== r.was) lines.push(bagName(x) + (x.variation ? " (" + x.variation + ")" : "") + " is now " + money(r.priceMinor, "GBP") + ". It was " + money(r.was, "GBP") + ".");
+        buy.push(x);
+      });
+      if (why === "many") lines.push("Relay has checked a lot of prices today, so it couldn't check these. " + shops + " checkout shows what you'll pay.");
+      else if (unchecked) lines.push("Relay couldn't check the prices at " + shop + " just now, so they may have changed. " + shops + " checkout shows what you'll pay.");
+      else if (!lines.length) lines.push("Relay checked the prices at " + shop + " just now. Nothing has changed.");
+      sheet.appendChild(el("div", { className: "bg-msgs", role: "status" }, lines.map(function (t) { return el("p", { text: t }); })));
+      if (!buy.length) {
+        sheet.appendChild(el("p", { className: "bg-p", text: "Everything here has sold out at " + shop + ". You can take it out of your bag from each one's card." }));
+        sheet.appendChild(el("button", { type: "button", className: "rl-btn ghost", text: "Close", style: "margin-top:14px", onclick: close }));
+        return;
+      }
+      var total = buy.reduce(function (s, x) { return s + bagLine(x); }, 0);
+      sheet.appendChild(el("div", { className: "wl-sh-facts" }, [el("div", { className: "wl-sh-f" }, [el("span", { text: "Total before delivery" }), el("b", { className: "bg-total", text: money(total, "GBP") })])]));
+      var url = bagCartUrl(items[0].origin, buy.map(function (x) { return { variantId: x.variantId, qty: x.qty }; }));
+      sheet.appendChild(el("p", { className: "bg-p", text: "You choose delivery and pay at " + shops + " own checkout, not through Relay." }));
+      sheet.appendChild(el("a", { className: "rl-btn bg-go", href: url, target: "_blank", rel: "noopener noreferrer", text: "Go to " + shops + " checkout",
+        onclick: function () { bagAskLater(key, shop); setTimeout(close, 300); } }));
+      sheet.appendChild(el("button", { type: "button", className: "rl-btn ghost", text: "Not now", onclick: close }));
+    });
+  }
+  // After going to a shop's checkout: asked once, on coming back to Relay, whether they finished paying there.
+  function bagAskLater(key, shop) {
+    try { localStorage.setItem(BAG_ASK_KEY, JSON.stringify({ email: (load() || {}).email, key: key, shop: shop, at: Date.now(), away: false })); } catch (e) {}
+  }
+  function bagPending() {
+    try { var p = JSON.parse(localStorage.getItem(BAG_ASK_KEY) || "null"), s = load(); return p && s && p.email === s.email && Date.now() - p.at < 3 * 864e5 ? p : null; } catch (e) { return null; }
+  }
+  function bagAskNow() {
+    var p = bagPending();
+    try { localStorage.removeItem(BAG_ASK_KEY); } catch (e) {}
+    if (!p || !bagNow().some(function (x) { return x.shopKey === p.key; })) return;
+    open(function (sheet) {
+      sheet.setAttribute("aria-label", "Did you finish paying at " + p.shop + "?");
+      sheet.appendChild(el("h2", { text: "Did you finish paying at " + p.shop + "?" }));
+      sheet.appendChild(el("p", { className: "bg-p", text: "If you did, Relay takes " + bagShops(p.shop) + " things out of your bag. Your receipt shows up in Relay once " + p.shop + " emails it to you." }));
+      var note = el("div", { className: "rl-msg", role: "status" });
+      var yes = el("button", { type: "button", className: "rl-btn", text: "Yes, I paid" });
+      yes.onclick = function () {
+        if (yes.disabled) return; yes.disabled = true; say(note, "");
+        api("/relay/my/bag/paid", { method: "POST", body: { shop: p.key } }).then(function (r) {
+          if (r.ok && r.body && Array.isArray(r.body.items)) { bagKeep(r.body.items); bagQuietUntil = Date.now() + 500; return close(); }
+          yes.disabled = false; say(note, "Couldn't change your bag. Try again in a moment.", true);
+        }, function () { yes.disabled = false; say(note, "Couldn't reach Relay. Check your connection and try again.", true); });
+      };
+      sheet.appendChild(yes); sheet.appendChild(note);
+      sheet.appendChild(el("button", { type: "button", className: "rl-btn ghost", text: "No, keep them in my bag", onclick: close }));
+    });
+  }
+  document.addEventListener("visibilitychange", function () {
+    var p = bagPending(); if (!p) return;
+    if (document.hidden) { if (!p.away) { p.away = true; try { localStorage.setItem(BAG_ASK_KEY, JSON.stringify(p)); } catch (e) {} } }
+    else if (p.away) bagAskNow();
+  });
+  // The bag's own screen (index.html bagView): the shops, each with its things, its subtotal and its Pay button.
+  function mountBag(host) {
+    if (!host) return;
+    host.textContent = "";
+    var s = load();
+    if (!s || !s.token) {
+      host.appendChild(el("div", { className: "rl-po h2-start", style: "margin:0" }, [el("h3", { text: "Sign in to use your bag", style: "margin:0;font-size:19px" }),
+        el("p", { text: "Your bag is kept with your Relay account, so it's on all your phones.", style: "margin:0;color:var(--rl-text2);font-size:15px;line-height:1.45" }),
+        el("button", { type: "button", className: "rl-po-primary", text: "Sign in", style: "max-width:280px", onclick: tapOnce(function () { show(); }) })]));
+      return;
+    }
+    var draw = function () {
+      if (!host.isConnected) { window.removeEventListener("relay:bag", draw); return; }
+      host.textContent = "";
+      if (!memo.bag) {
+        var bones = el("div", { className: "wl-list" });
+        for (var k = 0; k < 2; k++) bones.appendChild(el("div", { className: "wl-card wl-bone" }, [el("span", { className: "wl-pic rl-skel" }), el("span", { className: "wl-mid" }, [el("span", { className: "rl-skel", style: "height:16px;width:90%;border-radius:8px" }), el("span", { className: "rl-skel", style: "height:16px;width:50%;border-radius:8px" })])]));
+        host.appendChild(bones); return;
+      }
+      var items = bagNow();
+      if (!items.length) {
+        host.appendChild(el("div", { className: "rl-po h2-start bg-empty", style: "margin:0" }, [el("h3", { text: "Your bag is empty", style: "margin:0;font-size:19px" }),
+          el("p", { text: "Find something you like in Browse, choose its size or colour and tap Add to bag. You pay each shop at its own checkout.", style: "margin:0;color:var(--rl-text2);font-size:15px;line-height:1.45" }),
+          el("button", { type: "button", className: "rl-po-primary", text: "Go to Browse", style: "max-width:280px", onclick: tapOnce(function () { if (window.go) window.go("discover"); }) })]));
+        return;
+      }
+      host.appendChild(el("p", { className: "bg-intro", text: "Each shop is paid separately, at its own checkout. Delivery is added there." }));
+      bagGroups(items).forEach(function (g) {
+        var sub = g.items.reduce(function (t, x) { return t + (x.soldOut ? 0 : bagLine(x)); }, 0);
+        var pay = el("button", { type: "button", className: "rl-btn bg-pay", text: "Pay at " + g.shop });
+        pay.onclick = function () { bagPay(g.key, g.shop, pay); };
+        host.appendChild(el("section", { className: "bg-group", "data-shop": g.key }, [bagShopHead(g),
+          el("div", { className: "wl-list", "data-round": "plain" }, g.items.map(bagCard)),
+          el("div", { className: "bg-sub" }, [el("span", { text: "Subtotal" }), el("b", { text: money(sub, "GBP") })]), pay]));
+      });
+    };
+    window.addEventListener("relay:bag", draw);
+    draw();
+    bagLoad().then(function () { draw(); var p = bagPending(); if (p && (p.away || Date.now() - p.at > 5000)) bagAskNow(); });
+  }
   // ---- Auctions (worker/auctions.js): shops on Relay put clothing up for auction; the winner pays the shop at its own
   // checkout. Relay bids for each shopper only as much as it takes to keep them ahead, up to the most they said they'd pay.
   var AU_BID_KEY = "relay.auctions.v1"; // this device has bid, so Home checks for wins to pay (and nobody else's Home asks)
@@ -12190,6 +12440,9 @@
     // Orders the shop confirmed (shares the wallet's request when one is already on its way).
     // Swap & resell from anywhere (Discover's row): a sheet over the page, starting on Browse.
     buyAtShop: buyAtShop,
+    // The shopping bag: its screen, adding to it, how many things are in it (the copy on the phone), and the cart link.
+    mountBag: mountBag, bagLoad: bagLoad, bagCount: bagCount, bagCartUrl: bagCartUrl,
+    bagAdd: function (sku, qty) { return bagSend(sku, qty, true); },
     picksAiSheet: picksAiSheet,
     itemKinds: function () { return api("/relay/my/item-kinds", { fresh: true }).then(function (r) { return r.ok ? r.body : null; }, function () { return null; }); },
     mountWatchList: mountWatchList, openAuctions: openAuctions, openAuction: openAuction, mountAuctions: mountAuctions, mountAsk: mountAsk, askOn: askOn, mountBrowse: mountBrowse, auctionsLive: auctionsLive, auctionsCheck: auMineCheck,

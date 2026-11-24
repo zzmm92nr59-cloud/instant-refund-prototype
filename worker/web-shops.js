@@ -58,6 +58,8 @@ export const WEB_SHOPS = [
 ];
 export const PAGES_PER_SHOP = 24;
 const PAGE_SHOPS = new Set(WEB_SHOPS.filter(s => s.reader === "pages").map(s => s.domain));
+// A shop read from its product pages: no basket Relay can fill there (the bag opens its product pages instead).
+export const pageShop = (domain) => PAGE_SHOPS.has(domain);
 
 export const USER_AGENT = "RelayBot/1.0 (+https://zzmm92nr59-cloud.github.io/instant-refund-prototype/relaybot.html)";
 export const ROBOT_TOKEN = "relaybot";
