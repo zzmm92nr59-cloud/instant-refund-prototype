@@ -198,7 +198,9 @@ for (const scheme of ["light", "dark"]) {
   // Its price can be watched (Relay reads the shop's prices about once a day).
   assert.equal(acts[acts.length - 1], "Watch price", "Watch price comes last");
   assert.equal(await pg.locator(".dc-pricefrom").innerText(), "Prices from Lark & Lantern's website on " + dateLong + ".");
-  assert.doesNotMatch(text, /Add to bag|Out of stock|Only \d+ left/);
+  assert.doesNotMatch(text, /Out of stock|Only \d+ left/);
+  // The only Add to bag is the real bag's (account.js, worker/bag.js; Connor, 24 Nov 2026), never the old demo shop's.
+  assert.equal((text.match(/Add to bag/g) || []).length, 1); assert.equal(await pg.locator("#bagAdd").innerText(), "Add to bag"); assert.doesNotMatch(text, /Add to bag \+/);
   assert.doesNotMatch(text, NEVER);
   const pic = await pg.locator(".dc-pagepic").boundingBox(); assert.ok(pic.width > 340, "a big photo");
   await page.waitForFunction(() => { const i = document.querySelector(".dc-pagepic .dc-photo"); return i && i.complete && i.naturalWidth > 0; });

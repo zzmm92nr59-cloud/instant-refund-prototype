@@ -35,6 +35,7 @@ import { handleCardRoute, forgetCard } from "./payments.js";
 import { handleResaleRoute, resaleDeleteStatements } from "./resale.js";
 import { handleProfileRoute, profileDeleteStatements, ensureProfileTable, cleanName } from "./profile.js";
 import { handleInterestsRoute, interestsDeleteStatements, ensureInterestsTable } from "./interests.js";
+import { handleBagRoute, bagDeleteStatements, ensureBagTable } from "./bag.js";
 import { handleTipsRoute, tipsDeleteStatements, ensureTipsTable } from "./tips.js";
 import { handleDeliveryRoute, deliveryDeleteStatements, ensureDeliveryTables } from "./delivery.js";
 import { handleAuctionShopperRoute, forgetAuctionBidder } from "./auctions.js";
@@ -606,6 +607,7 @@ async function deleteShopper(env, shopper, o) {
   await ensureProfileTable(env.RELAY_DB);
   await ensureInterestsTable(env.RELAY_DB);
   await ensureTipsTable(env.RELAY_DB);
+  await ensureBagTable(env.RELAY_DB);
   await ensureDeliveryTables(env.RELAY_DB);
   await ensureBankTables(env.RELAY_DB);
   for (const sql of SUPPORT_TABLE_SQL) await env.RELAY_DB.prepare(sql).run(); // the help chat's counts (made on first use)
@@ -621,6 +623,7 @@ async function deleteShopper(env, shopper, o) {
     ...profileDeleteStatements(env.RELAY_DB, shopper.id),
     ...interestsDeleteStatements(env.RELAY_DB, shopper.id),
     ...tipsDeleteStatements(env.RELAY_DB, shopper.id),
+    ...bagDeleteStatements(env.RELAY_DB, shopper.id),
     ...deliveryDeleteStatements(env.RELAY_DB, shopper.id),
     ...bankDeleteStatements(env.RELAY_DB, shopper.id),
     ...gmailDeleteStatements(env.RELAY_DB, shopper.id),
@@ -774,6 +777,9 @@ export async function handleAuthRoute(request, env, url, cors = {}, opts = {}) {
     // Which first-run tips the shopper has seen (tips.js), so each shows once, on any of their phones.
     const tipsResponse = await handleTipsRoute(request, env, url, cors, shopper, o);
     if (tipsResponse) return tipsResponse;
+    // The shopping bag (bag.js): things picked in Browse, paid for at each shop's own checkout. Relay moves no money.
+    const bagResponse = await handleBagRoute(request, env, url, cors, shopper, o);
+    if (bagResponse) return bagResponse;
     // Delivery details, and starting a checkout at a shop's own website with them filled in (delivery.js).
     const deliveryResponse = await handleDeliveryRoute(request, env, url, cors, shopper, o);
     if (deliveryResponse) return deliveryResponse;

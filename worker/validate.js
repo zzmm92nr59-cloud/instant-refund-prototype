@@ -72,6 +72,11 @@ const ROUTES = new Map(Object.entries({
   "/relay/my/interests": { fields: { interests: list(12, one(...INTEREST_IDS)) } },
   // Which first-run tips the shopper has seen: ids from the list in tips.js (which checks them again).
   "/relay/my/tips": { fields: { seen: list(4, one(...TIP_IDS)) } },
+  // The shopping bag (bag.js checks the product is one Relay shows, and the numbers): add or set how many of one thing,
+  // say a shop's things were paid for there, and check a shop's prices before opening its checkout.
+  "/relay/my/bag": { fields: { sku: str(200), qty: int(0, 10), add: bool } },
+  "/relay/my/bag/paid": { fields: { shop: str(120) } },
+  "/relay/my/bag/check": { fields: { shop: str(120) } },
   // Delivery details (delivery.js checks each one properly: a UK postcode, a UK phone number), removing them, and starting a
   // checkout at a shop's website with them filled in.
   "/relay/my/delivery": { fields: { firstName: text(100), lastName: text(100), line1: text(200), line2: text(200), town: text(120), county: text(120), postcode: str(20), phone: str(40) } },

@@ -7,6 +7,7 @@ import { exportPhone } from "./phone.js";
 import { sharedForExport } from "./shared-emails.js";
 import { crossSwapsForExport } from "./cross-swap.js";
 import { deliveryForExport } from "./delivery.js";
+import { bagForExport } from "./bag.js";
 import { auctionsForExport } from "./auctions.js";
 import { ensureBankColumns, visibleSql } from "./bank.js";
 const json = (body, status, cors) => Response.json(body, { status, headers: { ...cors, "Cache-Control": "no-store" } });
@@ -49,6 +50,8 @@ export async function exportShopperData(env, shopper, now = Date.now()) {
     tips: tips && { seen: parse(tips.seen) || [], updatedAt: iso(tips.updatedAt) },
     // The delivery address kept for filling in shops' checkouts, and each shop it was sent to.
     delivery: await deliveryForExport(env, id),
+    // The shopping bag: what's in it, from which shop, how many and the price Relay last saw.
+    bag: await bagForExport(env, id),
     // Auctions bid on (with the most they'd pay) and anything won or offered to them.
     auctions: await auctionsForExport(env, id),
     signIn: {

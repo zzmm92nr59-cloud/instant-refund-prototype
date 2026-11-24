@@ -60,6 +60,8 @@ jobs:
         run: node --import ./scripts/record-app-requests.mjs scripts/test-style-ui.mjs
       - name: Test against the common "built in a hurry" tells (sizes, colours, double taps, caching, first visit)
         run: node --import ./scripts/record-app-requests.mjs scripts/test-polish-ui.mjs
+      - name: Shopping bag (add from a product, grouped by shop, prices checked, the shop's own cart link, asked once whether paid)
+        run: node --import ./scripts/record-app-requests.mjs scripts/test-bag-ui.mjs
       - name: Test that every receipt has a picture (photo, then logo, then a drawing of what it most likely is)
         run: node --import ./scripts/record-app-requests.mjs scripts/test-pictures-ui.mjs
       - name: Test the sign-up journey (one visit to Google or Microsoft, scan from the start)
