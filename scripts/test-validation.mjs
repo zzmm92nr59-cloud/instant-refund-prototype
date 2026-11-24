@@ -79,6 +79,22 @@ async function signIn(email) {
   assert.equal(ok({ a: "‮ab" }).a, "‮ab", "only text fields lose them (ids and codes are left alone)");
   console.log("ok - the rules: types, lengths, ranges, unexpected fields, prototype keys, nulls and cleaning");
 }
+// Swap & resell's newer routes: changing a listing takes only price, offers, condition, note and photos (never its title,
+// shop or someone else's id), up to 4 photos within the listing's own size limit; blocking and unblocking take nothing.
+{
+  const id = "11111111-2222-4333-8444-555555555555";
+  const edit = schemaFor("/relay/my/resale/listings/" + id + "/edit");
+  assert.ok(edit && edit.limit === 2600 * 1024, "an edit can carry photos");
+  assert.ok(validateBody(edit, { askPence: 1500, condition: "good", note: "Fine", photos: ["data:image/png;base64,AAAA"], removePhotos: false, offers: false }).ok);
+  for (const f of ["title", "store", "sellerId", "receiptId", "status"]) assert.equal(validateBody(edit, { [f]: "x" }).ok, false, "an edit can't send " + f);
+  assert.equal(validateBody(edit, { photos: ["a", "b", "c", "d", "e"] }).ok, false, "at most 4 photos");
+  assert.equal(validateBody(edit, { note: "x".repeat(601) }).ok, false);
+  assert.equal(validateBody(edit, { note: "pay ‮ecnetsixe‬ now" }).value.note, "pay ecnetsixe now", "a note is cleaned like a message");
+  for (const p of ["/relay/my/resale/requests/" + id + "/block", "/relay/my/resale/blocks/" + id + "/remove"]) {
+    assert.ok(schemaFor(p), p + " is listed"); assert.equal(validateBody(schemaFor(p), { memberId: "x" }).ok, false, p + " takes no fields");
+  }
+  console.log("ok - Swap & resell: an edit takes only what a seller may change; block and unblock take nothing");
+}
 // The request-level wrapper: size limits, JSON shape, UTF-8, and the rebuilt request.
 {
   const cors = { "Access-Control-Allow-Origin": "*" };

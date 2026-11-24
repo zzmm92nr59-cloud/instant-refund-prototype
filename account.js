@@ -132,7 +132,7 @@
   function mailOwner() { return mailName() === "Outlook" ? "Microsoft" : "Google"; }
   // An email Relay can open again: its id in Gmail or in Outlook.
   function mailRef(x) { return x && (/^[A-Za-z0-9]{6,40}$/.test(x.gmailId || "") || /^[A-Za-z0-9_=+\/-]{16,512}$/.test(x.outlookId || "")); }
-  function save(v) { reads = {}; var was = load(); if (!v || (was && was.email !== v.email)) memoReset(); if (!v) { try { localStorage.removeItem(MAILBOX_KEY); localStorage.removeItem(PROFILE_KEY); localStorage.removeItem("relay.drafts.v1"); localStorage.removeItem("relay.pending-watches.v1"); localStorage.removeItem("relay.auctions.v1"); localStorage.removeItem("relay.bag.ask.v1"); logoMisses = {}; window.__relayPayDue = 0; } catch (e) {} } try { v ? localStorage.setItem(KEY, JSON.stringify(v)) : localStorage.removeItem(KEY); } catch (e) {} if (!v) paintAvatars();
+  function save(v) { reads = {}; var was = load(); if (!v || (was && was.email !== v.email)) memoReset(); if (!v) { try { localStorage.removeItem(MAILBOX_KEY); localStorage.removeItem(PROFILE_KEY); localStorage.removeItem("relay.drafts.v1"); localStorage.removeItem("relay.pending-watches.v1"); localStorage.removeItem("relay.auctions.v1"); localStorage.removeItem("relay.bag.ask.v1"); localStorage.removeItem("relay.market.v1"); logoMisses = {}; window.__relayPayDue = 0; window.__relayMarket = 0; window.__relayMarketNews = null; } catch (e) {} } try { v ? localStorage.setItem(KEY, JSON.stringify(v)) : localStorage.removeItem(KEY); } catch (e) {} if (!v) paintAvatars();
     if (((was && was.token) || null) !== ((v && v.token) || null)) { try { window.dispatchEvent(new Event("relay:session")); } catch (e) {} } }
   // Reads are shared and briefly remembered: two parts of a screen asking for the same thing make one request, and going
   // back to a tab within a minute reuses what was just loaded instead of asking Relay again. Any change (a POST) forgets
@@ -1264,7 +1264,7 @@
     ".rl-se-body .rl-hp-row:first-child{border-top:0}" +
     ".rl-rr-picw{position:relative;flex:none;display:block}.rl-rr-gift{position:absolute;right:-5px;bottom:-5px;width:22px;height:22px;border-radius:999px;display:grid;place-items:center;background:#C9D8FF;color:#101828;box-shadow:0 0 0 2px var(--rl-card)}.rl-rr-gift.rl-jic{margin:0}" +
     ".rl-btn.ghost.rl-plain{border-color:transparent;margin-top:2px}" +
-    ".rl-mk-photos{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}.rl-mk-photos img{width:72px;height:72px;object-fit:cover;border-radius:12px;background:var(--rl-fill)}.rl-mk-thumb{all:unset;cursor:pointer;position:relative;width:72px;height:72px;border-radius:12px;overflow:hidden}.rl-mk-thumb img{width:100%;height:100%;object-fit:cover;display:block}.rl-mk-thumb-x{position:absolute;right:4px;top:4px;background:rgba(255,255,255,.92);border-radius:8px;padding:3px;color:#101828}.rl-mk-thumb:active{opacity:.7}.rl-mk-addph{display:inline-flex;align-items:center;gap:6px;min-height:44px;max-width:220px}" +
+    ".rl-mk-photos{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}.rl-mk-photos img{width:72px;height:72px;object-fit:cover;border-radius:12px;background:var(--rl-fill)}.rl-mk-thumb{all:unset;cursor:pointer;position:relative;width:72px;height:72px;border-radius:12px;overflow:hidden}.rl-mk-thumb img{width:100%;height:100%;object-fit:cover;display:block}.rl-mk-thumb-x{position:absolute;right:4px;top:4px;background:rgba(255,255,255,.92);border-radius:8px;padding:3px;color:#101828}.rl-mk-thumb:active{opacity:.7}.rl-mk-addph{display:inline-flex;align-items:center;gap:6px;min-height:44px;max-width:220px;flex:0 0 auto;align-self:flex-start}" +
     ".rl-rr-detail{padding:0 14px 14px}.rl-rr-items{font-size:14px;color:var(--rl-text2);margin:0 0 8px}.rl-rr-list{list-style:none;margin:0 0 8px;padding:0}.rl-rr-list li{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:7px 0;border-top:1px solid var(--rl-line);font-size:15px;line-height:20px;color:var(--rl-text)}.rl-rr-list li:first-child{border-top:0}.rl-rr-list li b{flex:none;font-weight:600}.rl-rr-more{all:unset;cursor:pointer;min-height:44px;display:flex;align-items:center;font-size:15px;font-weight:600;color:var(--rl-accent)}.rl-rr-more:active{opacity:.6}.rl-rr-acts{display:flex;gap:8px;margin:10px 0 0}.rl-rr-move{margin-top:10px;width:100%;min-height:44px}.rl-rr-note{display:block;font-size:13px;color:var(--rl-text2);margin-top:4px}" +
     ".rl-cat-more{display:block;margin:14px auto 0;width:auto;min-height:44px;padding:0 20px}" +
     "@media(max-width:420px){.rl-cat-hero h3{font-size:24px}.rl-rr-main{padding:10px 12px;gap:10px}.rl-rr-pic{width:44px;height:44px}}" +
@@ -1307,6 +1307,24 @@
     ".rl-chat-b.bot p{border:0}.rl-chat-bar{border:0;background:var(--rl-glass);-webkit-backdrop-filter:blur(30px) saturate(1.8);backdrop-filter:blur(30px) saturate(1.8)}" +
     ".rl-chat-person{border:0!important;background:none!important;color:var(--rl-accent)!important;margin-top:4px}" +
     // Swap & resell listings: name and price, shop and size, then tags, without a border.
+    // Swap & resell cards (CLAUDE.md rule 16): one tap, a 140px square picture with the name and price beside it, no buttons.
+    ".rl-mk-card2{position:relative;display:flex;gap:14px;align-items:flex-start;margin:10px 0;padding:14px;border-radius:20px;background:var(--rl-card);cursor:pointer;-webkit-tap-highlight-color:transparent;transition:transform .12s}" +
+    ".rl-mk-card2:active{transform:scale(.985)}.rl-mk-card2:focus-visible,.rl-mk-tapcard:focus-visible{outline:3px solid var(--rl-accent);outline-offset:2px}" +
+    ".rl-mk-pic{flex:none;width:140px;height:140px;border-radius:16px;overflow:hidden;background:#fff;box-shadow:inset 0 0 0 1px var(--rl-line);display:grid;place-items:center}" +
+    ".rl-mk-pic img{width:100%;height:100%;object-fit:cover;object-position:50% 0;display:block}.rl-mk-pic.big{width:100%;height:auto;aspect-ratio:1/1;max-height:340px;margin:6px 0 10px;border-radius:20px}" +
+    ".rl-mk-mark{display:grid;place-items:center}.rl-mk-info{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}" +
+    ".rl-mk-name{font-size:17px;line-height:22px;font-weight:600;color:var(--rl-text);overflow-wrap:anywhere}.rl-mk-info .rl-mk-price{font-size:17px;font-weight:600}" +
+    ".rl-mk-info .rl-mk-tags{display:flex}.rl-mk-info .rl-mk-near{align-self:flex-start}.rl-mk-info .rl-mk-status{margin-top:2px}" +
+    ".rl-mk-count{display:inline-block;min-width:22px;height:22px;padding:0 7px;box-sizing:border-box;border-radius:11px;background:#e5342a;color:#fff;font-size:13px;font-weight:700;line-height:22px;text-align:center}" +
+    ".rl-mk-card2>.rl-mk-count,.rl-mk-tapcard>.rl-mk-count{position:absolute;top:10px;right:10px}.rl-mk-tabs button{position:relative;gap:6px;grid-auto-flow:column}.rl-mk-tabs .rl-mk-count{margin-left:2px}" +
+    ".rl-mk-new{display:block;font-size:14px;font-weight:700;color:#c4271e}.rl-mk-req .rl-mk-new{display:inline-block;margin:2px 0}" +
+    ".rl-mk-sheet .rl-mk-top{display:flex;justify-content:space-between;align-items:baseline;gap:12px}.rl-mk-sheet .rl-mk-top h2{margin:0;font-size:22px;line-height:28px}" +
+    ".rl-mk-sheet .rl-mk-from{display:block;margin-top:4px;font-size:15px;color:var(--rl-text2)}.rl-mk-sheet .rl-mk-tags{display:flex}.rl-mk-sheet-acts{margin-top:14px}.rl-mk-sheet-acts .rl-btn{margin-top:10px}" +
+    ".rl-mk-sheet .rl-btn.ghost{margin-top:10px}.rl-mk-sheet .rl-mk-acts>.rl-btn.rl-btn{margin:0}.rl-mk-tools .rl-btn{margin-top:8px}.rl-mk-sheet .rl-mk-photos img{width:72px;height:72px}" +
+    ".rl-mk-tapcard{position:relative;cursor:pointer;transition:transform .12s;-webkit-tap-highlight-color:transparent}.rl-mk-tapcard:active{transform:scale(.985)}.rl-mk-go{display:block;margin-top:6px;font-size:15px;font-weight:600;color:var(--rl-accent)}" +
+    "#dcRoot.rl-mk-inchat>.rl-navback,#dcRoot.rl-mk-inchat>h1.title{display:none}" +
+    // A button whose request is on its way: pressed in, with a soft sweep across it (no spinner, no "Saving…": rule 7).
+    ".rl-btn.rl-working{opacity:1;transform:scale(.98);background-image:linear-gradient(90deg,rgba(255,255,255,0),rgba(255,255,255,.22),rgba(255,255,255,0));background-size:200% 100%;animation:rlsk 1.1s linear infinite;cursor:default}" +
     ".rl-mk-card{border:0;display:block;padding:14px 16px}.rl-mk-card>*{display:block}.rl-mk-card>[hidden]{display:none!important}.rl-mk-from{margin-top:2px}.rl-mk-top{display:flex;justify-content:space-between;align-items:baseline;gap:12px}" +
     ".rl-mk-top b{font-size:17px;font-weight:600}.rl-mk-price{font-size:17px;font-weight:600;white-space:nowrap;color:var(--rl-text)}.rl-mk-from{font-size:15px;color:var(--rl-text2)}" +
     ".rl-mk-card>.rl-mk-top,.rl-mk-card>.rl-mk-tags{display:flex}.rl-mk-tags{flex-wrap:wrap;gap:6px;margin:6px 0 2px}.rl-mk-tag{font-size:13px;font-weight:600;padding:4px 9px;border-radius:999px;background:var(--rl-fill);color:var(--rl-text)}" +
@@ -3627,16 +3645,21 @@
   // Money a shop's email says it refunded on a receipt, in pounds. Shown beside what was spent, never silently taken off it
   // (round 7: Relay's totals are what was paid; refunds are said next to them).
   function refundOf(r) { var p = r && r.returnProgress; return p && p.refundedAt && Number.isInteger(p.refundPence) && (!p.currency || p.currency === "GBP") && !notPounds(r) ? p.refundPence : 0; }
-  function consentView(sheet, email, c) {
+  // after: where to go once agreed (Swap & resell asks from its own page and goes back there); otherwise the account sheet.
+  function consentView(sheet, email, c, after) {
     var msg = el("div", { className: "rl-msg" });
     var agree = el("button", { className: "rl-btn", text: "I agree and continue" });
     agree.onclick = function () {
-      agree.disabled = true; say(msg, "Saving…");
+      // No bare "Saving…" (CLAUDE.md rule 7): the button itself shows it's working, and can't be pressed again meanwhile.
+      if (agree.disabled) return;
+      agree.disabled = true; agree.classList.add("rl-working"); agree.setAttribute("aria-busy", "true"); say(msg, "");
+      var idle = function () { agree.disabled = false; agree.classList.remove("rl-working"); agree.removeAttribute("aria-busy"); };
       api("/relay/my/consent", { method: "POST", body: { version: c.version } }).then(function (r) { memo.consent = null; memo.gmail = null;
         if (r.status === 401) { save(null); close(); return; }
-        if (!r.ok) { agree.disabled = false; return say(msg, "Couldn't save your choice. Please try again.", true); }
+        if (!r.ok) { idle(); return say(msg, "Couldn't save your choice. Please try again.", true); }
+        if (after) { close(); after(); return; }
         open(function (s) { gate(s, email); });
-      }).catch(function () { agree.disabled = false; say(msg, "Couldn't reach Relay. Check your connection.", true); });
+      }).catch(function () { idle(); say(msg, "Couldn't reach Relay. Check your connection.", true); });
     };
     sheet.appendChild(el("h2", { text: c.acceptedEarlier ? "We've updated this" : "Before you start" }));
     sheet.appendChild(el("p", { text: c.acceptedEarlier ? "Relay can now read Outlook as well as Gmail, so the wording below changed to say so. What Relay reads and keeps is the same. Please agree again to keep your receipts updating."
@@ -5137,26 +5160,70 @@
   var CONDITION = { new_with_tags: "New with tags", like_new: "Like new", good: "Good", fair: "Fair" };
   var resaleErrors = { bad_photo: "One of those photos couldn't be used. Try a different one.", photo_too_big: "One of those photos is too big. Try a different one.", photos_too_big: "Those photos are too big together. Try fewer.", too_many_photos: "Up to 4 photos.", area_needed: "Add your postcode area (like SW11) so buyers know where to collect, or choose Post only.", invalid_area: "That doesn't look like a postcode area. Use the first part, like SW11 or M1.", invalid_handover: "Choose how the item changes hands.", not_resellable: "Only physical items can be listed. Food, travel and digital purchases can't be resold.", account_restricted: "Your account can't use the swap and resell board right now.", agreement_required: "Please tick the box to agree.", already_listed: "That item is already listed.", too_many_listings: "You have the maximum number of listings.",
     already_asked: "You've already asked about this one.", offer_one_of_your_listings: "Choose one of your own listings to offer.", swap_not_offered: "The seller isn't open to swaps.",
-    not_found: "That's no longer available.", invalid_price: "Enter a price between £0 and £5,000.", too_many_requests: "Too many requests today. Try again tomorrow." };
+    not_found: "That's no longer available.", item_gone: "This item has gone, so you can't send messages about it any more.", not_asked_yet: "They haven't asked for it yet. You can reply by message.", own_listing: "That's your own listing.", invalid_price: "Enter a price between £0 and £5,000.", too_many_requests: "Too many requests today. Try again tomorrow." };
+
+  // ---- What's new in Swap & resell: a red number on Browse's tab (index.html relayBadge), on Yours and on each card ----
+  // Requests on your listings you haven't seen and messages you haven't read, counted by Relay (worker/resale.js news). Asked
+  // for when Relay opens, a tab opens or you pull down, and only on a phone that has used Swap & resell (MK_KEY), so
+  // everyone else's app asks nothing more. Opening Yours or a conversation clears what it shows.
+  var MK_KEY = "relay.market.v1";
+  function mkUsed(on) { try { if (on) localStorage.setItem(MK_KEY, "1"); else localStorage.removeItem(MK_KEY); } catch (e) {} }
+  function mkNews(n) {
+    if (!n) return;
+    window.__relayMarket = Number(n.total) || 0; window.__relayMarketNews = n;
+    if (n.active === false && !window.__relayMarket) mkUsed(false);
+    if (window.relayBadge) window.relayBadge();
+    try { document.dispatchEvent(new CustomEvent("relay:market-news")); } catch (e) {}
+  }
+  function mkCheck() {
+    var on = false; try { on = localStorage.getItem(MK_KEY) === "1"; } catch (e) {}
+    if (!on) { if (window.__relayMarket) { window.__relayMarket = 0; window.__relayMarketNews = null; if (window.relayBadge) window.relayBadge(); } return; }
+    api("/relay/my/resale/news").then(function (r) { if (r.ok && r.body) mkNews(r.body); }, function () {});
+  }
+  // A sheet over whatever is showing (the Browse page or the Swap & resell sheet): tap outside, swipe down, Escape or its
+  // Back closes it. done() closes it from inside.
+  function mkLayer(build) {
+    var sheet = el("div", { className: "rl-sheet rl-mk-sheet", role: "dialog" });
+    sheet.setAttribute("aria-modal", "true");
+    var layer = el("div", { className: "rl-back rl-mk-layer", style: "z-index:9500" }, [sheet]);
+    var born = Date.now();
+    function done() { layer.remove(); document.removeEventListener("keydown", onKey); }
+    function onKey(e) { var all = document.querySelectorAll(".rl-back"); if (e.key === "Escape" && all[all.length - 1] === layer) done(); }
+    layer.addEventListener("click", function (e) { if (e.target === layer && (!e.isTrusted || Date.now() - born > 400)) done(); });
+    document.addEventListener("keydown", onKey);
+    document.body.appendChild(layer);
+    build(sheet, done);
+    return done;
+  }
+  function mkNavBack(label, onBack) {
+    return el("button", { type: "button", className: "rl-navback", "data-back": "", ariaLabel: "Back to " + label, onclick: onBack }, [jIc("back", 22), el("span", { text: label })]);
+  }
+  // A red number, like the tab's.
+  function mkCount(n) { var c = el("span", { className: "rl-mk-count", text: n > 9 ? "9+" : String(n) }); c.setAttribute("aria-hidden", "true"); return c; }
 
   // A conversation between a seller and the member whose request they accepted.
   var chatErrors = { no_contact_details: "Please keep emails, phone numbers and links out of messages for now.", too_many_messages: "That's a lot of messages. Try again in a bit.",
-    thread_full: "This conversation has reached its limit.", conversation_closed: "This conversation has ended.", empty_message: "Write a message first." };
+    thread_full: "This conversation has reached its limit.", conversation_closed: "This conversation has ended.", empty_message: "Write a message first.",
+    item_gone: "This item has gone, so you can't send messages about it any more." };
   function chatView(sheet, requestId, onBack) {
     var log = el("div", { style: "margin:10px 0;max-height:42vh;overflow:auto" }), msg = el("div", { className: "rl-msg" });
     var head = el("h2", { text: "Messages" }), sub = el("p", { text: "" });
     var input = el("input", { className: "rl-mk-chat-in", placeholder: "Write a message", maxLength: 500, autocomplete: "off", enterKeyHint: "send" });
     input.setAttribute("aria-label", "Write a message");
     var send = el("button", { className: "rl-btn", text: "Send" });
-    var tools = el("div");
+    var tools = el("div", { className: "rl-mk-tools" });
     // How to do the deal safely. Relay doesn't take payments yet, so this is what keeps both sides safe.
     var tips = el("details", { className: "rl-mk-safe", style: "background:var(--rl-fill);border-radius:14px;padding:0 14px;margin:6px 0;font-size:14px;color:var(--rl-text2)" }, [
       el("summary", { text: "Doing the deal safely" }),
       el("p", { text: "Collecting: meet somewhere public in daylight, check the item, then pay on the spot (cash, or a bank transfer you can see arrive).", style: "margin:8px 0 4px" }),
       el("p", { text: "Posting: Relay doesn't handle payments, so never pay a stranger in advance by bank transfer. Collecting in person is the safer way.", style: "margin:4px 0" }),
       el("p", { text: "Keep chatting here. Relay hides phone numbers and emails to protect you both.", style: "margin:4px 0 12px" })]);
-    [head, sub, tips, log, input, send, msg, tools, el("button", { className: "rl-btn ghost", text: "Back", "data-back": "", onclick: function () { stop(); onBack(); } })].forEach(function (n) { sheet.appendChild(n); });
-    var stopFresh = null, isOpen = false, loaded = false;
+    // An inner screen: its own Back bar at the top (CLAUDE.md rule 18), not a button at the bottom.
+    // On Browse's Swap & resell page the conversation is the screen: the page's own Back and big title step aside for its bar.
+    var root = sheet.closest && sheet.closest("#dcRoot");
+    if (root) root.classList.add("rl-mk-inchat");
+    [mkNavBack("Swap & resell", function () { stop(); if (root) root.classList.remove("rl-mk-inchat"); onBack(); }), head, sub, tips, log, input, send, msg, tools].forEach(function (n) { sheet.appendChild(n); });
+    var stopFresh = null, isOpen = false, loaded = false, notice = "", blockedHere = false;
     function stop() { if (stopFresh) { stopFresh(); stopFresh = null; } }
     function load() {
       if (!document.body.contains(sheet)) return stop();
@@ -5164,6 +5231,8 @@
       api("/relay/my/resale/requests/" + requestId + "/messages", { fresh: true }).then(function (r) {
         if (!r.ok) return say(msg, "Couldn't load this conversation.", true);
         var b = r.body; isOpen = b.open; loaded = true;
+        // Reading it is seeing it: the red number goes down by what was new here.
+        if (b.news) mkNews(b.news);
         head.textContent = b.title; sub.textContent = "Chatting with the " + b.with.toLowerCase() + ". Names and contact details stay private. Relay doesn't handle payment or postage, so agree them here.";
         log.textContent = "";
         if (!b.messages.length) log.appendChild(el("p", { text: "No messages yet. Say hello and agree how this will work." }));
@@ -5173,16 +5242,30 @@
         });
         log.scrollTop = log.scrollHeight;
         input.style.display = send.style.display = isOpen ? "" : "none";
-        if (!isOpen) say(msg, "This conversation has ended.");
+        // Matched with someone else, or taken down: said plainly; what was written stays to read.
+        if (!isOpen) say(msg, (notice ? notice + " " : "") + (b.itemGone ? "This item has gone, so this conversation has ended. You can still read it." : "This conversation has ended."));
         tools.textContent = "";
-        if (isOpen) {
-          tools.appendChild(el("button", { className: "rl-btn ghost", text: "End conversation", style: "padding:9px 14px;font-size:14px", onclick: function () {
+        if (isOpen && b.matched) {
+          tools.appendChild(el("button", { className: "rl-btn ghost", text: "End conversation", onclick: function () {
             ask("End this conversation? The item goes back on sale.", "End conversation", function () {
               api("/relay/my/resale/requests/" + requestId + "/end", { method: "POST", body: {} }).then(load); }); } }));
-          tools.appendChild(el("button", { className: "rl-btn ghost", text: "Report a problem", style: "padding:9px 14px;font-size:14px", onclick: function () {
-            askText("What went wrong? (for example: they wanted a bank transfer before you'd seen the item). Reporting lets the Relay team read this conversation to review it. They won't see who either of you is.", "Send report", function (why) {
-              api("/relay/my/resale/requests/" + requestId + "/report", { method: "POST", body: { reason: why } }).then(function (x) { if (x.ok) { say(msg, "Reported and ended. Thank you."); load(); } else say(msg, "Couldn't send the report. Try again.", true); }); }); } }));
         }
+        if (isOpen) {
+          tools.appendChild(el("button", { className: "rl-btn ghost", text: "Report a problem", onclick: function () {
+            askText("What went wrong? (for example: they wanted a bank transfer before you'd seen the item). Reporting lets the Relay team read this conversation to review it. They won't see who either of you is.", "Send report", function (why) {
+              api("/relay/my/resale/requests/" + requestId + "/report", { method: "POST", body: { reason: why } }).then(function (x) { if (x.ok) { notice = "Reported. Thank you."; load(); } else say(msg, "Couldn't send the report. Try again.", true); }); }); } }));
+        }
+        // Blocking is the member's own choice, kept apart from reporting: nobody at Relay is asked to look.
+        var blk = el("button", { className: "rl-btn ghost", text: "Block this member", onclick: function () {
+          ask("Block this member? They won't be able to message you or ask about your listings, and you won't see theirs. They aren't told. You can unblock them in Profile, under Blocked members.", "Block", function () {
+            if (blk.disabled) return;
+            blk.disabled = true;
+            api("/relay/my/resale/requests/" + requestId + "/block", { method: "POST" }).then(function (x) {
+              blk.disabled = false;
+              if (x.ok) { blockedHere = true; notice = "Blocked. They can't message you or ask about your listings."; load(); } else say(msg, "Couldn't block them. Please try again.", true);
+            }, function () { blk.disabled = false; say(msg, "Couldn't reach Relay. Check your connection and try again.", true); });
+          }); } });
+        if (!blockedHere) tools.appendChild(blk);
       });
     }
     send.onclick = function () {
@@ -5201,40 +5284,106 @@
     // New messages are looked for every 30 seconds while the conversation is open and on screen, and never once it has ended.
     stopFresh = keepFresh(sheet, 30000, load, function () { return !loaded || isOpen; });
   }
+  // Members you've blocked (Profile → Blocked members): only what you were talking about, never who, and Unblock.
+  function blocksPage(b) {
+    var msg = el("div", { className: "rl-msg" }), list = el("div");
+    b.appendChild(list); b.appendChild(msg);
+    function draw() {
+      list.textContent = "";
+      list.appendChild(el("div", { className: "rl-skel", style: "min-height:64px;border-radius:16px" }));
+      api("/relay/my/resale/blocks", { fresh: true }).then(function (r) {
+        list.textContent = "";
+        if (!r.ok) return say(msg, "Couldn't load who you've blocked. Pull down to try again.", true);
+        var rows = r.body.blocks || [];
+        if (!rows.length) return list.appendChild(el("div", { className: "rl-empty" }, [el("h3", { text: "You haven't blocked anyone" }),
+          el("p", { text: "In a Swap & resell conversation, Block this member stops them messaging you or asking about your listings." })]));
+        rows.forEach(function (x) {
+          var when = new Date(x.createdAt).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
+          list.appendChild(accGroup("", [accRow("lock", x.about ? "The member you talked to about " + x.about : "A member you talked to", "Blocked on " + when, function () {
+            ask("Unblock this member? They'll be able to see your listings and ask about them again.", "Unblock", function () {
+              api("/relay/my/resale/blocks/" + x.id + "/remove", { method: "POST" }).then(function (y) {
+                if (y.ok) { say(msg, "Unblocked."); draw(); } else say(msg, "Couldn't unblock them. Please try again.", true);
+              }, function () { say(msg, "Couldn't reach Relay. Check your connection and try again.", true); });
+            }); })]));
+        });
+      }, function () { list.textContent = ""; say(msg, "Couldn't reach Relay. Check your connection and try again.", true); });
+    }
+    draw();
+  }
   function resaleView(sheet, onBack, focusReceipt, startTab) {
     var body = el("div"), msg = el("div", { className: "rl-msg" });
     var tabs = el("div", { className: "rl-mk-tabs", role: "group", ariaLabel: "Swap & resell" });
-    var cur = startTab || (focusReceipt ? "sell" : "browse");
+    // Opened from a notification or a search (index.html openLink, browseSuggest): which part, conversation or listing.
+    var want = window.__relayMarketWant || null; window.__relayMarketWant = null;
+    var cur = (want && want.tab) || startTab || (focusReceipt ? "sell" : "browse");
     function openChat(id) { sheet.textContent = ""; chatView(sheet, id, function () { sheet.textContent = ""; resaleView(sheet, onBack, null, "mine"); }); }
     [["browse", "Browse"], ["mine", "Yours"], ["sell", "Sell"]].forEach(function (t) {
-      var b = el("button", { type: "button", text: t[1], onclick: function () { if (cur === t[0] && !focusReceipt) return; cur = t[0]; focusReceipt = null; draw(); } });
+      var b = el("button", { type: "button", onclick: function () { if (cur === t[0] && !focusReceipt) return; cur = t[0]; focusReceipt = null; draw(); } }, [el("span", { text: t[1] })]);
       b.setAttribute("data-tab", t[0]); tabs.appendChild(b);
     });
+    // Yours carries the red number while anything there is new.
+    function paintCount() {
+      if (!document.body.contains(tabs)) return document.removeEventListener("relay:market-news", paintCount);
+      var y = tabs.querySelector('[data-tab="mine"]'), n = Number(window.__relayMarket) || 0, old = y.querySelector(".rl-mk-count");
+      if (old) old.remove();
+      if (n) y.appendChild(mkCount(n));
+      y.setAttribute("aria-label", n ? "Yours, " + n + " new" : "Yours");
+    }
+    document.addEventListener("relay:market-news", paintCount);
     // On the Market page (no onBack) the page supplies its own heading and there is nothing to go back to.
     [onBack ? el("h2", { text: "Swap & resell" }) : null,
      onBack ? el("p", { className: "rl-mk-lead", text: "Passed the return date? Sell or swap it with other Relay members. Relay puts you in touch, and you agree payment and handover between you." }) : null,
-     tabs, body, msg,
+     tabs, msg, body,
      onBack ? el("button", { className: "rl-btn ghost", text: "Back", "data-back": "", onclick: onBack }) : null].forEach(function (n) { if (n) sheet.appendChild(n); });
     function tell(t, bad) { say(msg, t, bad); }
     function fail(r) { tell(resaleErrors[r.body && r.body.error] || "Something went wrong. Please try again.", true); }
-    function photo(card, id, has, count) {
-      if (!has) return;
-      var ph = el("img", { alt: "", style: "float:right;width:72px;height:72px;object-fit:cover;border-radius:12px;margin:0 0 8px 10px;background:var(--rl-fill)" });
-      card.insertBefore(ph, card.firstChild);
-      apiBlob("/relay/my/resale/listings/" + id + "/image").then(function (u) { if (u) ph.src = u; else ph.remove(); });
-      // The seller's other photos, in a row under it.
-      if (count > 1) { var row = el("div", { className: "rl-mk-photos" }); card.appendChild(row);
-        for (var n = 2; n <= Math.min(4, count); n++) (function (n) { var im = el("img", { alt: "Photo " + n + " from the seller" }); row.appendChild(im);
-          apiBlob("/relay/my/resale/listings/" + id + "/photos/" + n).then(function (u) { if (u) im.src = u; else im.remove(); }); })(n); }
+    // A listing's picture: its photo filling a square, or the shop's mark whole on white.
+    function mkPic(l, big) {
+      var box = el("span", { className: "rl-mk-pic" + (big ? " big" : "") });
+      var mark = function () { var w = el("span", { className: "rl-mk-mark" }); w.appendChild(ysLogo({ name: String(l.store || l.title || "?"), logo: "", cat: "other" }, big ? 96 : 64)); return w; };
+      if (l.hasImage) {
+        var im = el("img", { alt: big ? "Photo of " + l.title : "" }); box.appendChild(im);
+        apiBlob("/relay/my/resale/listings/" + l.id + "/image").then(function (u) { if (u) im.src = u; else { im.remove(); box.appendChild(mark()); } });
+      } else box.appendChild(mark());
+      return box;
     }
-    // A listing: its name and price on top, the shop and size under it, then its condition, swaps and handover as tags.
+    // The seller's other photos, in a row under the big one.
+    function morePhotos(l) {
+      var row = el("div", { className: "rl-mk-photos" });
+      for (var n = 2; n <= Math.min(4, l.photos || 0); n++) (function (n) { var im = el("img", { alt: "Photo " + n + " from the seller" }); row.appendChild(im);
+        apiBlob("/relay/my/resale/listings/" + l.id + "/photos/" + n).then(function (u) { if (u) im.src = u; else im.remove(); }); })(n);
+      return row;
+    }
+    function forgetPics(l) { Object.keys(memo.blobs || {}).forEach(function (k) { if (k.indexOf("/relay/my/resale/listings/" + l.id + "/") === 0) delete memo.blobs[k]; }); }
     function priceOf(l) { return l.askPence == null ? "Open to offers" : l.askPence === 0 ? "Free" : money(l.askPence, l.currency); }
-    function listingHead(l) {
-      var tags = [CONDITION[l.condition] || null, l.swapOk ? "Open to swaps" : null,
+    function tagsOf(l) {
+      return [CONDITION[l.condition] || null, l.swapOk ? "Open to swaps" : null,
         l.handover === "collect" ? "Collection in " + l.area : l.handover === "either" ? "Collect in " + l.area + " or post" : l.handover === "post" ? "Posted" : null].filter(Boolean);
-      return [el("div", { className: "rl-mk-top" }, [el("b", { text: l.title }), el("span", { className: "rl-mk-price", text: priceOf(l) })]),
-        el("span", { className: "rl-mk-from", text: [l.store, l.size ? "size " + l.size : null].filter(Boolean).join(", ") }),
-        el("span", { className: "rl-mk-tags" }, tags.map(function (t) { return el("span", { className: "rl-mk-tag", text: t }); }))];
+    }
+    function fromOf(l) { return [l.store, l.size ? "size " + l.size : null].filter(Boolean).join(", "); }
+    // A listing as a card: its picture (a 140px square) with its name, price and details beside it. One tap opens its sheet;
+    // the card itself has no buttons (CLAUDE.md rule 16).
+    function mkCard(l, lines, n, onOpen) {
+      var info = el("span", { className: "rl-mk-info" }, [el("b", { className: "rl-mk-name", text: l.title }), el("span", { className: "rl-mk-price", text: priceOf(l) }),
+        fromOf(l) ? el("span", { className: "rl-mk-from", text: fromOf(l) }) : null,
+        el("span", { className: "rl-mk-tags" }, tagsOf(l).map(function (t) { return el("span", { className: "rl-mk-tag", text: t }); }))].concat(lines).filter(Boolean));
+      var card = el("div", { className: "rl-mk-card2", role: "button", tabIndex: 0 }, [mkPic(l), info]);
+      if (n) card.appendChild(mkCount(n));
+      card.setAttribute("aria-label", l.title + ", " + priceOf(l) + (n ? ", " + n + " new" : ""));
+      card.onclick = onOpen;
+      card.onkeydown = function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onOpen(); } };
+      return card;
+    }
+    // A listing's own sheet: its photos, everything about it, then what you can do.
+    function sheetTop(sh, l, done) {
+      sh.appendChild(mkNavBack("Swap & resell", done));
+      // The big picture only when there's a photo (a shop's letter on its own would just take up the screen).
+      if (l.hasImage) sh.appendChild(mkPic(l, true));
+      if ((l.photos || 0) > 1) sh.appendChild(morePhotos(l));
+      sh.appendChild(el("div", { className: "rl-mk-top" }, [el("h2", { text: l.title }), el("span", { className: "rl-mk-price", text: priceOf(l) })]));
+      if (fromOf(l)) sh.appendChild(el("span", { className: "rl-mk-from", text: fromOf(l) }));
+      sh.appendChild(el("span", { className: "rl-mk-tags" }, tagsOf(l).map(function (t) { return el("span", { className: "rl-mk-tag", text: t }); })));
+      if (l.note) sh.appendChild(el("span", { className: "rl-mk-quote", text: "“" + l.note + "”" }));
     }
     // Where a request has got to, in words (the server keeps a short code).
     var STATUS = { pending: "Waiting for the seller", accepted: "Accepted", declined: "Declined", closed: "Ended", withdrawn: "Taken down", matched: "Matched", active: "On sale" };
@@ -5242,14 +5391,15 @@
     var dayOf = function (d) { return /^\d{4}-\d{2}-\d{2}/.test(d || "") ? new Date(String(d).slice(0, 10) + "T12:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }) : null; };
     // Greyed outlines while a list loads.
     var outlines = function (n) { for (var i = 0; i < n; i++) body.appendChild(el("div", { className: "rl-skel rl-mk-skel" })); };
-    function draw() {
+    function draw(openId) {
       Array.prototype.forEach.call(tabs.children, function (b) { b.setAttribute("aria-pressed", b.getAttribute("data-tab") === cur ? "true" : "false"); });
+      paintCount();
       body.textContent = ""; tell("");
-      if (cur === "browse") return drawBrowse();
+      if (cur === "browse") return drawBrowse(openId);
       if (cur === "mine") return drawMine();
       drawSell();
     }
-    function drawBrowse() {
+    function drawBrowse(openId) {
       outlines(3);
       // What other members list, and who has asked about yours, changes without this phone doing anything, so opening Browse
       // or Yours asks Relay itself rather than reusing the copy from the last minute (a request Bea had just sent didn't show
@@ -5258,6 +5408,7 @@
         if (cur !== "browse") return;
         body.textContent = "";
         if (!rs[0].ok) return body.appendChild(el("p", { text: "Couldn't load what's listed. Pull down to try again." }));
+        if (rs[1].ok && rs[1].body && rs[1].body.news) mkNews(rs[1].body.news);
         var mine = ((rs[1].body && rs[1].body.listings) || []).filter(function (l) { return l.status === "active"; });
         var rows = rs[0].body.listings || [];
         // Like a local marketplace: put things you could collect near you first. Only the postcode area is used.
@@ -5271,117 +5422,214 @@
         rows = rows.slice().sort(function (a, b) { return score(b) - score(a); });
         if (!rows.length) body.appendChild(el("div", { className: "rl-empty", style: "margin-top:14px" }, [el("h3", { text: "Nothing listed yet" }), el("p", { text: "When other Relay members list something they no longer need, it shows up here. Got something past its return date? List it from the Sell tab." })]));
         rows.forEach(function (l) {
-          var card = el("div", { className: "rl-order rl-mk-card" }, listingHead(l));
-          if (score(l)) card.appendChild(el("span", { className: "rl-mk-near" }, [jIc("pin", 14), el("span", { text: score(l) === 2 ? "Near you" : "In your area" })]));
-          photo(card, l.id, l.hasImage, l.photos);
-          if (l.note) card.appendChild(el("span", { className: "rl-mk-quote", text: "“" + l.note + "”" }));
-          if (l.myRequest) {
-            card.appendChild(el("span", { className: "rl-mk-status", text: "You asked about this: " + said(l.myRequest.status).toLowerCase() + "." }));
-            if (l.myRequest.status === "accepted") card.appendChild(el("button", { type: "button", className: "rl-btn", text: "Message the seller", onclick: function () { openChat(l.myRequest.id); } }));
-          } else {
-            // The two asks side by side; for a swap, the first tap shows what you'd offer, the second sends it.
-            var acts = el("div", { className: "rl-mk-acts" }); card.appendChild(acts);
-            var add = function (label, kind) {
-              var btn = el("button", { type: "button", className: "rl-btn" + (kind === "buy" ? "" : " ghost"), text: label, onclick: function () {
-                if (btn.disabled) return;
-                var pick = card.querySelector("select");
-                var b = { kind: kind };
-                if (kind === "swap") {
-                  if (!pick) return tell("List something of your own first (Sell tab), then offer it in a swap.", true);
-                  if (pick.hidden) { pick.hidden = false; btn.textContent = "Send swap offer"; pick.focus(); return; }
-                  b.offeredListingId = pick.value;
-                }
-                btn.disabled = true;
-                api("/relay/my/resale/listings/" + l.id + "/ask", { method: "POST", body: b }).then(function (r) { btn.disabled = false; if (r.ok) { tell("Sent. The seller sees your request from “Member”, not your name."); drawBrowse(); } else fail(r); },
-                  function () { btn.disabled = false; tell("Couldn't reach Relay. Check your connection and try again.", true); }); } });
-              acts.appendChild(btn);
-            };
-            add("I'd like this", "buy");
-            if (l.swapOk) {
-              if (mine.length) {
-                var sel = el("select", { className: "rl-mk-select" });
-                sel.setAttribute("aria-label", "What you'd offer in a swap");
-                mine.forEach(function (m) { sel.appendChild(el("option", { value: m.id, text: "Offer my " + m.title })); });
-                sel.hidden = true;
-              }
-              add("Offer a swap", "swap");
-              if (sel) card.appendChild(sel);
-            }
-          }
-          // Anyone can report a listing; it goes to Relay's team and stops showing here for them.
-          var rep = el("button", { type: "button", className: "rl-btn ghost rl-plain rl-mk-report", text: "Report this listing", onclick: function () {
-            askText("What's wrong with this listing? For example, it isn't what it says, or it's something that shouldn't be sold. Relay's team will look at it. The seller won't see who reported it.", "Send report", function (why) {
-              why = String(why || "").trim();
-              if (!why) return tell("Say what's wrong, so Relay's team can check it.", true);
-              if (rep.disabled) return;
-              rep.disabled = true;
-              api("/relay/my/resale/listings/" + l.id + "/report", { method: "POST", body: { reason: why } }).then(function (r) {
-                rep.disabled = false;
-                if (r.ok || (r.body && r.body.error === "already_reported")) { tell("Reported. Relay's team will look at it, and you won't see this listing again."); drawBrowse(); }
-                else tell(r.body && r.body.error === "too_many_reports" ? "That's 10 reports today. Try again tomorrow, or use Talk to a person in Help." : "Couldn't send the report. Please try again.", true);
-              }, function () { rep.disabled = false; tell("Couldn't reach Relay. Check your connection and try again.", true); });
-            });
-          } });
-          card.appendChild(rep);
-          body.appendChild(card);
+          var lines = [score(l) ? el("span", { className: "rl-mk-near" }, [jIc("pin", 14), el("span", { text: score(l) === 2 ? "Near you" : "In your area" })]) : null,
+            l.myRequest ? el("span", { className: "rl-mk-status", text: l.myRequest.kind === "chat" ? "You're chatting with the seller." : "You asked about this: " + said(l.myRequest.status).toLowerCase() + "." }) : null];
+          body.appendChild(mkCard(l, lines, 0, function () { browseSheet(l, mine); }));
         });
+        if (openId) { var hit = rows.filter(function (l) { return l.id === openId; })[0]; if (hit) browseSheet(hit, mine); else tell("That's no longer available.", true); }
       });
     }
-    function drawMine() {
+    // Someone else's listing: ask for it, offer a swap, message the seller once they've said yes, or report it.
+    function browseSheet(l, mine) {
+      mkLayer(function (sh, done) {
+        sheetTop(sh, l, done);
+        var note = el("div", { className: "rl-msg" });
+        var acts = el("div", { className: "rl-mk-sheet-acts" });
+        sh.appendChild(acts); sh.appendChild(note);
+        var asked = l.myRequest && l.myRequest.kind !== "chat";
+        // Anyone can message the seller about it first (Connor, 24 Nov 2026): their own conversation, the same one each time.
+        var talk = el("button", { type: "button", className: "rl-btn" + (asked ? "" : " ghost"), text: "Message the seller", onclick: function () {
+          if (talk.disabled) return;
+          if (l.myRequest) { done(); return openChat(l.myRequest.id); }
+          talk.disabled = true;
+          api("/relay/my/resale/listings/" + l.id + "/chat", { method: "POST" }).then(function (r) {
+            talk.disabled = false;
+            if (r.ok && r.body && r.body.requestId) { mkUsed(true); done(); openChat(r.body.requestId); }
+            else say(note, resaleErrors[r.body && r.body.error] || "Couldn't open a conversation. Please try again.", true);
+          }, function () { talk.disabled = false; say(note, "Couldn't reach Relay. Check your connection and try again.", true); });
+        } });
+        if (asked) {
+          acts.appendChild(el("p", { className: "rl-mk-status", text: "You asked about this: " + said(l.myRequest.status).toLowerCase() + "." }));
+          if (l.myRequest.status === "accepted" || l.myRequest.status === "pending") acts.appendChild(talk);
+        } else {
+          var sel = null;
+          var send = function (btn, b) {
+            if (btn.disabled) return;
+            btn.disabled = true;
+            api("/relay/my/resale/listings/" + l.id + "/ask", { method: "POST", body: b }).then(function (r) {
+              btn.disabled = false;
+              if (r.ok) { mkUsed(true); done(); tell("Sent. The seller sees your request from “Member”, not your name."); drawBrowse(); }
+              else say(note, resaleErrors[r.body && r.body.error] || "Something went wrong. Please try again.", true);
+            }, function () { btn.disabled = false; say(note, "Couldn't reach Relay. Check your connection and try again.", true); });
+          };
+          var buy = el("button", { type: "button", className: "rl-btn", text: "I'd like this", onclick: function () { send(buy, { kind: "buy" }); } });
+          acts.appendChild(buy);
+          if (l.swapOk) {
+            if (mine.length) {
+              sel = el("select", { className: "rl-mk-select" });
+              sel.setAttribute("aria-label", "What you'd offer in a swap");
+              mine.forEach(function (m) { sel.appendChild(el("option", { value: m.id, text: "Offer my " + m.title })); });
+              acts.appendChild(sel);
+              var swap = el("button", { type: "button", className: "rl-btn ghost", text: "Offer a swap", onclick: function () { send(swap, { kind: "swap", offeredListingId: sel.value }); } });
+              acts.appendChild(swap);
+            } else acts.appendChild(el("p", { className: "rl-mk-status", text: "The seller is open to swaps. List something of your own from the Sell tab to offer it." }));
+          }
+          acts.appendChild(talk);
+        }
+        // Anyone can report a listing; it goes to Relay's team and stops showing here for them.
+        var rep = el("button", { type: "button", className: "rl-btn ghost rl-plain rl-mk-report", text: "Report this listing", onclick: function () {
+          askText("What's wrong with this listing? For example, it isn't what it says, or it's something that shouldn't be sold. Relay's team will look at it. The seller won't see who reported it.", "Send report", function (why) {
+            why = String(why || "").trim();
+            if (!why) return say(note, "Say what's wrong, so Relay's team can check it.", true);
+            if (rep.disabled) return;
+            rep.disabled = true;
+            api("/relay/my/resale/listings/" + l.id + "/report", { method: "POST", body: { reason: why } }).then(function (r) {
+              rep.disabled = false;
+              if (r.ok || (r.body && r.body.error === "already_reported")) { done(); tell("Reported. Relay's team will look at it, and you won't see this listing again."); drawBrowse(); }
+              else say(note, r.body && r.body.error === "too_many_reports" ? "That's 10 reports today. Try again tomorrow, or use Talk to a person in Help." : "Couldn't send the report. Please try again.", true);
+            }, function () { rep.disabled = false; say(note, "Couldn't reach Relay. Check your connection and try again.", true); });
+          });
+        } });
+        sh.appendChild(rep);
+      });
+    }
+    function drawMine(openId) {
       outlines(2);
-      api("/relay/my/resale/mine", { fresh: true }).then(function (r) {
+      // Opening Yours is seeing what's here: Relay marks the requests on your listings seen (?seen=1); this answer still
+      // says which were new.
+      api("/relay/my/resale/mine?seen=1", { fresh: true }).then(function (r) {
         if (cur !== "mine") return;
         body.textContent = "";
         if (!r.ok) return body.appendChild(el("p", { text: "Couldn't load your listings. Pull down to try again." }));
-        var ls = r.body.listings || [];
+        var ls = r.body.listings || [], mr = r.body.myRequests || [];
+        if (ls.length || mr.length) mkUsed(true);
+        if (r.body.news) mkNews(r.body.news);
         if (!ls.length) body.appendChild(el("div", { className: "rl-empty", style: "margin-top:14px" }, [el("h3", { text: "Nothing listed yet" }), el("p", { text: "Use the Sell tab to list something from your receipts." })]));
         ls.forEach(function (l) {
-          var card = el("div", { className: "rl-order rl-mk-card" }, listingHead(l));
-          if (l.status === "matched") card.appendChild(el("span", { className: "rl-mk-status", text: "Matched: you're chatting with a member about this." }));
-          photo(card, l.id, l.hasImage, l.photos);
-          (l.requests || []).forEach(function (q) {
-            var row = el("div", { className: "rl-mk-req" });
-            row.appendChild(el("b", { text: q.who + (q.kind === "swap" ? " offers a swap" : " would like to buy") }));
-            if (q.offered) row.appendChild(el("span", { text: "Offering: " + q.offered.title + (q.offered.size ? " (size " + q.offered.size + ")" : "") }));
-            if (q.message) row.appendChild(el("span", { text: "“" + q.message + "”" }));
-            if (q.status === "pending" && l.status === "active") {
-              var acts = el("div", { className: "rl-mk-acts" });
-              [["Accept", "accept", "rl-btn"], ["Decline", "decline", "rl-btn ghost"]].forEach(function (a) {
-                var b = el("button", { type: "button", className: a[2], text: a[0], onclick: function () {
-                  if (b.disabled) return;
-                  Array.prototype.forEach.call(acts.children, function (x) { x.disabled = true; });
-                  api("/relay/my/resale/requests/" + q.id + "/" + a[1], { method: "POST" }).then(function (x) {
-                    if (x.ok) return drawMine();
-                    Array.prototype.forEach.call(acts.children, function (y) { y.disabled = false; }); fail(x);
-                  }, function () { Array.prototype.forEach.call(acts.children, function (y) { y.disabled = false; }); tell("Couldn't reach Relay. Check your connection and try again.", true); }); } });
-                acts.appendChild(b);
-              });
-              row.appendChild(acts);
-            } else {
-              row.appendChild(el("span", { className: "rl-mk-status", text: q.status === "accepted" ? "Accepted. Relay doesn't handle payment or postage, so agree the handover by message." : said(q.status) + "." }));
-              if (q.status === "accepted") row.appendChild(el("button", { type: "button", className: "rl-btn", text: "Open messages", onclick: function () { openChat(q.id); } }));
-            }
-            card.appendChild(row);
-          });
-          var down = el("button", { type: "button", className: "rl-btn ghost", text: "Take this down", onclick: function () {
-            ask("Take " + l.title + " off Relay? Anyone who asked about it is told it's gone.", "Take it down", function () {
-              if (down.disabled) return;
-              down.disabled = true;
-              api("/relay/my/resale/listings/" + l.id + "/withdraw", { method: "POST" }).then(function (x) { if (x.ok) { tell("Taken down."); drawMine(); } else { down.disabled = false; fail(x); } },
-                function () { down.disabled = false; tell("Couldn't reach Relay. Check your connection and try again.", true); });
-            }); } });
-          card.appendChild(down);
-          body.appendChild(card);
+          var qs = l.requests || [], fresh = qs.filter(function (q) { return q.new; }).length, unread = qs.reduce(function (t, q) { return t + (q.unread || 0); }, 0);
+          var waiting = qs.filter(function (q) { return q.status === "pending" && q.kind !== "chat"; }).length, chats = qs.filter(function (q) { return q.kind === "chat" && q.status === "pending"; }).length;
+          var line = l.status === "matched" ? "Matched: you're chatting with a member about this." : waiting ? (waiting === 1 ? "1 member asked about this." : waiting + " members asked about this.") : chats ? (chats === 1 ? "1 member is chatting with you about this." : chats + " members are chatting with you about this.") : "No requests yet.";
+          var extra = [el("span", { className: "rl-mk-status", text: line }),
+            unread ? el("span", { className: "rl-mk-new", text: unread === 1 ? "1 new message" : unread + " new messages" }) : fresh ? el("span", { className: "rl-mk-new", text: fresh === 1 ? "New request" : fresh + " new requests" }) : null];
+          body.appendChild(mkCard(l, extra, fresh + unread, function () { mineSheet(l); }));
         });
-        var mr = r.body.myRequests || [];
         if (mr.length) {
           body.appendChild(el("h3", { className: "rl-mk-h", text: "Things you asked about" }));
           mr.forEach(function (q) {
-            var c = el("div", { className: "rl-order" }, [el("b", { text: q.title }), el("span", { text: (q.kind === "swap" ? "You offered a swap" : "You'd like to buy it") + ". " + said(q.status) + "." })]);
-            if (q.status === "accepted") c.appendChild(el("button", { type: "button", className: "rl-btn", text: "Message the seller", onclick: function () { openChat(q.id); } }));
-            body.appendChild(c); });
+            var words = el("span", { text: q.itemGone ? (q.kind === "chat" ? "You messaged the seller. " : "") + "The item has gone." :
+              q.kind === "chat" ? "You're chatting with the seller." : (q.kind === "swap" ? "You offered a swap" : "You'd like to buy it") + ". " + said(q.status) + "." });
+            if (q.status !== "accepted" && q.status !== "pending" && !q.itemGone) return body.appendChild(el("div", { className: "rl-order rl-mk-asked" }, [el("b", { text: q.title }), words]));
+            // One tap opens the conversation (an item that has gone, to read it).
+            var c = el("div", { className: "rl-order rl-mk-asked rl-mk-tapcard", role: "button", tabIndex: 0 }, [el("b", { text: q.title }), words,
+              el("span", { className: "rl-mk-go", text: q.itemGone ? "Read the messages" : "Message the seller" })]);
+            if (q.unread) c.appendChild(mkCount(q.unread));
+            c.onclick = function () { openChat(q.id); };
+            c.onkeydown = function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openChat(q.id); } };
+            body.appendChild(c);
+          });
         }
+        if (openId) { var hit = ls.filter(function (l) { return l.id === openId; })[0]; if (hit) mineSheet(hit); }
       });
+    }
+    // Your own listing: who asked (Accept or Decline), its conversation, changing its details, taking it down.
+    function mineSheet(l) {
+      mkLayer(function (sh, done) {
+        sheetTop(sh, l, done);
+        var note = el("div", { className: "rl-msg" });
+        if (l.status === "matched") sh.appendChild(el("span", { className: "rl-mk-status", text: "Matched: you're chatting with a member about this." }));
+        var qs = l.requests || [];
+        sh.appendChild(el("h3", { className: "rl-mk-h", text: "Requests" }));
+        if (!qs.length) sh.appendChild(el("p", { className: "rl-mk-status", text: "Nobody has asked yet. When someone does, it shows here and on Browse's tab." }));
+        qs.forEach(function (q) {
+          var row = el("div", { className: "rl-mk-req" });
+          row.appendChild(el("b", { text: q.who + (q.kind === "chat" ? " sent you a message" : q.kind === "swap" ? " offers a swap" : " would like to buy") }));
+          if (q.new) row.appendChild(el("span", { className: "rl-mk-new", text: "New" }));
+          if (q.offered) row.appendChild(el("span", { text: "Offering: " + q.offered.title + (q.offered.size ? " (size " + q.offered.size + ")" : "") }));
+          if (q.message) row.appendChild(el("span", { text: "“" + q.message + "”" }));
+          var talk = function (label) { return el("button", { type: "button", className: "rl-btn ghost", text: label + (q.unread ? " (" + q.unread + " new)" : ""), onclick: function () { done(); openChat(q.id); } }); };
+          if (q.kind === "chat") {
+            // A chat, not a request yet: reply by message (they ask for it when they want it).
+            row.appendChild(talk(q.status === "pending" && l.status === "active" ? "Open messages" : "Read the messages"));
+          } else if (q.status === "pending" && l.status === "active") {
+            var acts = el("div", { className: "rl-mk-acts" });
+            [["Accept", "accept", "rl-btn"], ["Decline", "decline", "rl-btn ghost"]].forEach(function (a) {
+              var b = el("button", { type: "button", className: a[2], text: a[0], onclick: function () {
+                if (b.disabled) return;
+                Array.prototype.forEach.call(acts.children, function (x) { x.disabled = true; });
+                api("/relay/my/resale/requests/" + q.id + "/" + a[1], { method: "POST" }).then(function (x) {
+                  if (x.ok) { done(); tell(a[1] === "accept" ? "Accepted. Message them to agree payment and handover." : "Declined."); return drawMine(l.id); }
+                  Array.prototype.forEach.call(acts.children, function (y) { y.disabled = false; }); say(note, resaleErrors[x.body && x.body.error] || "Something went wrong. Please try again.", true);
+                }, function () { Array.prototype.forEach.call(acts.children, function (y) { y.disabled = false; }); say(note, "Couldn't reach Relay. Check your connection and try again.", true); }); } });
+              acts.appendChild(b);
+            });
+            row.appendChild(acts);
+            row.appendChild(talk(q.messages ? "Open messages" : "Message them"));
+          } else {
+            row.appendChild(el("span", { className: "rl-mk-status", text: q.status === "accepted" ? "Accepted. Relay doesn't handle payment or postage, so agree the handover by message." : said(q.status) + "." }));
+            if (q.status === "accepted") row.appendChild(el("button", { type: "button", className: "rl-btn", text: q.unread ? "Open messages (" + q.unread + " new)" : "Open messages", onclick: function () { done(); openChat(q.id); } }));
+          }
+          sh.appendChild(row);
+        });
+        sh.appendChild(note);
+        if (l.status === "active") sh.appendChild(el("button", { type: "button", className: "rl-btn ghost", text: "Change details", onclick: function () { editSheet(sh, l, done); } }));
+        var down = el("button", { type: "button", className: "rl-btn ghost", text: "Take this down", onclick: function () {
+          ask("Take " + l.title + " off Relay? Anyone who asked about it is told it's gone.", "Take it down", function () {
+            if (down.disabled) return;
+            down.disabled = true;
+            api("/relay/my/resale/listings/" + l.id + "/withdraw", { method: "POST" }).then(function (x) { down.disabled = false; if (x.ok) { done(); tell("Taken down."); drawMine(); } else say(note, resaleErrors[x.body && x.body.error] || "Something went wrong. Please try again.", true); },
+              function () { down.disabled = false; say(note, "Couldn't reach Relay. Check your connection and try again.", true); });
+          }); } });
+        sh.appendChild(down);
+      });
+    }
+    // Changing a listing's price, condition, note and photos (the name and shop come from the receipt, so they stay).
+    function editSheet(sh, l, done) {
+      sh.textContent = "";
+      sh.appendChild(mkNavBack(l.title, function () { done(); mineSheet(l); }));
+      sh.appendChild(el("h2", { text: "Change details" }));
+      var note = el("div", { className: "rl-msg" });
+      var form = el("div", { className: "rl-mk-form" });
+      var field = function (label, input) { input.setAttribute("aria-label", label); return el("label", { className: "rl-mk-field" }, [el("span", { text: label }), input]); };
+      var cond = el("select");
+      Object.keys(CONDITION).forEach(function (k) { cond.appendChild(el("option", { value: k, text: CONDITION[k] })); });
+      cond.value = l.condition;
+      var price = el("input", { placeholder: "Leave empty for offers", inputMode: "decimal", autocomplete: "off", value: l.askPence == null ? "" : String((l.askPence / 100).toFixed(2)).replace(/\.00$/, "") });
+      var words = el("input", { placeholder: "Optional, no contact details", maxLength: 200, autocomplete: "off", value: l.note || "" });
+      // Photos: the ones there now stay unless new ones are chosen (which replace them) or they're taken away.
+      var shots = [], drop = false, pickIn = el("input", { type: "file", accept: "image/*", multiple: true, style: "display:none" });
+      var thumbs = el("div", { className: "rl-mk-photos" }), state = el("span", { className: "rl-mk-note" });
+      var addPh = el("button", { type: "button", className: "rl-po-secondary rl-mk-addph" }, [accIc("plus", 20, "rl-calm-fi"), el("span", { text: "Choose new photos" })]);
+      var dropBtn = el("button", { type: "button", className: "rl-btn ghost rl-plain", text: "Take the photos away" });
+      var drawShots = function () {
+        thumbs.textContent = "";
+        shots.forEach(function (u, k) { var x = el("button", { type: "button", className: "rl-mk-thumb", ariaLabel: "Remove photo " + (k + 1) }, [el("img", { src: u, alt: "" }), accIc("trash", 16, "rl-mk-thumb-x")]);
+          x.onclick = function () { shots.splice(k, 1); drawShots(); }; thumbs.appendChild(x); });
+        state.textContent = shots.length ? "These replace the photos there now." : drop ? "The photos will be taken away." : (l.photos ? "The photos there now stay." : "No photos of your own yet.");
+        addPh.hidden = shots.length >= 4; addPh.lastChild.textContent = shots.length ? "Add another photo" : "Choose new photos";
+        dropBtn.hidden = !(l.photos > 0) || drop || shots.length > 0;
+      };
+      addPh.onclick = function () { pickIn.click(); };
+      dropBtn.onclick = function () { drop = true; drawShots(); };
+      pickIn.onchange = function () {
+        var files = Array.prototype.slice.call(pickIn.files || [], 0, 4 - shots.length); pickIn.value = "";
+        Promise.all(files.map(shrinkPhoto)).then(function (urls) { urls.forEach(function (u) { if (u && shots.length < 4) { shots.push(u); drop = false; } }); if (urls.some(function (u) { return !u; })) say(note, "Couldn't read one of those pictures. Try another.", true); drawShots(); });
+      };
+      var save = el("button", { type: "button", className: "rl-btn", text: "Save changes", onclick: function () {
+        if (save.disabled) return;
+        var p = price.value.trim(), b = { condition: cond.value, note: words.value };
+        if (p) { var n = Number(p.replace(/[£,\s]/g, "")); if (!isFinite(n) || n < 0 || n > 5000) return say(note, resaleErrors.invalid_price, true); b.askPence = Math.round(n * 100); } else b.offers = true;
+        if (shots.length) b.photos = shots.slice(0, 4); else if (drop) b.removePhotos = true;
+        save.disabled = true; save.classList.add("rl-working");
+        api("/relay/my/resale/listings/" + l.id + "/edit", { method: "POST", body: b }).then(function (r) {
+          save.disabled = false; save.classList.remove("rl-working");
+          if (r.ok) { forgetPics(l); done(); tell("Saved. Members see the new details now."); drawMine(); }
+          else say(note, resaleErrors[r.body && r.body.error] || "Couldn't save the changes. Please try again.", true);
+        }, function () { save.disabled = false; save.classList.remove("rl-working"); say(note, "Couldn't reach Relay. Check your connection and try again.", true); });
+      } });
+      [field("Asking price in £", price), field("Condition", cond), field("Note for buyers", words),
+       el("div", { className: "rl-mk-field" }, [el("span", { text: "Photos" }), thumbs, state, addPh, dropBtn, pickIn]), note, save].forEach(function (n) { form.appendChild(n); });
+      sh.appendChild(form);
+      drawShots();
     }
     function drawSell() {
       outlines(2);
@@ -5425,7 +5673,7 @@
           if (p) { var n = Number(p.replace(/[£,\s]/g, "")); if (!isFinite(n) || n < 0 || n > 5000) return tell(resaleErrors.invalid_price, true); pence = Math.round(n * 100); }
           go.disabled = true;
           api("/relay/my/resale/listings", { method: "POST", body: { receiptId: i.receiptId, itemIndex: i.itemIndex, condition: cond.value, size: size.value, askPence: pence, swapOk: swap.checked, note: note.value, photos: shots.slice(0, 4), agree: agree.checked, handover: hand.value, area: hand.value === "post" ? null : area.value.trim() || null } })
-            .then(function (r) { go.disabled = false; if (r.ok) { ["size", "price", "note"].forEach(function (f) { draftSet(dk + f, ""); }); cur = "mine"; focusReceipt = null; draw(); tell("Listed. Other members can now see it."); } else fail(r); },
+            .then(function (r) { go.disabled = false; if (r.ok) { mkUsed(true); ["size", "price", "note"].forEach(function (f) { draftSet(dk + f, ""); }); cur = "mine"; focusReceipt = null; draw(); tell("Listed. Other members can now see it."); } else fail(r); },
               function () { go.disabled = false; tell("Couldn't reach Relay. Check your connection and try again.", true); });
         } });
         // Up to 4 of your own photos (made smaller on the phone first). Without one, the receipt's photo is used when it has one.
@@ -5454,7 +5702,9 @@
       card.appendChild(start);
       return card;
     }
-    draw();
+    if (want && want.chat) openChat(want.chat);
+    else if (want && want.listing) { cur = "browse"; draw(want.listing); }
+    else draw();
   }
   // ---- The Account page. Laid out like a phone's Settings: a few short groups, each row opening a page of its own,
   // and Back returns here. Detail that used to crowd one long sheet now sits one tap away. ----
@@ -6306,6 +6556,7 @@
       }).catch(function () {});
       b.appendChild(accGroup("Privacy & data", (review ? [] : [
         accRow("shield", "Email permission", "What Relay reads and keeps", function () { page("Email permission", permissionPage); })]).concat([
+        accRow("lock", "Blocked members", "People you blocked in Swap & resell", function () { page("Blocked members", blocksPage); }),
         accRow("download", "Download my data", "A copy of everything Relay keeps", function () { page("Download my data", exportPage); }),
         accRow("trash", "Delete my account", "", function () { page("Delete my account", deletePage); }, { danger: true })])));
     }
@@ -7509,7 +7760,10 @@
       if (!r.ok) { host.appendChild(el("p", { text: "Couldn't reach Relay." })); return; }
       if (!r.body.accepted) {
         host.appendChild(el("p", { text: "Relay needs your OK before it can list anything from your receipts. It takes a moment." }));
-        host.appendChild(el("button", { className: "rl-btn", text: "Review and agree", style: "max-width:260px", onclick: show }));
+        // Agreeing comes straight back here, not to the account sheet.
+        var consent = r.body;
+        host.appendChild(el("button", { className: "rl-btn", text: "Review and agree", style: "max-width:260px", onclick: function () {
+          open(function (sh) { consentView(sh, s.email || "", consent, function () { if (document.body.contains(host)) mountMarket(host); }); }); } }));
         return;
       }
       resaleView(host, null, null, "browse");
@@ -7697,7 +7951,7 @@
     // products they're hidden (CSS: #dcRoot:has(.bg-sec)), as nobody reaches the end of those.
     var go = function (m) { return function () { if (opts.open) opts.open(m); }; };
     var auRow = accRow("gavel", "Auctions", opts.auctions ? opts.auctions + " live now" : "", go("auctions")); auRow.setAttribute("data-door", "auctions");
-    host.appendChild(el("div", { className: "rl-b2-doors" }, [accGroup("", [accRow("swap", "Swap & resell", "", go("market")), auRow, accRow("bag", "Shops on Relay", "", go("shops"))])]));
+    host.appendChild(el("div", { className: "rl-b2-doors" }, [accGroup("", [accRow("swap", "Swap & resell", Number(window.__relayMarket) ? window.__relayMarket + " new" : "", go("market")), auRow, accRow("bag", "Shops on Relay", "", go("shops"))])]));
   }
   function mountWrapped(host, year) {
     year = year || memo.wrappedYear || undefined; memo.wrappedYear = null;
@@ -12352,8 +12606,8 @@
     if (host) { host.hidden = true; host.textContent = ""; }
     var setDue = function (n) { window.__relayDue = n; if (window.relayBadge) window.relayBadge(); };
     var s = load();
-    if (!s || !s.token) { window.__relayPayDue = 0; window.__relayMailFix = 0; setDue(0); return; }
-    auMineCheck();
+    if (!s || !s.token) { window.__relayPayDue = 0; window.__relayMailFix = 0; window.__relayMarket = 0; setDue(0); return; }
+    auMineCheck(); mkCheck();
     cachedGet("gmail", "/relay/my/gmail").then(function (g) { if (g.ok) mailFixBadge(g.body); }, function () {});
     var draw = function (rows) {
       var today = new Date().toISOString().slice(0, 10), n = 0;
@@ -12384,6 +12638,17 @@
     itemKinds: function () { return api("/relay/my/item-kinds", { fresh: true }).then(function (r) { return r.ok ? r.body : null; }, function () { return null; }); },
     mountWatchList: mountWatchList, openAuctions: openAuctions, openAuction: openAuction, mountAuctions: mountAuctions, mountAsk: mountAsk, askOn: askOn, mountBrowse: mountBrowse, auctionsLive: auctionsLive, auctionsCheck: auMineCheck,
     openMarket: function () { if (!load()) return show(); open(function (sh) { resaleView(sh, close, null, "browse"); }); },
+    // Members' listings for Browse's search: the same list Swap & resell's Browse shows (on sale, not your own, not ones you
+    // reported, not from someone either of you blocked), reused when it was just loaded. Signed out, or before Relay has
+    // your OK, there are none.
+    marketFeed: function () {
+      if (!load()) return Promise.resolve([]);
+      return cachedGet("consent", "/relay/my/consent").then(function (c) {
+        if (!c.ok || !c.body || !c.body.accepted) return [];
+        return api("/relay/my/resale/feed").then(function (r) { return (r.ok && r.body && r.body.listings) || []; });
+      }).catch(function () { return []; });
+    },
+    marketPic: function (id) { return apiBlob("/relay/my/resale/listings/" + id + "/image"); },
     // Search by photo on Discover: whether it's on (asked once, then remembered), and the search itself.
     photoAvailable: photoAvailable, photoSearch: photoSearch,
     interests: function () { return interestsLoad(); },

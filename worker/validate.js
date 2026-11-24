@@ -200,6 +200,15 @@ const PATTERNS = [
   [new RegExp("^/relay/my/admin/shared-emails/" + uuidish + "$"), { fields: { delete: bool } }],
   [new RegExp("^/relay/my/resale/listings/" + uuidish + "/ask$"), { fields: { kind: one("swap", "buy"), message: text(600), offeredListingId: str(64) } }],
   [new RegExp("^/relay/my/resale/listings/" + uuidish + "/withdraw$"), NOTHING],
+  // Starting (or reopening) a member's own chat with the seller about a listing on sale: nothing but the address.
+  [new RegExp("^/relay/my/resale/listings/" + uuidish + "/chat$"), NOTHING],
+  // The seller changing their own listing (resale.js editListing): price (or open to offers), condition, note, and their photos
+  // (a new set of up to 4 replaces the old, or removePhotos takes them away). The title and shop can't be sent: they come from the receipt.
+  [new RegExp("^/relay/my/resale/listings/" + uuidish + "/edit$"), { limit: 2600 * KB, tooLarge: "photos_too_big", fields: { condition: str(40), askPence: int(0, 10000000), offers: bool,
+    note: text(600), photos: list(4, str(620000)), removePhotos: bool } }],
+  // A member blocking the other member of a request or conversation, and taking a block of their own away again.
+  [new RegExp("^/relay/my/resale/requests/" + uuidish + "/block$"), NOTHING],
+  [new RegExp("^/relay/my/resale/blocks/" + uuidish + "/remove$"), NOTHING],
   [new RegExp("^/relay/my/resale/requests/" + uuidish + "/(accept|decline|end)$"), NOTHING],
   [new RegExp("^/relay/my/resale/requests/" + uuidish + "/messages$"), { fields: { body: text(600) } }],
   [new RegExp("^/relay/my/resale/requests/" + uuidish + "/report$"), { fields: { reason: text(300) } }],

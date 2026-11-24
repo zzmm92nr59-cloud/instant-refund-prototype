@@ -36,7 +36,7 @@ const reset = (o = {}) => { log = []; st = { instoreLive: false, auction: null, 
 reset();
 const H = { "access-control-allow-origin": "*", "access-control-allow-headers": "*", "access-control-allow-methods": "*" };
 const browser = await chromium.launch();
-async function shopper({ testingTools = false, hash = "" } = {}) {
+async function shopper({ testingTools = false, hash = "", market = false } = {}) {
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: "block" }); await skipInterests(ctx);
   await ctx.route("https://**/*", async route => {
     const req = route.request(), u = new URL(req.url()), m = req.method(), p = u.pathname;
@@ -67,6 +67,7 @@ async function shopper({ testingTools = false, hash = "" } = {}) {
     if (p === "/relay/my/auctions") return j({ canBid: true, auctions: [] });
     if (p === "/relay/my/resale/items") return j({ items: [] });
     if (p === "/relay/my/resale/feed") return j({ listings: [] });
+    if (p === "/relay/my/resale/news") return j({ requests: 1, messages: 1, total: 2, active: true });
     if (p === "/relay/my/resale/mine") return j({ listings: [{ id: "66666666-6666-6666-6666-666666666666", title: "Wool jumper", store: "Example Outfitters", size: "L", condition: "good", askPence: 2500, currency: "GBP", swapOk: true, hasImage: false, status: "active",
       requests: [{ id: CHAT, who: "Member 1", kind: "buy", message: null, status: "accepted", offered: null }] }], myRequests: [] });
     if (p === "/relay/my/resale/requests/" + CHAT + "/messages") return j({ title: "Wool jumper", status: "accepted", with: "Buyer", open: st.chatOpen, messages: [{ mine: false, body: "Is it still available?", createdAt: 1 }] });
@@ -75,11 +76,12 @@ async function shopper({ testingTools = false, hash = "" } = {}) {
   const page = await ctx.newPage(), errors = []; page.on("pageerror", e => errors.push(String(e)));
   await page.clock.install();
   await page.goto(origin + "/index.html");
-  await page.evaluate(([e, t, back]) => {
+  await page.evaluate(([e, t, back, market]) => {
     localStorage.setItem("relay.session.v1", JSON.stringify({ token: "T".repeat(43), email: e })); if (t) localStorage.setItem("relay-testing-tools", "1");
     // Part-way through first-time set-up, as someone is when Google sends them back from connecting their inbox.
     if (back) { let h = 0; for (let i = 0; i < e.length; i++) h = (Math.imul(h, 31) + e.charCodeAt(i)) >>> 0; localStorage.setItem("relay.onboard.v1", JSON.stringify({ ["a" + h.toString(36)]: { back: true } })); }
-  }, [EMAIL, testingTools, Boolean(hash)]);
+    if (market) localStorage.setItem("relay.market.v1", "1");
+  }, [EMAIL, testingTools, Boolean(hash), market]);
   log.length = 0;
   // A fresh load of the app (from another page, as when Google sends someone back with "#gmail=connected").
   await page.goto("about:blank"); await page.goto(origin + "/index.html" + hash);
@@ -212,6 +214,24 @@ const TEN_MINUTES = 600000;
   console.log("ok - an auction's page: every 20 seconds while on screen, nothing in the background, once on return, and it stops when the auction is over or the page is closed");
 }
 
+// 1b. Someone who uses Swap & resell on this phone: one more thing on opening (what's new there, for the red number on
+// Browse), and still nothing on a timer.
+{
+  reset();
+  const { ctx, page, errors } = await shopper({ market: true });
+  await homeShows(page, "J");
+  await pass(page, 6000);
+  await until(page, () => count(/resale\/news/) === 1, "what's new in Swap & resell");
+  assert.equal(await page.locator('#foot [data-tab="discover"] .tab-badge').innerText(), "2", "a red number on Browse");
+  assert.equal(count(/resale\/news/), 1, "asked once on opening");
+  const mark = log.length;
+  await pass(page, TEN_MINUTES);
+  assert.deepEqual(log.slice(mark), [], "and nothing for ten minutes after");
+  assert.deepEqual(errors, []);
+  await ctx.close();
+  console.log("ok - a Swap & resell member: what's new there is asked once on opening (a red number on Browse), then nothing on a timer");
+}
+
 // 5. A conversation.
 {
   reset();
@@ -222,7 +242,8 @@ const TEN_MINUTES = 600000;
   await page.locator("#browsePage .rl-b2-doors .rl-arow", { hasText: "Swap & resell" }).click();
   await page.getByRole("heading", { name: "Swap & resell" }).waitFor();
   await page.locator('[data-tab="mine"]').click();
-  await page.getByRole("button", { name: "Open messages" }).click();
+  await page.locator(".rl-mk-card2", { hasText: "Wool jumper" }).click();
+  await page.locator(".rl-mk-layer").getByRole("button", { name: "Open messages" }).click();
   await page.getByText("Is it still available?").waitFor();
   await settle(page);
   assert.equal(asks(), 1, "opened: asked once");

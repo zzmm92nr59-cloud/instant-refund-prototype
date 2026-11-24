@@ -68,7 +68,7 @@ button,.card[role=button],.profile-row,a.outline,a.darkbtn,a.limebtn,summary{tra
 button:active:not(:disabled),.card[role=button]:active,.profile-row:active,a.outline:active,a.darkbtn:active,a.limebtn:active,summary:active{transform:scale(.94);filter:brightness(.88);transition-duration:.06s}
 .navbtn:active,.footnav button:active{transform:scale(.88);transition-duration:.06s}
 @media(prefers-reduced-motion:reduce){button,.card[role=button],.profile-row,summary{transition:none}button:active,.card[role=button]:active,.profile-row:active,summary:active{transform:none}}
-:focus-visible{outline:3px solid #9ccc3a;outline-offset:2px}
+:focus-visible{outline:3px solid #2B59C3;outline-offset:2px}
 .ico-i{width:18px;height:18px;flex:none;vertical-align:-3px}
 @media(max-width:560px){.sectionhead{margin:26px 0 12px}.hero{padding:22px}}
 /* Home's shortcuts: colourful tiles (the welcome story's navy, pink and blue, and Wrapped's lime), title at the bottom, a big
@@ -596,9 +596,11 @@ async function checkSandboxBank(){
 function navRender(){const lit=demo||(testing&&page==="wallet")?page:page==="me"?meFrom:page==="discover"&&dcFrom&&dcMode!=="home"?dcFrom:(NAV_FROM[page]||NAV_HOME[page]||page);for(const id of ["side","foot"])$(id).innerHTML=navItems().map(([key,name])=>'<button class="'+(lit===key?"active":"")+(id==="side"?" navbtn":"")+'"'+(lit===key?' aria-current="page"':'')+' data-tab="'+key+'" data-name="'+name+'" onclick="tabTap(\''+key+'\')"><span class="'+(id==="foot"?"ico":"nico")+'">'+navIcon(key==="discover"&&!demo?"browse":key)+'</span>'+(id==="foot"?'<span class="tab-name">'+name+'</span>':name)+'</button>').join("");relayBadge()}
 // Returns due in the next three days and auction wins to pay for, as a red number on the Home tab, and inboxes that need
 // connecting again on the Receipts tab (Profile isn't a tab), the way a phone shows it (account.js counts them).
-function relayBadge(){const due=Number(window.__relayDue)||0,pay=Number(window.__relayPayDue)||0,mail=Number(window.__relayMailFix)||0,home=due+pay;
+// New requests and unread messages in Swap & resell are a red number on Browse, where Swap & resell is.
+function relayBadge(){const due=Number(window.__relayDue)||0,pay=Number(window.__relayPayDue)||0,mail=Number(window.__relayMailFix)||0,home=due+pay,mk=Number(window.__relayMarket)||0;
  const tabs=[["profile",home,pay?(due?home+" things to do soon":pay+(pay===1?" auction win":" auction wins")+" to pay for"):home+(home===1?" return":" returns")+" due soon"],
-  ["receipts",mail,(mail===1?"an inbox needs":mail+" inboxes need")+" connecting again"]];
+  ["receipts",mail,(mail===1?"an inbox needs":mail+" inboxes need")+" connecting again"],
+  ["discover",mk,mk+" new in Swap & resell"]];
  for(const [tab,n,said] of tabs)for(const id of ["side","foot"]){const nav=$(id),b=nav&&nav.querySelector&&nav.querySelector('[data-tab="'+tab+'"]');if(!b||!b.querySelector)continue;let t=b.querySelector(".tab-badge");
  if(!n||demo){if(t)t.remove();b.removeAttribute("aria-label");continue}
  if(!t){t=document.createElement("span");t.className="tab-badge";t.setAttribute("aria-hidden","true");(b.querySelector(".ico,.nico")||b).appendChild(t)}
@@ -1242,7 +1244,7 @@ function browseSearch(e){if(e&&e.preventDefault)e.preventDefault();const q=$("br
 function browseSuggest(){const box=$("browseSuggest"),grid=$("browseGrid"),q=$("browseQuery");if(!box||!q)return;
  const raw=String(q.value||"").trim(),t=raw.toLowerCase();
  const rest=$("browsePage");
- if(!t){box.innerHTML="";box.hidden=true;if(grid)grid.hidden=false;if(rest)rest.hidden=false;return}
+ if(!t){box.innerHTML="";box.hidden=true;if(grid)grid.hidden=false;if(rest)rest.hidden=false;if(Date.now()-bsMk.at>60000)bsMk.rows=null;return}
  box.hidden=false;if(grid)grid.hidden=true;if(rest)rest.hidden=true;
  const score=s=>{s=String(s||"").toLowerCase();return s.startsWith(t)?0:s.split(/[^a-z0-9&]+/).some(w=>w.startsWith(t))?1:s.includes(t)?2:-1};
  const groups=dcGroups(shownProducts()).filter(g=>/^https:\/\//.test(g.imageUrl)),shops=new Map();
@@ -1250,14 +1252,26 @@ function browseSuggest(){const box=$("browseSuggest"),grid=$("browseGrid"),q=$("
  const shopHits=[...shops.values()].map(x=>({x,s:score(x.name)})).filter(y=>y.s>=0).sort((a,b)=>a.s-b.s||b.x.n-a.x.n).slice(0,3).map(y=>y.x);
  const byShop=new Set(shopHits.map(x=>storeKey(x.name)));
  const prodHits=groups.map(g=>{const a=score(g.product);return{g,s:a>=0?a:byShop.has(storeKey(g.store))?3:-1}}).filter(y=>y.s>=0).sort((a,b)=>a.s-b.s).slice(0,6).map(y=>y.g);
+ // Members' listings in Swap & resell that match, from the same list its Browse shows (on sale only, never your own or
+ // one you reported, nothing between members who blocked each other: account.js marketFeed). Asked for when you start
+ // typing (and reused while it's recent), then the suggestions are drawn again.
+ if(!bsMk.rows&&!bsMk.asking&&window.RelayAccount&&RelayAccount.marketFeed){bsMk.asking=true;RelayAccount.marketFeed().then(rows=>{bsMk.rows=rows||[];bsMk.at=Date.now();bsMk.asking=false;const q2=$("browseQuery");if(q2&&String(q2.value||"").trim())browseSuggest()},()=>{bsMk.asking=false})}
+ const memHits=(bsMk.rows||[]).map(l=>{const a=score(l.title),b=score(l.store);return{l,s:a>=0?a:b>=0?3:-1}}).filter(y=>y.s>=0).sort((a,b)=>a.s-b.s).slice(0,4).map(y=>y.l);
+ const mkPrice=l=>l.askPence==null?"Offers":l.askPence===0?"Free":(l.currency&&l.currency!=="GBP"?l.currency+" ":"£")+(l.askPence/100).toFixed(2);
+ const memRow=l=>'<button type="button" class="bs-row" data-bs-mk="'+safe(l.id)+'"><span class="'+(l.hasImage?'bs-pic':'bs-logo')+'" data-mk-pic="'+safe(l.id)+'" data-mk-has="'+(l.hasImage?1:0)+'" data-name="'+safe(l.store||l.title)+'"></span><span class="bs-t"><b>'+safe(l.title)+'</b><span>'+safe(l.store?"From a member, first bought at "+l.store:"From a member")+'</span></span><span class="bs-price">'+safe(mkPrice(l))+'</span></button>';
  const shopRow=x=>'<button type="button" class="bs-row" data-bs-shop="'+safe(x.name)+'"><span class="bs-logo" data-name="'+safe(x.name)+'" data-dom="'+safe(x.dom)+'" data-cat="'+safe(x.cat)+'"></span><span class="bs-t"><b>'+safe(x.name)+'</b><span>'+x.n+(x.n===1?' product':' products')+'</span></span>'+ic("chev")+'</button>';
  const prodRow=g=>'<button type="button" class="bs-row" data-bs-sku="'+safe(g.lead.sku)+'" data-bs-name="'+safe(g.product)+'"><span class="bs-pic"><img alt="" loading="lazy" referrerpolicy="no-referrer" src="'+safe(g.imageUrl)+'"></span><span class="bs-t"><b>'+safe(g.product)+'</b><span>'+safe(g.store)+'</span></span><span class="bs-price">'+safe(dcPrice(g))+'</span></button>';
  box.innerHTML=(shopHits.length?'<h2 class="bs-h">Shops</h2>'+shopHits.map(shopRow).join(""):"")+(prodHits.length?'<h2 class="bs-h">Products</h2>'+prodHits.map(prodRow).join(""):"")
-  +(shopHits.length||prodHits.length?'<button type="button" class="bs-row bs-all" data-bs-all>'+SEARCH_IC+'<span class="bs-t"><b>See everything for “'+safe(raw.slice(0,40))+'”</b></span></button>':'<p class="bs-none">Nothing in Browse matches “'+safe(raw.slice(0,40))+'”. Try a shop’s name or a kind of thing, like jumper or mug.</p>');
+  +(memHits.length?'<h2 class="bs-h">From members</h2>'+memHits.map(memRow).join(""):"")
+  +(shopHits.length||prodHits.length?'<button type="button" class="bs-row bs-all" data-bs-all>'+SEARCH_IC+'<span class="bs-t"><b>See everything for “'+safe(raw.slice(0,40))+'”</b></span></button>':memHits.length?'':'<p class="bs-none">Nothing in Browse matches “'+safe(raw.slice(0,40))+'”. Try a shop’s name or a kind of thing, like jumper or mug.</p>');
  box.querySelectorAll(".bs-logo").forEach(x=>{try{if(window.RelayAccount&&RelayAccount.shopBadge)x.appendChild(RelayAccount.shopBadge(x.dataset.name,x.dataset.dom,x.dataset.cat,40))}catch(e){}});
  box.querySelectorAll("[data-bs-shop]").forEach(b=>b.onclick=()=>relayOpenShop(b.dataset.bsShop));
  box.querySelectorAll("[data-bs-sku]").forEach(b=>b.onclick=()=>relayOpenProduct(b.dataset.bsSku,b.dataset.bsName));
- box.querySelectorAll("[data-bs-all]").forEach(b=>b.onclick=()=>browseSearch())}
+ box.querySelectorAll("[data-bs-all]").forEach(b=>b.onclick=()=>browseSearch());
+ box.querySelectorAll("[data-mk-pic]").forEach(x=>{try{if(x.dataset.mkHas==="1"&&RelayAccount.marketPic)RelayAccount.marketPic(x.dataset.mkPic).then(u=>{if(u){const i=document.createElement("img");i.alt="";i.src=u;x.appendChild(i)}});else if(RelayAccount.shopBadge)x.appendChild(RelayAccount.shopBadge(x.dataset.name,"","other",40))}catch(e){}});
+ box.querySelectorAll("[data-bs-mk]").forEach(b=>b.onclick=()=>{window.__relayMarketWant={listing:b.dataset.bsMk};dcShow("market")})}
+// Members' listings for the suggestions: kept a minute, and forgotten when the search is emptied after that.
+const bsMk={rows:null,at:0,asking:false};
 if(typeof document!=="undefined"&&document.addEventListener)document.addEventListener("input",e=>{if(e.target&&e.target.id==="browseQuery")browseSuggest()});
 function askView(){return '<h1 class="rl-sr">Ask</h1><div id="askPage"></div>'}
 function homeHello(){const h=new Date().getHours(),p=window.RelayAccount&&RelayAccount.profile?RelayAccount.profile():null,n=p&&p.name?String(p.name).trim().split(/\s+/)[0]:"";return(h<5?"Good evening":h<12?"Good morning":h<18?"Good afternoon":"Good evening")+(n?", "+n:"")}
@@ -1370,6 +1384,8 @@ function shellRefresh(){const A=window.RelayAccount,jobs=[];if(A&&A.forget)A.for
 // #open=product&sku=…. Each opens that exact screen; the address is then tidied so reloading doesn't open it again.
 function openLink(href){const h=String(href||"").split("#")[1]||"",q=new URLSearchParams(h.replace(/^\?/,"")),what=q.get("open");if(!what)return false;
  if(what==="receipts")go("receipts");else if(what==="alerts")go("radar");else if(what==="profile")go("me");else if(what==="health"){go("me");if(window.relayOpenHealth)window.relayOpenHealth();else window.__relayWantHealth=true}else if(what==="home")go("profile");
+ // Swap & resell (a new request or message, from a phone notification): its page on Browse, at Yours or the conversation.
+ else if(what==="market"){const chat=q.get("chat")||"",tab=q.get("tab")||"";window.__relayMarketWant=/^[0-9a-f-]{36}$/.test(chat)?{chat}:{tab:tab==="mine"?"mine":"browse"};if(page==="discover"&&dcMode==="market"){dcMode=null;}dcShow("market")}
  else if(what==="auction"||what==="auctions"){const id=q.get("id")||"";go("discover");let n=0;(function when(){if(window.RelayAccount&&RelayAccount.openAuctions){openAuctions(/^[0-9a-f-]{36}$/.test(id)?id:"");return}if(++n<80)setTimeout(when,100)})()}
  else if(what==="product"){const sku=q.get("sku")||"";dcShow("shops");let n=0;(function when(){const p=sku&&catalog.find(x=>x.sku===sku);if(p&&$("catalogResults")){chooseSku(sku);window.scrollTo({top:0,behavior:"instant"});return}if(++n<80)setTimeout(when,100)})()}
  else return false;

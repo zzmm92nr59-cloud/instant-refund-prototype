@@ -163,6 +163,11 @@ export async function exportShopperData(env, shopper, now = Date.now()) {
         .map((r) => ({ ...r, createdAt: iso(r.createdAt) })),
       listingsYouReported: (await rows("SELECT listing_id AS listingId, reason, created_at AS createdAt FROM resale_listing_reports WHERE reporter_id = ?", id))
         .map((r) => ({ ...r, createdAt: iso(r.createdAt) })),
+      // Members you blocked (only what it was about; never who), and when you last read each conversation.
+      membersYouBlocked: (await rows("SELECT about, created_at AS createdAt FROM resale_member_blocks WHERE blocker_id = ?", id))
+        .map((r) => ({ ...r, createdAt: iso(r.createdAt) })),
+      conversationsRead: (await rows("SELECT request_id AS requestId, read_at AS readAt FROM resale_reads WHERE shopper_id = ?", id))
+        .map((r) => ({ ...r, readAt: iso(r.readAt) })),
     },
     inStorePurchaseSuggestions: (await rows("SELECT order_id AS orderId, brand, last4, amount_minor AS amountPence, currency, paid_at AS paidAt, store, status FROM square_instore_suggestions WHERE email_hash = ?", shopper.emailHash)),
     ordersFromConnectedShops: (await rows("SELECT order_id AS orderId FROM retailer_order_emails WHERE email_hash = ?", shopper.emailHash)).map((o) => o.orderId),

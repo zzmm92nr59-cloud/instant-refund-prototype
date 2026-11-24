@@ -171,10 +171,14 @@ assert.equal((await (await get("/relay/my/resale/feed", bob)).json()).listings.s
 const bobReqs = (await (await get("/relay/my/resale/mine", bob)).json()).myRequests;
 assert.ok(bobReqs.some(q => q.title === "Define Jacket Nulu" && q.status === "accepted"));
 
-// Messages: only the seller and the member whose request was accepted, only while it is accepted.
+// Messages: only the seller and that member. Free chats (Connor, 24 Nov 2026): a request still waiting for an answer can
+// be talked about while the item is on sale; a request declined because the item went to someone else can't.
 const msg = (token, id, body) => post(`/relay/my/resale/requests/${id}/messages`, token, { body });
 const pendingReq = sqlite.prepare("SELECT id FROM resale_requests WHERE listing_id = ? AND status = 'pending'").get(L2).id;
-assert.equal((await msg(bob, pendingReq, "hello")).status, 409, "no messages before the seller accepts");
+assert.equal((await msg(bob, pendingReq, "hello")).status, 200, "a request waiting for an answer can be talked about");
+const declinedReq = sqlite.prepare("SELECT id FROM resale_requests WHERE listing_id = ? AND status = 'declined'").get(L1).id;
+const gone = await msg(sqlite.prepare("SELECT asker_id FROM resale_requests WHERE id = ?").get(declinedReq).asker_id === idOf("bob@example.com") ? bob : carol, declinedReq, "hello");
+assert.deepEqual([gone.status, (await gone.json()).error], [409, "item_gone"], "but not once the item went to someone else");
 assert.equal((await get(`/relay/my/resale/requests/${reqId}/messages`, carol)).status, 404, "an outsider cannot read the thread");
 assert.equal((await msg(carol, reqId, "hello")).status, 404, "an outsider cannot write to the thread");
 assert.equal((await get(`/relay/my/resale/requests/${reqId}/messages`)).status, 401);
