@@ -22,7 +22,7 @@ const raw = (m, id = "x") => rawEmail({ ...fixture(id, "", "", m, {}) });
 let n = 0;
 const read = (m, id) => ({ ...classifyEmail(raw(m, id), { gmailId: id }).details, id, createdAt: ++n });
 const rows = (lines) => `<table>${lines.map((l) => `<tr>${l.split(" | ").map((c) => `<td>${h(c)}</td>`).join("")}</tr>`).join("")}</table>`;
-assert.equal(PARSER_VERSION, 62);
+assert.equal(PARSER_VERSION, 63);
 
 const paypal = (to, item, pid, price, date, tid) => ({ from: "PayPal <service@paypal.co.uk>", subject: "Receipt for your payment to " + to, date,
   html: page({ brand: "PayPal", domain: "paypal.co.uk", rows: [rows(["Receipt for your payment to " + to, "Sam Taylor, you've successfully sent a payment.", "You paid £" + price + " GBP to " + to,

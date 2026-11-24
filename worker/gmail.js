@@ -14,7 +14,7 @@
 //  * Disconnect revokes the token at Google and deletes the token and captured receipts. (Microsoft has no
 //    revoke call for personal accounts: the token is deleted, and the shopper can remove Relay at account.live.com.)
 import { decodePhoto, RECEIPT_PHOTOS_SQL } from "./photos.js";
-import { receiptsToAdd } from "./bank.js";
+import { receiptsToAdd, refundCredits, namesShop } from "./bank.js";
 import { recordReceiptShops } from "./shop-directory.js";
 import { mailText, emailForReading, parseReceiptEmail, parseReturnEmail, parseReturnUpdateEmail, parseReturnParcelEmail, parseDeliveryEmail, parseDispatchEmail, parseCancellationEmail, parseOrderAdjustmentEmail, parseOrderAcceptedEmail, trackingLink, extractProductImageUrls, photoShowsItem } from "./receipt-parser.js";
 import { ensureOnce, runAll } from "./once.js";
@@ -198,7 +198,11 @@ async function gmailGet(fetchImpl, url, headers) {
 // list keep their own spelling ("TK Maxx", never "Tkmaxx"); a booking fee said only in a sentence is its own line; a free
 // gift never stops a refund matching the paid item; a refund with no number or amount finds its booking; a meal deal's
 // part keeps how many apart from its name; a counter's short order number only joins emails of the same day.
-export const PARSER_VERSION = 62;
+// 63 (24 Nov 2026, return tracking): a return step is read only when the email says it has happened, so a carrier's label
+// email ("once you've dropped it off"), a reminder, "we'll let you know when it's delivered" and a shop's "we'll process
+// your refund" are no longer a drop-off, an arrival or a refund; a shop's own return-label email with the parcel's tracking
+// number and the order's number starts the return on that order.
+export const PARSER_VERSION = 63;
 // Which full read of every mailbox is due: version 33 of the reader was full read 14, and each reader version since is one
 // more, so a better reader always reaches old receipts too, without anyone having to remember to raise this.
 export const READER_FULL_REV = 14 + Math.max(0, PARSER_VERSION - 33);
@@ -3053,7 +3057,7 @@ async function listReceipts(env, shopperId, timing, opts = {}) {
     lookups.push(env.RELAY_DB.prepare(`SELECT store_key AS k, category, promo FROM receipt_learning WHERE shopper_id = ? AND store_key IN (${qs})`).bind(shopperId, ...chunk).all());
     lookups.push(env.RELAY_DB.prepare(`SELECT store_key AS k, category, COUNT(*) AS n FROM receipt_learning WHERE category IS NOT NULL AND store_key IN (${qs}) GROUP BY store_key, category`).bind(...chunk).all());
   }
-  const [gone, rem, marks, gifts, fixes, sent, aiReads, tracked, typedReturns, shopKinds, aiTypes, codeRows, ...learned] = await Promise.all([
+  const [gone, rem, marks, gifts, fixes, sent, aiReads, tracked, typedReturns, credits, shopKinds, aiTypes, codeRows, ...learned] = await Promise.all([
     env.RELAY_DB.prepare("SELECT details FROM captured_receipts WHERE shopper_id = ? AND status = 'dismissed'").bind(shopperId).all(),
     env.RELAY_DB.prepare("SELECT receipt_id AS id, sent_at AS sentAt FROM return_reminders WHERE shopper_id = ?").bind(shopperId).all(),
     env.RELAY_DB.prepare("SELECT receipt_id AS id, item_index AS i, status, updated_at AS at FROM receipt_item_marks WHERE shopper_id = ?").bind(shopperId).all(),
@@ -3064,6 +3068,8 @@ async function listReceipts(env, shopperId, timing, opts = {}) {
     readTrackedRows(env.RELAY_DB, shopperId),
     // "I've sent it back", with the return's tracking number if the shopper gave it (return-tracking.js).
     readReturnTracks(env.RELAY_DB, shopperId),
+    // Money back seen in the shopper's own bank payments, for a return's "Refund received" (bank.js; [] with no bank).
+    refundCredits(env, shopperId),
     // What Claude said about shops whose names don't say what they sell (shop-kind-ai.js): nothing personal, one per shop.
     readShopKinds(env.RELAY_DB, orders.map(o => storeKey(o))),
     // What the AI said each thing is, unless the shopper switched AI for picks off (item-kinds.js); {} then.
@@ -3092,7 +3098,7 @@ async function listReceipts(env, shopperId, timing, opts = {}) {
   attachUnnumberedPlans(orders, plans.filter((p) => !p.orderRef));
   attachReturnProgress(orders, deliveries, updates);
   // Where each return has got to, step by step, and who said so (return-tracking.js).
-  attachReturnTracking(orders, { updates, deliveries, typed: typedReturns, tracked, marks: (marks && marks.results) || [], today: new Date(opts.now || Date.now()).toISOString().slice(0, 10) });
+  attachReturnTracking(orders, { updates, deliveries, typed: typedReturns, tracked, credits, names: namesShop, marks: (marks && marks.results) || [], today: new Date(opts.now || Date.now()).toISOString().slice(0, 10) });
   attachItemReturns(orders, (marks && marks.results) || []);
   attachGifts(orders, (gifts && gifts.results) || []);
   // What the AI read fills only what the rules missed, and the shopper's own fixes still win (so they come after).
@@ -3184,7 +3190,9 @@ async function listReceipts(env, shopperId, timing, opts = {}) {
 
 // For a future Plus instant refund (nothing pays out yet): whether the return on one of the shopper's own receipts is
 // confirmed on its way (returnInTransit) or at the shop (returnReceived), by a carrier or the shop, never only by the
-// shopper's own word. null when the receipt isn't theirs. See return-tracking.js returnFacts and docs/SECURITY.md.
+// shopper's own word; and onItsWay, the one fact to pay on: who confirmed the parcel left the shopper, how, and when (the
+// carrier's first scan time when its tracking gave one). null when the receipt isn't theirs. See return-tracking.js
+// returnFacts and docs/RETURN_TRACKING.md.
 export async function returnFactsFor(env, shopperId, receiptId) {
   if (!/^[0-9a-f-]{36}$/.test(String(receiptId || ""))) return null;
   const c = (await listReceipts(env, shopperId, null, ALL)).find((r) => r.id === receiptId);

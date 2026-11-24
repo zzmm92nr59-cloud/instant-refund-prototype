@@ -3934,6 +3934,25 @@ export function returnCarrierOf(from) {
   const domain = addr.split("@")[1] || "";
   return domain ? (RETURN_CARRIER_SENDERS.find(([, re]) => re.test(domain)) || [])[0] || null : null;
 }
+// Said to have happened, or only promised? (24 Nov 2026: a carrier's label email, "Once you've dropped off your parcel
+// we'll email you", was read as dropped off, and a shop's "We've received your return. We'll process your refund within 5
+// days" as refunded. A future instant refund will rely on these, so a step counts only when the email states it.)
+// True when `re` matches somewhere that isn't: after a word in the same sentence that makes it a condition, a plan or a
+// denial ("once", "when", "if", "we'll", "hasn't"…); with such a word inside the match ("refund will be issued"); followed
+// at once by one ("your refund will…", "your refund can take…", "your refund has not…"); or in a question. `more` adds words for carriers' emails.
+const NOT_YET = "once|when|whenever|as soon as|if|unless|until|till|whether|will|shall|we(?:'|’)ll|you(?:'|’)ll|it(?:'|’)ll|they(?:'|’)ll|should|could|would|need(?:s)? to|to be|due to|expect(?:ed)? to|can (?!confirm)|how to|ready to|remember to|forget to|not|cannot|no";
+const NOT_YET_NEXT = /^\s*(?:(?:has|have|is|was|are|were|did|does)(?:n(?:'|’)t\b|\s+(?:still\s+)?(?:not|never)\b)|will|shall|should|could|would|may|might|is expected|is due|is usually|usually|normally|typically|can take|takes|won(?:'|’)t|can(?:'|’)t|cannot)\b/i;
+function saidNow(text, re, more) {
+  const t = String(text || ""), notYet = new RegExp("\\b(?:" + NOT_YET + (more ? "|" + more : "") + ")\\b|n(?:'|’)t\\b", "i");
+  for (const m of t.matchAll(new RegExp(re.source, re.flags.includes("g") ? re.flags : re.flags + "g"))) {
+    const before = t.slice(Math.max(0, m.index - 400), m.index).split(/[.!?:]["')\]]?\s+|\n/).pop();
+    const after = t.slice(m.index + m[0].length, m.index + m[0].length + 300);
+    const end = /[.!?](?=["')\]]?(?:\s|$))|\n/.exec(after);
+    if (notYet.test(before + " " + m[0]) || NOT_YET_NEXT.test(after) || (end && end[0] === "?")) continue;
+    return true;
+  }
+  return false;
+}
 export function parseDeliveryEmail(rawEmail) {
   const raw = String(rawEmail || "").slice(0, MAX_INPUT);
   const { headers, body } = splitMessage(raw);
@@ -3997,7 +4016,12 @@ export function parseReturnEmail(rawEmail) {
   const sender = retailerFromFrom(headers.from);
   const refDate = headers.date ? new Date(headers.date) : null;
 
-  const isReturn = hasReturn(text);
+  // (Or a shop's own email with the return label: its subject says so, and it carries the return parcel's tracking number
+  // and the order's number, so it can only join the order it names. A carrier's own label email is read by
+  // parseReturnParcelEmail. 24 Nov 2026.)
+  const labelMail = /\b(?:your|the|a|prepaid|pre-paid|free)\s+returns?\s+(?:label|qr code)\b|\breturns? label (?:for|is|attached|enclosed)\b|\blabel for your return\b/i.test(subject) &&
+    !returnCarrierOf(headers.from) && Boolean(trackingIn(text)) && /\border\s*(?:number|no\.?|id|#)?\s*[:#\s]*#?\s*(?=[A-Z0-9-]*\d)[A-Z0-9-]{4,24}/i.test(subject + "\n" + text.slice(0, 6000));
+  const isReturn = hasReturn(text) || labelMail;
   if (!isReturn) return { ok: false, reason: "not_a_return_email", source: "shopper_email" };
 
   // A real return ID has at least one digit and ends at a space or line break ("RETURN ID: nuk0400251601"),
@@ -4143,8 +4167,9 @@ export function parseReturnUpdateEmail(rawEmail) {
   // approved, or the refund issued, is. Round 13.)
   if (/\brefund request\b|\brequest(?:ed)? (?:for )?a refund\b/i.test(subj) && !/\brefund(?: request)? (?:has been|was|is) (?:approved|granted|issued|processed|completed)\b|\bwe(?:'|’)?ve (?:approved|issued|processed) (?:your|a|the) refund\b|\bwe(?:'|’)?re refunding (?:your|the|this)\b|\byour refund is being (?:credited|paid|sent)\b/i.test(both)) return { ok: false, reason: "refund_request" };
   let stage = null;
-  if (/\brefund(?:ed)?\b[^.\n]{0,40}\b(?:has been|have been|was|is being|been)?\s*(?:processed|issued|approved|completed|sent|on (?:its|the) way)\b|\bwe(?:'|’)?ve (?:processed|issued|sent|completed) (?:your|a) refund|\bwe(?:'|’)?ve refunded\b|\brefund confirmation\b|\byour refund\b|\b(?:has|have) been (?:successfully )?refunded\b|\bhere comes the refund\b|\bsent you a refund\b|\brefund complete\b|\brefund (?:of £\s?[\d,.]+ )?has been (?:successfully )?initiated\b/i.test(both)) stage = "refunded";
-  else if (/\b(?:we(?:'|’)?ve|we have) received your return|\byour return (?:has been received|has arrived|is with us)|\breturn (?:received|arrived)\b/i.test(both)) stage = "received";
+  // Only what the shop says it has done (saidNow): "we'll process your refund" isn't a refund.
+  if (saidNow(both, /\brefund(?:ed)?\b[^.\n]{0,40}\b(?:has been|have been|was|is being|been)?\s*(?:processed|issued|approved|completed|sent|on (?:its|the) way)\b|\b(?:we(?:'|’)?ve|we have) (?:processed|issued|sent|completed) (?:your|a|the) refund|\b(?:we(?:'|’)?ve|we have) refunded\b|\brefund confirmation\b|\byour refund\b|\b(?:has|have) been (?:successfully )?refunded\b|\bhere comes the refund\b|\bsent you a refund\b|\brefund complete\b|\brefund (?:of £\s?[\d,.]+ )?has been (?:successfully )?initiated\b/i)) stage = "refunded";
+  else if (saidNow(both, /\b(?:we(?:'|’)?ve|we have) received your return|\byour return (?:has been received|has arrived|is with us)|\breturn (?:received|arrived)\b/i)) stage = "received";
   if (!stage) return { ok: false, reason: "not_a_return_update" };
   const sender = retailerFromFrom(headers.from);
   // A refund email the shopper forwarded from their own mailbox is the shop's: the shop is read from the forwarded
@@ -4212,8 +4237,10 @@ export function parseReturnParcelEmail(rawEmail) {
   if (!aboutReturn) return no;
   if (!carrierSender && !/\breturn\b[^\n]{0,40}\b(?:on (?:its|it's|the) way|dropped off|in transit|been sent|been posted)\b|\bdropped off\b|\bon (?:its|it's|the) way back\b/i.test(subject)) return no;
   let stage = null;
-  if (carrierSender && /\b(?:has been|was|been|we(?:'|’)?ve)\s+delivered\b|\bdelivered to\b/i.test(head) && !/\bout for delivery\b|\bdue to be delivered\b/i.test(head)) stage = "received";
-  else if (/\bdropped off\b|\bdrop[- ]off (?:confirmed|confirmation|receipt)\b|\bhanded (?:it |your parcel |your return )?(?:in|over)\b|\b(?:we(?:'|’)?ve|we have) (?:got|received|collected) your (?:return|parcel)\b|\bcollected your (?:return|parcel)\b|\bon (?:its|it's|the) way back\b|\bon (?:its|it's) way to\b|\bin transit\b|\bhas been (?:posted|sent)\b|\baccepted at\b/i.test(head)) stage = "sent";
+  // Only what the email says has happened (saidNow): a label email's "once you've dropped it off" isn't a drop-off.
+  const CARRIER_NOT_YET = "after|before|please|can|track";
+  if (carrierSender && saidNow(head, /\b(?:has been|was|been|we(?:'|’)?ve)\s+delivered\b|\bdelivered to\b/i, CARRIER_NOT_YET) && !/\bout for delivery\b|\bdue to be delivered\b/i.test(head)) stage = "received";
+  else if (saidNow(head, /\bdropped off\b|\bthanks for dropping off\b|\breturn\b[^.\n]{0,40}\bis on (?:its|it's|the) way\b|\bdrop[- ]off (?:confirmed|confirmation|receipt)\b|\bhanded (?:it |your parcel |your return )?(?:in|over)\b|\b(?:we(?:'|’)?ve|we have) (?:got|received|collected) your (?:return|parcel)\b|\bcollected your (?:return|parcel)\b|\bon (?:its|it's|the) way back\b|\bon (?:its|it's) way to\b|\bin transit\b|\bhas been (?:posted|sent)\b|\baccepted at\b/i, CARRIER_NOT_YET)) stage = "sent";
   else if (carrierSender && /\breturn label\b|\byour label\b|\blabel (?:is )?ready\b|\bprint (?:your|the) label\b|\b(?:qr|barcode) code\b/i.test(head)) stage = "started";
   if (!stage) return no;
   const t = trackingIn(text);

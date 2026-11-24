@@ -1,11 +1,14 @@
 // Return tracking (Connor, 18 Nov 2026: instant refunds are Relay's main selling point, and the pilot pays one only once
 // the return is confirmed on its way). Where a return has got to, on the receipt it belongs to:
 //
-//   Return started  →  Sent back (on its way to the shop)  →  Received by the shop  →  Refund issued
+//   Return started  →  Sent back (on its way to the shop)  →  Received by the shop  →  Refund issued / received
 //
-// Each step carries the day and who said so: a carrier ("from Royal Mail": its email, or its tracking through Ship24), the
-// shop ("from ASOS's email"), or the shopper ("you said"). Relay never makes a step up. A later step shows the earlier ones
-// as done (a parcel the shop has received was sent), without a day or a source, since nobody said when.
+// Each step carries the day and who said so: a carrier ("from Royal Mail": its tracking through Ship24, or its own email),
+// the shop ("from ASOS's email"), the shopper's bank ("seen in your bank payments", a refund only) or the shopper ("you
+// said"). Whom Relay believes first, when two say the same step: the carrier's tracking, the carrier's email, the shop's
+// email, the bank, the shopper. Relay never makes a step up: a step nobody told Relay about is not ticked, even when a
+// later one is (24 Nov 2026; a refund doesn't prove a parcel was sent: some shops refund without one). It is marked
+// `missed` so the app can say "Relay wasn't told".
 //
 // Where the news comes from:
 //  * Emails, read from the shopper's own inboxes only (gmail.js, receipt-parser.js): the shop's return email with its label
@@ -22,8 +25,14 @@
 //    (parcel-tracking.js trackNumber): only when the shopper opens that receipt (GET /relay/my/receipts/<id>/return-parcel),
 //    only with a tracking number, only before the shop has it, only for a return sent in the last 30 days. Never on a timer.
 //
+//  * The shopper's bank (bank.js refundCredits), for the refund only and only on a receipt whose return Relay already
+//    knows of: money in, on one of their own cards or accounts, whose bank text names the shop, of the amount the shop's
+//    refund email gave (or, with no such email, the order's total, an item's price or a set of its items), on or after the
+//    day the return started, inside the 120 days. A credit that fits two receipts, or two credits that fit one, are left out.
+//
 // For a future Plus instant refund (no money moves here): each receipt carries returnInTransit and returnReceived, true only
-// when a carrier or the shop said so, never on the shopper's word alone (returnFacts; docs/SECURITY.md).
+// when a carrier or the shop said so, never on the shopper's word alone, and onItsWay: who confirmed the parcel left the
+// shopper, how, and when (the carrier's first scan time when its tracking gave one). returnFacts; docs/RETURN_TRACKING.md.
 //
 // Kept with the shopper (return_tracks: what they typed), shown in Download my data, deleted with the receipt's inbox, the
 // email permission or the account.
@@ -91,6 +100,34 @@ function fromUpdate(u) {
     shopKey: !carrierSaid && u.retailer && (u.retailer.domain || u.retailer.name) ? storeKey(u) : null, shopNamed: carrierSaid ? u.shopNamed || null : null,
     amountPence: Number.isInteger(u.amountPence) ? u.amountPence : null, currency: u.currency || null };
 }
+// Money back seen in the shopper's bank payments: the refund step only, and the weakest word after the shopper's own.
+// `fits` is asked of each receipt whose return is already known. names(text, shop, domain): bank.js namesShop.
+function creditNews(orders, credits, newsOf, names) {
+  const out = new Map(), taken = new Map();
+  if (!names) return out;
+  for (const c of credits || []) {
+    if (!c || !Number.isInteger(c.pence) || c.pence <= 0 || !day(c.on) || !c.text) continue;
+    const fit = orders.filter((o) => {
+      const news = newsOf(o);
+      if (!news.length || !o.orderDate || !o.retailer || String(o.currency || "GBP") !== String(c.currency || "GBP")) return false;
+      if (!names(c.text, o.retailer.name, o.retailer.domain)) return false;
+      const first = news.map((n) => n.at).filter(Boolean).sort()[0] || day(o.orderDate);
+      if (c.on < first || c.on < day(o.orderDate) || daysBetween(day(o.orderDate), c.on) > MATCH_DAYS) return false;
+      // The shop's own refund email gave an amount: only that amount. Otherwise what the order could refund.
+      const said = news.filter((n) => n.stage === "refunded" && n.by !== "bank" && n.amountPence != null);
+      return said.length ? said.some((n) => n.amountPence === c.pence) : amountFits(c.pence, o);
+    });
+    if (fit.length !== 1) continue;
+    taken.set(fit[0], (taken.get(fit[0]) || []).concat([c]));
+  }
+  for (const [o, list] of taken) {
+    if (list.length !== 1) continue;   // two credits that fit one receipt: Relay can't tell which is this return's
+    const c = list[0];
+    out.set(o, { stage: "refunded", at: day(c.on), by: "bank", name: c.account || null, via: "bank", amountPence: c.pence, currency: c.currency || "GBP" });
+  }
+  return out;
+}
+
 // A carrier's parcel email (delivery_update) only counts for a return when its tracking number is the return's.
 function fromDelivery(d) {
   if (!d.trackingNumber) return null;
@@ -132,10 +169,13 @@ export function matchReturnNews(orders, news, known, opened) {
   return out;
 }
 
-// Who to believe for a step: a carrier or the shop over the shopper's own word; then the earliest (the latest for a refund).
+// Who to believe for a step: the carrier's tracking, the carrier's email, the shop's email, the bank, then the shopper's
+// own word; then the earliest (the latest for a refund).
+const trust = (n) => (n.by === "carrier" ? (n.via === "tracking" ? 0 : 1) : n.by === "shop" ? 2 : n.by === "bank" ? 3 : 4);
+const sureWord = (n) => n.by === "carrier" || n.by === "shop";
 function best(list, stage) {
   if (!list.length) return null;
-  const rank = (n) => (n.by === "you" ? 1 : 0);
+  const rank = trust;
   return list.slice().sort((a, b) => rank(a) - rank(b) || (stage === "refunded" ? (b.at || "").localeCompare(a.at || "") : (a.at || "9999").localeCompare(b.at || "9999")))[0];
 }
 
@@ -146,25 +186,37 @@ export function returnTimeline(o, news, today) {
   const top = [...STEPS].reverse().find((s) => by[s].length);
   if (!top) return null;
   const typed = news.find((n) => n.typed) || null;
-  const numbered = typed && typed.tn ? typed : news.find((n) => n.tn && n.by !== "you") || null;
+  const numbered = typed && typed.tn ? typed : news.find((n) => n.tn && sureWord(n)) || null;
   const tn = numbered ? numbered.tn : null;
   const carrier = (typed && typed.tn === tn && typed.carrier) || (numbered && numbered.carrier) || (tn && guessCarrier(tn)) || news.map((n) => n.carrier).find(Boolean) || null;
   const reach = STEPS.indexOf(top);
   const steps = STEPS.map((s, i) => {
     const b = best(by[s], s);
-    if (!b) return { step: s, done: i <= reach, at: null, from: null };
+    // Nobody told Relay about this step: not done, even when a later one is (missed).
+    if (!b) return { step: s, done: false, at: null, from: null, ...(i < reach ? { missed: true } : {}) };
+    // The shop said it refunded and the money was also seen coming in: both are shown.
+    const bank = s === "refunded" && b.by !== "bank" ? by[s].find((n) => n.by === "bank") : null;
     return { step: s, done: true, at: b.at || null, from: { by: b.by, name: b.by === "you" ? null : b.name || null, via: b.via },
-      ...(s === "refunded" && b.amountPence != null ? { amountPence: b.amountPence, currency: b.currency || "GBP" } : {}) };
+      ...(b.atTime ? { atTime: b.atTime } : {}),
+      ...(s === "refunded" && b.amountPence != null ? { amountPence: b.amountPence, currency: b.currency || "GBP" } : {}),
+      ...(bank ? { seenInBank: { at: bank.at || null, account: bank.name || null } } : {}) };
   });
-  const sure = (s) => by[s].some((n) => n.by !== "you");
+  // Only a carrier's or the shop's word makes a fact: never the shopper's, and never a bank payment that looks like the refund.
+  const sure = (s) => by[s].some(sureWord);
   const returnReceived = sure("received") || sure("refunded");
   const returnInTransit = !returnReceived && sure("sent");
-  const confirmed = returnReceived ? best(by.received.concat(by.refunded).filter((n) => n.by !== "you"), "received") : returnInTransit ? best(by.sent.filter((n) => n.by !== "you"), "sent") : null;
+  const word = (n) => (n ? { by: n.by, name: n.name || null, at: n.at || null, via: n.via || null, atTime: n.atTime || null } : null);
+  const confirmed = returnReceived ? best(by.received.concat(by.refunded).filter(sureWord), "received") : returnInTransit ? best(by.sent.filter(sureWord), "sent") : null;
+  // The one fact a future instant refund asks for: did a carrier or the shop confirm the parcel left the shopper, how and
+  // when? Their word that it's on its way; failing that, their word that it arrived (it was sent, though nobody said when).
+  // A refund alone doesn't say a parcel was sent.
+  const handed = best(by.sent.filter(sureWord), "sent") || best(by.received.filter(sureWord), "received");
+  const onItsWay = handed ? { ...word(handed), ...(handed.stage === "received" ? { arrived: true } : {}) } : null;
   // "Refund not seen yet": only when Relay really saw the shop (or the carrier) say it arrived, and no refund since.
-  const recv = best(by.received.filter((n) => n.by !== "you"), "received");
+  const recv = best(by.received.filter(sureWord), "received");
   let refundNotSeen = null;
   if (recv && recv.at && !by.refunded.length && daysBetween(recv.at, today) >= REFUND_NUDGE_DAYS) refundNotSeen = { since: recv.at, days: daysBetween(recv.at, today) };
-  const problem = news.find((n) => n.problem) || null;
+  const problem0 = news.find((n) => n.problem) || null, problem = problem0 ? { ...problem0, at: problem0.problemAt || problem0.at } : null;
   // When the parcel last moved, by anyone's word: Ship24 is asked only for a return sent in the last 30 days.
   const lastDay = [steps[1].at, steps[0].at, typed && typed.at].filter(Boolean).sort().pop() || null;
   const live = Boolean(tn && !returnReceived && top !== "refunded" && lastDay && daysBetween(lastDay, today) <= LIVE_DAYS);
@@ -172,7 +224,7 @@ export function returnTimeline(o, news, today) {
     state: top, steps, trackingNumber: tn, carrier, trackUrl: tn ? trackingLink(carrier, tn) : null,
     typed: typed ? { trackingNumber: typed.tn || null, carrier: typed.carrier || null, sentOn: typed.at } : null,
     returnInTransit, returnReceived,
-    confirmedBy: confirmed ? { by: confirmed.by, name: confirmed.name || null, at: confirmed.at || null } : null,
+    confirmedBy: word(confirmed), onItsWay,
     refundNotSeen, ...(problem ? { problem: { at: problem.at || null, name: problem.name || null } } : {}),
     liveTracking: live
   };
@@ -182,7 +234,8 @@ export function returnTimeline(o, news, today) {
 // plans: the shops' return emails already on their receipts (o.returnPlan). updates: return_update emails. deliveries:
 // carriers' parcel emails. typed: this shopper's return_tracks rows. tracked: their parcel_tracks rows (Ship24). marks:
 // receipt_item_marks rows ("I'm sending this back").
-export function attachReturnTracking(orders, { updates = [], deliveries = [], typed = [], tracked = [], marks = [], today }) {
+// credits: money in from the shopper's bank payments (bank.js refundCredits), with names (bank.js namesShop).
+export function attachReturnTracking(orders, { updates = [], deliveries = [], typed = [], tracked = [], marks = [], credits = [], names = null, today }) {
   const idsOf = (o) => o.emailIds || [o.id];
   const byId = new Map();
   for (const o of orders) for (const id of idsOf(o)) byId.set(id, o);
@@ -215,15 +268,33 @@ export function attachReturnTracking(orders, { updates = [], deliveries = [], ty
   const matched = matchReturnNews(orders, news, known, opened);
   // Ship24's word on the return parcel, once its number is known.
   const live = new Map((tracked || []).filter((r) => r && r.status).map((r) => [String(r.tracking_number).toUpperCase(), r]));
+  const numbersOf = new Map();
+  for (const [tn, o] of known) numbersOf.set(o, (numbersOf.get(o) || []).concat([tn]));
+  const allOf = new Map();
   for (const o of orders) {
     const all = own.get(o).concat(matched.get(o) || []);
-    for (const [tn, oo] of known) {
-      if (oo !== o || !live.has(tn) || purchaseNumbers.has(tn)) continue;
+    allOf.set(o, all);
+    for (const tn of numbersOf.get(o) || []) {
+      if (!live.has(tn) || purchaseNumbers.has(tn)) continue;
       const r = live.get(tn), carrier = all.map((n) => n.carrier).find(Boolean) || guessCarrier(tn) || null;
-      if (r.status === "delivered") all.push({ stage: "received", at: day(r.at), by: "carrier", name: carrier, via: "tracking", tn });
-      else if (r.status === "problem") all.push({ stage: "sent", at: day(r.at), by: "carrier", name: carrier, via: "tracking", tn, problem: true });
-      else all.push({ stage: "sent", at: day(r.at), by: "carrier", name: carrier, via: "tracking", tn });
+      // The carrier's first scan: the day and time it first had the parcel (parcel-tracking.js firstScan). Without one
+      // (a parcel looked up before Relay kept it), the day of the carrier's latest news; never its expected delivery day.
+      const scan = r.first_scan && day(r.first_scan) ? { at: day(r.first_scan), atTime: String(r.first_scan) } : null;
+      const said = { by: "carrier", name: carrier, via: "tracking", tn };
+      if (r.status === "delivered") {
+        all.push({ ...said, stage: "received", at: day(r.at) });
+        if (scan) all.push({ ...said, stage: "sent", ...scan });
+      } else if (r.status === "problem") {
+        // Something went wrong with it. It counts as sent only if the carrier scanned it first.
+        all.push(scan ? { ...said, stage: "sent", ...scan, problem: true, problemAt: day(r.at) } : { ...said, stage: null, at: day(r.at), problem: true });
+      } else all.push({ ...said, stage: "sent", ...(scan || { at: r.status === "due" ? null : day(r.at) }) });
     }
+  }
+  // Money back seen in the bank: only on a receipt whose return is already known.
+  const fromBank = creditNews(orders, credits, (o) => allOf.get(o).filter((n) => n.stage), names);
+  for (const o of orders) {
+    const all = allOf.get(o);
+    if (fromBank.has(o)) all.push(fromBank.get(o));
     const t = returnTimeline(o, all, today);
     if (!t) continue;
     o.returnTracking = t;
@@ -233,13 +304,13 @@ export function attachReturnTracking(orders, { updates = [], deliveries = [], ty
     const recv = t.steps[2], paid = t.steps[3];
     if (o.returnProgress) {
       const p = o.returnProgress;
-      if (!p.receivedAt && recv.from && recv.from.by !== "you") p.receivedAt = recv.at;
-      if (!p.refundedAt && paid.from) { p.refundedAt = paid.at; p.refundPence = paid.amountPence ?? null; p.currency = paid.currency || null; }
+      if (!p.receivedAt && recv.from && recv.from.by !== "you") p.receivedAt = recv.at;   // (a carrier or the shop: only they say "received")
+      if (!p.refundedAt && paid.from && paid.from.by !== "bank") { p.refundedAt = paid.at; p.refundPence = paid.amountPence ?? null; p.currency = paid.currency || null; }
       if (!p.trackingNumber && t.trackingNumber) { p.trackingNumber = t.trackingNumber; p.carrier = p.carrier || t.carrier; p.trackUrl = p.trackUrl || t.trackUrl; }
     } else if (t.state !== "started" || o.returnPlan) {
       o.returnProgress = { trackingNumber: t.trackingNumber, carrier: t.carrier, trackUrl: t.trackUrl, parcel: null,
-        receivedAt: recv.from && recv.from.by !== "you" ? recv.at : null, refundedAt: paid.from ? paid.at : null,
-        refundPence: paid.from ? paid.amountPence ?? null : null, currency: paid.from ? paid.currency || null : null };
+        receivedAt: recv.from && recv.from.by !== "you" ? recv.at : null, refundedAt: paid.from && paid.from.by !== "bank" ? paid.at : null,
+        refundPence: paid.from && paid.from.by !== "bank" ? paid.amountPence ?? null : null, currency: paid.from && paid.from.by !== "bank" ? paid.currency || null : null };
     }
   }
 }
@@ -247,11 +318,19 @@ export function attachReturnTracking(orders, { updates = [], deliveries = [], ty
 // The facts a future Plus instant refund can rely on, for one receipt from the shopper's own list (docs/SECURITY.md).
 // returnInTransit: a carrier (its email or its tracking) or the shop said the return parcel is on its way, and nobody has
 // said it arrived. returnReceived: the shop said it has the return (or refunded it), or the carrier delivered it to the shop.
-// The shopper's own word never makes either true.
+// The shopper's own word never makes either true, and neither does a bank payment that looks like the refund.
+// onItsWay: the single fact to pay on. null until a carrier or the shop confirmed the parcel left the shopper; then
+//   { by: "carrier" | "shop", name, via: "tracking" | "email", at: the day, atTime: the carrier's first scan time when its
+//     tracking gave one (as the carrier wrote it), arrived: true when all Relay was told is that it arrived }.
+// statement says the same in words, for logs and support ("On its way: confirmed by Royal Mail's tracking, first scan
+// 2026-11-23T09:14:00"). docs/RETURN_TRACKING.md.
 export function returnFacts(card) {
-  const t = card && card.returnTracking;
+  const t = card && card.returnTracking, w = (t && t.onItsWay) || null;
+  const who = w ? (w.by === "carrier" ? (w.name || "the carrier") + "'s " + (w.via === "tracking" ? "tracking" : "email") : (w.name || "the shop") + "'s email") : null;
+  const statement = !w ? "Not confirmed on its way" : w.arrived ? "Arrived at the shop: confirmed by " + who + (w.at ? " on " + w.at : "")
+    : "On its way: confirmed by " + who + (w.atTime ? ", first scan " + w.atTime : w.at ? " on " + w.at : "");
   return { receiptId: card ? card.id : null, returnInTransit: Boolean(t && t.returnInTransit), returnReceived: Boolean(t && t.returnReceived),
-    confirmedBy: (t && t.confirmedBy) || null, trackingNumber: (t && t.trackingNumber) || null, state: (t && t.state) || null };
+    confirmedBy: (t && t.confirmedBy) || null, onItsWay: w, statement, trackingNumber: (t && t.trackingNumber) || null, state: (t && t.state) || null };
 }
 
 export async function readReturnTracks(db, shopperId) {
