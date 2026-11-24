@@ -47,7 +47,7 @@ footer{border-top:1px solid var(--line);margin-top:40px;padding-top:18px;color:v
 </ul>
 </section>
 
-<nav class="toc" aria-label="On this page"><a href="#collect">What we collect</a><a href="#email">Your email</a><a href="#use">How we use it</a><a href="#share">Who sees it</a><a href="#keep">How long we keep it</a><a href="#rights">Your choices</a></nav>
+<nav class="toc" aria-label="On this page"><a href="#collect">What we collect</a><a href="#email">Your email</a><a href="#google">Google data</a><a href="#use">How we use it</a><a href="#share">Who sees it</a><a href="#keep">How long we keep it</a><a href="#rights">Your choices</a></nav>
 
 <h2 id="collect">What we collect</h2>
 <h3>Your account</h3>
@@ -88,7 +88,39 @@ footer{border-top:1px solid var(--line);margin-top:40px;padding-top:18px;color:v
 <li><strong>Sending an email to Relay:</strong> only if you choose to, from a receipt Relay read wrong. You see exactly what will be sent first. Relay hides web links, email addresses, phone numbers, card numbers and codes, postcodes, addresses and your name before it's sent, and you can add a note. A person at Relay reads it to work out why it was read wrong and improve how Relay reads emails like it. They don't see who sent it, and each time one is opened it's recorded. It's kept encrypted, and deleted after 30 days, or sooner if you delete it, remove the receipt, disconnect that inbox, withdraw your permission or delete your account.</li>
 <li><strong>More than one inbox:</strong> you can connect up to five, Gmail or Outlook. Each is read in the same way, and disconnecting one deletes the receipts Relay captured from it.</li>
 </ul>
-<p>Relay's use of information received from Google APIs follows the Google API Services User Data Policy, including its Limited Use requirements.</p>
+
+<h2 id="google">Information from your Google account</h2>
+<p>This part says in one place what Relay does with what it gets from Google. It applies as well as everything above.</p>
+<h3>What Relay gets from Google</h3>
+<ul>
+<li><strong>If you continue with Google:</strong> your email address, that Google has checked it is yours, and your name. Relay offers the name for your profile and keeps it only if you save it.</li>
+<li><strong>If you connect Gmail:</strong> read-only access to the emails in that Gmail inbox. Relay searches for order confirmations, receipts, and delivery and return emails, and reads the ones it finds. It can't send, delete, move or change anything.</li>
+</ul>
+<h3>What Relay uses it for</h3>
+<p>Only for the things you see in Relay: signing you in, your receipts, return dates and reminders, where a parcel is, codes to show or scan, your Wrapped and your picks. Nothing else.</p>
+<h3>What Relay keeps, and where</h3>
+<p>The purchase details listed under Your email, never the emails themselves, in Relay's own database at Cloudflare. The key to your inbox is kept encrypted, and everything travels over encrypted connections.</p>
+<h3>Who it is passed to</h3>
+<ul>
+<li><strong>Cloudflare</strong>, which runs Relay's servers and database.</li>
+<li><strong>Anthropic</strong>, whose AI, Claude, reads the emails Relay's own rules can't work out, with your name, addresses, links, phone numbers and card numbers hidden first, and reads the names of the things you bought to say what kind of thing each is. Relay's permission wording says this before you connect your inbox, and you can switch either off at any time under AI help. Anthropic's terms don't let it train its AI on what Relay sends.</li>
+<li><strong>A shop</strong>, only when you start a return or swap with it yourself: it gets that order's details.</li>
+<li><strong>Ship24</strong>, when you open a purchase whose parcel hasn't arrived: it gets that parcel's tracking number, and nothing else.</li>
+<li><strong>Resend</strong>, only when you asked for a return reminder: it sends you that one email, which names the item and the shop.</li>
+<li><strong>A person at Relay</strong> reads an email of yours only if you choose to send that one email to Relay (see Sending an email to Relay, above).</li>
+</ul>
+<p>Nobody else gets it, except where the law requires it or to look into misuse of Relay.</p>
+<h3>What Relay never does with it</h3>
+<ul>
+<li>Sell it, or pass it to advertisers, data brokers or anyone who resells information.</li>
+<li>Use it to show or target adverts.</li>
+<li>Use it to decide whether to lend to you or to judge your credit.</li>
+<li>Use it to build, improve or train AI or machine-learning models. Relay does not use information from Gmail or any other Google Workspace API to develop, improve or train generalised or non-personalised AI or machine-learning models, and doesn't let anyone else do so.</li>
+</ul>
+<h3>Google's rules</h3>
+<p>Relay's use of information received from Google APIs will adhere to the <a href="https://developers.google.com/terms/api-services-user-data-policy" rel="noopener">Google API Services User Data Policy</a>, including the Limited Use requirements.</p>
+<h3>Deleting it</h3>
+<p>Disconnecting a Gmail inbox deletes every receipt Relay captured from it and the key to it, and cancels Relay's access at Google. Deleting your account does the same for every inbox. You can also remove Relay yourself at any time in your Google Account, under Third-party apps and services (<a href="https://myaccount.google.com/connections" rel="noopener">myaccount.google.com/connections</a>). How long each thing is kept is under How long we keep it.</p>
 
 <h2 id="use">How we use it</h2>
 <ul>

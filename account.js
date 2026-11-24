@@ -994,6 +994,7 @@
     // The sign-in page: Relay's navy whatever the phone's setting (as the welcome story), the name, a little wallet of
     // receipts, white headline, three equal white buttons, Face ID in lime underneath, and the legal line.
     ".rl-choices{display:grid;gap:10px;margin:6px 0 4px}" +
+    ".rl-cmark{display:inline-flex;flex:none;width:20px;height:20px;margin-right:2px}.rl-cmark svg{display:block}" +
     ".rl-choice,.rl-textbtn{all:unset;box-sizing:border-box;display:flex;align-items:center;justify-content:center;gap:8px;width:100%;font:inherit;cursor:pointer;text-align:center;transition:transform .12s,background-color .12s,opacity .12s}" +
     ".rl-choice{min-height:54px;padding:0 18px;border-radius:999px;background:#fff;color:#101828;font-size:17px;font-weight:700}.rl-choice:active{transform:scale(.97);background:#dfe5f0}" +
     ".rl-textbtn{min-height:48px;margin-top:8px;color:#C9D8FF;font-size:16px;font-weight:700}.rl-textbtn:active{opacity:.6}.rl-textbtn .rl-jic{color:inherit;margin:0}" +
@@ -2157,6 +2158,7 @@
     barcode: '<path d="M4 6v12M7.2 6v12M10.6 6v12M13 6v12M16.6 6v12M20 6v12"/>',
     qr: '<rect x="4" y="4" width="6.5" height="6.5" rx="1.2"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.2"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.2"/><path d="M13.5 13.5h2.6v2.6h-2.6zM20 13.5v.01M20 17.4V20h-2.6M13.5 20v.01"/>',
     full: '<path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/>',
+    spark: '<path d="M11 4.5l1.7 4.8 4.8 1.7-4.8 1.7L11 17.5l-1.7-4.8L4.5 11l4.8-1.7z"/><path d="M18.5 15.5v4M16.5 17.5h4"/>',
     gift: GIFT_PATH
   };
   function jIc(n, px) {
@@ -2543,6 +2545,11 @@
     var consent = null;
     var gBtn = el("button", { type: "button", className: "rl-choice", text: "Continue with Google", onclick: function () { goProvider("google", fresh && consent, msg, choices); } });
     var mBtn = el("button", { type: "button", className: "rl-choice", text: "Continue with Microsoft", onclick: function () { goProvider("microsoft", fresh && consent, msg, choices); } });
+    // Google's and Microsoft's own marks, in their own colours and unchanged, as each company's sign-in rules ask
+    // (Google's: developers.google.com/identity/branding-guidelines; checked for Google's review, docs/GOOGLE_VERIFICATION.md).
+    var mark = function (svg) { var m = el("span", { className: "rl-cmark" }); m.setAttribute("aria-hidden", "true"); m.innerHTML = svg; return m; };
+    gBtn.insertBefore(mark('<svg viewBox="0 0 48 48" width="20" height="20"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>'), gBtn.firstChild);
+    mBtn.insertBefore(mark('<svg viewBox="0 0 21 21" width="20" height="20"><path fill="#F25022" d="M1 1h9v9H1z"/><path fill="#7FBA00" d="M11 1h9v9h-9z"/><path fill="#00A4EF" d="M1 11h9v9H1z"/><path fill="#FFB900" d="M11 11h9v9h-9z"/></svg>'), mBtn.firstChild);
     gBtn.style.display = mBtn.style.display = "none";
     var eBtn = el("button", { type: "button", className: "rl-choice", text: "Continue with email", onclick: function () { emailStep(sheet); } });
     [gBtn, mBtn, eBtn].forEach(function (n) { choices.appendChild(n); });
@@ -2570,7 +2577,7 @@
       var panel = el("div", { id: "rl-consent-words", className: "rl-sperm-panel" }); panel.hidden = true;
       more.setAttribute("aria-expanded", "false"); more.setAttribute("aria-controls", "rl-consent-words");
       more.onclick = function () { var on = panel.hidden; panel.hidden = !on; more.setAttribute("aria-expanded", on ? "true" : "false"); more.textContent = on ? "Hide" : "What Relay reads"; if (on && panel.scrollIntoView) panel.scrollIntoView({ block: "nearest", behavior: "smooth" }); };
-      [["eye", "Only order confirmations, receipts and return emails"], ["lock", "Read-only: never sends, deletes or changes anything"], ["check", "Never sells or shares what it finds"], ["trash", "Disconnect and delete everything at any time"]]
+      [["eye", "Only order confirmations, receipts and return emails"], ["lock", "Read-only: never sends, deletes or changes anything"], ["spark", "An AI reads the receipts Relay's rules can't, with your details hidden. You can switch it off"], ["check", "Never sold, never used for adverts"], ["trash", "Disconnect and delete everything at any time"]]
         .forEach(function (x) { panel.appendChild(el("div", { className: "rl-jpt" }, [jIc(x[0]), el("span", { text: x[1] })])); });
       words = el("div", { className: "rl-jwords", role: "region", tabIndex: 0 });
       words.setAttribute("aria-label", "Relay's permission wording");
@@ -3708,7 +3715,7 @@
       }).catch(function () { idle(); say(msg, "Couldn't reach Relay. Check your connection.", true); });
     };
     sheet.appendChild(el("h2", { text: c.acceptedEarlier ? "We've updated this" : "Before you start" }));
-    sheet.appendChild(el("p", { text: c.acceptedEarlier ? "Relay can now read Outlook as well as Gmail, so the wording below changed to say so. What Relay reads and keeps is the same. Please agree again to keep your receipts updating."
+    sheet.appendChild(el("p", { text: c.acceptedEarlier ? "The wording below now says that an AI reads the receipts Relay's own rules can't work out, with your personal details hidden first, and how to switch that off. Please agree again to keep your receipts updating."
       : "Relay is only useful if it can see your receipts, so this is needed to use it." }));
     c.text.forEach(function (t) { sheet.appendChild(el("p", { text: t })); });
     sheet.appendChild(agree); sheet.appendChild(msg);
@@ -5934,7 +5941,7 @@
     ["How do I delete my account?", "Tap your picture at the top of the screen, then Security and privacy, then Delete my account. Your sign-in and everything linked to it are deleted, and it can't be undone."],
     ["Can the help chat look at one of my receipts?", "Only if you choose. Open the receipt, tap Ask the assistant, then Show it. The assistant sees what Relay read from that receipt (the shop, date, total, items and return date), never the email itself, and only for that chat. Relay keeps no copy of the chat."]
   ];
-  var CONSENT_FALLBACK = ["Relay reads your email in read-only mode and looks only for order confirmations, receipts and return emails.", "It never sends email from your account, never deletes or changes anything in your inbox, and never sells or shares what it finds."];
+  var CONSENT_FALLBACK = ["Relay reads your email in read-only mode and looks only for order confirmations, receipts and return emails.", "It never sends email from your account, never deletes or changes anything in your inbox, never sells what it finds and never uses it for adverts.", "When Relay's own rules can't work out a receipt, an AI reads that one email with your personal details hidden first. You can switch this off under AI help."];
   // Asking the assistant about one receipt: it is shown that receipt only once the shopper says so (support-chat.js), and
   // nothing goes anywhere until they send a question. The same from the receipt itself and from its tile on the Ask tab,
   // where the question names the receipt because it isn't the thing on screen.
@@ -7922,7 +7929,7 @@
       if (r.status === 401) { save(null); mountReceipts(host); return; }
       if (!r.ok) { host.appendChild(el("p", { text: "Couldn't reach Relay." })); return; }
       if (!r.body.accepted) {
-        host.appendChild(el("p", { text: r.body.acceptedEarlier ? "Relay's permission wording changed: it now works with Outlook as well as Gmail. Agree again to keep your receipts updating."
+        host.appendChild(el("p", { text: r.body.acceptedEarlier ? "Relay's permission wording changed: it now says how AI helps read your receipts, and how to switch that off. Agree again to keep your receipts updating."
           : "Relay needs your OK before it looks at your receipts. It takes a moment." }));
         host.appendChild(el("button", { className: "rl-btn", text: "Review and agree", style: "max-width:260px", onclick: show }));
         return;
