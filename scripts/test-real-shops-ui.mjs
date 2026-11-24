@@ -197,7 +197,12 @@ for (const scheme of ["light", "dark"]) {
   assert.equal(acts[0], "View on their website", "View on their website comes first");
   // Its price can be watched (Relay reads the shop's prices about once a day).
   assert.equal(acts[acts.length - 1], "Watch price", "Watch price comes last");
-  assert.equal(await pg.locator(".dc-pricefrom").innerText(), "Prices from Lark & Lantern's website on " + dateLong + ".");
+  // When Relay last checked is said once (the box above), and that you pay at the shop once.
+  assert.equal(text.split(dateLong).length, 2, "the date Relay checked is said once"); assert.equal(await pg.locator(".dc-pricefrom").count(), 0);
+  assert.equal(await pg.locator("#watchNote").innerText(), "You pay at Lark & Lantern, not through Relay.");
+  assert.equal(acts.length, 2, "View on their website and Watch price, no Buy button");
+  assert.ok(await pg.locator("#bagAdd").evaluate(b => b.classList.contains("darkbtn")), "Add to bag is the main button");
+  assert.ok((await pg.locator(".actions > *").evaluateAll(xs => xs.every(x => x.classList.contains("outline")))), "the others are quieter");
   assert.doesNotMatch(text, /Out of stock|Only \d+ left/);
   // The only Add to bag is the real bag's (account.js, worker/bag.js; Connor, 24 Nov 2026), never the old demo shop's.
   assert.equal((text.match(/Add to bag/g) || []).length, 1); assert.equal(await pg.locator("#bagAdd").innerText(), "Add to bag"); assert.doesNotMatch(text, /Add to bag \+/);

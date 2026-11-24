@@ -10,6 +10,8 @@
 //     email gives them. A receipt whose amount is only in its PDF says so on its row, never a blank.
 //  7. A receipt from one of Relay's own test shops (testShop, marked by the server) is never shown without the testing tools
 //     (CLAUDE.md rule 15).
+//  8. An order the shop edited after it was paid (amended.amountDuePence): "£20.00 still to pay to <shop>", with the date of the
+//     invoice that says so, only when the server has the amount.
 // RELAY_SHOTS=<folder> also saves a 390x844 screenshot of each page there.
 import assert from "node:assert/strict";
 import { createRequire } from "node:module"; import { createServer } from "node:http"; import { readFile, mkdir } from "node:fs/promises"; import { resolve, extname, join } from "node:path";
@@ -53,7 +55,15 @@ const PDFONLY = base("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", "Northbridge Instit
   itemsCheck: { complete: false, itemsPence: 0, expectedPence: null, missingPence: null, inAttachment: "pdf" } });
 const TESTSHOP = base("abbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", "Kestrel Test Kicks", { totalPence: 9500, orderDate: day(-1), testShop: true,
   items: [{ name: "Trail Runner Shoes", qty: 1, pricePence: 9500 }], itemsCheck: { complete: true, itemsPence: 9500, expectedPence: 9500, missingPence: 0 } });
-const RECEIPTS = [HOTEL, FLIGHT, OLDFLIGHT, PAYPAL, GIFT, PACK, OLDSTAY, BOOK, GIFTCARD, PDFONLY, TESTSHOP];
+// An order the shop edited after it was paid (Shopify's invoice, worker/gmail.js attachEdits): what's still to pay, and one
+// edited order whose invoice gave no amount to pay (nothing is said about paying).
+const EDITED = base("accccccc-cccc-4ccc-8ccc-cccccccccccc", "Linden Lane", { totalPence: 12000, orderDate: day(-30), category: "fashion",
+  amended: { at: "2026-11-21T10:00:00.000Z", changes: 1, byInvoice: true, amountDuePence: 2000 },
+  items: [{ name: "Wool Coat", qty: 1, pricePence: 12000 }], itemsCheck: { complete: true, itemsPence: 12000, expectedPence: 12000, missingPence: 0 } });
+const EDITED_NODUE = base("addddddd-dddd-4ddd-8ddd-dddddddddddd", "Copper Fern", { totalPence: 5000, orderDate: day(-31), category: "fashion",
+  amended: { at: "2026-11-20T10:00:00.000Z", changes: 1, byInvoice: true },
+  items: [{ name: "Linen Shirt", qty: 1, pricePence: 5000 }], itemsCheck: { complete: true, itemsPence: 5000, expectedPence: 5000, missingPence: 0 } });
+const RECEIPTS = [HOTEL, FLIGHT, OLDFLIGHT, PAYPAL, GIFT, PACK, OLDSTAY, BOOK, GIFTCARD, PDFONLY, TESTSHOP, EDITED, EDITED_NODUE];
 
 const H = { "access-control-allow-origin": "*", "access-control-allow-headers": "*", "access-control-allow-methods": "*" };
 const browser = await chromium.launch();
@@ -168,6 +178,23 @@ await gcRow.locator(".rl-rr-main").click();
 const pdfEnd = await page.locator("#receiptsPage .rl-rr", { hasText: "Northbridge Institute" }).first().locator(".rl-rr-end").innerText();
 assert.match(pdfEnd, /In the PDF/, "the row says where the amount is: " + pdfEnd);
 console.log("ok - a gift card's part and the card's part, as the email gives them; an amount only in the PDF says so");
+
+// 8. An order the shop edited: what its invoice says is still to pay, said once with the invoice's date; nothing when the
+// server has no amount.
+const edRow = page.locator("#receiptsPage .rl-rr", { hasText: "Linden Lane" }).first();
+await edRow.scrollIntoViewIfNeeded(); await edRow.locator(".rl-rr-main").click();
+await edRow.locator(".rl-rr-detail").waitFor(); await page.waitForTimeout(300);
+t = await edRow.locator(".rl-rr-detail").innerText();
+assert.equal(await edRow.locator(".rl-po-due").innerText(), "£20.00 still to pay to Linden Lane, as its invoice of 21 November says.");
+assert.equal(t.split("still to pay").length, 2, "said once\n" + t); noDots(t, "edited order");
+if (SHOTS) { await edRow.locator(".rl-po-due").scrollIntoViewIfNeeded(); await page.waitForTimeout(200); await page.screenshot({ path: join(SHOTS, "8-edited-still-to-pay.png") }); }
+await edRow.locator(".rl-rr-main").click();
+const ndRow = page.locator("#receiptsPage .rl-rr", { hasText: "Copper Fern" }).first();
+await ndRow.scrollIntoViewIfNeeded(); await ndRow.locator(".rl-rr-main").click();
+await ndRow.locator(".rl-rr-detail").waitFor(); await page.waitForTimeout(300);
+assert.doesNotMatch(await ndRow.locator(".rl-rr-detail").innerText(), /still to pay|to pay to/, "no amount from the server: nothing said");
+await ndRow.locator(".rl-rr-main").click();
+console.log("ok - an edited order says what its invoice says is still to pay, with the invoice's date; nothing without an amount");
 
 // 7. Relay's own test shops, without the testing tools.
 assert.equal(await page.locator("#receiptsPage .rl-rr", { hasText: "Kestrel Test Kicks" }).count(), 0, "a test shop's receipt is never in Receipts without the testing tools");

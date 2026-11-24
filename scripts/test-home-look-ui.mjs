@@ -111,7 +111,7 @@ for (const scheme of ["light", "dark"]) {
 await page.emulateMedia({ colorScheme: "light" });
 assert.equal(await sheet.locator(".rl-wbrand").innerText(), "Relay");
 assert.equal(await sheet.locator(".rl-sart").getAttribute("aria-hidden"), "true", "the picture is decoration, hidden from screen readers");
-assert.match(await sheet.locator(".rl-sfront").innerText(), /Canvas Cruiser[\s\S]*Allbirds[\s\S]*12 days left/, "a real shop and thing, not a made-up one");
+assert.match(await sheet.locator(".rl-sfront").innerText(), /Canvas trainers[\s\S]*Wrenfield[\s\S]*12 days left/, "an invented shop and an everyday thing, never a real shop with a made-up price (Connor, 24 Nov 2026)");
 for (const name of ["Continue with Google", "Continue with Microsoft", "Continue with email"]) {
   const b = sheet.getByRole("button", { name }); await b.waitFor();
   assert.deepEqual(await b.evaluate(n => [getComputedStyle(n).backgroundColor, getComputedStyle(n).color]), ["rgb(255, 255, 255)", NAVY], name + ": white, navy words");
