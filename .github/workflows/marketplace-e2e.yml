@@ -1,0 +1,46 @@
+name: Marketplace end to end
+# Swap & resell, the real app against Relay's real server code run on the runner (scripts/local-worker.mjs: worker/worker.js
+# with a SQLite database built from worker/migrations). Made-up members only; nothing talks to Relay's live server,
+# database or any outside service, so no secrets are needed.
+on:
+  push:
+    branches: [main]
+    paths:
+      - account.js
+      - index.html
+      - relay-app-v2.html
+      - worker/**
+      - scripts/local-worker.mjs
+      - scripts/test-marketplace-e2e.mjs
+      - scripts/relay-places.mjs
+      - .github/workflows/marketplace-e2e.yml
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  marketplace-e2e:
+    runs-on: ubuntu-latest
+    # The test itself takes about two minutes (two waits of 32 seconds prove nothing is asked on a timer); installing the
+    # test browser has taken over 9 minutes on a slow runner.
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install test browser
+        run: |
+          npm install --no-save playwright
+          npx playwright install --with-deps chromium
+      - name: Listings, requests, conversations, reports, blocks and deleting an account, end to end
+        run: node scripts/test-marketplace-e2e.mjs
+        env:
+          RELAY_SHOTS: ${{ runner.temp }}/marketplace-shots
+      - name: Keep the screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: marketplace-screenshots
+          path: ${{ runner.temp }}/marketplace-shots
+          if-no-files-found: ignore

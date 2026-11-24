@@ -1218,7 +1218,7 @@
     ".rl-mk-tabs button[aria-pressed=true]{background:#C9D8FF;color:#101828}.rl-mk-tabs button:active{transform:scale(.97)}.rl-mk-tabs button:focus-visible{outline:2px solid var(--rl-text);outline-offset:2px}" +
     ".rl-mk-lead{font-size:15px;line-height:1.45;color:var(--rl-text2)}.rl-mk-skel{min-height:110px;margin:10px 0;border-radius:18px}" +
     ".rl-mk-area{display:flex;gap:8px;align-items:center;margin:12px 0;color:var(--rl-text2)}.rl-mk-area .rl-jic{margin:0;flex:none}" +
-    ".rl-mk-area input,.rl-mk-form input:not([type=checkbox]),.rl-mk-form select,.rl-mk-select{box-sizing:border-box;width:100%;min-width:0;min-height:44px;margin:0;padding:0 14px;border:1px solid var(--rl-line);border-radius:12px;font:inherit;font-size:16px;background:var(--rl-card);color:var(--rl-text)}" +
+    ".rl-mk-area input,.rl-mk-form input:not([type=checkbox]),.rl-mk-form select,.rl-mk-select,.rl-mk-chat-in{box-sizing:border-box;width:100%;min-width:0;min-height:44px;margin:0;padding:0 14px;border:1px solid var(--rl-line);border-radius:12px;font:inherit;font-size:16px;background:var(--rl-card);color:var(--rl-text)}.rl-mk-chat-in{margin:0 0 10px}.rl-mk-safe summary{display:block;padding:13px 0;line-height:18px;font-weight:800;cursor:pointer}" +
     ".rl-mk-select{margin-top:8px}.rl-mk-area input{flex:1}" +
     ".rl-mk-near{display:inline-flex;align-items:center;gap:4px;margin-top:6px;padding:3px 10px;border-radius:999px;background:var(--rl-accent-bg);color:var(--rl-accent);font-size:13px;font-weight:700}.rl-mk-near .rl-jic{margin:0}" +
     ".rl-mk-quote,.rl-mk-status{display:block;margin-top:6px;font-size:14px;line-height:1.4;color:var(--rl-text2)}.rl-mk-warn{display:block;margin-top:6px;font-size:14px;line-height:1.4;color:var(--rl-text)}" +
@@ -5145,15 +5145,16 @@
   function chatView(sheet, requestId, onBack) {
     var log = el("div", { style: "margin:10px 0;max-height:42vh;overflow:auto" }), msg = el("div", { className: "rl-msg" });
     var head = el("h2", { text: "Messages" }), sub = el("p", { text: "" });
-    var input = el("input", { placeholder: "Write a message", maxLength: 500 });
+    var input = el("input", { className: "rl-mk-chat-in", placeholder: "Write a message", maxLength: 500, autocomplete: "off", enterKeyHint: "send" });
+    input.setAttribute("aria-label", "Write a message");
     var send = el("button", { className: "rl-btn", text: "Send" });
     var tools = el("div");
     // How to do the deal safely. Relay doesn't take payments yet, so this is what keeps both sides safe.
-    var tips = el("details", { style: "background:var(--rl-fill);border-radius:14px;padding:10px 14px;margin:6px 0;font-size:14px;color:var(--rl-text2)" }, [
-      el("summary", { text: "Doing the deal safely", style: "font-weight:800;cursor:pointer" }),
+    var tips = el("details", { className: "rl-mk-safe", style: "background:var(--rl-fill);border-radius:14px;padding:0 14px;margin:6px 0;font-size:14px;color:var(--rl-text2)" }, [
+      el("summary", { text: "Doing the deal safely" }),
       el("p", { text: "Collecting: meet somewhere public in daylight, check the item, then pay on the spot (cash, or a bank transfer you can see arrive).", style: "margin:8px 0 4px" }),
       el("p", { text: "Posting: Relay doesn't handle payments, so never pay a stranger in advance by bank transfer. Collecting in person is the safer way.", style: "margin:4px 0" }),
-      el("p", { text: "Keep chatting here. Relay hides phone numbers and emails to protect you both.", style: "margin:4px 0 0" })]);
+      el("p", { text: "Keep chatting here. Relay hides phone numbers and emails to protect you both.", style: "margin:4px 0 12px" })]);
     [head, sub, tips, log, input, send, msg, tools, el("button", { className: "rl-btn ghost", text: "Back", "data-back": "", onclick: function () { stop(); onBack(); } })].forEach(function (n) { sheet.appendChild(n); });
     var stopFresh = null, isOpen = false, loaded = false;
     function stop() { if (stopFresh) { stopFresh(); stopFresh = null; } }
@@ -5167,7 +5168,7 @@
         log.textContent = "";
         if (!b.messages.length) log.appendChild(el("p", { text: "No messages yet. Say hello and agree how this will work." }));
         b.messages.forEach(function (m) {
-          log.appendChild(el("div", { text: m.body, style: "margin:6px 0;padding:8px 12px;border-radius:14px;max-width:85%;font-size:15px;" +
+          log.appendChild(el("div", { className: "rl-mk-bubble" + (m.mine ? " mine" : ""), text: m.body, style: "margin:6px 0;padding:8px 12px;border-radius:14px;max-width:85%;font-size:15px;" +
             (m.mine ? "margin-left:auto;background:#101828;color:#fff" : "background:var(--rl-fill);color:var(--rl-text)") }));
         });
         log.scrollTop = log.scrollHeight;
@@ -5185,12 +5186,14 @@
       });
     }
     send.onclick = function () {
+      // Enter on the keyboard comes here too, past the disabled button: a second press while the first is on its way sends nothing.
+      if (send.disabled) return;
       var t = input.value.trim(); if (!t) return;
       send.disabled = true;
       api("/relay/my/resale/requests/" + requestId + "/messages", { method: "POST", body: { body: t } }).then(function (r) {
         send.disabled = false;
         if (r.ok) { input.value = ""; draftSet("msg:" + requestId, ""); say(msg, ""); load(); } else say(msg, chatErrors[r.body && r.body.error] || "Couldn't send. Try again.", true);
-      });
+      }, function () { send.disabled = false; say(msg, "Couldn't reach Relay. Check your connection and try again.", true); });
     };
     keepDraft(input, "msg:" + requestId);
     input.addEventListener("keydown", function (e) { if (e.key === "Enter") send.onclick(); });
@@ -5248,7 +5251,10 @@
     }
     function drawBrowse() {
       outlines(3);
-      Promise.all([api("/relay/my/resale/feed"), api("/relay/my/resale/mine")]).then(function (rs) {
+      // What other members list, and who has asked about yours, changes without this phone doing anything, so opening Browse
+      // or Yours asks Relay itself rather than reusing the copy from the last minute (a request Bea had just sent didn't show
+      // in Sam's Yours, 24 Nov 2026). Your own listings, for a swap offer, can come from that copy.
+      Promise.all([api("/relay/my/resale/feed", { fresh: true }), api("/relay/my/resale/mine")]).then(function (rs) {
         if (cur !== "browse") return;
         body.textContent = "";
         if (!rs[0].ok) return body.appendChild(el("p", { text: "Couldn't load what's listed. Pull down to try again." }));
@@ -5323,7 +5329,7 @@
     }
     function drawMine() {
       outlines(2);
-      api("/relay/my/resale/mine").then(function (r) {
+      api("/relay/my/resale/mine", { fresh: true }).then(function (r) {
         if (cur !== "mine") return;
         body.textContent = "";
         if (!r.ok) return body.appendChild(el("p", { text: "Couldn't load your listings. Pull down to try again." }));

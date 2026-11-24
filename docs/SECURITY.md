@@ -128,6 +128,8 @@ on Relay's Square sandbox account. To use the "Existing API and verification too
 no session, a made-up one, a malformed one, a shop's key, an admin route as a shopper, someone else's receipt, unsigned
 webhooks. Ownership of purchases, swaps, returns, resale and inboxes is also tested in `test-auth`, `test-exchange`,
 `test-cross-swap`, `test-square-orders`, `test-resale`, `test-resale-admin`, `test-more-inboxes` and `test-retailer`.
+Resale is also tested end to end in `test-marketplace-e2e`: the real app in a browser against the server's own code run
+locally (`scripts/local-worker.mjs`), where a third member tries every listing, request and conversation route that isn't theirs.
 
 ## The shop directory (not personal data)
 
