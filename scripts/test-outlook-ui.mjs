@@ -172,10 +172,10 @@ console.log("ok - with Outlook connected, the scan starts, the original opens fr
 state.accepted = false; state.earlier = true;
 await page.goto(origin + "/index.html"); await page.waitForTimeout(600);
 await page.evaluate(() => window.go("receipts"));
-await page.getByText(/permission wording changed: it now works with Outlook as well as Gmail/).waitFor();
+await page.getByText(/permission wording changed: it now says how AI helps read your receipts, and how to switch that off/).waitFor();
 await page.getByRole("button", { name: "Review and agree" }).click();
 await page.getByRole("heading", { name: "We've updated this" }).waitFor();
-assert.ok(await page.getByText(/What Relay reads and keeps is the same/).count());
+assert.ok(await page.getByText(/now says that an AI reads the receipts Relay's own rules can't work out, with your personal details hidden first, and how to switch that off/).count());
 await page.screenshot({ path: "/tmp/shots/consent-updated.png" });
 console.log("ok - a changed permission wording is explained, not shown as if for the first time");
 

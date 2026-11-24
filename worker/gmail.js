@@ -43,13 +43,18 @@ import { RECEIPT_CODES_SQL, findCodes, codeEmailDetails, codeStatements, codeFet
 import { ensurePushTables, subsOf, sendPush } from "./push.js";
 
 // v5: the same permission, worded for Outlook as well as Gmail.
-export const CONSENT_VERSION = "2026-11-v5";
+// v6: says that an AI (Claude, by Anthropic) reads the emails Relay's rules can't work out, with personal details hidden,
+// and how to switch that off; and no longer says "never shares", which stopped being true when AI help went on for
+// everyone (24 Nov 2026). Google's rules for Gmail let email text go to another company only with the person's consent
+// (docs/GOOGLE_VERIFICATION.md), so the wording a person agrees to has to say it. Changing the wording asks everyone again.
+export const CONSENT_VERSION = "2026-11-v6";
 export const CONSENT_TEXT = [
   "To work, Relay needs to see your online and in-store receipts.",
   "With your permission, Relay reads your email (Gmail or Outlook) in read-only mode and looks only for order confirmations, receipts and return emails from the past year or so.",
   "From each one it keeps the store, order number, date, total and items, plus return details (deadline, how to return, return ID, any return link), one small product photo from the email if there is one, and a link back to the original email so you can open it yourself. It does not keep the email itself.",
   "If you ask for a return reminder on an item, Relay emails you once, at your sign-in address, a few days before its deadline. It sends nothing otherwise.",
-  "Relay never sends email from your account, never deletes or changes anything in your inbox, and never sells or shares what it finds.",
+  "When Relay's own rules can't work out a receipt, Claude, an AI made by Anthropic, reads that one email to fill in what's missing, with your name, addresses, links, phone numbers and card numbers hidden first. Anthropic isn't allowed to train its AI on it. You can switch this off at any time: tap your picture, then AI help.",
+  "Relay never sends email from your account and never deletes or changes anything in your inbox. It never sells what it finds or uses it for adverts, and passes it to another company only as this wording and the privacy policy say.",
   "You can disconnect your email and delete everything Relay has captured at any time, in one tap.",
   "What Relay finds comes from your email, not from the store, so it can track your purchases but cannot start an automatic refund on its own."
 ];
