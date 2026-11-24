@@ -5209,7 +5209,8 @@
     not_found: "That's no longer available.", item_gone: "This item has gone, so you can't send messages about it any more.", not_asked_yet: "They haven't asked for it yet. You can reply by message.", own_listing: "That's your own listing.", invalid_price: "Enter a price between £0 and £5,000.", too_many_requests: "Too many requests today. Try again tomorrow." };
 
   // ---- What's new in Swap & resell: a red number on Browse's tab (index.html relayBadge), on Yours and on each card ----
-  // Requests on your listings you haven't seen and messages you haven't read, counted by Relay (worker/resale.js news). Asked
+  // Requests on your listings you haven't seen, messages you haven't read, and a seller's answer to something you asked
+  // about that you haven't seen (they accepted, declined, or accepted someone else), counted by Relay (worker/resale.js news). Asked
   // for when Relay opens, a tab opens or you pull down, and only on a phone that has used Swap & resell (MK_KEY), so
   // everyone else's app asks nothing more. Opening Yours or a conversation clears what it shows.
   var MK_KEY = "relay.market.v1";
@@ -5254,6 +5255,10 @@
   function chatView(sheet, requestId, onBack) {
     var log = el("div", { style: "margin:10px 0;max-height:42vh;overflow:auto" }), msg = el("div", { className: "rl-msg" });
     var head = el("h2", { text: "Messages" }), sub = el("p", { text: "" });
+    // The seller's answer, said once at the top while the two are matched: what happened and what to do next. Only what
+    // Relay knows: it takes no payment and arranges no postage, so it never says anything was paid for or sent.
+    var state = el("p", { className: "rl-mk-answer", style: "display:none;margin:6px 0;padding:12px 14px;border-radius:14px;background:#C9D8FF;color:#101828;font-size:15px;line-height:1.4" });
+    state.setAttribute("role", "status");
     var input = el("input", { className: "rl-mk-chat-in", placeholder: "Write a message", maxLength: 500, autocomplete: "off", enterKeyHint: "send" });
     input.setAttribute("aria-label", "Write a message");
     var send = el("button", { className: "rl-btn", text: "Send" });
@@ -5268,7 +5273,7 @@
     // On Browse's Swap & resell page the conversation is the screen: the page's own Back and big title step aside for its bar.
     var root = sheet.closest && sheet.closest("#dcRoot");
     if (root) root.classList.add("rl-mk-inchat");
-    [mkNavBack("Swap & resell", function () { stop(); if (root) root.classList.remove("rl-mk-inchat"); onBack(); }), head, sub, tips, log, input, send, msg, tools].forEach(function (n) { sheet.appendChild(n); });
+    [mkNavBack("Swap & resell", function () { stop(); if (root) root.classList.remove("rl-mk-inchat"); onBack(); }), head, sub, state, tips, log, input, send, msg, tools].forEach(function (n) { sheet.appendChild(n); });
     var stopFresh = null, isOpen = false, loaded = false, notice = "", blockedHere = false;
     function stop() { if (stopFresh) { stopFresh(); stopFresh = null; } }
     function load() {
@@ -5279,7 +5284,12 @@
         var b = r.body; isOpen = b.open; loaded = true;
         // Reading it is seeing it: the red number goes down by what was new here.
         if (b.news) mkNews(b.news);
-        head.textContent = b.title; sub.textContent = "Chatting with the " + b.with.toLowerCase() + ". Names and contact details stay private. Relay doesn't handle payment or postage, so agree them here.";
+        var buying = b.with === "Seller", swap = b.kind === "swap", yes = isOpen && b.answer === "accepted";
+        head.textContent = b.title; sub.textContent = "Chatting with the " + b.with.toLowerCase() + ". Names and contact details stay private." + (yes || !isOpen ? "" : " Relay doesn't handle payment or postage, so agree them here.");
+        state.textContent = !yes ? "" : swap
+          ? (buying ? "The seller accepted your swap offer." : "You accepted their swap offer.") + " Next, agree here how you'll swap the two items. Relay doesn't arrange postage."
+          : (buying ? "The seller accepted your request. Next, agree here how you'll pay and how it gets to you." : "You accepted their request. Next, agree here how they'll pay and how it gets to them.") + " Relay doesn't take payment or arrange postage.";
+        state.style.display = yes ? "" : "none";
         log.textContent = "";
         if (!b.messages.length) log.appendChild(el("p", { text: "No messages yet. Say hello and agree how this will work." }));
         b.messages.forEach(function (m) {
@@ -5289,7 +5299,11 @@
         log.scrollTop = log.scrollHeight;
         input.style.display = send.style.display = isOpen ? "" : "none";
         // Matched with someone else, or taken down: said plainly; what was written stays to read.
-        if (!isOpen) say(msg, (notice ? notice + " " : "") + (b.itemGone ? "This item has gone, so this conversation has ended. You can still read it." : "This conversation has ended."));
+        // The seller said no, or said yes to someone else: said as what it was.
+        var why = b.answer === "other" ? (buying ? "The seller accepted another member's request" : "You accepted another member's request") + ", so this conversation has ended. You can still read it."
+          : b.answer === "declined" && b.kind !== "chat" ? (buying ? "The seller declined your request" : "You declined their request") + ", so this conversation has ended. You can still read it."
+          : b.itemGone ? "This item has gone, so this conversation has ended. You can still read it." : "This conversation has ended.";
+        if (!isOpen) say(msg, (notice ? notice + " " : "") + why);
         tools.textContent = "";
         if (isOpen && b.matched) {
           tools.appendChild(el("button", { className: "rl-btn ghost", text: "End conversation", onclick: function () {
@@ -5369,11 +5383,11 @@
       var b = el("button", { type: "button", onclick: function () { if (cur === t[0] && !focusReceipt) return; cur = t[0]; focusReceipt = null; draw(); } }, [el("span", { text: t[1] })]);
       b.setAttribute("data-tab", t[0]); tabs.appendChild(b);
     });
-    // The red numbers: unread messages on Messages, new requests on your listings on Yours.
+    // The red numbers: unread messages on Messages; on Yours, new requests on your listings and sellers' answers to yours.
     function paintCount() {
       if (!document.body.contains(tabs)) return document.removeEventListener("relay:market-news", paintCount);
       var nw = window.__relayMarketNews || {}, total = Number(window.__relayMarket) || 0;
-      var msgs = Number(nw.messages) || 0, reqs = nw.requests != null ? Number(nw.requests) || 0 : Math.max(0, total - msgs);
+      var msgs = Number(nw.messages) || 0, reqs = nw.requests != null ? (Number(nw.requests) || 0) + (Number(nw.answers) || 0) : Math.max(0, total - msgs);
       [["messages", "Messages", msgs, msgs === 1 ? "1 unread" : msgs + " unread"], ["mine", "Yours", reqs, reqs + " new"]].forEach(function (t) {
         var b = tabs.querySelector('[data-tab="' + t[0] + '"]'), old = b.querySelector(".rl-mk-count");
         if (old) old.remove();
@@ -5504,12 +5518,14 @@
           var when = c.lastAt ? new Date(c.lastAt) : null, today = new Date();
           var whenText = !when ? "" : when.toDateString() === today.toDateString() ? when.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }) : when.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
           var line = c.last ? (c.last.mine ? "You: " : "") + c.last.body : c.selling ? "You accepted. Say hello." : "They said yes. Say hello.";
-          var who = (c.selling ? "Buyer" : "Seller") + (c.itemGone ? ", item gone" : !c.open ? ", ended" : "");
-          var row = el("button", { type: "button", className: "rl-mk-conv" + (c.unread ? " unread" : ""), onclick: tapOnce(function () { openChat(c.id); }) }, [pic,
+          var who = (c.selling ? "Buyer" : "Seller") + (c.answer === "declined" ? ", declined" : c.itemGone ? ", item gone" : !c.open ? ", ended" : c.answer === "accepted" ? ", accepted" : "");
+          // A seller's answer you haven't seen counts with what's unread here (reading the conversation clears both).
+          var fresh = (c.unread || 0) + (c.answerNew ? 1 : 0);
+          var row = el("button", { type: "button", className: "rl-mk-conv" + (fresh ? " unread" : ""), onclick: tapOnce(function () { openChat(c.id); }) }, [pic,
             el("span", { className: "rl-mk-cmid" }, [el("span", { className: "rl-mk-ctop" }, [el("b", { text: c.title }), whenText ? el("span", { className: "rl-mk-cwhen", text: whenText }) : null].filter(Boolean)),
               el("span", { className: "rl-mk-cwho", text: who }), el("span", { className: "rl-mk-cline", text: line })])]);
-          if (c.unread) row.appendChild(mkCount(c.unread));
-          row.setAttribute("aria-label", c.title + ", with the " + who.toLowerCase() + (c.unread ? ", " + c.unread + " unread" : "") + ". " + line);
+          if (fresh) row.appendChild(mkCount(fresh));
+          row.setAttribute("aria-label", c.title + ", with the " + who.toLowerCase() + (c.answerNew ? ", new answer" : "") + (c.unread ? ", " + c.unread + " unread" : "") + ". " + line);
           row.setAttribute("data-conv", c.id);
           list.appendChild(row);
         });
@@ -5603,13 +5619,17 @@
         if (mr.length) {
           body.appendChild(el("h3", { className: "rl-mk-h", text: "Things you asked about" }));
           mr.forEach(function (q) {
-            var words = el("span", { text: q.itemGone ? (q.kind === "chat" ? "You messaged the seller. " : "") + "The item has gone." :
-              q.kind === "chat" ? "You're chatting with the seller." : (q.kind === "swap" ? "You offered a swap" : "You'd like to buy it") + ". " + said(q.status) + "." });
-            if (q.status !== "accepted" && q.status !== "pending" && !q.itemGone) return body.appendChild(el("div", { className: "rl-order rl-mk-asked" }, [el("b", { text: q.title }), words]));
+            var asked = q.kind === "chat" ? "You messaged the seller. " : (q.kind === "swap" ? "You offered a swap" : "You'd like to buy it") + ". ";
+            var words = el("span", { text: q.answer === "other" ? asked + "The seller accepted another member's request." :
+              q.itemGone ? (q.kind === "chat" ? asked : "") + "The item has gone." :
+              q.kind === "chat" ? "You're chatting with the seller." : asked + said(q.status) + "." });
+            // The seller's answer, not seen until now: marked, as a new request is on your own listing.
+            var isNew = q.new ? el("span", { className: "rl-mk-new", text: "New" }) : null;
+            if (q.status !== "accepted" && q.status !== "pending" && !q.itemGone) return body.appendChild(el("div", { className: "rl-order rl-mk-asked" }, [el("b", { text: q.title }), words, isNew].filter(Boolean)));
             // One tap opens the conversation (an item that has gone, to read it).
-            var c = el("div", { className: "rl-order rl-mk-asked rl-mk-tapcard", role: "button", tabIndex: 0 }, [el("b", { text: q.title }), words,
-              el("span", { className: "rl-mk-go", text: q.itemGone ? "Read the messages" : "Message the seller" })]);
-            if (q.unread) c.appendChild(mkCount(q.unread));
+            var c = el("div", { className: "rl-order rl-mk-asked rl-mk-tapcard", role: "button", tabIndex: 0 }, [el("b", { text: q.title }), words, isNew,
+              el("span", { className: "rl-mk-go", text: q.itemGone ? "Read the messages" : "Message the seller" })].filter(Boolean));
+            if (q.unread || q.new) c.appendChild(mkCount((q.unread || 0) + (q.new ? 1 : 0)));
             c.onclick = function () { openChat(q.id); };
             c.onkeydown = function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openChat(q.id); } };
             body.appendChild(c);
@@ -7955,9 +7975,10 @@
           open(function (sh) { consentView(sh, s.email || "", consent, function () { if (document.body.contains(host)) mountMarket(host); }); }); } }));
         return;
       }
-      // The red number leads somewhere: with messages unread, Swap & resell opens on Messages.
+      // The red number leads somewhere: with messages unread, Swap & resell opens on Messages; with a seller's answer to
+      // something you asked about (and nothing unread), on Yours, where it's said.
       var nw = window.__relayMarketNews;
-      resaleView(host, null, null, nw && Number(nw.messages) > 0 ? "messages" : "browse");
+      resaleView(host, null, null, nw && Number(nw.messages) > 0 ? "messages" : nw && Number(nw.answers) > 0 ? "mine" : "browse");
     }).catch(function () { host.textContent = ""; host.appendChild(el("p", { text: "Couldn't reach Relay." })); });
   }
 

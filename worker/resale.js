@@ -88,7 +88,10 @@ async function ensureResaleTablesRun(db) {
   // Added later: how the item changes hands, and the area for collection (only the first half of a postcode, never an address).
   for (const sql of ["ALTER TABLE resale_listings ADD COLUMN handover TEXT", "ALTER TABLE resale_listings ADD COLUMN area TEXT", "ALTER TABLE resale_listings ADD COLUMN photos INTEGER NOT NULL DEFAULT 0",
     // Whether the seller has seen a request yet (Yours shows it), for the red number.
-    "ALTER TABLE resale_requests ADD COLUMN seller_seen INTEGER NOT NULL DEFAULT 0"]) {
+    "ALTER TABLE resale_requests ADD COLUMN seller_seen INTEGER NOT NULL DEFAULT 0",
+    // The seller's answer, for the member who asked: what it was ('accepted', 'declined', or 'other' when the seller accepted
+    // another member's request for the item) and whether they've seen it yet (0 until they open Yours or the conversation).
+    "ALTER TABLE resale_requests ADD COLUMN outcome TEXT", "ALTER TABLE resale_requests ADD COLUMN asker_seen INTEGER NOT NULL DEFAULT 1"]) {
     try { await db.prepare(sql).run(); } catch { /* already there */ }
   }
 }
@@ -302,7 +305,8 @@ async function feed(env, shopper) {
   return (rows.results || []).map(r => ({ ...publicListing(r, false), myRequest: asked.has(r.id) ? { id: asked.get(r.id).id, kind: asked.get(r.id).kind, status: asked.get(r.id).status } : null }));
 }
 
-// ---- What's new for a member: requests on their listings they haven't seen, and messages they haven't read --------------
+// ---- What's new for a member: requests on their listings they haven't seen, messages they haven't read, and a seller's
+// answer to something they asked about that they haven't seen (accepted, declined, or gone to another member) ----------
 // Counted from the database when asked (opening Relay, opening Swap & resell, pulling down), never on a timer.
 const UNREAD = `SELECT q.id AS request_id, COUNT(m.id) AS n FROM resale_requests q JOIN resale_listings l ON l.id = q.listing_id
     JOIN resale_messages m ON m.request_id = q.id LEFT JOIN resale_reads r ON r.shopper_id = ? AND r.request_id = q.id
@@ -319,9 +323,15 @@ async function news(env, shopperId) {
   // Whether there's anything that could bring news: a listing up, or a request waiting or accepted. The app stops asking when not.
   const live = await env.RELAY_DB.prepare(`SELECT EXISTS (SELECT 1 FROM resale_listings WHERE seller_id = ? AND status IN ('active','matched'))
       OR EXISTS (SELECT 1 FROM resale_requests WHERE asker_id = ? AND status IN ('pending','accepted')) AS x`).bind(shopperId, shopperId).first();
-  const requests = Number(fresh && fresh.n || 0);
-  return { requests, messages, total: requests + messages, active: Boolean(live && live.x) };
+  const told = await env.RELAY_DB.prepare("SELECT COUNT(*) AS n FROM resale_requests WHERE asker_id = ? AND asker_seen = 0 AND outcome IS NOT NULL").bind(shopperId).first();
+  const requests = Number(fresh && fresh.n || 0), answers = Number(told && told.n || 0);
+  return { requests, messages, answers, total: requests + messages + answers, active: Boolean(live && live.x) };
 }
+
+// The seller's answer as the member who asked is told it, only while it still holds: 'accepted' while they're matched,
+// 'declined' or 'other' (the seller accepted another member's request) while that is why it ended. A conversation that
+// ended any other way (either side ending it, a block, the listing taken down) says nothing here.
+const answerOf = q => q.outcome === "accepted" ? (q.status === "accepted" ? "accepted" : null) : (q.outcome === "declined" || q.outcome === "other") && q.status === "declined" ? q.outcome : null;
 
 async function myStuff(env, shopper, markSeen) {
   const unread = await unreadByRequest(env, shopper.id);
@@ -350,11 +360,15 @@ async function myStuff(env, shopper, markSeen) {
     out.push({ ...publicListing(l, true), requests });
   }
   const asked = await env.RELAY_DB.prepare(
-    `SELECT q.id, q.kind, q.status, q.created_at, l.title, l.store, l.status AS listing_status FROM resale_requests q JOIN resale_listings l ON l.id = q.listing_id
+    `SELECT q.id, q.kind, q.status, q.outcome, q.asker_seen, q.created_at, l.title, l.store, l.status AS listing_status FROM resale_requests q JOIN resale_listings l ON l.id = q.listing_id
        WHERE q.asker_id = ? ORDER BY q.created_at DESC LIMIT 40`).bind(shopper.id).all();
   // Opening Yours shows every request on the member's listings, so they count as seen from now on (this answer still says which were new).
-  if (markSeen) await env.RELAY_DB.prepare("UPDATE resale_requests SET seller_seen = 1 WHERE seller_seen = 0 AND listing_id IN (SELECT id FROM resale_listings WHERE seller_id = ?)").bind(shopper.id).run();
+  // It also shows the sellers' answers to what the member asked about, so those count as seen too.
+  if (markSeen) await env.RELAY_DB.batch([
+    env.RELAY_DB.prepare("UPDATE resale_requests SET seller_seen = 1 WHERE seller_seen = 0 AND listing_id IN (SELECT id FROM resale_listings WHERE seller_id = ?)").bind(shopper.id),
+    env.RELAY_DB.prepare("UPDATE resale_requests SET asker_seen = 1 WHERE asker_seen = 0 AND asker_id = ?").bind(shopper.id)]);
   return { listings: out, myRequests: (asked.results || []).map(r => ({ id: r.id, kind: r.kind, status: r.status, createdAt: r.created_at, title: r.title, store: r.store, unread: unread.get(r.id) || 0,
+      ...(answerOf(r) ? { answer: answerOf(r) } : {}), ...(answerOf(r) && !r.asker_seen ? { new: true } : {}),
       ...(r.status !== "accepted" && r.listing_status !== "active" ? { itemGone: true } : {}) })),
     news: await news(env, shopper.id) };
 }
@@ -366,7 +380,7 @@ async function myStuff(env, shopper, markSeen) {
 async function conversations(env, shopper) {
   const unread = await unreadByRequest(env, shopper.id);
   const rows = await env.RELAY_DB.prepare(
-    `SELECT q.id, q.status, q.created_at, q.asker_id, l.id AS listing_id, l.seller_id, l.title, l.store, l.status AS listing_status, l.has_image,
+    `SELECT q.id, q.status, q.outcome, q.asker_seen, q.created_at, q.asker_id, l.id AS listing_id, l.seller_id, l.title, l.store, l.status AS listing_status, l.has_image,
        (SELECT MAX(m.created_at) FROM resale_messages m WHERE m.request_id = q.id) AS last_at,
        (SELECT m.body FROM resale_messages m WHERE m.request_id = q.id ORDER BY m.created_at DESC, m.rowid DESC LIMIT 1) AS last_body,
        (SELECT m.sender_id FROM resale_messages m WHERE m.request_id = q.id ORDER BY m.created_at DESC, m.rowid DESC LIMIT 1) AS last_from
@@ -379,6 +393,8 @@ async function conversations(env, shopper) {
       ...(!open && q.status !== "accepted" && q.status !== "closed" && q.listing_status !== "active" ? { itemGone: true } : {}),
       lastAt: q.last_at || q.created_at, last: q.last_body ? { mine: q.last_from === shopper.id, body: String(q.last_body).slice(0, 140) } : null,
       unread: unread.get(q.id) || 0,
+      // The seller's answer, and whether the member who asked has seen it yet (reading the conversation, or opening Yours).
+      ...(answerOf(q) ? { answer: answerOf(q) } : {}), ...(!seller && answerOf(q) && !q.asker_seen ? { answerNew: true } : {}),
       // The listing's picture, where the member may see it (as the picture route allows: on sale, or their own).
       ...(q.has_image && (seller || q.listing_status === "active") ? { listingId: q.listing_id, hasImage: true } : {}) };
   });
@@ -525,23 +541,44 @@ async function startChat(env, shopper, listingId, now) {
   return { status: 200, body: { ok: true, requestId: id } };
 }
 
-async function decide(env, shopper, requestId, accept) {
+// The seller's answer reaches the member who asked (Connor, 24 Nov 2026: a buyer heard nothing when their offer was
+// accepted): it's kept on the request (outcome), counted in their red number until they've seen it (asker_seen), said in
+// the conversation, and sent to their phone where they turned notifications on. The words say only what has happened:
+// Relay takes no payment and arranges no postage, so nothing here says anything was paid for, sold or sent.
+export const ANSWER_PUSH = {
+  accepted: (title, id, kind) => ({ title: "The seller said yes", body: "They accepted your " + (kind === "swap" ? "swap offer" : "request") + " for " + title + ". Open Relay to agree the handover with them.", url: "./#open=market&chat=" + id }),
+  declined: title => ({ title: "The seller said no", body: "They declined your request for " + title + ".", url: "./#open=market&tab=mine" }),
+  other: title => ({ title: "No longer available", body: "The seller of " + title + " accepted another member's request.", url: "./#open=market&tab=mine" })
+};
+async function decide(env, shopper, requestId, accept, o) {
   // Only the listing's seller can decide, and only while the request is pending.
   const q = await env.RELAY_DB.prepare(
-    `SELECT q.id, q.listing_id, q.kind FROM resale_requests q JOIN resale_listings l ON l.id = q.listing_id
+    `SELECT q.id, q.listing_id, q.kind, q.asker_id, l.title FROM resale_requests q JOIN resale_listings l ON l.id = q.listing_id
        WHERE q.id = ? AND l.seller_id = ? AND q.status = 'pending'`).bind(requestId, shopper.id).first();
   if (!q) return { status: 404, body: { error: "not_found" } };
   // A chat isn't a request for the item: only someone who asked for it (to buy or swap) can be matched with it.
   if (accept && q.kind === "chat") return { status: 409, body: { error: "not_asked_yet" } };
   if (!accept) {
-    await env.RELAY_DB.prepare("UPDATE resale_requests SET status = 'declined' WHERE id = ?").bind(requestId).run();
+    // "AND status = 'pending'": a second tap, or two phones at once, answers (and tells the member) once.
+    const done = await env.RELAY_DB.prepare("UPDATE resale_requests SET status = 'declined', outcome = 'declined', asker_seen = 0 WHERE id = ? AND status = 'pending' RETURNING id").bind(requestId).first();
+    if (done) await tell(env, q.asker_id, ANSWER_PUSH.declined(q.title), o);
     return { status: 200, body: { ok: true } };
   }
-  await env.RELAY_DB.batch([
-    env.RELAY_DB.prepare("UPDATE resale_requests SET status = 'accepted' WHERE id = ?").bind(requestId),
+  // Everyone else waiting on this item: members who asked for it, and members chatting with the seller about it who had
+  // written something (a chat opened and left empty was never a conversation, so there's nothing to tell them).
+  const others = await env.RELAY_DB.prepare(`SELECT q.id, q.asker_id FROM resale_requests q WHERE q.listing_id = ? AND q.id != ? AND q.status = 'pending'
+      AND (q.kind != 'chat' OR EXISTS (SELECT 1 FROM resale_messages m WHERE m.request_id = q.id))`).bind(q.listing_id, requestId).all();
+  const lost = (others.results || []);
+  const won = await env.RELAY_DB.batch([
+    env.RELAY_DB.prepare("UPDATE resale_requests SET status = 'accepted', outcome = 'accepted', asker_seen = 0 WHERE id = ? AND status = 'pending' RETURNING id").bind(requestId),
+    ...lost.map(x => env.RELAY_DB.prepare("UPDATE resale_requests SET outcome = 'other', asker_seen = 0 WHERE id = ? AND status = 'pending'").bind(x.id)),
     env.RELAY_DB.prepare("UPDATE resale_requests SET status = 'declined' WHERE listing_id = ? AND id != ? AND status = 'pending'").bind(q.listing_id, requestId),
     env.RELAY_DB.prepare("UPDATE resale_listings SET status = 'matched' WHERE id = ? AND seller_id = ?").bind(q.listing_id, shopper.id)
   ]);
+  if (won[0] && won[0].results && won[0].results.length) {
+    await tell(env, q.asker_id, ANSWER_PUSH.accepted(q.title, requestId, q.kind), o);
+    for (const x of lost) await tell(env, x.asker_id, ANSWER_PUSH.other(q.title), o);
+  }
   return { status: 200, body: { ok: true } };
 }
 
@@ -557,7 +594,7 @@ const CONTACT = [/[A-Za-z0-9._%+-]+\s*(?:@|\(at\)| at )\s*[A-Za-z0-9-]+\s*(?:\.|
 
 async function party(env, shopper, requestId) {
   const q = await env.RELAY_DB.prepare(
-    `SELECT q.id, q.status, q.kind, q.asker_id, l.seller_id, l.title, l.id AS listing_id, l.status AS listing_status FROM resale_requests q JOIN resale_listings l ON l.id = q.listing_id WHERE q.id = ?`).bind(requestId).first();
+    `SELECT q.id, q.status, q.kind, q.outcome, q.asker_seen, q.asker_id, l.seller_id, l.title, l.id AS listing_id, l.status AS listing_status FROM resale_requests q JOIN resale_listings l ON l.id = q.listing_id WHERE q.id = ?`).bind(requestId).first();
   if (!q || (q.asker_id !== shopper.id && q.seller_id !== shopper.id)) return null;
   const open = q.status === "accepted" || (q.status === "pending" && q.listing_status === "active");
   // The item went to someone else, or was taken down: say so, rather than only "ended".
@@ -571,8 +608,12 @@ async function readThread(env, shopper, requestId) {
   const rows = await env.RELAY_DB.prepare("SELECT sender_id, body, created_at FROM resale_messages WHERE request_id = ? ORDER BY created_at ASC, rowid ASC LIMIT 200").bind(requestId).all();
   // Read now: the other person's messages so far stop counting as new.
   const last = (rows.results || []).reduce((t, m) => Math.max(t, m.created_at), 0);
+  // Opened by the member who asked: the seller's answer is said here, so it's seen.
+  if (!q.iAmSeller && !q.asker_seen) await env.RELAY_DB.prepare("UPDATE resale_requests SET asker_seen = 1 WHERE id = ? AND asker_id = ?").bind(requestId, shopper.id).run();
   if (last) await env.RELAY_DB.prepare("INSERT INTO resale_reads (shopper_id, request_id, read_at) VALUES (?,?,?) ON CONFLICT (shopper_id, request_id) DO UPDATE SET read_at = MAX(read_at, excluded.read_at)").bind(shopper.id, requestId, last).run();
   return { status: 200, body: { title: q.title, status: q.status, with: q.iAmSeller ? "Buyer" : "Seller", open: q.open, ...(q.gone ? { itemGone: true } : {}), matched: q.status === "accepted",
+    // What the seller answered, while it still holds, and whether it was a swap they offered (for the words the app uses).
+    ...(answerOf(q) ? { answer: answerOf(q) } : {}), kind: q.kind,
     messages: (rows.results || []).map(m => ({ mine: m.sender_id === shopper.id, body: m.body, createdAt: m.created_at })),
     // What's still new for them elsewhere, so the red number goes down as soon as this is read.
     news: await news(env, shopper.id) } };
@@ -702,7 +743,7 @@ export async function handleResaleRoute(request, env, url, cors, shopper, opts) 
     }
   }
   const decision = /^\/relay\/my\/resale\/requests\/([0-9a-f-]{36})\/(accept|decline)$/.exec(path);
-  if (decision && m === "POST") return send(await decide(env, shopper, decision[1], decision[2] === "accept"));
+  if (decision && m === "POST") return send(await decide(env, shopper, decision[1], decision[2] === "accept", opts));
   // The seller's own photos (n = 1 to 4): seen like the listing's picture, by members while it's active and by the seller.
   const own = /^\/relay\/my\/resale\/listings\/([0-9a-f-]{36})\/photos\/([1-4])$/.exec(path);
   if (own && m === "GET") {
