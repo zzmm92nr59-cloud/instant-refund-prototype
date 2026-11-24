@@ -1,15 +1,16 @@
 // The AI second reader: the parts that need nothing but the reading itself (ai-runner.js does the reading).
-// When Relay's own reader (fixed rules on Relay's servers) isn't sure about a receipt, and only for shoppers who switched on
-// "AI help", Claude (Anthropic's AI) reads that one email and fills in what the rules missed.
+// When Relay's own reader (fixed rules on Relay's servers) isn't sure about a receipt, for every shopper who hasn't switched
+// "AI help" off (on by default since 24 Nov 2026, ai-choice.js), Claude (Anthropic's AI) reads that one email and fills in what the rules missed.
 //
 // Rules (do not weaken):
-//  * Off unless the shopper switched it on, and off for everyone until ANTHROPIC_API_KEY is set (or AI_READER=off).
+//  * On unless the shopper switched it off (their choice is kept, ai-choice.js), and off for everyone until
+//    ANTHROPIC_API_KEY is set (or AI_READER=off).
 //  * Only the email's text goes to Anthropic, with the shopper's personal details hidden first (shared-emails.js
 //    hideDetails). Anthropic's terms don't let it train its models on what Relay sends.
 //  * It fills gaps only. What the rules read stays as it was; what the AI read is kept apart (receipt_ai_reads) and used
 //    only where the rules found nothing, and such a receipt is marked for the shopper to check. A shopper's own fix wins.
 //  * It never decides anything else: an email the AI thinks isn't a purchase is only counted, not removed.
-//  * Turning it off deletes what the AI read. It also goes with the receipt, the inbox, the permission and the account.
+//  * Turning it off deletes what the AI read. What it read also goes with the receipt, the inbox, the permission and the account.
 //  * The health page counts where the AI and the rules agreed and where they didn't, so the rules can be made better.
 import { cleanItems } from "./receipt-reader.js";
 
@@ -23,7 +24,7 @@ export const AI_READS_SQL = `CREATE TABLE IF NOT EXISTS receipt_ai_reads (
   shopper_id TEXT NOT NULL, receipt_id TEXT NOT NULL, fields TEXT, failed TEXT, not_purchase INTEGER NOT NULL DEFAULT 0,
   shop INTEGER NOT NULL DEFAULT 0, total INTEGER NOT NULL DEFAULT 0, date INTEGER NOT NULL DEFAULT 0, number INTEGER NOT NULL DEFAULT 0,
   items INTEGER NOT NULL DEFAULT 0, reader INTEGER, model TEXT, created_at INTEGER NOT NULL, ai_version INTEGER, email_key TEXT, PRIMARY KEY (shopper_id, receipt_id))`;
-// AI for picks (worker/item-kinds.js): who switched it on, and what the AI made of each item name on their receipts.
+// AI for picks (worker/item-kinds.js): who switched it on (kept for when; whether it's on is ai-choice.js), and what the AI made of each item name on their receipts.
 export const PICKS_AI_SQL = `CREATE TABLE IF NOT EXISTS picks_ai (shopper_id TEXT PRIMARY KEY, on_since INTEGER NOT NULL)`;
 export const ITEM_KINDS_SQL = `CREATE TABLE IF NOT EXISTS item_kinds (shopper_id TEXT NOT NULL, name_key TEXT NOT NULL, data TEXT NOT NULL,
   created_at INTEGER NOT NULL, PRIMARY KEY (shopper_id, name_key))`;

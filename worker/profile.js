@@ -3,6 +3,7 @@
 // The photo is cut to a square and shrunk on the shopper's own device before it is sent (which also leaves the camera's
 // location details behind). Here it is only checked to be a real, small JPEG, PNG or WebP picture.
 import { ensureOnce } from "./once.js";
+import { aiNoticeDue } from "./ai-choice.js";
 
 const MAX_NAME = 40, MAX_PHOTO_BYTES = 150_000, MAX_BODY = 260_000;
 
@@ -52,7 +53,9 @@ async function readProfile(env, shopperId) {
 export async function handleProfileRoute(request, env, url, cors, shopper, o) {
   if (url.pathname !== "/relay/my/profile") return null;
   await ensureProfileTable(env.RELAY_DB);
-  if (request.method === "GET") return json({ email: shopper.email, ...(await readProfile(env, shopper.id)) }, 200, cors);
+  // aiNotice: true while Home should show the one-time "AI help is now on" notice (ai-choice.js), so opening the app needs
+  // no request of its own for it.
+  if (request.method === "GET") return json({ email: shopper.email, ...(await readProfile(env, shopper.id)), ...((await aiNoticeDue(env, shopper.id)) ? { aiNotice: true } : {}) }, 200, cors);
   if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405, cors);
   const text = await request.text();
   if (text.length > MAX_BODY) return json({ error: "photo_too_big" }, 413, cors);

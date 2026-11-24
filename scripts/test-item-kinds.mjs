@@ -1,5 +1,5 @@
-// Offline test (real SQLite; Anthropic is a stand-in): AI for picks (worker/item-kinds.js). Off until the AI key is set, and only
-// for shoppers who switch it on; only item names and shops' names go to the AI (never the email, address, order number or
+// Offline test (real SQLite; Anthropic is a stand-in): AI for picks (worker/item-kinds.js). Off until the AI key is set, then on
+// for every shopper unless they switch it off (ai-choice.js); only item names and shops' names go to the AI (never the email, address, order number or
 // price), with anything personal hidden; each name once; the AI's answer is checked; limits; turning it off deletes what it
 // said; and it goes with the account. People, shops and receipts are made up.
 import { DatabaseSync } from "node:sqlite";
@@ -86,20 +86,21 @@ receipt(S, "Studio North", "fashion", [{ name: "Sam's Secret Jumper", qty: 1, pr
 
 // 1. Off until the key is set.
 let r = await (await call("/relay/my/item-kinds", { token: jess })).json();
-assert.deepEqual(r, { available: false, on: false, kinds: {} });
+assert.deepEqual(r, { available: false, on: false, choice: null, kinds: {} });
 assert.equal((await call("/relay/my/item-kinds", { method: "POST", token: jess, body: { on: true } })).status, 503);
+assert.equal(aiCalls.length, 0);
 env.ANTHROPIC_API_KEY = "sk-test-not-a-real-key";
-r = await (await call("/relay/my/item-kinds", { token: jess })).json();
-assert.deepEqual(r, { available: true, on: false, kinds: {} }, "available, but off until she switches it on");
+// Sam switches it off before anything of his is read.
+assert.deepEqual(await (await call("/relay/my/item-kinds", { method: "POST", token: sam, body: { on: false } })).json(), { available: true, on: false, choice: "off" });
 assert.equal(aiCalls.length, 0);
 assert.equal((await call("/relay/my/item-kinds", { method: "POST", token: jess, body: { on: "yes" } })).status, 400);
 assert.equal((await call("/relay/my/item-kinds", { token: null })).status, 401);
-console.log("ok - off until the AI key is set, and then only for shoppers who switch it on");
+console.log("ok - off until the AI key is set, then on for everyone unless they switch it off");
 
-// 2. Jess switches it on: her item names are read once, with the shop's name and nothing else.
-assert.deepEqual(await (await call("/relay/my/item-kinds", { method: "POST", token: jess, body: { on: true } })).json(), { available: true, on: true });
+// 2. Jess never touched the switch, so it's on: her item names are read once, with the shop's name and nothing else.
 // The screen asking doesn't wait for the AI (Connor, 18 Nov 2026): it's read after the response, and the next open has it.
 r = await (await call("/relay/my/item-kinds", { token: jess })).json();
+assert.equal(r.on, true); assert.equal(r.choice, null, "on by default, with no choice of hers recorded");
 assert.equal(aiCalls.length, 1);
 assert.deepEqual(r.kinds, {}, "the first open answers at once with what's known");
 r = await (await call("/relay/my/item-kinds", { token: jess })).json();
@@ -114,7 +115,7 @@ assert.deepEqual(r.kinds, { "align high-rise pant 25": { mode: "again", kind: "l
   "55 inch qled tv": { mode: "once" } }, "what to pick from, what not to; skipped names aren't sent back");
 await call("/relay/my/item-kinds", { token: jess });
 assert.equal(aiCalls.length, 1, "each name is read once");
-assert.deepEqual(await (await call("/relay/my/item-kinds", { token: sam })).json(), { available: true, on: false, kinds: {} }, "Sam's are his: off, and nothing of Jess's");
+assert.deepEqual(await (await call("/relay/my/item-kinds", { token: sam })).json(), { available: true, on: false, choice: "off", kinds: {} }, "Sam's are his: off, as he chose, and nothing of Jess's");
 // The AI's type from the fixed list goes with her receipts (with whether it was sure), for Wrapped and the receipts list.
 {
   const typed = sqlite.prepare("SELECT data FROM item_kinds WHERE shopper_id = ? AND name_key = ?").get(J, "55 inch qled tv");
@@ -166,7 +167,10 @@ assert.equal(aiCalls.length, 1, "more the next day");
 console.log("ok - limits: 40 names a request and 120 a day; a busy AI is asked again later");
 
 // 4. Off deletes what the AI said; the account going takes it too.
-assert.deepEqual(await (await call("/relay/my/item-kinds", { method: "POST", token: jess, body: { on: false } })).json(), { available: true, on: false });
+assert.deepEqual(await (await call("/relay/my/item-kinds", { method: "POST", token: jess, body: { on: false } })).json(), { available: true, on: false, choice: "off" });
+aiCalls = [];
+assert.equal((await (await call("/relay/my/item-kinds", { token: jess })).json()).on, false);
+assert.equal(aiCalls.length, 0, "switched off: nothing more is read");
 assert.equal(sqlite.prepare("SELECT COUNT(*) AS n FROM item_kinds WHERE shopper_id = ?").get(J).n, 0);
 assert.equal(sqlite.prepare("SELECT COUNT(*) AS n FROM picks_ai WHERE shopper_id = ?").get(J).n, 0);
 await call("/relay/my/item-kinds", { method: "POST", token: jess, body: { on: true } }); await call("/relay/my/item-kinds", { token: jess });
@@ -178,4 +182,4 @@ assert.equal((await call("/relay/my/consent/withdraw", { method: "POST", token: 
 assert.equal(sqlite.prepare("SELECT COUNT(*) AS n FROM item_kinds WHERE shopper_id = ?").get(J).n, 0, "withdrawing permission deletes it");
 assert.equal(sqlite.prepare("SELECT COUNT(*) AS n FROM picks_ai WHERE shopper_id = ?").get(J).n, 0);
 console.log("ok - switching it off deletes what the AI said, and so does withdrawing permission; it's in Download my data");
-console.log("PASS AI for picks: opt-in, item names and shops only, checked answers, limits, deleted when switched off");
+console.log("PASS AI for picks: on unless switched off, item names and shops only, checked answers, limits, deleted when switched off");

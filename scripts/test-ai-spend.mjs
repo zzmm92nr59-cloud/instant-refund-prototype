@@ -3,7 +3,7 @@
 // nothing about the email; the monthly limit and each shopper's daily limit stop calls BEFORE they're made (allowing for
 // the call's max_tokens), and every AI feature then does what it does without the key, until the next month or day; an
 // email already read by the AI is never sent again when Relay's own reader version changes, only when the email or
-// AI_READ_VERSION does; only receipts the rules weren't sure about, from shoppers who switched AI help on; the health
+// AI_READ_VERSION does; only receipts the rules weren't sure about, never from shoppers who switched AI help off; the health
 // page's "AI spending" numbers, for Relay's team only. People, shops and emails are made up.
 import { DatabaseSync } from "node:sqlite";
 import { readFileSync, readdirSync } from "node:fs";
@@ -126,7 +126,7 @@ const sent = () => sqlite.prepare("SELECT receipt_id AS id FROM receipt_ai_reads
 const spendRows = () => sqlite.prepare("SELECT * FROM ai_spend ORDER BY month, feature").all().map((r) => ({ ...r }));
 env.ANTHROPIC_API_KEY = "sk-test-not-a-real-key";
 
-// 2. Which emails the AI reader gets: only receipts the rules weren't sure about, only from shoppers who switched AI help on.
+// 2. Which emails the AI reader gets: only receipts the rules weren't sure about, never from a shopper who switched AI help off.
 const sure = receipt(J, {});
 const lowConf = receipt(J, { confidence: "low" });
 const noTotal = receipt(J, { totalPence: null });
@@ -134,13 +134,13 @@ const notAddingUp = receipt(J, { itemsCheck: { complete: false, expectedPence: 4
 const oddNames = receipt(J, { itemsCheck: { complete: true, namesOk: false } });
 const noShop = receipt(J, { retailer: { name: null, domain: null } });
 const addsUp = receipt(J, { itemsCheck: { complete: true, namesOk: true } });
-const kitsUnsure = receipt(K, { confidence: "low" });   // Kit never switches AI help on
-assert.equal((await call("/relay/my/ai-reading", { method: "POST", token: jess, body: { on: true } })).status, 200);
+const kitsUnsure = receipt(K, { confidence: "low" });   // Kit switches AI help off; Jess leaves it as it is (on)
+assert.equal((await call("/relay/my/ai-reading", { method: "POST", token: kit, body: { on: false } })).status, 200);
 assert.deepEqual(await runAiReads(env, clock, fetchImpl), { read: 5, failed: 0 });
 assert.deepEqual(sent(), [lowConf, noTotal, notAddingUp, oddNames, noShop].sort(), "low confidence, no total, items that don't add up, doubtful names, no shop: and nothing else");
-assert.ok(!sent().includes(sure) && !sent().includes(addsUp) && !sent().includes(kitsUnsure), "never a receipt the rules are sure of, nor one of a shopper without AI help");
+assert.ok(!sent().includes(sure) && !sent().includes(addsUp) && !sent().includes(kitsUnsure), "never a receipt the rules are sure of, nor one of a shopper who switched AI help off");
 for (const b of aiCalls) assert.deepEqual(b.thinking, { type: "disabled" }, "the reader doesn't pay for thinking it doesn't need");
-console.log("ok - only unsure receipts (low confidence, no total, items not adding up, doubtful names, no shop) and only with AI help on");
+console.log("ok - only unsure receipts (low confidence, no total, items not adding up, doubtful names, no shop), never with AI help switched off");
 
 // 3. Spend recorded per call, from the answer's own token counts; nothing about the email or the shopper in it.
 let rows = spendRows();

@@ -20,6 +20,7 @@ import { answerKey } from "./answer-key.js";
 import { SHARE_DAYS } from "./shared-emails.js";
 import { aiAvailable } from "./ai-reader.js";
 import { spendSummary } from "./ai-spend.js";
+import { ensureAiChoiceTables } from "./ai-choice.js";
 
 export const MIN_SHOPPERS_PER_SHOP = 3;
 // Whether Relay sends its emails (sign-in codes, a shop's return and swap emails) from an address of its own. Until it
@@ -110,6 +111,7 @@ export async function relayHealth(env, me, now = Date.now()) {
   const db = env.RELAY_DB;
   // Whether inbox reading is working (gmail.js ensureHealthColumns): there before it's counted below.
   try { await ensureHealthColumns(db); } catch { /* no inboxes yet */ }
+  try { await ensureAiChoiceTables(db); } catch { /* counted as none */ }
   // A table nobody has used yet doesn't exist yet: its part is simply empty.
   const all = async (sql, ...a) => {
     try { return (await db.prepare(sql).bind(...a).all()).results || []; }
@@ -188,9 +190,10 @@ export async function relayHealth(env, me, now = Date.now()) {
       dates[13], dates[7]),
     // Emails shoppers chose to send to Relay (shared-emails.js): how many are kept, and how many nobody has read yet.
     one("SELECT COUNT(*) AS kept, SUM(looked_at IS NULL) AS waiting, SUM(created_at >= ?) AS week, COUNT(DISTINCT shopper_id) AS people FROM shared_emails WHERE expires_at > ?", d7, now),
-    // AI help (ai-reader.js): who has it on, and for each part whether the AI filled a gap (1), agreed with the rules (2) or
+    // AI help (ai-reader.js): who has it on (everyone but those who switched it off, ai-choice.js), and for each part whether the AI filled a gap (1), agreed with the rules (2) or
     // differed from them (3).
-    one("SELECT COUNT(*) AS n FROM ai_reading"),
+    one(`SELECT (SELECT COUNT(*) FROM shoppers) - (SELECT COUNT(*) FROM ai_choices WHERE feature = 'receipts' AND is_on = 0) AS n,
+      (SELECT COUNT(*) FROM ai_choices WHERE feature = 'receipts' AND is_on = 0) AS off`),
     one(`SELECT COUNT(*) AS n, SUM(created_at >= ?) AS week, SUM(fields IS NULL) AS failed, SUM(not_purchase) AS notPurchase,
       ${["shop", "total", "date", "number", "items"].map((k) => `SUM(${k} = 1) AS ${k}1, SUM(${k} = 2) AS ${k}2, SUM(${k} = 3) AS ${k}3`).join(", ")} FROM receipt_ai_reads`, d7)
   ]);
@@ -249,7 +252,7 @@ export async function relayHealth(env, me, now = Date.now()) {
     mail: { ownAddress: sendsFromOwnAddress(env), returnsShopNotEmailedThisWeek: n(notEmailed.n) },
     helpChat: { on: chatAvailable(env), messagesToday: n(chat.today), messagesThisWeek: n(chat.m), handoffsThisWeek: n(chat.h), peopleThisWeek: n(chat.people) },
     sharedEmails: { kept: n(shared.kept), waiting: n(shared.waiting), thisWeek: n(shared.week), people: n(shared.people), keptDays: SHARE_DAYS },
-    aiReader: { on: aiAvailable(env), shoppersOn: n(aiOn.n), reads: n(ai.n), thisWeek: n(ai.week), failed: n(ai.failed), notPurchase: n(ai.notPurchase),
+    aiReader: { on: aiAvailable(env), shoppersOn: n(aiOn.n), shoppersOff: n(aiOn.off), reads: n(ai.n), thisWeek: n(ai.week), failed: n(ai.failed), notPurchase: n(ai.notPurchase),
       parts: Object.fromEntries(["shop", "total", "date", "number", "items"].map((k) => [k, { filled: n(ai[k + "1"]), agreed: n(ai[k + "2"]), differed: n(ai[k + "3"]) }])) },
     // What the AI cost this month (estimated), against the monthly limit, by feature; and for the AI reader, how often it
     // filled a gap, agreed with the rules or differed from them (the same counts as aiReader.parts, added up).

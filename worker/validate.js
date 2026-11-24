@@ -98,6 +98,8 @@ const ROUTES = new Map(Object.entries({
   "/relay/my/admin/health/email": { fields: {} },
   "/relay/my/ai-reading": { fields: { on: bool } },
   "/relay/my/item-kinds": { fields: { on: bool } },
+  // The one-time "AI help is now on" notice: seen (nothing to send).
+  "/relay/my/ai-notice": NOTHING,
   "/relay/my/bank/disconnect": { fields: { id: str(36) } },
   // Which of one of the shopper's own connections' cards are theirs (bank.js checks each ref is one of that connection's).
   "/relay/my/bank/cards": { fields: { id: str(36), cards: list(40, obj({ ref: str(36), mine: bool })) } },

@@ -19,7 +19,7 @@
   // knows it's an admin's, or as soon as it does.
   var openHealthPage = null, wantHealth = false;
   // Coming back from the bank's own page (#bank=connected and so on): Profile opens Bank and cards with what happened.
-  var openBankPage = null, wantBank = null;
+  var openBankPage = null, wantBank = null, wantAi = false;
   window.relayOpenHealth = function () {
     wantHealth = true;
     // Opening the tab may draw it afresh (then the new drawing opens the page once it knows); otherwise open it here.
@@ -1163,7 +1163,7 @@
     ".rl-share-box.rl-skel{min-height:180px}.rl-share-box b{display:block;font-size:15px;margin:0 0 2px}.rl-share-box .rl-share-from{display:block;font-size:13px;color:var(--rl-text2);margin:0 0 10px}" +
     ".rl-share-box i{display:block;margin-top:10px;font-style:normal;color:var(--rl-text2)}.rl-share-box:focus-visible{outline:2px solid var(--rl-accent);outline-offset:1px}" +
     ".rl-share-check{margin:0 0 12px;font-size:14px;line-height:1.4;color:var(--rl-text2)}.rl-fix [hidden],.rl-se [hidden]{display:none!important}" +
-    // AI help: a switch with what it means underneath, on the Email connection page.
+    // AI help: a switch with what it means underneath, on Profile's AI help page.
     ".rl-bk-h{margin:22px 0 6px;font-size:20px;font-weight:700;color:var(--rl-text)}.rl-bk-list{border-radius:18px;background:var(--rl-card);padding:0 16px}" +
     ".rl-bk-row{display:flex;align-items:center;gap:12px;min-height:60px;padding:10px 0;border-top:.5px solid var(--rl-line)}.rl-bk-row:first-child{border-top:0}" +
     "button.rl-bk-row{width:100%;background:none;border-left:0;border-right:0;border-bottom:0;font:inherit;color:inherit;text-align:left;cursor:pointer;transition:opacity .15s}button.rl-bk-row:active{opacity:.55}" +
@@ -1208,7 +1208,7 @@
     ".rl-rp-photo{display:block;width:100%;max-height:340px;min-height:120px;object-fit:contain;border-radius:14px;background:var(--rl-fill);margin:10px 0 14px}.rl-rr-detail .rl-rp-photo{max-height:240px}" +
     ".rl-rp .rl-bk-list{background:var(--rl-fill);margin:0 0 10px}" +
     ".rl-aih-picks{margin:16px 0 0;padding:16px 0 0;border-top:.5px solid var(--rl-line)}" +
-    ".rl-aih{margin:22px 0 6px;padding:16px 18px;border-radius:18px;background:var(--rl-card);border:1px solid var(--rl-line)}" +
+    ".rl-aih{margin:22px 0 6px;padding:16px 18px;border-radius:18px;background:var(--rl-card);border:1px solid var(--rl-line)}.rl-aih [hidden]{display:none!important}" +
     ".rl-aih-top{display:flex;align-items:center;justify-content:space-between;gap:12px}.rl-aih-top b{font-size:16px;line-height:1.3;color:var(--rl-text)}" +
     ".rl-aih p{margin:8px 0 0;font-size:14px;line-height:1.45;color:var(--rl-text2)}.rl-aih p.rl-msg{color:var(--rl-text)}.rl-aih p.rl-msg:empty{display:none}" +
     ".rl-rc-ai{margin:6px 0 2px;font-size:14px;line-height:1.4;color:var(--rl-text2)}" +
@@ -1716,10 +1716,41 @@
     var s = load(); if (!s || !s.token) return Promise.resolve(null);
     if (!profileLoading) profileLoading = api("/relay/my/profile").then(function (r) {
       profileLoading = null;
-      if (r.ok && r.body && r.body.email === (load() || {}).email) { keepProfile(r.body); profileChanged(); }
+      if (r.ok && r.body && r.body.email === (load() || {}).email) { aiNoteFrom(r.body); keepProfile(r.body); profileChanged(); }
       return profileNow();
     }, function () { profileLoading = null; return profileNow(); });
     return profileLoading;
+  }
+  // ---- "AI help is now on": told once per account (worker/ai-choice.js; Connor, 24 Nov 2026: AI on for everyone) ----
+  // Relay says with the profile (aiNotice) while it's due, so opening the app asks nothing extra for it. It shows as a small
+  // card in Home's "Needs you"; tapping it opens a sheet saying what's sent and where to switch it off, and that counts as
+  // seen: kept with the account, and on this phone too (so it never comes back here even if Relay couldn't be told at once;
+  // it's told again the next time Relay says it's still due).
+  var AI_NOTE_KEY = "relay.ainotice.v1", aiNoteDue = false;
+  function aiNoteSeenHere() { var s = load(); try { var all = JSON.parse(localStorage.getItem(AI_NOTE_KEY) || "{}"); return Boolean(s && s.email && all[s.email]); } catch (e) { return false; } }
+  function aiNoteTell() { return api("/relay/my/ai-notice", { method: "POST" }).catch(function () {}); }
+  function aiNoteFrom(body) {
+    var due = Boolean(body && body.aiNotice) && !isReview();
+    if (due && aiNoteSeenHere()) { due = false; aiNoteTell(); }
+    aiNoteDue = due;
+  }
+  function aiNoteSeen() {
+    var s = load(); aiNoteDue = false;
+    try { var all = JSON.parse(localStorage.getItem(AI_NOTE_KEY) || "{}"); if (s && s.email) { all[s.email] = 1; localStorage.setItem(AI_NOTE_KEY, JSON.stringify(all)); } } catch (e) {}
+    aiNoteTell();
+  }
+  function aiNoteSheet(after) {
+    aiNoteSeen();
+    open(function (sheet) {
+      sheet.setAttribute("aria-label", "AI help is now on");
+      sheet.appendChild(el("h2", { text: "AI help is now on" }));
+      sheet.appendChild(el("p", { className: "rl-dl-intro", text: "Relay now uses Claude, an AI made by Anthropic, to fill in receipts its own reader can't work out, to write a first description when you list something to sell, and to work out what the things you bought are, for your picks and Wrapped." }));
+      sheet.appendChild(el("p", { className: "rl-dl-intro", text: "It gets only what it needs. Emails go with your name, addresses, links, phone numbers and card numbers hidden first. Anthropic can't train its AI on any of it." }));
+      sheet.appendChild(el("p", { className: "rl-dl-intro", text: "You can switch it off any time: tap your picture, then AI help. Switching it off deletes what the AI made." }));
+      sheet.appendChild(el("button", { type: "button", className: "rl-btn", text: "Got it", onclick: function () { close(); } }));
+      sheet.appendChild(el("button", { type: "button", className: "rl-btn ghost", text: "AI settings", onclick: function () { close(); wantAi = true; if (window.go) window.go("me"); } }));
+    });
+    if (after) after();
   }
   // Cuts the chosen photo to a centred square and shrinks it to 256 × 256 on this device. Re-drawing it also leaves the
   // camera's details (like where it was taken) behind. Only this small copy is sent to Relay.
@@ -5848,7 +5879,7 @@
   // Profile's colours, from the Receipts tiles' set (TILE_COLOURS): each kind of thing keeps its own, as tile or row icon.
   var ACC_TINT = { mail: "#4F72E0", pin: "#14918A", bell: "#6662D9", swap: "#E0446E", gavel: "#E0612F", paste: "#B455C9", doc: "#7A7F8C", bag: "#2B3A5C",
     face: "#2E9E5B", lock: "#4F72E0", devices: "#6662D9", phone: "#2E9E5B", card: "#B455C9", shield: "#14918A", download: "#4F72E0", help: "#D47B1F",
-    chat: "#14918A", key: "#D47B1F", flag: "#E0612F", pulse: "#E0446E", gear: "#7A7F8C", layout: "#E0446E", check: "#2E9E5B" };
+    chat: "#14918A", key: "#D47B1F", flag: "#E0612F", pulse: "#E0446E", gear: "#7A7F8C", layout: "#E0446E", check: "#2E9E5B", spark: "#2B59C3" };
   // One row: icon (a white drawing on its colour), label, an optional line underneath, and a chevron (or an arrow for pages
   // that open outside the app).
   function accRow(icon, label, detail, onclick, opts) {
@@ -6566,6 +6597,11 @@
     var rows = [];
     var mailRow = accRow("mail", "Inboxes", "", function () { page("Inboxes", mailPage); });
     if (!review) rows.push(mailRow);
+    // AI help: its two switches, on unless switched off (worker/ai-choice.js).
+    var aiPage = function () { page("AI help", function (b) { b.appendChild(aiHelp()); }); };
+    if (!review) rows.push(accRow("spark", "AI help", "", aiPage));
+    // Opened straight to it from Home's "AI help is on" notice.
+    if (wantAi && !review) { wantAi = false; setTimeout(aiPage, 0); }
     var deliveryRow = null;
     if (!review) {
       // The delivery details a shop gets when you win its auction (in Settings).
@@ -6781,21 +6817,53 @@
         accRow("pulse", "More testing tools", "", null, { href: "./testing.html" })]));
       return box;
     }
-    // AI help (worker/ai-reader.js): Claude reads emails Relay's own reader isn't sure about, only once switched on here.
-    // Shown only once Relay can offer it (the AI key is set). Switching it off deletes what the AI read.
+    // AI help (Profile, AI help): two switches, both on for everyone unless the member switched them off (worker/ai-choice.js,
+    // Connor, 24 Nov 2026). AI help with receipts: Claude reads emails Relay's own reader isn't sure about, and writes the
+    // first description of a listing. AI for picks: Claude reads the names of things bought. Off deletes what the AI made,
+    // and Relay keeps the choice with the account. The last answer is shown at once (memo.aiState) and checked quietly.
     function aiHelp() {
-      var box = el("div", { className: "rl-aih" }); box.hidden = true;
+      var box = el("div", { className: "rl-aih" });
       var sw = el("button", { type: "button", className: "rl-sw" }, [el("i")]);
       sw.setAttribute("role", "switch"); sw.setAttribute("aria-label", "AI help with receipts");
       var msg = el("p", { className: "rl-msg" }); msg.setAttribute("role", "status");
-      box.appendChild(el("div", { className: "rl-aih-top" }, [el("b", { text: "AI help with receipts" }), sw]));
-      box.appendChild(el("p", { text: "When Relay's own reader can't work out a receipt, Claude, an AI made by Anthropic, can read that email to fill in what's missing. It gets the email's text with your name, addresses, links, phone numbers and card numbers hidden, and Anthropic can't train its AI on it. What it fills in is marked for you to check." }));
-      box.appendChild(msg);
-      var on = false, busy = false;
+      var head = el("div", { className: "rl-aih-top" }, [el("b", { text: "AI help with receipts" }), sw]);
+      var what = el("p", { text: "When Relay's own reader can't work out a receipt, Claude, an AI made by Anthropic, reads that email to fill in what's missing, and it writes a first description when you list something to sell. It gets the email's text with your name, addresses, links, phone numbers and card numbers hidden, and Anthropic can't train its AI on it. What it fills in is marked for you to check." });
+      var offNote = el("p", { text: "AI isn't available in Relay right now. Your choices here are kept." }); offNote.hidden = true;
+      box.appendChild(head); box.appendChild(what); box.appendChild(msg);
+      // Greyed-out outlines until Relay answers, when there's no answer kept from before.
+      var bones = el("div", { className: "rl-skel", style: "min-height:150px;border-radius:14px;margin:12px 0 0" });
+      var on = true, busy = false, known = false;
       var draw = function () { sw.setAttribute("aria-checked", on ? "true" : "false"); };
+      var got = function (b) {
+        known = true; bones.remove();
+        var avail = Boolean(b && b.available);
+        sw.style.display = avail ? "" : "none"; offNote.hidden = avail; both.hidden = !avail; pk.hidden = !avail && !picksKnown;
+        on = avail && Boolean(b.on); draw();
+      };
+      // AI for picks: its own switch, under AI help with receipts (worker/item-kinds.js). Off deletes what the AI worked out.
+      var pk = el("div", { className: "rl-aih-picks" });
+      var psw = el("button", { type: "button", className: "rl-sw" }, [el("i")]);
+      psw.setAttribute("role", "switch"); psw.setAttribute("aria-label", "AI for picks");
+      var pmsg = el("p", { className: "rl-msg" }); pmsg.setAttribute("role", "status");
+      pk.appendChild(el("div", { className: "rl-aih-top" }, [el("b", { text: "AI for picks" }), psw]));
+      pk.appendChild(el("p", { text: "Claude reads the names of the things you bought, and the shop, to work out what each one is, so Browse's picks and your Wrapped fit. Nothing else is sent: not your emails, address, order numbers or prices." }));
+      pk.appendChild(pmsg); box.appendChild(pk); box.appendChild(offNote);
+      var both = el("p", { text: "Both are on unless you switch them off. Switching one off deletes what the AI made for it." }); box.appendChild(both);
+      var pon = true, pbusy = false, picksKnown = false;
+      var pdraw = function () { psw.setAttribute("aria-checked", pon ? "true" : "false"); };
+      var pgot = function (b) { picksKnown = true; if (!b || !b.available) { pk.hidden = true; return; } pk.hidden = false; pon = Boolean(b.on); pdraw(); };
+      var kept = memo.aiState || null;
+      if (kept && kept.help) got(kept.help); else { head.hidden = true; what.hidden = true; pk.hidden = true; both.hidden = true; box.appendChild(bones); }
+      if (kept && kept.picks) pgot(kept.picks);
+      draw(); pdraw();
+      var keep = function (k, v) { memo.aiState = memo.aiState || {}; memo.aiState[k] = v; };
       api("/relay/my/ai-reading", { fresh: true }).then(function (r) {
-        if (!r.ok || !r.body || !r.body.available) return;
-        on = Boolean(r.body.on); draw(); box.hidden = false;
+        if (!r.ok || !r.body) { if (!known) { bones.remove(); head.hidden = false; what.hidden = false; sw.style.display = "none"; both.hidden = true; offNote.hidden = false; offNote.textContent = "Couldn't check your AI settings. Check your connection and open this page again."; } return; }
+        keep("help", r.body); head.hidden = false; what.hidden = false; got(r.body);
+      }, function () { if (!known) { bones.remove(); head.hidden = false; what.hidden = false; sw.style.display = "none"; both.hidden = true; offNote.hidden = false; offNote.textContent = "Couldn't reach Relay. Check your connection and open this page again."; } });
+      api("/relay/my/item-kinds", { fresh: true }).then(function (r) {
+        if (!r.ok || !r.body) return;
+        keep("picks", { available: r.body.available, on: r.body.on, choice: r.body.choice || null }); pgot(r.body);
       }, function () {});
       sw.onclick = function () {
         if (busy) return;
@@ -6804,32 +6872,18 @@
         api("/relay/my/ai-reading", { method: "POST", body: { on: want } }).then(function (r) {
           busy = false; sw.disabled = false;
           if (!r.ok) return say(msg, r.status === 503 ? "AI help isn't available right now. Try again later." : "Couldn't change that. Try again in a moment.", true);
-          on = Boolean(r.body && r.body.on); draw();
-          say(msg, on ? "On. Relay will ask the AI about receipts it isn't sure of, a few at a time." : "Off. What the AI read has been deleted.");
+          on = Boolean(r.body && r.body.on); draw(); keep("help", r.body);
+          say(msg, on ? "On. Relay will ask the AI about receipts it isn't sure of, a few at a time." : "Off. What the AI read has been deleted, and it won't write listing descriptions.");
           staleReceipts();
         }, function () { busy = false; sw.disabled = false; say(msg, "Couldn't reach Relay. Check your connection and try again.", true); });
       };
-      // AI for picks: its own switch, under AI help (worker/item-kinds.js). Off deletes what the AI worked out.
-      var pk = el("div", { className: "rl-aih-picks" }); pk.hidden = true;
-      var psw = el("button", { type: "button", className: "rl-sw" }, [el("i")]);
-      psw.setAttribute("role", "switch"); psw.setAttribute("aria-label", "AI for picks");
-      var pmsg = el("p", { className: "rl-msg" }); pmsg.setAttribute("role", "status");
-      pk.appendChild(el("div", { className: "rl-aih-top" }, [el("b", { text: "AI for picks" }), psw]));
-      pk.appendChild(el("p", { text: "Claude reads the names of the things you bought, and the shop, to work out what each one is, so Browse's picks and your Wrapped fit. Nothing else is sent: not your emails, address, order numbers or prices." }));
-      pk.appendChild(pmsg); box.appendChild(pk);
-      var pon = false, pbusy = false;
-      var pdraw = function () { psw.setAttribute("aria-checked", pon ? "true" : "false"); };
-      api("/relay/my/item-kinds", { fresh: true }).then(function (r) {
-        if (!r.ok || !r.body || !r.body.available) return;
-        pon = Boolean(r.body.on); pdraw(); pk.hidden = false; box.hidden = false;
-      }, function () {});
       psw.onclick = function () {
         if (pbusy) return;
         var want = !pon; pbusy = true; psw.disabled = true; say(pmsg, "");
         api("/relay/my/item-kinds", { method: "POST", body: { on: want } }).then(function (r) {
           pbusy = false; psw.disabled = false;
           if (!r.ok) return say(pmsg, r.status === 503 ? "AI isn't available right now. Try again later." : "Couldn't change that. Try again in a moment.", true);
-          pon = Boolean(r.body && r.body.on); pdraw();
+          pon = Boolean(r.body && r.body.on); pdraw(); keep("picks", r.body);
           say(pmsg, pon ? "On. Your picks will follow what the AI works out." : "Off. What the AI worked out has been deleted.");
           if (window.relayAiPicksChanged) window.relayAiPicksChanged();
         }, function () { pbusy = false; psw.disabled = false; say(pmsg, "Couldn't reach Relay. Check your connection and try again.", true); });
@@ -6875,7 +6929,6 @@
         b.appendChild(el("p", { className: "rl-anote", text: "Shop with more than one email address? Add the others and Relay reads them all." }));
         b.appendChild(adds); addInboxButtons(adds, note);
       } else b.appendChild(el("p", { className: "rl-anote", text: "That's the most inboxes Relay can read for one account." }));
-      b.appendChild(aiHelp());
       b.appendChild(note);
       b.appendChild(el("button", { className: "rl-btn", text: "Open my receipts", style: "margin-top:18px", onclick: function () { close(); window.go("receipts"); } }));
       b.appendChild(el("button", { className: "rl-btn ghost", text: "Add a missing receipt", onclick: function () { openFind(); } }));
@@ -7450,7 +7503,7 @@
         var ar = h.aiReader;
         if (ar) {
           var arRows = [row("AI help", ar.on ? "On" : "Off", ar.on ? null : "Comes on once the AI key is added in Cloudflare"),
-            row("Shoppers with it on", N(ar.shoppersOn)), row("Emails read by the AI", N(ar.reads), N(ar.thisWeek) + " this week" + (ar.failed ? ", " + N(ar.failed) + " couldn't be read" : "") + (ar.notPurchase ? ", " + N(ar.notPurchase) + " not purchases" : ""))];
+            row("Shoppers with it on", N(ar.shoppersOn)), row("Switched it off", N(ar.shoppersOff || 0)), row("Emails read by the AI", N(ar.reads), N(ar.thisWeek) + " this week" + (ar.failed ? ", " + N(ar.failed) + " couldn't be read" : "") + (ar.notPurchase ? ", " + N(ar.notPurchase) + " not purchases" : ""))];
           [["total", "Totals"], ["items", "Items"], ["date", "Dates"], ["number", "Order numbers"], ["shop", "Shop names"]].forEach(function (x) {
             var p = ar.parts && ar.parts[x[0]]; if (!p || !(p.filled + p.agreed + p.differed)) return;
             arRows.push(row(x[1], N(p.filled) + " filled in", N(p.agreed) + " agreed with the rules, " + N(p.differed) + " differed"));
@@ -10763,7 +10816,7 @@
       sheet.appendChild(el("h2", { text: "Smarter picks with AI" }));
       sheet.appendChild(el("p", { className: "rl-dl-intro", text: "Claude, an AI made by Anthropic, reads the names of the things on your receipts, like \u201cAlign High-Rise Pant\u201d, to work out what each one is. Your picks and your Wrapped then follow what you really buy." }));
       sheet.appendChild(el("p", { className: "rl-dl-intro", text: "It gets the item names and the shop, nothing else: not your emails, address, order numbers or prices. Anthropic doesn't train its AI on them." }));
-      sheet.appendChild(el("p", { className: "rl-dl-intro", text: "You can switch it off any time: tap your picture, then Inboxes. Switching it off deletes what the AI worked out." }));
+      sheet.appendChild(el("p", { className: "rl-dl-intro", text: "You can switch it off any time: tap your picture, then AI help. Switching it off deletes what the AI worked out." }));
       var note = el("div", { className: "rl-msg", role: "status" });
       var go = el("button", { type: "button", className: "rl-btn", text: "Turn on" });
       go.onclick = function () {
@@ -12226,7 +12279,7 @@
       if (!state.both || !document.body.contains(feed)) return;
       var watched = watches();
       var key = [homeIds(state.both[0]), homeIds(state.both[1]), homeIds(memo.needReceipt), state.connected, state.mail.length, state.wins.length, state.pick, homeLook(), homeFocus(),
-        watched.map(function (w) { return w.sku + ":" + w.nowMinor + ":" + (w.image ? 1 : 0) + ":" + (w.store || "") + ":" + (w.dom || ""); }).join(","), state.watchWaiting ? 1 : 0].join("|");
+        watched.map(function (w) { return w.sku + ":" + w.nowMinor + ":" + (w.image ? 1 : 0) + ":" + (w.store || "") + ":" + (w.dom || ""); }).join(","), state.watchWaiting ? 1 : 0, aiNoteDue ? 1 : 0].join("|");
       if (!force && key === drawnKey && feed.firstChild && !feed.querySelector(".rl-skel")) return;
       drawnKey = key;
       var all = homeFeedEntries(state.both[0], state.both[1]);
@@ -12328,6 +12381,10 @@
     var winsCard = function () { var nWin = state.wins.length, st0 = state.wins[0].you && state.wins[0].you.state, a0 = state.wins[0].auction || {};
       return feedCard({ small: true, icon: "gavel", line: nWin > 1 ? nWin + " auctions to finish" : st0 === "add_address" ? "Add delivery details for your auction win" : st0 === "offered" ? "An auction is yours if you pay" : "Pay for your auction win",
         sub: nWin > 1 ? "" : (a0.title || ""), open: function () { openAuctions("mine"); } }); };
+    // "AI help is now on", once (aiNoteSheet).
+    var aiNoteCard = function () { return feedCard({ small: true, icon: "spark", line: "AI help is now on", sub: "What it does, and how to switch it off", open: function () { aiNoteSheet(function () { draw(); }); } }); };
+    // Relay's answer about it comes with the profile, which may arrive after Home is drawn.
+    profileWatchers.push(function () { if (!feed.isConnected) return false; draw(); });
     var receiptsChanged = function () { draw(true); loadBoth().then(function (both) { state.both = both; draw(); }); };
     // Receipts first (the users-first Home): what needs you, most urgent first; then parcels on their way; then the
     // latest receipts. Only what is really there: when nothing needs you, one calm line says so.
@@ -12351,6 +12408,7 @@
       });
       if (state.wins.length) needs.push({ u: 0.5, card: winsCard() });
       if (state.mail.length) needs.push({ u: 8, card: mailCard() });
+      if (aiNoteDue) needs.push({ u: 20, card: aiNoteCard() });
       var payments = isReview() ? [] : needReceiptNow();
       if (payments.length) needs.push({ u: 9, card: needReceiptCard(payments, receiptsChanged) });
       // Watched things whose price has really dropped since the shopper started watching.
@@ -12380,6 +12438,7 @@
     // testing tools on.
     var drawOrders = function (all) {
       var receipts = state.both[1], byOrder = {};
+      if (aiNoteDue) feed.appendChild(aiNoteCard());
       // The shop's own emails about an order (matched as Home already matches them: shop and amount) say where its parcel is.
       receipts.forEach(function (x) { if (x && x.retailer && x.delivery) byOrder[label(x.retailer.name) + "|" + x.totalPence] = x; });
       var orders = feedEntries(state.both[0], [], refresh, { withTest: testToolsOn() });

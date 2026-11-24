@@ -343,7 +343,7 @@ export function buildWrapped(cards, year, now = Date.now(), opts = {}) {
 // The story opens on the first thing worth remembering, not the first bottle of water or bag of sweets (Connor, 18 Nov
 // 2026): the year's first thing that is kept rather than used up (clothes, shoes, a bag, tech, something for the home, a
 // toy, a book, sports kit), by item-kind-core.js and sure of it (the thing's own name says so, or the AI did for shoppers who
-// switched it on), from a shop rather than a forwarded email. Food, drink, toiletries, beauty, tickets, travel and apps never
+// haven't switched it off), from a shop rather than a forwarded email. Food, drink, toiletries, beauty, tickets, travel and apps never
 // open it. Within a month of that, one with a photo of it is preferred. Null when there is none: the story then opens with
 // the count. Nothing is made up: the shop, the thing and the date are the receipt's; `thing` is what it is, for its icon.
 const GROCER = /\b(sainsbury'?s?|tesco|asda|morrisons|aldi|lidl|waitrose|co-?op|iceland|ocado|m ?& ?s food|spar|budgens|farmfoods|deliveroo|just ?eat|uber ?eats|greggs|pret|costa|starbucks|nespresso)\b/i;

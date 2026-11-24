@@ -4,8 +4,8 @@
 // is no second AI system for kinds.
 //
 // Rules (do not weaken):
-//  * Off unless the shopper switched it on (picks_ai, "AI for picks" under AI help), and off for everyone until
-//    ANTHROPIC_API_KEY is set. Without it, Relay's own rules decide, and a line they aren't sure of is "other": never a guess.
+//  * On for every shopper unless they switched it off ("AI for picks" in Profile, AI help; their choice is kept in
+//    ai-choice.js, 24 Nov 2026), and off for everyone until ANTHROPIC_API_KEY is set. Without it, Relay's own rules decide, and a line they aren't sure of is "other": never a guess.
 //  * Only item names and the shop's name go to Anthropic, with anything that looks personal hidden first (hideDetails):
 //    never the email, the address, the order number or the price. Anthropic's terms don't let it train on what Relay sends.
 //  * Each name is read once and kept with the shopper (item_kinds). At most 40 names a request and 120 a day per shopper.
@@ -16,13 +16,15 @@
 //  * What the AI says shapes picks and what each thing on a receipt is counted as (Wrapped, the receipts list's groups),
 //    only when it says it is sure; it never changes what the receipt says (shop, items, prices, dates).
 //  * Switching it off deletes what the AI said for that shopper (item_kinds), and Relay stops using any AI answers for them.
-//    It also goes with the inbox, the permission and the account (gmail.js).
+//    What the AI said also goes with the inbox, the permission and the account (gmail.js); the shopper's choice stays until
+//    the account goes (ai-choice.js).
 //
-// GET /relay/my/item-kinds: { available, on, kinds: { "<item name, lower case>": { mode, kind, look } } }. With it on,
-//   names not read yet are read first (up to 40). POST { on }: switches it.
+// GET /relay/my/item-kinds: { available, on, choice, kinds: { "<item name, lower case>": { mode, kind, look } } }. With it
+//   on, names not read yet are read after the answer (up to 40). POST { on }: the shopper's choice, kept.
 import { aiAvailable, PICKS_AI_SQL, ITEM_KINDS_SQL, ITEM_KIND_CACHE_SQL } from "./ai-reader.js";
 import { aiModel } from "./ai-runner.js";
 import { claudeFetch, isCapped, noThinking } from "./ai-spend.js";
+import { aiOnFor, aiChoiceOf, aiChoiceStatement, ensureAiChoiceTables } from "./ai-choice.js";
 import { hideDetails, namesToHide } from "./shared-emails.js";
 import { boughtNames } from "./gmail.js";
 import KindCore from "./item-kind-core.js";
@@ -86,7 +88,8 @@ async function askKinds(env, list, fetchImpl) {
   return cleanKinds(text, ids);
 }
 
-const isOnFor = async (env, db, shopperId) => aiAvailable(env) && Boolean(await db.prepare("SELECT 1 AS x FROM picks_ai WHERE shopper_id = ?").bind(shopperId).first());
+// On unless the shopper switched it off (ai-choice.js).
+const isOnFor = async (env, db, shopperId) => aiOnFor(env, shopperId, "picks");
 
 // For a shopper with AI on: the names of things they bought that haven't been read yet, newest first, within today's
 // allowance, are read (a name another shopper's AI already read, with nothing personal in it, is taken from the shared copy
@@ -154,25 +157,29 @@ export async function handleItemKindsRoute(path, method, request, env, cors, sho
   if (path !== "/relay/my/item-kinds") return null;
   const db = env.RELAY_DB, now = (o && o.now) || Date.now();
   await db.batch([db.prepare(PICKS_AI_SQL), db.prepare(ITEM_KINDS_SQL)]);
+  await ensureAiChoiceTables(db);
   if (method === "POST") {
     const b = await request.json().catch(() => null);
     if (!b || typeof b.on !== "boolean") return json({ error: "invalid_request" }, 400, cors);
     if (b.on) {
       if (!aiAvailable(env)) return json({ error: "ai_off" }, 503, cors);
-      await db.prepare("INSERT OR IGNORE INTO picks_ai (shopper_id, on_since) VALUES (?, ?)").bind(shopper.id, now).run();
+      await db.batch([db.prepare("INSERT OR IGNORE INTO picks_ai (shopper_id, on_since) VALUES (?, ?)").bind(shopper.id, now),
+        aiChoiceStatement(db, shopper.id, "picks", true, now)]);
     } else {
-      await db.batch([db.prepare("DELETE FROM picks_ai WHERE shopper_id = ?").bind(shopper.id), db.prepare("DELETE FROM item_kinds WHERE shopper_id = ?").bind(shopper.id)]);
+      await db.batch([db.prepare("DELETE FROM picks_ai WHERE shopper_id = ?").bind(shopper.id), db.prepare("DELETE FROM item_kinds WHERE shopper_id = ?").bind(shopper.id),
+        aiChoiceStatement(db, shopper.id, "picks", false, now)]);
     }
-    return json({ available: aiAvailable(env), on: b.on }, 200, cors);
+    return json({ available: aiAvailable(env), on: b.on, choice: b.on ? "on" : "off" }, 200, cors);
   }
   if (method !== "GET") return json({ error: "not_found" }, 404, cors);
   const known = await learnItemKinds(env, shopper, { ...o, askNow: false });
   if (known && o && o.later) o.later(learnItemKinds(env, shopper, o).catch(() => null));
-  if (!known) return json({ available: aiAvailable(env), on: false, kinds: {} }, 200, cors);
+  const c = await aiChoiceOf(db, shopper.id, "picks"), choice = c ? (c.on ? "on" : "off") : null;
+  if (!known) return json({ available: aiAvailable(env), on: false, choice, kinds: {} }, 200, cors);
   // What picks use: the mode, the kind and the words to look for (what each thing is goes with the receipts instead).
   const kinds = {};
   for (const [k, r] of known) {
     try { const d = JSON.parse(r.data); if (d && (d.mode === "again" || d.mode === "with" || d.mode === "once")) kinds[k] = d.mode === "once" ? { mode: "once" } : { mode: d.mode, kind: d.kind, look: d.look }; } catch {}
   }
-  return json({ available: true, on: true, kinds }, 200, cors);
+  return json({ available: true, on: true, choice, kinds }, 200, cors);
 }

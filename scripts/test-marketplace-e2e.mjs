@@ -457,6 +457,15 @@ for (const [rid, v] of [[ivyJumper, "Size: M, Colour: Sage green"], [ivyBoots, "
   const n0 = anthropic.calls.length; w.env.AI_MONTHLY_LIMIT_PENCE = "0";
   assert.deepEqual((await describe(ivy, ivyBoots)).body, { description: null }); assert.equal(anthropic.calls.length, n0, "past the limit, the AI isn't asked");
   delete w.env.AI_MONTHLY_LIMIT_PENCE;
+  // It goes with AI help, which is on unless the member switches it off: off, the box stays empty and nothing is sent; on
+  // again, it's back (worker/ai-choice.js).
+  anthropic.reply = "Tan suede Chelsea boots from Alpine Active, size UK 6.";
+  assert.equal((await call("/relay/my/ai-reading", { method: "POST", token: ivy.token, body: { on: false } })).status, 200);
+  const n1 = anthropic.calls.length;
+  assert.deepEqual((await describe(ivy, ivyBoots)).body, { description: null }, "AI help switched off: no description");
+  assert.equal(anthropic.calls.length, n1, "and the AI isn't asked");
+  assert.equal((await call("/relay/my/ai-reading", { method: "POST", token: ivy.token, body: { on: true } })).status, 200);
+  assert.equal((await describe(ivy, ivyBoots)).body.description, "Tan suede Chelsea boots from Alpine Active, size UK 6.", "switched on again: written again");
   // 20 a day each.
   anthropic.reply = "Tan suede Chelsea boots from Alpine Active, size UK 6.";
   while (Number(one("SELECT n FROM resale_describe_usage WHERE shopper_id = (SELECT id FROM shoppers WHERE email = ?)", ivy.email).n) < 20) assert.equal((await describe(ivy, ivyBoots)).status, 200);
@@ -464,7 +473,7 @@ for (const [rid, v] of [[ivyJumper, "Size: M, Colour: Sage green"], [ivyBoots, "
   assert.equal((await describe(jay, ivyBoots)).status, 404, "and Jay still can't");
   w.sqlite.exec("DELETE FROM resale_describe_usage");
   delete w.env.ANTHROPIC_API_KEY;
-  console.log("ok - server: an AI description only for the owner's own item, from its name, shop, size and colour (never price, order number or address), checked (nothing it can't say, no contact details), counted, inside the AI limit, 20 a day");
+  console.log("ok - server: an AI description only for the owner's own item, from its name, shop, size and colour (never price, order number or address), checked (nothing it can't say, no contact details), counted, inside the AI limit, 20 a day, and not at all with AI help switched off");
 
   // Messages: every conversation a member is in, newest first, with what's unread; only their own.
   const convs = async who => (await call("/relay/my/resale/conversations", { token: who.token })).body;

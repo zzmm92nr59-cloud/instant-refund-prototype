@@ -92,7 +92,7 @@ const relayWorker = {
     ctx.waitUntil(tidyTexts(env).catch(() => {}));
     // Emails shoppers sent to Relay are deleted after 30 days.
     ctx.waitUntil(tidySharedEmails(env).catch(() => {}));
-    // AI help: a few receipts the rules weren't sure about, for shoppers who switched it on (off until the AI key is set).
+    // AI help: a few receipts the rules weren't sure about, for shoppers who haven't switched it off (off until the AI key is set).
     ctx.waitUntil(runAiReads(env).then(r => { if (r.read || r.failed || r.stopped) console.log("AI reads", JSON.stringify(r)); })
       .catch(e => console.error("AI reads failed", String(e && e.message || e).slice(0, 120))));
     // Relay health by email: the admins' morning summary (from 8am UK time) and alerts when something breaks.

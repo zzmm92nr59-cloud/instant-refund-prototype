@@ -1,5 +1,5 @@
 // Offline test (real SQLite; Gmail and Anthropic are stand-ins): AI help, the AI second reader (worker/ai-reader.js,
-// worker/ai-runner.js). Off until the AI key is set, and only for shoppers who switch it on; only receipts the rules weren't
+// worker/ai-runner.js). Off until the AI key is set, then on for every shopper unless they switch it off (ai-choice.js); only receipts the rules weren't
 // sure about, never one the shopper fixed; the email goes with personal details hidden; the AI's answer is checked; it fills
 // gaps only and marks the receipt for the shopper to check; a shopper's fix wins; limits; a busy AI stops the run; turning it
 // off deletes what it read; the health page counts where the AI and the rules agreed and differed. People, shops and
@@ -110,17 +110,18 @@ const reads = () => sqlite.prepare("SELECT receipt_id, fields, failed, not_purch
 
 // 1. Off until the key is set.
 let r = await (await call("/relay/my/ai-reading", { token: jess })).json();
-assert.deepEqual(r, { available: false, on: false, since: null });
+assert.deepEqual(r, { available: false, on: false, choice: null, since: null });
 assert.equal((await call("/relay/my/ai-reading", { method: "POST", token: jess, body: { on: true } })).status, 503);
 assert.deepEqual(await runAiReads(env, clock, fetchImpl), { read: 0, why: "off" });
-env.ANTHROPIC_API_KEY = "sk-test-not-a-real-key";
-assert.deepEqual(await runAiReads(env, clock, fetchImpl), { read: 0, failed: 0 }, "nobody has switched it on");
 assert.equal(aiCalls.length, 0);
-console.log("ok - off until the AI key is set, and then only for shoppers who switch it on");
+env.ANTHROPIC_API_KEY = "sk-test-not-a-real-key";
+// Sam switches it off; Jess never touches it, so it's on for her.
+r = await (await call("/relay/my/ai-reading", { method: "POST", token: sam, body: { on: false } })).json();
+assert.deepEqual(r, { available: true, on: false, choice: "off", since: null });
+assert.deepEqual(await (await call("/relay/my/ai-reading", { token: jess })).json(), { available: true, on: true, choice: null, since: null }, "on for Jess without her doing anything");
+console.log("ok - off until the AI key is set, then on for everyone unless they switch it off");
 
-// 2. Jess switches it on; the hourly run reads only what the rules weren't sure about, with her details hidden.
-r = await (await call("/relay/my/ai-reading", { method: "POST", token: jess, body: { on: true } })).json();
-assert.deepEqual(r, { available: true, on: true, since: new Date(clock).toISOString() });
+// 2. The hourly run reads only what the rules weren't sure about, from Jess (on by default), with her details hidden; never Sam's.
 assert.deepEqual(await runAiReads(env, clock, fetchImpl), { read: 1, failed: 0 });
 assert.equal(aiCalls.length, 1, "one email read: not the confident one, the fixed one, the pasted one, or Sam's");
 const sent = aiCalls[0];
@@ -166,15 +167,15 @@ console.log("ok - limits: " + AI_PER_RUN + " a run");
 
 // 5. The health page counts where they agreed and differed; Download my data has it; off deletes what was read.
 const h = await (await call("/relay/my/admin/health", { token: ops })).json();
-assert.equal(h.aiReader.on, true); assert.equal(h.aiReader.shoppersOn, 1);
+assert.equal(h.aiReader.on, true); assert.equal(h.aiReader.shoppersOn, 2, "everyone but Sam"); assert.equal(h.aiReader.shoppersOff, 1);
 assert.equal(h.aiReader.reads, AI_PER_RUN + 4); assert.equal(h.aiReader.failed, 2); assert.equal(h.aiReader.notPurchase, 1);
 assert.deepEqual(h.aiReader.parts.total, { filled: AI_PER_RUN + 1, agreed: 0, differed: 0 });
 const exp = await (await call("/relay/my/export", { token: jess })).json();
-assert.equal(exp.aiHelp.on, true); assert.ok(exp.aiHelp.readings.some((x) => x.receiptId === unsure && x.read.totalPence === 4500));
+assert.equal(exp.aiHelp.on, true); assert.equal(exp.aiHelp.yourChoice, "none (on, as for everyone)"); assert.ok(exp.aiHelp.readings.some((x) => x.receiptId === unsure && x.read.totalPence === 4500));
 assert.equal((await call("/relay/my/receipts/" + unsure + "/dismiss", { method: "POST", token: jess, body: {} })).status, 200);
 assert.equal(sqlite.prepare("SELECT COUNT(*) AS n FROM receipt_ai_reads WHERE receipt_id = ?").get(unsure).n, 0, "removing the receipt removes what the AI read");
 r = await (await call("/relay/my/ai-reading", { method: "POST", token: jess, body: { on: false } })).json();
-assert.deepEqual(r, { available: true, on: false, since: null });
+assert.deepEqual(r, { available: true, on: false, choice: "off", since: null });
 assert.equal(sqlite.prepare("SELECT COUNT(*) AS n FROM receipt_ai_reads WHERE shopper_id = ?").get(J).n, 0, "switching it off deletes what the AI read");
 assert.equal((await list()).find((c) => c.id === three).aiFilled, undefined);
 aiCalls = [];
@@ -182,12 +183,14 @@ assert.deepEqual(await runAiReads(env, clock, fetchImpl), { read: 0, failed: 0 }
 assert.equal((await call("/relay/my/ai-reading", { method: "POST", token: jess, body: { on: "yes" } })).status, 400);
 console.log("ok - counted on the health page; in Download my data; removing the receipt or switching off deletes what was read");
 
-// 6. Withdrawing permission deletes the switch and what was read.
-assert.equal((await call("/relay/my/ai-reading", { method: "POST", token: jess, body: { on: true } })).status, 200);
+// 6. Withdrawing permission deletes what was read; the choice itself stays with the account (ai-choice.js).
+r = await (await call("/relay/my/ai-reading", { method: "POST", token: jess, body: { on: true } })).json();
+assert.deepEqual(r, { available: true, on: true, choice: "on", since: new Date(clock).toISOString() });
 await runAiReads(env, clock, fetchImpl);
 assert.ok(sqlite.prepare("SELECT COUNT(*) AS n FROM receipt_ai_reads WHERE shopper_id = ?").get(J).n > 0);
 assert.equal((await call("/relay/my/consent/withdraw", { method: "POST", token: jess, body: {} })).status, 200);
 assert.equal(sqlite.prepare("SELECT COUNT(*) AS n FROM receipt_ai_reads WHERE shopper_id = ?").get(J).n, 0);
 assert.equal(sqlite.prepare("SELECT COUNT(*) AS n FROM ai_reading WHERE shopper_id = ?").get(J).n, 0);
-console.log("ok - withdrawing permission deletes the switch and what the AI read");
-console.log("PASS AI help: off until the key and the switch, unsure receipts only, details hidden, answers checked, gaps only, limits, deleted when off");
+assert.equal(sqlite.prepare("SELECT COUNT(*) AS n FROM ai_choices WHERE shopper_id = ? AND is_on = 0").get(S).n, 1, "Sam's off stays");
+console.log("ok - withdrawing permission deletes what the AI read; choices stay");
+console.log("PASS AI help: off until the key, then on unless switched off, unsure receipts only, details hidden, answers checked, gaps only, limits, deleted when off");
