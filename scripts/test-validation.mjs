@@ -93,7 +93,15 @@ async function signIn(email) {
   for (const p of ["/relay/my/resale/requests/" + id + "/block", "/relay/my/resale/blocks/" + id + "/remove"]) {
     assert.ok(schemaFor(p), p + " is listed"); assert.equal(validateBody(schemaFor(p), { memberId: "x" }).ok, false, p + " takes no fields");
   }
-  console.log("ok - Swap & resell: an edit takes only what a seller may change; block and unblock take nothing");
+  // An AI-written description: only which of the member's own receipt items, nothing more (never the words, a price or
+  // a prompt of the app's own).
+  const describe = schemaFor("/relay/my/resale/describe");
+  assert.ok(describe, "the describe route is listed");
+  assert.ok(validateBody(describe, { receiptId: id, itemIndex: 0 }).ok);
+  for (const f of ["title", "name", "store", "prompt", "system", "model", "size", "colour", "description"]) assert.equal(validateBody(describe, { receiptId: id, itemIndex: 0, [f]: "x" }).ok, false, "describe can't send " + f);
+  assert.equal(validateBody(describe, { receiptId: id, itemIndex: 1000 }).ok, false, "an item index in range");
+  assert.equal(validateBody(describe, { receiptId: "x".repeat(65), itemIndex: 0 }).ok, false, "a receipt id of sane length");
+  console.log("ok - Swap & resell: an edit takes only what a seller may change; block and unblock take nothing; describe takes only the receipt and item");
 }
 // The request-level wrapper: size limits, JSON shape, UTF-8, and the rebuilt request.
 {

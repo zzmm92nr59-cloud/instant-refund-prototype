@@ -29,7 +29,7 @@ await ctx.route("https://**/*", async route => {
     await new Promise(r => setTimeout(r, 500));
     if (st.fail) { const f = st.fail; st.fail = null; return j({ error: f.error }, f.status); }
     const q = b.messages[b.messages.length - 1].text;
-    return j({ reply: /receipts/i.test(q) ? "With your permission, Relay reads your inbox read-only and picks out order emails.\n1. Open Receipts\n2. Tap a group" : "Open Receipts, tap the receipt, then Fix details." });
+    return j({ reply: /receipt/i.test(q) ? "With your permission, Relay reads your inbox read-only and picks out order emails.\n1. Open Receipts\n2. Tap a group" : "Open Receipts, tap the receipt, then Fix details." });
   }
   if (p === "/relay/my/help/handoff") { st.handoffs.push(body()); await new Promise(r => setTimeout(r, 200)); return j({ ok: true, replyTo: EMAIL }); }
   if (p === "/relay/my/admin/me") return j({ admin: false });
@@ -94,26 +94,28 @@ await page.waitForTimeout(400);
 assert.equal(await view.locator(".rl-arow", { hasText: /Chat with us|Contact us/ }).isVisible(), false);
 console.log("ok - no chat row when there's no assistant and no one to write to");
 
-// 2. The assistant is on: it is the Ask tab (and not a row in Help and legal any more).
+// 2. The assistant is on: the Ask tab, and Chat with us in Help and legal too (Talk to a person lives in the chat, not on
+// the Ask tab, since 24 Nov 2026, so Help and legal is where someone who wants a person finds it).
 st.available = true; st.handoff = true;
 await open();
 await view.locator(".rl-arow", { hasText: "Settings" }).click();
 await view.locator(".rl-arow", { hasText: "Terms of use" }).waitFor(); await page.waitForTimeout(400);
-assert.equal(await view.locator(".rl-arow", { hasText: /Chat with us|Contact us/ }).count(), 0, "with the assistant on, it's the Ask tab, not a row");
+assert.ok(await view.locator(".rl-arow", { hasText: "Chat with us" }).isVisible(), "with the assistant on, Chat with us is a row in Help and legal");
+assert.equal(await view.locator(".rl-arow", { hasText: "Contact us" }).count(), 0, "named for the assistant, not Contact us");
 await page.evaluate(() => window.tabTap("ask"));
 const ask = page.locator("#askPage");
-await ask.getByText("Relay's assistant is an AI, so it can get things wrong.").waitFor();
-await ask.getByText(/Relay keeps no copy of this chat/).waitFor();
+await ask.getByText("Answers come from an AI and can be wrong. Relay keeps no copy.").waitFor();
+assert.equal(await ask.getByRole("button", { name: "Talk to a person" }).count(), 0, "Talk to a person is in the chat, not on the Ask tab");
 await polished("start", "#askPage");
 // A suggested question: the outline while it writes, then the answer, under the assistant saying it's an AI.
-await ask.getByRole("button", { name: "How does Relay find my receipts?" }).click();
+await ask.getByRole("button", { name: "Why is a receipt missing?" }).click();
 const chat = page.locator(".rl-back .rl-hc"); // the chat opens as a tall sheet over the Ask tab
 await chat.locator(".rl-chat-typing").waitFor();
 await chat.getByText("Hi, I'm Relay's assistant. I'm an AI, so I can get things wrong.", { exact: false }).waitFor();
 await chat.getByText(/picks out order emails/).waitFor();
 assert.equal(await chat.locator(".rl-chat-typing").count(), 0);
 assert.equal(await chat.getByText(/Relay keeps no copy of this chat/).count(), 1, "what is kept is said once in the chat");
-assert.deepEqual(st.chats[0], { messages: [{ role: "user", text: "How does Relay find my receipts?" }] });
+assert.deepEqual(st.chats[0], { messages: [{ role: "user", text: "Why is a receipt missing?" }] });
 assert.equal(await chat.getByRole("button", { name: "Where's my receipt?" }).count(), 0, "the topics go once a question is asked");
 // The answer's numbered steps show as a numbered list, never as the raw "1." text (Connor, 15 Nov: stars and dashes showed).
 assert.deepEqual(await chat.locator(".rl-chat-b.bot .rl-rich").last().locator("ol li").allInnerTexts(), ["Open Receipts", "Tap a group"], "the steps are a numbered list");
@@ -142,7 +144,7 @@ await page.evaluate(() => document.activeElement && document.activeElement.blur(
 await page.waitForFunction(() => !document.body.classList.contains("typing"));
 const gap = await page.evaluate(() => { const bar = document.querySelector(".rl-chat-bar").getBoundingClientRect(), nav = document.querySelector(".footnav").getBoundingClientRect(); return nav.top - bar.bottom; });
 assert.ok(gap >= 4, "the box to write in sits above the tab bar (gap " + gap + "px)");
-await ask.getByRole("button", { name: "Try asking. Carry on your chat" }).click();
+await ask.getByRole("button", { name: "Carry on your chat" }).click();
 await chat.getByText("Open Receipts, tap the receipt, then Fix details.").waitFor();
 assert.equal(await box.inputValue(), "One more thing", "what was written is still in the box");
 console.log("ok - the assistant: says it's an AI, outlines while it writes, answers, sends once, plain errors, above the tab bar");

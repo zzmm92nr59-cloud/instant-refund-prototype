@@ -70,6 +70,8 @@ async function shopper({ testingTools = false, hash = "", market = false } = {})
     if (p === "/relay/my/resale/news") return j({ requests: 1, messages: 1, total: 2, active: true });
     if (p === "/relay/my/resale/mine") return j({ listings: [{ id: "66666666-6666-6666-6666-666666666666", title: "Wool jumper", store: "Example Outfitters", size: "L", condition: "good", askPence: 2500, currency: "GBP", swapOk: true, hasImage: false, status: "active",
       requests: [{ id: CHAT, who: "Member 1", kind: "buy", message: null, status: "accepted", offered: null }] }], myRequests: [] });
+    if (p === "/relay/my/resale/conversations") return j({ conversations: [{ id: CHAT, title: "Wool jumper", store: "Example Outfitters", with: "Buyer", selling: true, open: st.chatOpen, lastAt: Date.now(), last: { mine: false, body: "Is it still available?" }, unread: 1 }],
+      news: { requests: 1, messages: 1, total: 2, active: true } });
     if (p === "/relay/my/resale/requests/" + CHAT + "/messages") return j({ title: "Wool jumper", status: "accepted", with: "Buyer", open: st.chatOpen, messages: [{ mine: false, body: "Is it still available?", createdAt: 1 }] });
     return j({});
   });
@@ -230,6 +232,29 @@ const TEN_MINUTES = 600000;
   assert.deepEqual(errors, []);
   await ctx.close();
   console.log("ok - a Swap & resell member: what's new there is asked once on opening (a red number on Browse), then nothing on a timer");
+}
+
+// 1c. Messages (24 Nov 2026): with a message unread, Swap & resell opens on Messages, which asks Relay once for the list
+// and nothing more while it sits there (no timer); pulling down or opening it again is what asks again.
+{
+  reset();
+  const { ctx, page, errors } = await shopper({ market: true });
+  await homeShows(page, "J");
+  await until(page, () => count(/resale\/news/) === 1, "what's new in Swap & resell");
+  const lists = () => count(/GET \/relay\/my\/resale\/conversations/);
+  assert.equal(lists(), 0, "the list isn't asked for on opening the app");
+  await goTab(page, "Browse");
+  await page.locator("#browsePage .rl-b2-doors .rl-arow", { hasText: "Swap & resell" }).click();
+  await page.locator('[data-tab="messages"][aria-pressed="true"]').waitFor();
+  await page.locator(".rl-mk-conv", { hasText: "Wool jumper" }).waitFor();
+  await settle(page);
+  assert.equal(lists(), 1, "opened: asked once");
+  const mark = log.length;
+  await pass(page, TEN_MINUTES);
+  assert.deepEqual(log.slice(mark), [], "and nothing for ten minutes while it's on screen");
+  assert.deepEqual(errors, []);
+  await ctx.close();
+  console.log("ok - Messages: asked once when opened, never on a timer");
 }
 
 // 5. A conversation.

@@ -149,7 +149,7 @@ async function homeDrawn(page, where, { cardsNeeded = true } = {}) {
 }
 const reqsSince = t => log.filter(x => x.at >= t).map(x => x.r);
 const tabKey = { Home: "profile", Receipts: "receipts", Browse: "discover", Ask: "ask" };
-const tabReady = { Home: "#homePage .h2-feed > *:not(.rl-skel)", Receipts: "#receiptsPage .rl-tile, #receiptsPage .rl-calm-filter", Browse: "#view .title, #view h1", Ask: "#askPage .rl-chat, #askPage .rl-ask-q" };
+const tabReady = { Home: "#homePage .h2-feed > *:not(.rl-skel)", Receipts: "#receiptsPage .rl-tile, #receiptsPage .rl-calm-filter", Browse: "#view .title, #view h1", Ask: "#askPage .rl-chat, #askPage .rl-ask-pill" };
 const hide = (page, hidden) => page.evaluate(h => {
   Object.defineProperty(document, "hidden", { configurable: true, get: () => h }); Object.defineProperty(document, "visibilityState", { configurable: true, get: () => (h ? "hidden" : "visible") });
   document.dispatchEvent(new Event("visibilitychange")); if (h) window.dispatchEvent(new Event("blur")); else window.dispatchEvent(new Event("focus"));

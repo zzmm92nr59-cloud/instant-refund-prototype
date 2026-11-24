@@ -1218,7 +1218,7 @@
     ".rl-mk-tabs button[aria-pressed=true]{background:#C9D8FF;color:#101828}.rl-mk-tabs button:active{transform:scale(.97)}.rl-mk-tabs button:focus-visible{outline:2px solid var(--rl-text);outline-offset:2px}" +
     ".rl-mk-lead{font-size:15px;line-height:1.45;color:var(--rl-text2)}.rl-mk-skel{min-height:110px;margin:10px 0;border-radius:18px}" +
     ".rl-mk-area{display:flex;gap:8px;align-items:center;margin:12px 0;color:var(--rl-text2)}.rl-mk-area .rl-jic{margin:0;flex:none}" +
-    ".rl-mk-area input,.rl-mk-form input:not([type=checkbox]),.rl-mk-form select,.rl-mk-select,.rl-mk-chat-in{box-sizing:border-box;width:100%;min-width:0;min-height:44px;margin:0;padding:0 14px;border:1px solid var(--rl-line);border-radius:12px;font:inherit;font-size:16px;background:var(--rl-card);color:var(--rl-text)}.rl-mk-chat-in{margin:0 0 10px}.rl-mk-safe summary{display:block;padding:13px 0;line-height:18px;font-weight:800;cursor:pointer}" +
+    ".rl-mk-area input,.rl-mk-form input:not([type=checkbox]),.rl-mk-form select,.rl-mk-form textarea,.rl-mk-select,.rl-mk-chat-in{box-sizing:border-box;width:100%;min-width:0;min-height:44px;margin:0;padding:0 14px;border:1px solid var(--rl-line);border-radius:12px;font:inherit;font-size:16px;background:var(--rl-card);color:var(--rl-text)}.rl-mk-chat-in{margin:0 0 10px}.rl-mk-safe summary{display:block;padding:13px 0;line-height:18px;font-weight:800;cursor:pointer}" +
     ".rl-mk-select{margin-top:8px}.rl-mk-area input{flex:1}" +
     ".rl-mk-near{display:inline-flex;align-items:center;gap:4px;margin-top:6px;padding:3px 10px;border-radius:999px;background:var(--rl-accent-bg);color:var(--rl-accent);font-size:13px;font-weight:700}.rl-mk-near .rl-jic{margin:0}" +
     ".rl-mk-quote,.rl-mk-status{display:block;margin-top:6px;font-size:14px;line-height:1.4;color:var(--rl-text2)}.rl-mk-warn{display:block;margin-top:6px;font-size:14px;line-height:1.4;color:var(--rl-text)}" +
@@ -1316,7 +1316,24 @@
     ".rl-mk-name{font-size:17px;line-height:22px;font-weight:600;color:var(--rl-text);overflow-wrap:anywhere}.rl-mk-info .rl-mk-price{font-size:17px;font-weight:600}" +
     ".rl-mk-info .rl-mk-tags{display:flex}.rl-mk-info .rl-mk-near{align-self:flex-start}.rl-mk-info .rl-mk-status{margin-top:2px}" +
     ".rl-mk-count{display:inline-block;min-width:22px;height:22px;padding:0 7px;box-sizing:border-box;border-radius:11px;background:#e5342a;color:#fff;font-size:13px;font-weight:700;line-height:22px;text-align:center}" +
-    ".rl-mk-card2>.rl-mk-count,.rl-mk-tapcard>.rl-mk-count{position:absolute;top:10px;right:10px}.rl-mk-tabs button{position:relative;gap:6px;grid-auto-flow:column}.rl-mk-tabs .rl-mk-count{margin-left:2px}" +
+    ".rl-mk-card2>.rl-mk-count,.rl-mk-tapcard>.rl-mk-count{position:absolute;top:10px;right:10px}.rl-mk-tabs button{position:relative;gap:6px;grid-auto-flow:column;flex:1 0 auto;padding:0 8px;white-space:nowrap}" +
+    // Four parts now (Messages added, 24 Nov 2026): each as wide as its name needs, the room left shared out, so a red
+    // number fits beside its word; with much bigger text the row slides sideways rather than the names running together.
+    ".rl-mk-tabs{overflow-x:auto;scrollbar-width:none}.rl-mk-tabs::-webkit-scrollbar{display:none}" +
+    ".rl-mk-tabs .rl-mk-count{margin:0}.rl-mk-field>.rl-mk-note{font-weight:400}" +
+    // Messages: a row per conversation, the item's picture, its name and when, who it's with, the last message.
+    ".rl-mk-convs{margin:12px 0 0;border-radius:20px;overflow:hidden;background:var(--rl-card)}" +
+    ".rl-mk-conv{all:unset;box-sizing:border-box;position:relative;cursor:pointer;width:100%;display:flex;gap:12px;align-items:center;min-height:76px;padding:12px 16px;transition:background .15s}.rl-mk-conv+.rl-mk-conv{border-top:1px solid var(--rl-line)}" +
+    ".rl-mk-conv:active{background:var(--rl-fill)}.rl-mk-conv:focus-visible{outline:2px solid var(--rl-accent);outline-offset:-2px}.rl-mk-conv>.rl-mk-count{flex:none;align-self:center}" +
+    ".rl-mk-cpic{flex:none;width:52px;height:52px;border-radius:14px;overflow:hidden;background:#fff;display:grid;place-items:center;box-shadow:inset 0 0 0 1px var(--rl-line)}.rl-mk-cpic img{width:100%;height:100%;object-fit:cover;object-position:50% 8%}" +
+    ".rl-mk-cmid{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}.rl-mk-ctop{display:flex;align-items:baseline;gap:8px}.rl-mk-ctop b{flex:1;min-width:0;font-size:16px;font-weight:600;color:var(--rl-text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}" +
+    ".rl-mk-cwhen{flex:none;font-size:13px;color:var(--rl-text2)}.rl-mk-cwho{font-size:13px;color:var(--rl-text2)}.rl-mk-cline{font-size:15px;line-height:20px;color:var(--rl-text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}" +
+    ".rl-mk-conv.unread .rl-mk-cline{color:var(--rl-text);font-weight:600}" +
+    // A new listing's description: a box of a few lines; while AI writes it, greyed (no spinner); then a small tag says so.
+    ".rl-mk-form textarea.rl-mk-desc{padding:12px 14px;min-height:96px;line-height:22px;resize:vertical}.rl-mk-desc.rl-mk-wait{background:var(--rl-fill);color:transparent}.rl-mk-desc.rl-mk-wait::placeholder{color:transparent}" +
+    ".rl-mk-dhead{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.rl-mk-field>.rl-mk-dhead{font-size:13px;font-weight:700;color:var(--rl-text2)}" +
+    ".rl-mk-aitag{display:inline-block;padding:2px 8px;border-radius:999px;background:var(--rl-accent-bg);color:var(--rl-accent);font-size:13px;font-weight:600;line-height:18px}" +
+    ".rl-mk-fromrc{display:flex;align-items:center;gap:12px;margin:2px 0 4px}.rl-mk-fromrc .rl-mk-note{flex:1;min-width:0}.rl-mk-rcpic{cursor:default;background:var(--rl-fill)}" +
     ".rl-mk-new{display:block;font-size:14px;font-weight:700;color:#c4271e}.rl-mk-req .rl-mk-new{display:inline-block;margin:2px 0}" +
     ".rl-mk-sheet .rl-mk-top{display:flex;justify-content:space-between;align-items:baseline;gap:12px}.rl-mk-sheet .rl-mk-top h2{margin:0;font-size:22px;line-height:28px}" +
     ".rl-mk-sheet .rl-mk-from{display:block;margin-top:4px;font-size:15px;color:var(--rl-text2)}.rl-mk-sheet .rl-mk-tags{display:flex}.rl-mk-sheet-acts{margin-top:14px}.rl-mk-sheet-acts .rl-btn{margin-top:10px}" +
@@ -1597,19 +1614,17 @@
     ".rl-ask-nm{padding:0 2px;font-size:14px;line-height:18px;font-weight:600;color:var(--rl-text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.rl-ask-tile .rl-ask-nm+.rl-ask-day{margin-top:-4px}.rl-ask-day{padding:0 2px;font-size:13px;line-height:16px;color:var(--rl-text2)}" +
     // The day it was bought is a line under the tile, so it never covers a photo or a logo. The shop is in the picture when
     // Relay has its logo, and always in the tile's spoken name.
-    ".rl-ask-q{all:unset;box-sizing:border-box;cursor:pointer;display:flex;align-items:center;gap:12px;width:100%;min-height:64px;padding:8px 0;transition:opacity .12s}.rl-ask-q:active{opacity:.55}.rl-ask-q:focus-visible{outline:2px solid var(--rl-accent);outline-offset:-2px;border-radius:14px}" +
-    ".rl-ask-q b{flex:1;min-width:0;font-size:16px;line-height:21px;font-weight:500;color:var(--rl-text)}" +
-    ".rl-ask-qi{flex:none;width:48px;height:48px;border-radius:12px;display:grid;place-items:center;color:#fff;background:var(--qi)}.rl-ask-qi>span{display:grid;margin:0;color:inherit}" +
-    // Said quietly at the end: it's an AI, what is kept, and the way to a person.
-    ".rl-ask-ai{margin:10px 0 0;font-size:13.5px;line-height:18px;color:var(--rl-text2)}" +
-    ".rl-asktab.rl-ask-opening .rl-anote{margin:4px 0 0!important;line-height:18px;color:var(--rl-text2)}" +
-    ".rl-asktab.rl-ask-opening .rl-chat-person{display:inline-flex;align-items:center;align-self:flex-start;width:auto;min-height:44px;margin:0;padding:0;border-radius:0;font-size:15px;font-weight:600}" +
-    // On a short phone the AI line moves above the questions, so it is still on the first screen.
-    "@media(max-height:760px){.rl-chat.rl-ask-open{display:flex;flex-direction:column;gap:0}.rl-ask-open .rl-ask-rec{order:0}.rl-ask-open .rl-ask-h2{order:1;margin-bottom:6px}.rl-ask-open .rl-ask-ai{order:2;margin:0 0 6px}.rl-ask-open .rl-ask-qs{order:3}}" +
-    // After a question typed into the box: the same words can be looked for in Receipts instead.
-    ".rl-ask-find{all:unset;box-sizing:border-box;cursor:pointer;align-self:flex-end;min-height:44px;display:inline-flex;align-items:center;padding:0 4px;color:var(--rl-accent);font-size:15px;font-weight:600;text-align:right;transition:opacity .12s}.rl-ask-find:active{opacity:.55}.rl-ask-find:focus-visible{outline:2px solid var(--rl-accent);outline-offset:1px;border-radius:10px}" +
+    // Three questions as pills: 44px tall, a hairline round them, the words in the page's own colour.
+    ".rl-ask-pills{display:flex;flex-wrap:wrap;gap:8px;margin:4px 0 0}" +
+    ".rl-ask-pill{all:unset;box-sizing:border-box;cursor:pointer;display:inline-flex;align-items:center;min-height:44px;padding:10px 16px;border-radius:999px;border:1px solid var(--rl-line);background:var(--rl-card);color:var(--rl-text);font-size:15px;line-height:20px;font-weight:500;transition:transform .12s,opacity .12s}" +
+    ".rl-ask-pill.on{border-color:var(--rl-accent);color:var(--rl-accent);font-weight:600}.rl-ask-pill:active{transform:scale(.96);opacity:.7}.rl-ask-pill:focus-visible{outline:2px solid var(--rl-accent);outline-offset:2px}" +
+    // Receipts that match what's typed, a row each, in the questions' place.
+    ".rl-ask-fl{border-radius:18px;overflow:hidden;background:var(--rl-card);margin:0 0 4px}.rl-ask-finds .rl-rr{margin:0}.rl-ask-hit:active{background:var(--rl-fill)}.rl-ask-fh{margin:0 0 4px}.rl-ask-hit{width:100%}" +
+    // The one line on what answers are: quiet, one tap to the whole of it.
+    ".rl-ask-note{all:unset;box-sizing:border-box;cursor:pointer;display:flex;align-items:center;gap:6px;min-height:44px;margin:8px 2px 4px;color:var(--rl-text2);font-size:13px;line-height:17px;transition:opacity .12s}.rl-ask-note:active{opacity:.55}.rl-ask-note:focus-visible{outline:2px solid var(--rl-accent);outline-offset:2px;border-radius:8px}" +
+    ".rl-ask-note>span:first-child{flex:1;min-width:0}.rl-ask-note-c{flex:none;display:grid;color:var(--rl-text2)}" +
     // Outlines while the page is being worked out.
-    ".rl-ask-sk .rl-skel{display:block;min-height:0;margin:0;border:0}.rl-ask-sk-t{display:flex;gap:8px;margin:0 0 20px}.rl-ask-sk-r{display:flex;align-items:center;gap:12px;height:64px}" +
+    ".rl-ask-sk .rl-skel{display:block;min-height:0;margin:0;border:0}.rl-ask-sk-t{display:flex;gap:8px;margin:0 0 20px}.rl-ask-sk-p{display:flex;flex-wrap:wrap;gap:8px}" +
     ".rl-b2-doors{margin-top:22px}#dcRoot:has(#browseGrid .bg-sec) .rl-b2-doors{display:none}#browsePage .rl-ys{margin-bottom:18px}.rl-b2-doors .rl-agroup{margin-top:0}" +
     ".rl-arow-t b{font-weight:600}.rl-arow-d{font-size:14px}.rl-rr-mid b{font-size:16px;font-weight:600}.rl-rr-mid span{font-size:14px}.rl-rr-end b{font-size:16px;font-weight:600}";
   document.head.appendChild(calmCss);
@@ -5316,18 +5331,24 @@
     // Opened from a notification or a search (index.html openLink, browseSuggest): which part, conversation or listing.
     var want = window.__relayMarketWant || null; window.__relayMarketWant = null;
     var cur = (want && want.tab) || startTab || (focusReceipt ? "sell" : "browse");
-    function openChat(id) { sheet.textContent = ""; chatView(sheet, id, function () { sheet.textContent = ""; resaleView(sheet, onBack, null, "mine"); }); }
-    [["browse", "Browse"], ["mine", "Yours"], ["sell", "Sell"]].forEach(function (t) {
+    // A conversation is the screen; its Back returns to the part it was opened from (Messages, or Yours).
+    function openChat(id) { var from = cur === "messages" ? "messages" : "mine"; sheet.textContent = ""; chatView(sheet, id, function () { sheet.textContent = ""; resaleView(sheet, onBack, null, from); }); }
+    // Messages (Connor, 24 Nov 2026: "Where's market chat?"): every conversation, as buyer or seller, in one list.
+    [["browse", "Browse"], ["messages", "Messages"], ["mine", "Yours"], ["sell", "Sell"]].forEach(function (t) {
       var b = el("button", { type: "button", onclick: function () { if (cur === t[0] && !focusReceipt) return; cur = t[0]; focusReceipt = null; draw(); } }, [el("span", { text: t[1] })]);
       b.setAttribute("data-tab", t[0]); tabs.appendChild(b);
     });
-    // Yours carries the red number while anything there is new.
+    // The red numbers: unread messages on Messages, new requests on your listings on Yours.
     function paintCount() {
       if (!document.body.contains(tabs)) return document.removeEventListener("relay:market-news", paintCount);
-      var y = tabs.querySelector('[data-tab="mine"]'), n = Number(window.__relayMarket) || 0, old = y.querySelector(".rl-mk-count");
-      if (old) old.remove();
-      if (n) y.appendChild(mkCount(n));
-      y.setAttribute("aria-label", n ? "Yours, " + n + " new" : "Yours");
+      var nw = window.__relayMarketNews || {}, total = Number(window.__relayMarket) || 0;
+      var msgs = Number(nw.messages) || 0, reqs = nw.requests != null ? Number(nw.requests) || 0 : Math.max(0, total - msgs);
+      [["messages", "Messages", msgs, msgs === 1 ? "1 unread" : msgs + " unread"], ["mine", "Yours", reqs, reqs + " new"]].forEach(function (t) {
+        var b = tabs.querySelector('[data-tab="' + t[0] + '"]'), old = b.querySelector(".rl-mk-count");
+        if (old) old.remove();
+        if (t[2]) b.appendChild(mkCount(t[2]));
+        b.setAttribute("aria-label", t[2] ? t[1] + ", " + t[3] : t[1]);
+      });
     }
     document.addEventListener("relay:market-news", paintCount);
     // On the Market page (no onBack) the page supplies its own heading and there is nothing to go back to.
@@ -5396,6 +5417,7 @@
       paintCount();
       body.textContent = ""; tell("");
       if (cur === "browse") return drawBrowse(openId);
+      if (cur === "messages") return drawMessages();
       if (cur === "mine") return drawMine();
       drawSell();
     }
@@ -5428,6 +5450,40 @@
         });
         if (openId) { var hit = rows.filter(function (l) { return l.id === openId; })[0]; if (hit) browseSheet(hit, mine); else tell("That's no longer available.", true); }
       });
+    }
+    // Messages: every conversation the member is in, as buyer or seller, newest first. Each row is one tap to the
+    // conversation: the item's picture, its name, who it's with and the last message; a red number while some is unread.
+    // Asked of Relay each time it's opened (a reply may have come), never on a timer.
+    function drawMessages() {
+      outlines(3);
+      api("/relay/my/resale/conversations", { fresh: true }).then(function (r) {
+        if (cur !== "messages") return;
+        body.textContent = "";
+        if (!r.ok || !r.body) return body.appendChild(el("p", { text: "Couldn't load your messages. Pull down to try again." }));
+        if (r.body.news) mkNews(r.body.news);
+        var cs = r.body.conversations || [];
+        if (cs.length) mkUsed(true);
+        if (!cs.length) return body.appendChild(el("div", { className: "rl-empty", style: "margin-top:14px" }, [el("h3", { text: "No messages yet" }),
+          el("p", { text: "When you message a seller about something in Browse, or someone messages you about your listing, the conversation shows here." })]));
+        var list = el("div", { className: "rl-mk-convs" });
+        cs.forEach(function (c) {
+          var pic = el("span", { className: "rl-mk-cpic" }); pic.setAttribute("aria-hidden", "true");
+          var mark = function () { pic.textContent = ""; pic.appendChild(ysLogo({ name: String(c.store || c.title || "?"), logo: "", cat: "other" }, 52)); };
+          if (c.hasImage && c.listingId) { var im = el("img", { alt: "" }); pic.appendChild(im); apiBlob("/relay/my/resale/listings/" + c.listingId + "/image").then(function (u) { if (u) im.src = u; else mark(); }); } else mark();
+          var when = c.lastAt ? new Date(c.lastAt) : null, today = new Date();
+          var whenText = !when ? "" : when.toDateString() === today.toDateString() ? when.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }) : when.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+          var line = c.last ? (c.last.mine ? "You: " : "") + c.last.body : c.selling ? "You accepted. Say hello." : "They said yes. Say hello.";
+          var who = (c.selling ? "Buyer" : "Seller") + (c.itemGone ? ", item gone" : !c.open ? ", ended" : "");
+          var row = el("button", { type: "button", className: "rl-mk-conv" + (c.unread ? " unread" : ""), onclick: tapOnce(function () { openChat(c.id); }) }, [pic,
+            el("span", { className: "rl-mk-cmid" }, [el("span", { className: "rl-mk-ctop" }, [el("b", { text: c.title }), whenText ? el("span", { className: "rl-mk-cwhen", text: whenText }) : null].filter(Boolean)),
+              el("span", { className: "rl-mk-cwho", text: who }), el("span", { className: "rl-mk-cline", text: line })])]);
+          if (c.unread) row.appendChild(mkCount(c.unread));
+          row.setAttribute("aria-label", c.title + ", with the " + who.toLowerCase() + (c.unread ? ", " + c.unread + " unread" : "") + ". " + line);
+          row.setAttribute("data-conv", c.id);
+          list.appendChild(row);
+        });
+        body.appendChild(list);
+      }, function () { if (cur !== "messages") return; body.textContent = ""; body.appendChild(el("p", { text: "Couldn't reach Relay. Check your connection and try again." })); });
     }
     // Someone else's listing: ask for it, offer a swap, message the seller once they've said yes, or report it.
     function browseSheet(l, mine) {
@@ -5594,7 +5650,7 @@
       Object.keys(CONDITION).forEach(function (k) { cond.appendChild(el("option", { value: k, text: CONDITION[k] })); });
       cond.value = l.condition;
       var price = el("input", { placeholder: "Leave empty for offers", inputMode: "decimal", autocomplete: "off", value: l.askPence == null ? "" : String((l.askPence / 100).toFixed(2)).replace(/\.00$/, "") });
-      var words = el("input", { placeholder: "Optional, no contact details", maxLength: 200, autocomplete: "off", value: l.note || "" });
+      var words = el("textarea", { className: "rl-mk-desc", placeholder: "What buyers should know. No contact details.", maxLength: 400, rows: 3, autocomplete: "off", value: l.note || "" });
       // Photos: the ones there now stay unless new ones are chosen (which replace them) or they're taken away.
       var shots = [], drop = false, pickIn = el("input", { type: "file", accept: "image/*", multiple: true, style: "display:none" });
       var thumbs = el("div", { className: "rl-mk-photos" }), state = el("span", { className: "rl-mk-note" });
@@ -5626,7 +5682,7 @@
           else say(note, resaleErrors[r.body && r.body.error] || "Couldn't save the changes. Please try again.", true);
         }, function () { save.disabled = false; save.classList.remove("rl-working"); say(note, "Couldn't reach Relay. Check your connection and try again.", true); });
       } });
-      [field("Asking price in £", price), field("Condition", cond), field("Note for buyers", words),
+      [field("Asking price in £", price), field("Condition", cond), field("Description", words),
        el("div", { className: "rl-mk-field" }, [el("span", { text: "Photos" }), thumbs, state, addPh, dropBtn, pickIn]), note, save].forEach(function (n) { form.appendChild(n); });
       sh.appendChild(form);
       drawShots();
@@ -5637,13 +5693,19 @@
         if (cur !== "sell") return;
         body.textContent = "";
         if (!r.ok) return body.appendChild(el("p", { text: "Couldn't load your items. Pull down to try again." }));
-        var items = (r.body.items || []).filter(function (i) { return !i.alreadyListed && (!focusReceipt || i.receiptId === focusReceipt); });
+        var items = (r.body.items || []).filter(function (i) { return !i.alreadyListed && (!focusReceipt || i.receiptId === focusReceipt); }), defaults = r.body.defaults || {};
         if (!items.length) body.appendChild(el("p", { text: focusReceipt ? "That item is already listed." : "Nothing to list yet. Items come from the receipts Relay found in your email." }));
-        items.forEach(function (i) { body.appendChild(sellCard(i)); });
+        items.forEach(function (i) { body.appendChild(sellCard(i, defaults)); });
         if (focusReceipt) body.appendChild(el("button", { className: "rl-btn ghost", text: "Show all my items", onclick: function () { focusReceipt = null; draw(); } }));
       });
     }
-    function sellCard(i) {
+    // A new listing starts filled in with what Relay already knows (Connor, 24 Nov 2026: "Listings should autofill your
+    // details like postcode etc and give an AI summary of the item"): the size from the receipt, what was paid, the
+    // receipt's photo when it's of this one thing, the postcode area from your delivery details (only its first half is
+    // ever shown), how you hand things over from your last listing, and a description written by AI from the item's name,
+    // shop, size and colour, marked until you change it. Everything can be changed before it goes on Relay.
+    function sellCard(i, defaults) {
+      defaults = defaults || {};
       var paidAt = (i.free === true && i.pricePence === 0 ? "A free gift" : i.pricePence != null ? "Paid " + money(i.pricePence, i.currency) : "Bought") + (i.store ? " at " + i.store : "") + (dayOf(i.orderDate) ? " on " + dayOf(i.orderDate) : "");
       var card = el("div", { className: "rl-order" }, [el("b", { text: cleanName(i.title, i.store) || i.title }), el("span", { text: paidAt })]);
       if (i.returnWindowOpen === true) card.appendChild(el("span", { className: "rl-mk-warn", text: "You can still return this to the shop for a refund" + (dayOf(i.returnDeadline) ? " until " + dayOf(i.returnDeadline) : "") + "." }));
@@ -5656,16 +5718,40 @@
         cond.value = "like_new";
         var size = el("input", { placeholder: "Optional", maxLength: 20, autocomplete: "off" });
         var price = el("input", { placeholder: "Leave empty for offers", inputMode: "decimal", autocomplete: "off" });
-        var note = el("input", { placeholder: "Optional, no contact details", maxLength: 200, autocomplete: "off" });
+        var note = el("textarea", { className: "rl-mk-desc", placeholder: "What buyers should know. No contact details.", maxLength: 400, rows: 3, autocomplete: "off" });
         var dk = "listing:" + i.receiptId + ":" + i.itemIndex + ":";
         keepDraft(size, dk + "size"); keepDraft(price, dk + "price"); keepDraft(note, dk + "note");
+        if (!size.value && i.size) size.value = i.size;
         var swap = el("input", { type: "checkbox" });
+        swap.checked = defaults.swapOk === true;
         var hand = el("select");
         [["either", "Collection or post"], ["collect", "Collection only"], ["post", "Post only"]].forEach(function (o) { hand.appendChild(el("option", { value: o[0], text: o[1] })); });
+        if (defaults.handover) hand.value = defaults.handover;
         var savedArea = ""; try { savedArea = localStorage.getItem("relay-market-area") || ""; } catch (e) {}
-        var area = el("input", { placeholder: "For example SW11", maxLength: 8, value: savedArea, autocomplete: "off" });
+        var area = el("input", { placeholder: "For example SW11", maxLength: 8, value: defaults.area || savedArea, autocomplete: "off" });
         var areaField = el("div", {}, [field("Postcode area for collection", area), el("span", { className: "rl-mk-note", text: "Only the first part of your postcode is shown, never your address." })]);
         hand.onchange = function () { areaField.hidden = hand.value === "post"; };
+        areaField.hidden = hand.value === "post";
+        // The description: written by AI when Relay's AI can describe it, marked until the member changes a word of it.
+        var aiTag = el("span", { className: "rl-mk-aitag", text: "Written by AI — check it" }); aiTag.hidden = true;
+        var aiAbout = el("span", { className: "rl-mk-note", text: "Written from the item's name, shop, size and colour on your receipt. Say anything about its condition yourself." }); aiAbout.hidden = true;
+        var aiText = null;
+        note.addEventListener("input", function () { if (aiText !== null && note.value !== aiText) { aiTag.hidden = aiAbout.hidden = true; note.classList.remove("rl-mk-ai"); aiText = null; } });
+        if (!note.value.trim()) {
+          memo.listingAi = memo.listingAi || {};
+          var key = i.receiptId + ":" + i.itemIndex, put = function (t) {
+            note.classList.remove("rl-mk-wait"); note.disabled = false; note.removeAttribute("aria-busy");
+            if (!t || note.value.trim()) return;
+            note.value = aiText = t; note.classList.add("rl-mk-ai"); aiTag.hidden = aiAbout.hidden = false;
+          };
+          // Greyed while it's written (no spinner), and the box stays a normal empty box if there's no description.
+          note.classList.add("rl-mk-wait"); note.disabled = true; note.setAttribute("aria-busy", "true");
+          var ask = memo.listingAi[key] || (memo.listingAi[key] = api("/relay/my/resale/describe", { method: "POST", body: { receiptId: i.receiptId, itemIndex: i.itemIndex } })
+            .then(function (x) { return x.ok && x.body && typeof x.body.description === "string" ? x.body.description : null; }, function () { return null; }));
+          ask.then(put, function () { put(null); });
+        }
+        // What was paid, beside the price (Relay never suggests a price of its own).
+        var paidLine = i.pricePence != null && !(i.free === true && i.pricePence === 0) ? el("span", { className: "rl-mk-note", text: "You paid " + money(i.pricePence, i.currency) + "." }) : null;
         var agree = el("input", { type: "checkbox" });
         var go = el("button", { type: "button", className: "rl-btn", text: "Put it on Relay", onclick: function () {
           if (go.disabled) return;
@@ -5691,10 +5777,20 @@
           var files = Array.prototype.slice.call(pickIn.files || [], 0, 4 - shots.length); pickIn.value = "";
           Promise.all(files.map(shrinkPhoto)).then(function (urls) { urls.forEach(function (u) { if (u && shots.length < 4) shots.push(u); }); if (urls.some(function (u) { return !u; })) tell("Couldn't read one of those pictures. Try another.", true); drawShots(); });
         };
-        var photoField = el("div", { className: "rl-mk-field" }, [el("span", { text: "Photos" }), thumbs, addPh, pickIn]);
-        [field("Condition", cond), photoField, field("Size", size), field("Asking price in £", price), field("Note for buyers", note), field("Handover", hand), areaField,
+        // The receipt's photo, when it is of this one thing, goes on the listing unless the member adds their own.
+        var fromReceipt = null;
+        if (i.photo) {
+          fromReceipt = el("span", { className: "rl-mk-fromrc" }, [el("span", { className: "rl-mk-thumb rl-mk-rcpic" }), el("span", { className: "rl-mk-note", text: "From your receipt. Add your own photos to use those instead." })]);
+          apiBlob("/relay/my/receipts/" + i.receiptId + "/image").then(function (u) { if (u && fromReceipt) fromReceipt.firstChild.appendChild(el("img", { src: u, alt: "" })); else if (fromReceipt) fromReceipt.remove(); });
+        }
+        var drawShots0 = drawShots; drawShots = function () { drawShots0(); if (fromReceipt) fromReceipt.hidden = shots.length > 0; };
+        var photoField = el("div", { className: "rl-mk-field" }, [el("span", { text: "Photos" }), fromReceipt, thumbs, addPh, pickIn].filter(Boolean));
+        var descField = el("div", { className: "rl-mk-field" }, [el("span", { className: "rl-mk-dhead" }, [el("span", { text: "Description" }), aiTag]), note, aiAbout]);
+        note.setAttribute("aria-label", "Description");
+        var priceField = el("div", {}, [field("Asking price in £", price), paidLine].filter(Boolean));
+        [field("Condition", cond), photoField, field("Size", size), priceField, descField, field("Handover", hand), areaField,
          el("label", { className: "rl-mk-check" }, [swap, el("span", { text: "I'm open to swaps" })]),
-         el("label", { className: "rl-mk-check small" }, [agree, el("span", { text: "I agree Relay shows this item's name, shop, size, condition, price, note and photo to other Relay members. My name, email, order number and address are never shown." })]),
+         el("label", { className: "rl-mk-check small" }, [agree, el("span", { text: "I agree Relay shows this item's name, shop, size, condition, price, description and photo to other Relay members. My name, email, order number and address are never shown." })]),
          go].forEach(function (n) { form.appendChild(n); });
         card.appendChild(form);
         cond.focus();
@@ -6037,8 +6133,8 @@
     var go = function () { tipsChecked = false; if (window.go) window.go("profile"); setTimeout(tipsMaybe, 700); };
     tipsServer = []; tipsPut(); tipsQueue.then(go, go);
   }
-  // The four questions the Ask tab offers before anything is asked, each with a drawn icon on one of Relay's tile colours.
-  var ASK_STARTERS = [["How do I return something?", "ret", "#14918A"], ["How does a swap work?", "swap", "#E0446E"], ["Why is a receipt missing?", "help", "#D47B1F"], ["How does Relay find my receipts?", "mail", "#4F72E0"]];
+  // The three questions the Ask tab offers before anything is asked, as pills (Connor, 24 Nov 2026: simpler).
+  var ASK_STARTERS = [["How do I return something?"], ["How does a swap work?"], ["Why is a receipt missing?"]];
   // What happens to what's written in the chat, said once wherever it opens (worker/support-chat.js).
   function chatNote(ai, about) {
     return !ai ? "Relay's team will see your message and your email address, so they can reply."
@@ -6110,16 +6206,11 @@
       if (first && ai) h.appendChild(el("span", { className: "rl-hc-ai", text: "AI assistant" }));
       return h;
     }
-    function bubble(t, findable) {
+    // (Searching receipts is the Ask tab's own box, as you type: never a link inside the conversation. Connor, 24 Nov 2026:
+    // "chat can look cleaner and simpler, too much going on".)
+    function bubble(t) {
       if (t.role === "note") return el("div", { className: "rl-chat-b note" }, [el("p", { text: t.text })]);
-      if (t.role === "user" || t.role === "pick") {
-        var n = el("div", { className: "rl-chat-b me" }, [el("p", { text: t.text })]);
-        // Under the newest thing the shopper typed on the Ask tab: look for the same words in Receipts instead.
-        if (findable) n.appendChild(el("button", { type: "button", className: "rl-ask-find", text: "Search your receipts for this instead", onclick: function () {
-          window.__relayFindReceipts = String(t.text).replace(/\s+/g, " ").trim().slice(0, 80); shut(); if (window.go) window.go("receipts");
-        } }));
-        return n;
-      }
+      if (t.role === "user" || t.role === "pick") return el("div", { className: "rl-chat-b me" }, [el("p", { text: t.text })]);
       return el("div", { className: "rl-chat-b bot" }, [who(t.first), t.role === "assistant" ? richText(t.text) : el("p", { text: t.text })]);
     }
     function pill(text, fn, cls) { return el("button", { type: "button", className: "rl-hc-qr-b" + (cls ? " " + cls : ""), text: text, onclick: function () { if (!busy) fn(); } }); }
@@ -6147,8 +6238,7 @@
       list.appendChild(bubble({ role: "prompt", first: true, text: about ? "Hi, I'm Relay's assistant. I'm an AI, so I can get things wrong. I can see what Relay read from this receipt. What would you like to know?"
         : ai ? "Hi, I'm Relay's assistant. I'm an AI, so I can get things wrong. Tap a topic, or write your question below."
         : "Write your question and tap send. Relay's team will reply by email to " + email + "." }));
-      var newest = -1; if (opts.tab && !about) log.forEach(function (t, i) { if (t.role === "user") newest = i; });
-      log.forEach(function (t, i) { list.appendChild(bubble(t, i === newest && t.typed === true)); });
+      log.forEach(function (t) { list.appendChild(bubble(t)); });
       if (busy) {
         var typing = el("div", { className: "rl-chat-b bot rl-chat-typing" }, [el("span", { className: "rl-hc-dots" }, [el("i"), el("i"), el("i")])]);
         typing.setAttribute("role", "status"); typing.setAttribute("aria-label", "Relay's assistant is writing");
@@ -6228,21 +6318,25 @@
     if (opts.ask) askAI(opts.ask, opts.typed === true);
     else if (opts.person) { if (opts.text) box.value = opts.text; handoff(); }
   }
-  // The Ask tab: the newest receipts to ask about, questions to tap, and a box to write in. Each opens the chat.
+  // The Ask tab (Connor, 24 Nov 2026: "chat can look cleaner and simpler, too much going on"): the newest receipts to ask
+  // about, three questions as pills, one short line on what answers are, and the box. Typing in the box also looks
+  // through your receipts (what the app already has, nothing asked of Relay's server) and shows the ones that match, a tap
+  // each. Sending opens the chat. Talk to a person, and the full words on what happens to the chat, are inside the chat
+  // (and the short line opens those words here too).
   function askLanding(b) {
     var list = el("div", { className: "rl-chat rl-ask-open" });
     var note = el("p", { className: "rl-msg" });
     var box = el("textarea", { className: "rl-chat-in", rows: 1, maxLength: 1000, placeholder: "Search receipts or ask about Relay", value: draftGet("help-chat") });
-    box.setAttribute("aria-label", "Your question for Relay's assistant");
+    box.setAttribute("aria-label", "Search your receipts, or ask Relay's assistant");
     var send = el("button", { type: "button", className: "rl-chat-send", ariaLabel: "Send" }, [jIc("send", 20)]);
-    var person = el("button", { type: "button", className: "rl-btn ghost rl-chat-person", text: "Talk to a person" });
     b.classList.add("rl-ask-opening");
     // The Ask tab's newest receipts, to ask about one: what the app already has, brought up to date once if that is old.
-    var recHost = null, recRows = (memo.receipts && memo.receipts.rows) || [];
+    var recHost = null, findHost = null, qsHost = null, recRows = (memo.receipts && memo.receipts.rows) || [];
+    var receiptsOnly = function () { return orderRows(recRows).filter(function (x) { return x && x.id; }).sort(function (x, y) { var X = x.orderDate || "", Y = y.orderDate || ""; return X < Y ? 1 : X > Y ? -1 : 0; }); };
     function drawTiles() {
       if (!recHost) return;
       recHost.textContent = "";
-      var rows = orderRows(recRows).filter(function (x) { return x && x.id; }).sort(function (x, y) { var X = x.orderDate || "", Y = y.orderDate || ""; return X < Y ? 1 : X > Y ? -1 : 0; }).slice(0, 6);
+      var rows = receiptsOnly().slice(0, 6);
       recHost.style.display = rows.length ? "" : "none";
       list.classList.toggle("no-rec", !rows.length);
       if (!rows.length) return;
@@ -6253,7 +6347,7 @@
       rows.forEach(function (x) {
         var shop = (x.retailer && x.retailer.name) || "", when = x.orderDate ? shortDate(x.orderDate) : "";
         var art = el("span", { className: "h2-art" }); art.setAttribute("aria-hidden", "true"); receiptPic(art, x, 60, 64);
-        var day = el("span", { className: "rl-ask-day", text: when || " " }); day.setAttribute("aria-hidden", "true");
+        var day = el("span", { className: "rl-ask-day", text: when || " " }); day.setAttribute("aria-hidden", "true");
         // The business under its picture, then the day (screen audit, 23 Nov 2026: three tiles that said only "23 Nov").
         var nm = el("span", { className: "rl-ask-nm", text: bizOf(x).name || shop }); nm.setAttribute("aria-hidden", "true");
         var tile = el("button", { type: "button", className: "rl-ask-tile", onclick: function () { askAssistantAbout(x, true); } }, [el("span", { className: "rl-ask-sq" }, [art]), nm, day]);
@@ -6264,46 +6358,87 @@
       });
       recHost.appendChild(strip);
     }
-    function row(text, icon, colour, fn) {
-      var pic = el("span", { className: "rl-ask-qi" }, [ACC_IC[icon] ? accIc(icon, 24, "rl-ask-qi-i") : jIc(icon, 24)]); pic.setAttribute("aria-hidden", "true"); pic.style.setProperty("--qi", colour);
-      return el("button", { type: "button", className: "rl-ask-q", onclick: fn }, [pic, el("b", { text: text })]);
+    // Searching as you type: every word typed has to be in the shop's name or an item's name. Up to three, newest first.
+    // While there are matches they take the questions' place; with none, the questions stay and send asks the assistant.
+    function drawFinds() {
+      if (!findHost) return;
+      findHost.textContent = "";
+      var words = box.value.toLowerCase().replace(/[^a-z0-9£.\s'&-]+/g, " ").split(/\s+/).filter(function (w) { return w.length >= 2; });
+      var hits = !words.length ? [] : receiptsOnly().filter(function (x) {
+        var hay = [bizOf(x).name, x.retailer && x.retailer.name, x.retailer && x.retailer.domain].concat((x.items || []).map(function (i) { return i && i.name; })).filter(Boolean).join(" ").toLowerCase();
+        return words.every(function (w) { return hay.indexOf(w) >= 0; });
+      }).slice(0, 3);
+      findHost.style.display = hits.length ? "" : "none";
+      if (qsHost) qsHost.style.display = hits.length ? "none" : "";
+      if (!hits.length) return;
+      findHost.appendChild(el("h2", { className: "rl-ask-h rl-ask-fh", text: "In your receipts" }));
+      var fl = el("div", { className: "rl-ask-fl" }); findHost.appendChild(fl);
+      hits.forEach(function (x) {
+        var d = /^\d{4}-\d{2}-\d{2}/.test(x.orderDate || "") ? shortDate(x.orderDate) : null;
+        var pic = el("span", { className: "rl-rr-pic" }); pic.setAttribute("aria-hidden", "true"); receiptPic(pic, x, 28, 32);
+        var row = el("button", { type: "button", className: "rl-rr-main rl-ask-hit", onclick: tapOnce(function () { var c = emailCard(x, { markable: true }); c.onclick(); }) }, [pic,
+          // (As on Receipts: what was bought may be cut short, never the day.)
+          el("span", { className: "rl-rr-mid" }, [el("b", { text: bizOf(x).name }), el("span", { className: "rl-rr-sub" }, [boughtWords(x) ? el("span", { className: "rl-rr-what", text: boughtWords(x) + (d ? "," : "") }) : null, d ? el("span", { text: (boughtWords(x) ? " " : "") + d }) : null].filter(Boolean))]),
+          el("span", { className: "rl-rr-end" }, [el("b", { text: x.totalPence == null ? "" : money(x.totalPence, x.currency) })])]);
+        row.setAttribute("aria-label", [bizOf(x).name, boughtWords(x), d, x.totalPence == null ? "" : money(x.totalPence, x.currency)].filter(Boolean).join(", "));
+        row.setAttribute("data-receipt", x.id);
+        fl.appendChild(el("div", { className: "rl-rr" }, [row]));
+      });
+    }
+    // The whole of what happens to what's written, a tap from the short line (and said again at the top of the chat).
+    function aboutAnswers() {
+      if (document.querySelector(".rl-ask-about")) return;
+      var sh = el("div", { className: "rl-sheet rl-ask-about", role: "dialog", ariaModal: "true", ariaLabel: "About Relay's assistant" });
+      var layer = el("div", { className: "rl-back" }, [sh]), born = Date.now();
+      var shut = function () { layer.remove(); document.removeEventListener("keydown", onKey); };
+      var onKey = function (e) { if (e.key === "Escape") shut(); };
+      sh.appendChild(el("h2", { text: "About Relay's assistant" }));
+      sh.appendChild(el("p", { text: "Relay's assistant is an AI, so it can get things wrong." }));
+      sh.appendChild(el("p", { text: chatNote(true, null) }));
+      sh.appendChild(el("button", { type: "button", className: "rl-btn", text: "Close", onclick: shut }));
+      // A tap outside closes it, but not the second half of the double tap that opened it.
+      layer.addEventListener("click", function (e) { if (e.target === layer && (!e.isTrusted || Date.now() - born > 400)) shut(); });
+      document.addEventListener("keydown", onKey);
+      document.body.appendChild(layer);
     }
     function draw() {
       if (!list.isConnected && list.parentNode) return;
       list.textContent = "";
       recHost = el("div", { className: "rl-ask-rec" }); list.appendChild(recHost); drawTiles();
-      // The heading's chevron opens the chat itself: its topics to tap, or the chat where it was left.
+      findHost = el("div", { className: "rl-ask-finds" }); list.appendChild(findHost);
+      // Three questions to tap, as pills. A chat already going comes first, to carry on where it was left.
       var going = (memo.chatLog || []).some(function (t) { return t.role === "user"; });
-      var open = el("button", { type: "button", className: "rl-ask-hc", onclick: function () { openHelpChat({ tab: true, about: going ? memo.chatAboutNow : null }); } }, [el("span", { text: "Try asking" }), accIc("chev", 12, "rl-ask-chev")]);
-      open.setAttribute("aria-label", going ? "Try asking. Carry on your chat" : "Try asking. Open the chat with Relay");
-      list.appendChild(el("h2", { className: "rl-ask-h2" }, [open]));
-      list.appendChild(el("div", { className: "rl-ask-qs" }, ASK_STARTERS.map(function (q) {
-        return row(q[0], q[1], q[2], function () { openHelpChat({ ask: q[0], tab: true }); });
-      })));
-      list.appendChild(el("p", { className: "rl-ask-ai", text: "Relay's assistant is an AI, so it can get things wrong." }));
+      var pills = [];
+      if (going) pills.push(el("button", { type: "button", className: "rl-ask-pill on", onclick: tapOnce(function () { openHelpChat({ tab: true, about: memo.chatAboutNow }); }) }, [el("span", { text: "Carry on your chat" })]));
+      ASK_STARTERS.slice(0, going ? 2 : 3).forEach(function (q) {
+        pills.push(el("button", { type: "button", className: "rl-ask-pill", onclick: function () { openHelpChat({ ask: q[0], tab: true }); } }, [el("span", { text: q[0] })]));
+      });
+      qsHost = el("div", { className: "rl-ask-pills", role: "group", ariaLabel: "Questions to ask" }, pills);
+      list.appendChild(qsHost);
+      drawFinds();
     }
     askRedraw = function () { if (list.isConnected) draw(); };
     function sendQuestion() {
       var q = box.value.replace(/\s+$/, "").trim();
       if (!q) { box.focus(); return; }
-      box.value = ""; draftSet("help-chat", ""); fit();
+      box.value = ""; draftSet("help-chat", ""); fit(); drawFinds();
       openHelpChat({ ask: q, typed: true, tab: true });
     }
     function fit() { box.style.height = "auto"; box.style.height = Math.min(140, Math.max(56, box.scrollHeight)) + "px"; }
-    box.addEventListener("input", function () { draftSet("help-chat", box.value); fit(); });
+    box.addEventListener("input", function () { draftSet("help-chat", box.value); fit(); drawFinds(); });
     box.addEventListener("keydown", function (e) { if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); sendQuestion(); } });
     send.onclick = sendQuestion;
     send.addEventListener("mousedown", function (e) { e.preventDefault(); });
-    person.onclick = function () { var t = box.value.trim(); box.value = ""; draftSet("help-chat", ""); fit(); openHelpChat({ tab: true, person: true, text: t }); };
+    var line = el("button", { type: "button", className: "rl-ask-note", onclick: tapOnce(aboutAnswers) }, [el("span", { text: "Answers come from an AI and can be wrong. Relay keeps no copy." }), accIc("chev", 14, "rl-ask-note-c")]);
+    line.setAttribute("aria-label", "Answers come from an AI and can be wrong. Relay keeps no copy. More about this");
     b.appendChild(list);
-    b.appendChild(el("p", { className: "rl-anote", text: chatNote(true, null) }));
-    b.appendChild(person); b.appendChild(note); b.appendChild(el("div", { className: "rl-chat-bar" }, [box, send]));
+    b.appendChild(line); b.appendChild(note); b.appendChild(el("div", { className: "rl-chat-bar" }, [box, send]));
     draw(); setTimeout(fit, 0);
     // The tiles show what the app already has; if that is more than a few minutes old, ask once and redraw them.
     if (!memoFresh(memo.receipts)) api("/relay/my/receipts").then(function (r) {
       if (!r.ok || !r.body || !list.isConnected) return;
       var rows = r.body.receipts || []; if (JSON.stringify(rows) === JSON.stringify(recRows)) return;
-      recRows = rows; drawTiles();
+      recRows = rows; drawTiles(); drawFinds();
     }, function () {});
   }
   // Whether the assistant is on: asked once each time Relay is opened, and the last answer is remembered on this phone so
@@ -6332,8 +6467,8 @@
     if (!s || !s.token) { host.appendChild(el("div", { className: "rl-po" }, [el("h3", { text: "Sign in to ask Relay", style: "margin:0" }), el("button", { className: "rl-po-primary", text: "Sign in", style: "max-width:220px", onclick: show })])); return; }
     host.classList.add("rl-asktab");
     var bone = function (w, h, r, m) { return el("div", { className: "rl-skel", style: "width:" + w + "px;height:" + h + "px;border-radius:" + r + "px" + (m ? ";margin:" + m : "") }); };
-    var bones = el("div", { className: "rl-ask-sk" }, [bone(180, 22, 8, "13px 0 17px"), el("div", { className: "rl-ask-sk-t" }, [bone(115, 115, 24), bone(115, 115, 24), bone(115, 115, 24)]), bone(110, 22, 8, "0 0 17px")]);
-    for (var i = 0; i < 4; i++) bones.appendChild(el("div", { className: "rl-ask-sk-r" }, [bone(48, 48, 12), bone(170 + (i % 2) * 40, 16, 8)]));
+    var bones = el("div", { className: "rl-ask-sk" }, [bone(180, 22, 8, "13px 0 17px"), el("div", { className: "rl-ask-sk-t" }, [bone(115, 115, 24), bone(115, 115, 24), bone(115, 115, 24)]),
+      el("div", { className: "rl-ask-sk-p" }, [bone(196, 44, 22), bone(176, 44, 22), bone(184, 44, 22)])]);
     bones.setAttribute("aria-hidden", "true"); host.appendChild(bones);
     helpChatState().then(function (hc) {
       if (!host.isConnected) return;
@@ -6569,12 +6704,13 @@
       if (!hc || !(hc.available || hc.handoff)) return;
       chatRow._ai = Boolean(hc.available);
       if (!hc.available) { chatRow.querySelector(".rl-arow-t b").textContent = "Contact us"; chatRow.setDetail("Write to Relay's team. They'll reply by email"); chatRow.style.display = ""; }
-      else if (askOn()) chatRow.remove();
+      // (Shown with the Ask tab on too: Talk to a person and the chat's topics live in the chat, not on Ask, so Help and
+      // legal is where someone who wants a person looks. Connor, 24 Nov 2026.)
       else chatRow.style.display = "";
     });
     function helpHub(b) {
       b.appendChild(accGroup("Help and legal", [
-        accRow("help", "Help", "Common questions", function () { page("Help", helpPage); })].concat(chatRow._ai ? [] : [chatRow], [
+        accRow("help", "Help", "Common questions", function () { page("Help", helpPage); })].concat([chatRow], [
         accRow("help", "Show the tips again", "A tip for each tab, from Home", function () { tipsAgain(); }),
         accRow("doc", "Terms of use", "", null, { href: "./terms.html" }),
         accRow("doc", "Privacy policy", "", null, { href: "./privacy.html" })])));
@@ -7766,7 +7902,9 @@
           open(function (sh) { consentView(sh, s.email || "", consent, function () { if (document.body.contains(host)) mountMarket(host); }); }); } }));
         return;
       }
-      resaleView(host, null, null, "browse");
+      // The red number leads somewhere: with messages unread, Swap & resell opens on Messages.
+      var nw = window.__relayMarketNews;
+      resaleView(host, null, null, nw && Number(nw.messages) > 0 ? "messages" : "browse");
     }).catch(function () { host.textContent = ""; host.appendChild(el("p", { text: "Couldn't reach Relay." })); });
   }
 
@@ -11708,8 +11846,13 @@
         price: x.adjusted && Number.isInteger(x.adjusted.newTotalPence) ? money(x.adjusted.newTotalPence, x.adjusted.currency || x.currency) : totalText(x), count: named.length };
       e.tiles = named.length > 1 ? named.slice(0, 6).map(function (i) { return { name: i.name,
           price: lineMoney(i, x.currency) || "",
-          draw: function (box) { illustrate(box, { items: [{ name: i.name }], retailer: x.retailer || {}, category: x.category }, 96); } }; })
+          // Each thing's own picture in the same order as everywhere else (Connor, 24 Nov 2026: "On doesn't have a picture?"):
+          // the shop's logo when Relay has it, the drawing of the item only when it hasn't.
+          draw: function (box) { shopLogo(box, logoDom(x), 104, function () { illustrate(box, { items: [{ name: i.name }], retailer: x.retailer || {}, category: x.category }, 96); }); } }; })
         : [{ name: named.length ? named[0].name : noItemsTitle(x), price: totalText(x), draw: function (box) { receiptPic(box, x, 96, 104); } }];
+      // The card's one picture (a Wallet square, the Ask tab's row): the receipt's picture, as Receipts and the receipt's page
+      // draw it: the item's photo, else the shop's logo, else a drawing.
+      e.pic = function (box) { receiptPic(box, x, 96, 104); };
       // The shop cancelled it (all of it: nothing to send back), said before anything else.
       if (x.cancelled && !x.cancelled.partial) { e.line = cancelWords(x); e.tag = "Cancelled"; }
       // A return Relay is following (return tracking): where it has got to, and "Refund not seen yet" when it's due.
@@ -11754,7 +11897,7 @@
   function setHomeFocus(v) { try { localStorage.setItem(HOME_FOCUS_KEY, v === "orders" ? "orders" : "receipts"); } catch (e) {} }
   function testToolsOn() { try { return window.testTools ? Boolean(window.testTools()) : testingOn(); } catch (e) { return false; } }
   var tapOnce = function (fn) { var busy = false; return function () { if (busy) return; busy = true; setTimeout(function () { busy = false; }, 600); fn(); }; };
-  var hlPic = function (e, cls) { var box = el("span", { className: cls }), art = el("span", { className: "h2-art" }); art.setAttribute("aria-hidden", "true"); box.appendChild(art); if (e.tiles && e.tiles[0]) e.tiles[0].draw(art); return box; };
+  var hlPic = function (e, cls) { var box = el("span", { className: cls }), art = el("span", { className: "h2-art" }); art.setAttribute("aria-hidden", "true"); box.appendChild(art); if (e.pic) e.pic(art); else if (e.tiles && e.tiles[0]) e.tiles[0].draw(art); return box; };
   // Today: a row per purchase, its picture small, the shop, what it is, and what's happening with it.
   function todayRow(e) {
     var what = e.shop ? homeWhat(e) : e.title || (e.tiles && e.tiles[0] && e.tiles[0].name) || "";

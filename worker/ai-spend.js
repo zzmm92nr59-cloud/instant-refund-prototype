@@ -37,7 +37,7 @@ export const DEFAULT_MONTHLY_LIMIT_PENCE = 2000;
 export const DEFAULT_SHOPPER_DAY_LIMIT_PENCE = 10;
 const DEFAULT_USD_TO_GBP = 0.80;
 // The features, as the health page names them. Receipt reading for one shopper counts against their daily limit.
-export const FEATURES = ["reader", "reread", "receipt_photo", "item_kinds", "shop_kinds", "photo_search", "help_chat"];
+export const FEATURES = ["reader", "reread", "receipt_photo", "item_kinds", "shop_kinds", "photo_search", "help_chat", "listing_text"];
 export const SHOPPER_FEATURES = new Set(["reader", "reread", "receipt_photo"]);
 // What a picture costs as input, at most (Anthropic: about width × height / 750 tokens, pictures are scaled to ~1.15
 // megapixels), with room to spare.
