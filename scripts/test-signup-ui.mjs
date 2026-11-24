@@ -111,6 +111,7 @@ for (let k = 0; k < 4; k++) {
   if (k) await page.keyboard.press("ArrowRight");
   await page.waitForTimeout(650); // the colour change has finished
   assert.deepEqual(await storyPolish(), { small: [], tiny: [], dim: [] }, "slide " + (k + 1) + ": " + await titleNow());
+  assert.doesNotMatch(await story.innerText(), /lululemon|Allbirds|Kitri|JD Sports|adidas|Restfeel/i, "slide " + (k + 1) + ": invented shops only, never a real shop with a made-up price");
   await page.screenshot({ path: "/tmp/shots/signup-0-story-" + (k + 1) + ".png" });
 }
 assert.equal(await titleNow(), "Your year, wrapped.", "the arrow keys move through the slides");
@@ -140,9 +141,9 @@ console.log("ok - the welcome story: four slides by tap, hold or arrow keys, mov
 await story.getByRole("button", { name: "Get started" }).click();
 await sheet.getByRole("heading", { name: "Create your account" }).waitFor();
 await sheet.getByRole("button", { name: "Continue with Google" }).waitFor();
-// Real shops in the pictures (Connor, 16 Nov 2026), never the made-up ones.
-assert.match(await page.locator(".rl-sart").innerText(), /Allbirds/);
-for (const fake of ["Kick Lane", "Crema & Co", "Studio North", "Harlow & Co", "Voltline"]) assert.equal(await page.getByText(fake).count(), 0, fake + " isn't shown");
+// The pictures use invented shops and everyday things, never a real shop with a price Relay made up (Connor, 24 Nov 2026).
+assert.match(await page.locator(".rl-sart").innerText(), /Canvas trainers[\s\S]*Wrenfield/);
+for (const real of ["lululemon", "Allbirds", "Kitri", "JD Sports", "adidas"]) assert.equal(await page.getByText(real, { exact: false }).count(), 0, real + " isn't shown");
 assert.ok(await sheet.getByRole("button", { name: "Continue with Microsoft" }).isVisible());
 assert.ok(await sheet.getByRole("button", { name: "Continue with email" }).isVisible());
 assert.ok(await sheet.getByRole("link", { name: "Terms of use" }).count() && await sheet.getByRole("link", { name: "Privacy policy" }).count(), "terms and privacy linked before anything is agreed");

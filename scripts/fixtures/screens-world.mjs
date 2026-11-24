@@ -91,6 +91,19 @@ const NAMES = ["Academy Hardcase Football Duffel Bag (Medium, 60L) in Black and 
   "Extra-Long Hand-Thrown Stoneware Table Lamp with Linen Drum Shade", "Linen Notebook", "Court Trainers", "Wool Scarf", "Travel Mug", "Desk Lamp", "Merino Socks", "Canvas Tote"];
 export const products = () => NAMES.map((n, i) => ({ product: n, variation: i === 4 ? "White / UK 8" : "Default Title", sku: "shopify:shop" + (i % 4) + ":variant:" + (100 + i), priceMinor: 1500 + i * 700, currency: "GBP",
   storeName: SHOPS[i % 4][0], shopDomain: SHOPS[i % 4][1], inStock: true, imageUrl: "https://img.example/" + (i % 3 === 1 ? "tall" : "sq") + "/" + i + ".svg", productType: ["Bags", "Hair care", "Lighting", "Stationery", "Shoes", "Scarves", "Kitchen", "Lighting", "Socks", "Bags"][i] }));
+// The bag (worker/bag.js's shape): two shops, one thing with a long name, one bought three at a time, one sold out.
+export const bag = () => [
+  { sku: "shopify:kestrel.example:variant:gid://shopify/ProductVariant/7001", kind: "shopify", product: NAMES[0], variation: "Black", priceMinor: 6500, imageUrl: "https://img.example/sq/0.svg",
+    productUrl: null, shop: "Kestrel Sports", shopKey: "kestrel.example", origin: "https://kestrel.example", variantId: "7001", cart: true, qty: 1, addedAt: NOW - DAY },
+  { sku: "shopify:kestrel.example:variant:gid://shopify/ProductVariant/7008", kind: "shopify", product: "Merino Socks", variation: "UK 7-9", priceMinor: 1200, imageUrl: "https://img.example/sq/8.svg",
+    productUrl: null, shop: "Kestrel Sports", shopKey: "kestrel.example", origin: "https://kestrel.example", variantId: "7008", cart: true, qty: 3, addedAt: NOW - DAY },
+  { sku: "shopify:harlow.example:variant:gid://shopify/ProductVariant/7105", kind: "shopify", product: "Wool Scarf", variation: null, priceMinor: 3800, imageUrl: "https://img.example/tall/5.svg",
+    productUrl: null, shop: "Harlow & Co", shopKey: "harlow.example", origin: "https://harlow.example", variantId: "7105", cart: true, qty: 1, addedAt: NOW - 2 * DAY },
+  { sku: "shopify:harlow.example:variant:gid://shopify/ProductVariant/7106", kind: "shopify", product: "Canvas Tote", variation: "Natural", priceMinor: 2200, imageUrl: "https://img.example/sq/9.svg",
+    productUrl: null, shop: "Harlow & Co", shopKey: "harlow.example", origin: "https://harlow.example", variantId: "7106", cart: true, qty: 1, addedAt: NOW - 2 * DAY, soldOut: true }];
+// Pay at a shop, as worker/bag.js answers it: the long-named one now costs more.
+export const bagCheck = (items, shop) => ({ shop, cart: true, checkedAt: NOW, items,
+  results: items.filter(x => x.shopKey === shop).map((x, i) => ({ sku: x.sku, checked: true, was: x.priceMinor, priceMinor: i === 0 ? x.priceMinor + 500 : x.priceMinor, available: !x.soldOut })) });
 export function watches() {
   const w = {};
   products().slice(0, 6).map((p, i) => [p, i]).reverse().forEach(([p, i]) => { w[p.sku] = { name: p.product, variant: p.variation, baseline: p.priceMinor + (i % 2 === 0 ? 1000 : 0), created: new Date(NOW - i * DAY).toISOString() }; });

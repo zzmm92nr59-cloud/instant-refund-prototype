@@ -134,7 +134,7 @@ assert.deepEqual(await page.locator("#catalogResults [data-card-select] h3").all
 assert.equal(await page.locator(".dc-for").count(), 0);
 await page.locator("#dcKinds").getByRole("button", { name: "Everything" }).click();
 await panel.getByRole("heading", { name: "Picked for you" }).waitFor();
-assert.equal(await page.locator('#catalogResults [data-card-select="shopify:kick:1"] .dc-opts').innerText(), "White · UK 8, UK 9", "the colour is said once, then the sizes");
+assert.equal(await page.locator('#catalogResults [data-card-select="shopify:kick:1"] .dc-opts').innerText(), "White in UK 8, UK 9", "the colour is said once, then the sizes");
 await page.waitForTimeout(1300);   // the drawings finish drawing themselves in
 await page.screenshot({ path: "/tmp/shots/discover-for-you.png", fullPage: true });
 // Turning picks off leaves a way straight back where they were (Connor, 18 Nov 2026: "When I turn off For you shopping
