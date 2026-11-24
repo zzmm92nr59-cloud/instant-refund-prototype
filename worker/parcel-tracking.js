@@ -18,7 +18,15 @@
 //
 // GET /relay/my/receipts/<id>/parcel: { available, delivery } (delivery as on a receipt, or null when there's no news).
 export const PARCEL_TRACKS_SQL = `CREATE TABLE IF NOT EXISTS parcel_tracks (shopper_id TEXT NOT NULL, tracking_number TEXT NOT NULL,
-  status TEXT, at TEXT, checked_at INTEGER NOT NULL, created_at INTEGER NOT NULL, PRIMARY KEY (shopper_id, tracking_number))`;
+  status TEXT, at TEXT, checked_at INTEGER NOT NULL, created_at INTEGER NOT NULL, first_scan TEXT, PRIMARY KEY (shopper_id, tracking_number))`;
+// first_scan (24 Nov 2026, return-tracking.js): the time of the carrier's first scan of the parcel, as the carrier gave it.
+// Added to tables made before it (tried once per copy of the Worker; "already there" is fine).
+let parcelColumnsReady = false;
+export async function ensureParcelColumns(db) {
+  if (parcelColumnsReady) return;
+  try { await db.prepare("ALTER TABLE parcel_tracks ADD COLUMN first_scan TEXT").run(); } catch { /* already there, or no table yet (it's made with it) */ }
+  parcelColumnsReady = true;
+}
 export const PARCEL_USES_SQL = `CREATE TABLE IF NOT EXISTS parcel_track_uses (month TEXT PRIMARY KEY, n INTEGER NOT NULL)`;
 
 export const trackingAvailable = (env) => Boolean(env && env.SHIP24_API_KEY);
@@ -59,6 +67,18 @@ export function readShip24(body, today) {
   }
 }
 
+// When the carrier first had the parcel in its hands: the time of its earliest event that is a real scan (on its way, out
+// for delivery, waiting to be collected, a delivery tried, delivered), exactly as the carrier gave it (its own local time
+// unless it carries an offset). "Label made" and "we've been told to expect it" (pending, info_received) are not scans, and
+// neither is a problem report. null when the carrier has shown no scan: Relay never works one out.
+const SCANNED = new Set(["in_transit", "out_for_delivery", "available_for_pickup", "failed_attempt", "delivered"]);
+export function firstScan(body) {
+  const t = body && body.data && Array.isArray(body.data.trackings) ? body.data.trackings[0] : null;
+  const times = (t && Array.isArray(t.events) ? t.events : []).filter((e) => e && SCANNED.has(e.statusMilestone))
+    .map((e) => String(e.occurrenceDatetime || "")).filter((d) => /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{1,6})?)?(Z|[+-]\d{2}:?\d{2})?$/.test(d) && !Number.isNaN(Date.parse(d))).sort();
+  return times[0] || null;
+}
+
 // The carrier's news replaces the email's, unless the email already says delivered and the carrier doesn't.
 export function applyTracked(orders, rows) {
   const byNumber = new Map((rows || []).filter((r) => r && r.status).map((r) => [String(r.tracking_number).toUpperCase(), r]));
@@ -71,7 +91,8 @@ export function applyTracked(orders, rows) {
 }
 
 export async function readTrackedRows(db, shopperId) {
-  try { return (await db.prepare("SELECT tracking_number, status, at FROM parcel_tracks WHERE shopper_id = ?").bind(shopperId).all()).results || []; }
+  await ensureParcelColumns(db);
+  try { return (await db.prepare("SELECT tracking_number, status, at, first_scan FROM parcel_tracks WHERE shopper_id = ?").bind(shopperId).all()).results || []; }
   catch { return []; }   // not made yet: nothing tracked
 }
 
@@ -104,7 +125,8 @@ export async function trackNumber(env, shopperId, number, carrier, o = {}) {
   const now = o.now || Date.now(), fetchImpl = o.fetchImpl || fetch, db = env.RELAY_DB;
   const today = new Date(now).toISOString().slice(0, 10), tn = String(number || "").toUpperCase();
   await db.batch([db.prepare(PARCEL_TRACKS_SQL), db.prepare(PARCEL_USES_SQL)]);
-  const mine = await db.prepare("SELECT status, at, checked_at, created_at FROM parcel_tracks WHERE shopper_id = ? AND tracking_number = ?").bind(shopperId, tn).first();
+  await ensureParcelColumns(db);
+  const mine = await db.prepare("SELECT status, at, first_scan, checked_at, created_at FROM parcel_tracks WHERE shopper_id = ? AND tracking_number = ?").bind(shopperId, tn).first();
   const answer = (row) => ({ row: row || { status: null, at: null } });
   if (mine && (FINAL.has(mine.status) || now - mine.checked_at < (mine.status ? AGAIN_AFTER : NO_NEWS_AGAIN))) return answer(mine);
 
@@ -127,9 +149,11 @@ export async function trackNumber(env, shopperId, number, carrier, o = {}) {
     if (mine) return answer(mine);
     return { row: null, reason: "carrier_unavailable" };
   }
-  const got = readShip24(res.body, today);
-  await db.prepare(`INSERT INTO parcel_tracks (shopper_id, tracking_number, status, at, checked_at, created_at) VALUES (?, ?, ?, ?, ?, ?)
-    ON CONFLICT(shopper_id, tracking_number) DO UPDATE SET status = COALESCE(excluded.status, parcel_tracks.status), at = COALESCE(excluded.at, parcel_tracks.at), checked_at = excluded.checked_at`)
-    .bind(shopperId, tn, got ? got.status : null, got ? got.at : null, now, now).run();
-  return answer(got || mine);
+  const got = readShip24(res.body, today), scan = firstScan(res.body);
+  // The first scan, once seen, is kept: a later answer that leaves it out doesn't take it back.
+  await db.prepare(`INSERT INTO parcel_tracks (shopper_id, tracking_number, status, at, checked_at, created_at, first_scan) VALUES (?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(shopper_id, tracking_number) DO UPDATE SET status = COALESCE(excluded.status, parcel_tracks.status), at = COALESCE(excluded.at, parcel_tracks.at), checked_at = excluded.checked_at,
+      first_scan = COALESCE(parcel_tracks.first_scan, excluded.first_scan)`)
+    .bind(shopperId, tn, got ? got.status : null, got ? got.at : null, now, now, scan).run();
+  return answer(got ? { ...got, first_scan: (mine && mine.first_scan) || scan } : mine);
 }

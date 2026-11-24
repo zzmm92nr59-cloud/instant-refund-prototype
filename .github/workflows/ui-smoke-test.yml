@@ -168,6 +168,8 @@ jobs:
         run: node --import ./scripts/record-app-requests.mjs scripts/test-delivery-ui.mjs
       - name: Test return tracking in the app (Needs you and To return show returns in progress, the receipt's timeline with who said so, Refund not seen yet, I've sent it back once per tap, the carrier asked only on opening)
         run: node --import ./scripts/record-app-requests.mjs scripts/test-return-tracking-ui.mjs
+      - name: Test return tracking end to end (Relay's real server and app on the runner; Ship24, the inbox and the bank stand in with made-up data)
+        run: node scripts/test-return-tracking-e2e.mjs
       - name: Test codes to show or scan in the app (the section on a receipt's page, full screen on white with Back, a passed date said plainly, no copy says to open the email, tickets, asked for only on opening)
         run: node --import ./scripts/record-app-requests.mjs scripts/test-scan-codes-ui.mjs
       - name: Test auctions in the app (a tile while live, one-tap cards, delivery details first, one bid per tap, a win to pay for first with the shop's own link)
