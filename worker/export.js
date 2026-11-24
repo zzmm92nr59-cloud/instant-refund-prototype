@@ -10,6 +10,7 @@ import { deliveryForExport } from "./delivery.js";
 import { bagForExport } from "./bag.js";
 import { auctionsForExport } from "./auctions.js";
 import { ensureBankColumns, visibleSql } from "./bank.js";
+import { aiChoicesForExport } from "./ai-choice.js";
 const json = (body, status, cors) => Response.json(body, { status, headers: { ...cors, "Cache-Control": "no-store" } });
 const iso = (ms) => (Number.isFinite(ms) && ms > 0 ? new Date(ms).toISOString() : null);
 
@@ -96,10 +97,13 @@ export async function exportShopperData(env, shopper, now = Date.now()) {
     },
     // Emails you chose to send to Relay from a receipt it read wrong, as kept (details hidden), until they're deleted.
     emailsSentToRelay: await sharedForExport(env, id, now),
-    // AI help: whether it's on, and what the AI read from emails Relay's own reader wasn't sure about.
+    // AI help: whether it's on (on for everyone unless switched off), your own choice if you made one, and what the AI read
+    // from emails Relay's own reader wasn't sure about.
     aiHelp: await (async () => {
+      const choices = await aiChoicesForExport(env.RELAY_DB, id);
       const on = await one("SELECT on_since AS since FROM ai_reading WHERE shopper_id = ?", id);
-      return { on: Boolean(on), since: on ? iso(on.since) : null,
+      return { on: choices.receipts.choice !== "switched off", yourChoice: choices.receipts.choice, choiceMadeAt: choices.receipts.at,
+        switchedOnSince: on && choices.receipts.choice !== "switched off" ? iso(on.since) : null, noticeSeenAt: choices.noticeSeenAt,
         readings: (await rows("SELECT receipt_id AS receiptId, fields, failed, created_at AS at FROM receipt_ai_reads WHERE shopper_id = ? ORDER BY created_at", id))
           .map((r) => ({ receiptId: r.receiptId, read: parse(r.fields), couldNotRead: r.failed || null, at: iso(r.at) })) };
     })(),
@@ -114,10 +118,13 @@ export async function exportShopperData(env, shopper, now = Date.now()) {
       // Payments you said weren't yours, and shops you said nothing from is yours.
       notMine: (await rows("SELECT kind, key, created_at AS at FROM bank_not_mine WHERE shopper_id = ? ORDER BY created_at", id).catch(() => [])).map((r) => ({ kind: r.kind, key: r.key, at: iso(r.at) }))
     },
-    // AI for picks: whether it's on, and what the AI made of each thing you bought (only item names were sent).
+    // AI for picks: whether it's on (on for everyone unless switched off), your own choice if you made one, and what the AI
+    // made of each thing you bought (only item names were sent).
     aiForPicks: await (async () => {
+      const choices = await aiChoicesForExport(env.RELAY_DB, id);
       const on = await one("SELECT on_since AS since FROM picks_ai WHERE shopper_id = ?", id);
-      return { on: Boolean(on), since: on ? iso(on.since) : null,
+      return { on: choices.picks.choice !== "switched off", yourChoice: choices.picks.choice, choiceMadeAt: choices.picks.at,
+        switchedOnSince: on && choices.picks.choice !== "switched off" ? iso(on.since) : null,
         items: (await rows("SELECT name_key AS item, data, created_at AS at FROM item_kinds WHERE shopper_id = ? ORDER BY created_at", id)).map((r) => ({ item: r.item, read: parse(r.data), at: iso(r.at) })) };
     })(),
     // Live parcel tracking: each tracking number Relay asked the carrier about (through Ship24), and what it said.

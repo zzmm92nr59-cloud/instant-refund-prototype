@@ -491,10 +491,11 @@ function toggleStoreAlert(){
  RelayAccount.syncStore(store,on,on?storeItems(store):[]).then(r=>{if(r&&!r.ok&&r.status>=400&&r.status<500&&r.status!==408&&r.status!==429){set(!on);renderCatalog()}});
 }
 let receiptBuys=[],tasteLoaded=false;
-// AI for picks (worker/item-kinds.js): what the AI made of each thing bought, for shoppers who switched it on.
+// AI for picks (worker/item-kinds.js): what the AI made of each thing bought. On unless the shopper switched it off, and
+// then never asked about again here (their choice stands).
 let aiKinds=null,aiPicks={available:false,on:false},aiPicksAsked=false;
 function loadAiKinds(){if(aiPicksAsked||!personalise||!window.RelayAccount||!RelayAccount.itemKinds||!RelayAccount.signedIn||!RelayAccount.signedIn())return;aiPicksAsked=true;
- RelayAccount.itemKinds().then(b=>{if(!b)return;aiPicks={available:!!b.available,on:!!b.on};aiKinds=b.on?b.kinds||{}:null;if(page==="discover"&&!$("backToResults"))renderCatalog()}).catch(()=>{})}
+ RelayAccount.itemKinds().then(b=>{if(!b)return;aiPicks={available:!!b.available,on:!!b.on,choice:b.choice||null};aiKinds=b.on?b.kinds||{}:null;if(page==="discover"&&!$("backToResults"))renderCatalog()}).catch(()=>{})}
 window.relayAiPicksChanged=()=>{aiPicksAsked=false;aiKinds=null;loadAiKinds()};
 function askAiPicks(){if(window.RelayAccount&&RelayAccount.picksAiSheet)RelayAccount.picksAiSheet()}
 function notNowAiPicks(){try{localStorage.setItem("relay-picks-ai-asked","1")}catch{}renderCatalog()}
@@ -883,7 +884,7 @@ function dcForYou(groups){const signed=window.RelayAccount&&RelayAccount.signedI
   +(lastNotFor?'<p class="dc-fewer" role="status">'+(lastNotFor.noun?'Fewer '+safe(lastNotFor.noun)+' from now on.':'Hidden from your picks.')+' <button class="link small" onclick="undoNotFor()">Undo</button></p>':'');
  if(!tasteLoaded&&!tasteOff)return '<div class="dc-for"><div class="skel" style="height:220px;border-radius:20px"></div></div>';
  let asked=false;try{asked=localStorage.getItem("relay-picks-ai-asked")==="1"}catch{}
- const aiRow=aiPicks.available&&!aiPicks.on&&!asked?'<button type="button" class="dc-pickrow dc-airow" onclick="askAiPicks()"><span class="dc-pickrow-ic" aria-hidden="true">'+navIcon("ask")+'</span><span class="dc-pickrow-t"><b>Smarter picks with AI</b><span>Let AI work out what each thing you bought is.</span></span>'+ic("chev")+'</button>':'';
+ const aiRow=aiPicks.available&&!aiPicks.on&&aiPicks.choice!=="off"&&!asked?'<button type="button" class="dc-pickrow dc-airow" onclick="askAiPicks()"><span class="dc-pickrow-ic" aria-hidden="true">'+navIcon("ask")+'</span><span class="dc-pickrow-t"><b>Smarter picks with AI</b><span>Let AI work out what each thing you bought is.</span></span>'+ic("chev")+'</button>':'';
  const picks=dcPicks(groups);markSeen(picks.map(x=>String(x.g.key).trim().toLowerCase()));
  return '<div class="dc-for">'+head+aiRow+(picks.length?'<div class="dc-strip">'+picks.map(x=>dcCard(x.g,x.why.slice(0,2).join("\n"))).join("")+'</div>':'<p class="small muted" style="margin:6px 0 0">Nothing in Browse goes with what you\'ve bought yet. As more shops join, picks show up here.</p>')+'</div>'}
 function shopperDiscoverView(){const signed=dcSigned();if(!signed)dcMode="shops";

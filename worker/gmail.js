@@ -433,7 +433,7 @@ async function ensureGmailTablesRun(db) {
     SHARED_EMAILS_SQL,
     // "Same order" / "different orders" (order-joins.js): which of the shopper's emails are one purchase, by their own word.
     RECEIPT_JOINS_SQL,
-    // "AI help" (ai-reader.js): who switched it on, and what the AI read from emails the rules weren't sure about.
+    // "AI help" (ai-reader.js): who switched it on (whether it's on is ai-choice.js), and what the AI read from emails the rules weren't sure about.
     AI_SETTING_SQL, AI_READS_SQL, PICKS_AI_SQL, ITEM_KINDS_SQL,
     // "Read it again" (receipt-reread.js): counts only, for its limits.
     REREADS_SQL,
@@ -2982,7 +2982,7 @@ export async function styleThings(env, shopperId) {
 }
 
 // The name of every thing the shopper bought, with its shop, newest receipts first, for the AI to say what each is (AI for
-// picks, item-kinds.js; only for shoppers who switched it on). Names and shops only: no prices, dates or order numbers.
+// picks, item-kinds.js; for shoppers who haven't switched it off). Names and shops only: no prices, dates or order numbers.
 // Forwarded receipts' senders are people, so no shop is given for those.
 export async function boughtNames(env, shopperId) {
   const cards = await listReceipts(env, shopperId, null, ALL);
@@ -3061,7 +3061,7 @@ async function listReceipts(env, shopperId, timing, opts = {}) {
     readReturnTracks(env.RELAY_DB, shopperId),
     // What Claude said about shops whose names don't say what they sell (shop-kind-ai.js): nothing personal, one per shop.
     readShopKinds(env.RELAY_DB, orders.map(o => storeKey(o))),
-    // What the AI said each thing is, for shoppers who switched AI for picks on (item-kinds.js); {} for everyone else.
+    // What the AI said each thing is, unless the shopper switched AI for picks off (item-kinds.js); {} then.
     aiTypesFor(env, shopperId),
     // Codes to show or scan (scan-codes.js): what each is for and whether its picture was kept, never the picture.
     readCodeRows(env.RELAY_DB, shopperId),
@@ -3144,7 +3144,7 @@ async function listReceipts(env, shopperId, timing, opts = {}) {
     // Each item's own group too (a supermarket shop's kitchen roll is Home & garden, its bananas Food & drink), with
     // `categorySure` when the item's own name said so rather than only the shop. Wrapped counts each item where it belongs.
     const kinds = itemCategories(c, learned);
-    // And what each thing is (item-kind-core.js, with the AI's sure answers for shoppers who switched it on): `kind`, whether
+    // And what each thing is (item-kind-core.js, with the AI's sure answers for shoppers who haven't switched it off): `kind`, whether
     // that is sure (`kindSure`, `kindAi` when the AI said so) and whether it is kept rather than used up (`lasting`).
     const own = itemKinds(c, aiTypes);
     // A food order can still hold things that go back on their own (a kettle in the weekly shop): those items are marked.

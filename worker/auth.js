@@ -15,6 +15,7 @@ import { handleHealthEmailRoute } from "./health-digest.js";
 import { handleSharedEmailAdminRoute } from "./shared-emails.js";
 import { handleAiReadingRoute } from "./ai-runner.js";
 import { handleItemKindsRoute } from "./item-kinds.js";
+import { handleAiNoticeRoute, ensureAiChoiceTables, aiChoiceDeleteStatements } from "./ai-choice.js";
 import { handleBankRoute, handleBankCallback, ensureBankTables, bankDeleteStatements, bankForEveryone } from "./bank.js";
 import { handleSupportRoute, supportDeleteStatements, SUPPORT_TABLE_SQL } from "./support-chat.js";
 import { parseReceiptEmail } from "./receipt-parser.js";
@@ -640,6 +641,8 @@ async function deleteShopper(env, shopper, o) {
     ...(await photoSearchDeleteStatements(env.RELAY_DB, shopper.id)),
     // What their receipt reading cost today, for their daily AI limit (ai-spend.js).
     ...(await ensureSpendTables(env.RELAY_DB).then(() => spendDeleteStatements(env.RELAY_DB, shopper.id))),
+    // Their AI choices (on or off for each feature) and whether they've seen the "AI help is now on" notice (ai-choice.js).
+    ...(await ensureAiChoiceTables(env.RELAY_DB).then(() => aiChoiceDeleteStatements(env.RELAY_DB, shopper.id))),
     ...(await outlookSearchDeleteStatements(env.RELAY_DB, shopper.id)),
     // Which orders at shops connected to Relay were placed with this email address (the orders themselves stay with the shop).
     env.RELAY_DB.prepare("DELETE FROM retailer_order_emails WHERE email_hash = ?").bind(shopper.emailHash),
@@ -757,10 +760,13 @@ export async function handleAuthRoute(request, env, url, cors = {}, opts = {}) {
     // The help chat (an AI assistant, and "Talk to a person"). Off until the ANTHROPIC_API_KEY secret is set.
     const supportResponse = await handleSupportRoute(path, request.method, request, env, cors, shopper, o);
     if (supportResponse) return supportResponse;
-    // "AI help": Claude reads emails Relay's own reader isn't sure about, only for shoppers who switch it on.
+    // "AI help": Claude reads emails Relay's own reader isn't sure about, for every shopper who hasn't switched it off.
     const aiResponse = await handleAiReadingRoute(path, request.method, request, env, cors, shopper, o);
     if (aiResponse) return aiResponse;
-    // "AI for picks": Claude reads the names of the things bought, for Browse's picks, only for shoppers who switch it on.
+    // The one-time "AI help is now on" notice on Home: seen (ai-choice.js).
+    const aiNoticeResponse = await handleAiNoticeRoute(path, request.method, env, cors, shopper, o);
+    if (aiNoticeResponse) return aiNoticeResponse;
+    // "AI for picks": Claude reads the names of the things bought, for Browse's picks, for every shopper who hasn't switched it off.
     const kindsResponse = await handleItemKindsRoute(path, request.method, request, env, cors, shopper, o);
     if (kindsResponse) return kindsResponse;
     // Bank and card payments through open banking (read-only), matched to receipts.

@@ -1,8 +1,10 @@
 // The AI second reader at work (ai-reader.js has its rules). Every hour, a few receipts the rules weren't sure about, from
-// shoppers who switched on AI help, are read by Claude; and the switch itself: GET/POST /relay/my/ai-reading.
+// shoppers who haven't switched AI help off (on for everyone by default: ai-choice.js), are read by Claude; and the switch
+// itself: GET/POST /relay/my/ai-reading.
 import { AI_SYSTEM, AI_READ_VERSION, cleanAiReading, compareReadings, aiAvailable } from "./ai-reader.js";
 import { ensureGmailTables, hiddenCopyOf } from "./gmail.js";
 import { DEFAULT_MODEL, claudeFetch, isCapped, noThinking, overLimit, mostItCouldCost } from "./ai-spend.js";
+import { ensureAiChoiceTables, notOffSql, aiChoiceOf, aiChoiceStatement } from "./ai-choice.js";
 
 export const AI_PER_RUN = 20;
 export const AI_PER_SHOPPER_DAY = 40;
@@ -75,14 +77,18 @@ async function recompare(env, now) {
 
 // Every hour (worker.js): up to AI_PER_RUN receipts, newest first, that the rules weren't sure about (read with less than
 // high confidence, no total, no items, items that don't add up, a name that doesn't look like a thing bought, or no shop
-// name), from shoppers with AI help on, not fixed by the shopper, and not yet read by the AI: an email already read at
+// name), from shoppers who haven't switched AI help off, not fixed by the shopper, and not yet read by the AI: an email already read at
 // this AI_READ_VERSION is never sent again, whatever Relay's own reader version. At most AI_PER_SHOPPER_DAY a shopper and
-// AI_ALL_DAY in all, in any 24 hours, and within the spending limits (ai-spend.js).
+// AI_ALL_DAY in all, in any 24 hours, and within the spending limits (ai-spend.js). With AI help on for everyone (24 Nov 2026)
+// the backlog of every member's unsure receipts is read the same way, AI_PER_RUN an hour: it trickles, never bursts. A
+// shopper who has had their AI_PER_SHOPPER_DAY today is left out of the query itself, so their backlog can't fill every
+// run's list and hold up everyone else's for the rest of the day.
 export async function runAiReads(env, now = Date.now(), fetchImpl = fetch) {
   if (!env.RELAY_DB || !aiAvailable(env)) return { read: 0, why: "off" };
   const db = env.RELAY_DB, since = now - DAY;
   await ensureGmailTables(db);
   await ensureAiReadColumns(db);
+  await ensureAiChoiceTables(db);
   await recompare(env, now).catch((e) => console.error("AI recompare failed", String(e && e.message || e).slice(0, 120)));
   // The monthly limit reached: nothing is fetched from anyone's inbox for the AI, and nothing is sent.
   const oneCall = mostItCouldCost(env, { model: aiModel(env), max_tokens: MAX_OUT, system: AI_SYSTEM, messages: [{ role: "user", content: "x".repeat(MAX_TEXT + 400) }] });
@@ -91,8 +97,8 @@ export async function runAiReads(env, now = Date.now(), fetchImpl = fetch) {
   let room = Math.min(AI_PER_RUN, AI_ALL_DAY - Number((all && all.n) || 0));
   if (room <= 0) return { read: 0, why: "limit" };
   const rows = (await db.prepare(`SELECT r.id AS id, r.shopper_id AS shopper, r.details AS details, s.email AS email FROM captured_receipts r
-      JOIN ai_reading a ON a.shopper_id = r.shopper_id JOIN shoppers s ON s.id = r.shopper_id
-      WHERE r.status NOT IN ('dismissed','not_receipt') AND COALESCE(json_extract(r.details, '$.kind'), 'receipt') = 'receipt'
+      JOIN shoppers s ON s.id = r.shopper_id
+      WHERE ${notOffSql("r.shopper_id", "receipts")} AND r.status NOT IN ('dismissed','not_receipt') AND COALESCE(json_extract(r.details, '$.kind'), 'receipt') = 'receipt'
         AND (json_extract(r.details, '$.gmailId') IS NOT NULL OR json_extract(r.details, '$.outlookId') IS NOT NULL)
         AND (COALESCE(json_extract(r.details, '$.confidence'), 'low') <> 'high' OR json_extract(r.details, '$.totalPence') IS NULL
           OR COALESCE(json_array_length(json_extract(r.details, '$.items')), 0) = 0
@@ -102,7 +108,8 @@ export async function runAiReads(env, now = Date.now(), fetchImpl = fetch) {
           AND COALESCE(x.ai_version, 1) = ? AND (x.email_key IS NULL
             OR x.email_key = COALESCE('g:' || json_extract(r.details, '$.gmailId'), 'o:' || json_extract(r.details, '$.outlookId'))))
         AND NOT EXISTS (SELECT 1 FROM receipt_fixes f WHERE f.shopper_id = r.shopper_id AND f.receipt_id = r.id)
-      ORDER BY r.created_at DESC LIMIT ?`).bind(AI_READ_VERSION, room * 3).all()).results || [];
+        AND (SELECT COUNT(*) FROM receipt_ai_reads y WHERE y.shopper_id = r.shopper_id AND y.created_at > ?) < ?
+      ORDER BY r.created_at DESC LIMIT ?`).bind(AI_READ_VERSION, since, AI_PER_SHOPPER_DAY, room * 3).all()).results || [];
   // An email can carry tomorrow's date by the UK clock, so tomorrow is the latest date accepted.
   const latestDay = new Date(now + DAY).toISOString().slice(0, 10);
   const perShopper = new Map(), overToday = new Set();
@@ -133,15 +140,19 @@ export async function runAiReads(env, now = Date.now(), fetchImpl = fetch) {
   return { read, failed, ...(stopped ? { stopped } : {}) };
 }
 
-// GET /relay/my/ai-reading: whether AI help can be switched on, and whether it is. POST { on }: switches it; off deletes what
+// GET /relay/my/ai-reading: whether AI help can be on, and whether it is (on unless the shopper switched it off; choice:
+// "on" or "off" when they chose, null when they haven't). POST { on }: their choice, kept (ai-choice.js); off deletes what
 // the AI read. Returns null for any other path.
 export async function handleAiReadingRoute(path, method, request, env, cors, shopper, o) {
   if (path !== "/relay/my/ai-reading") return null;
   const db = env.RELAY_DB, now = (o && o.now) || Date.now();
   await ensureGmailTables(db);
+  await ensureAiChoiceTables(db);
   const state = async () => {
+    const c = await aiChoiceOf(db, shopper.id, "receipts");
     const row = await db.prepare("SELECT on_since FROM ai_reading WHERE shopper_id = ?").bind(shopper.id).first();
-    return { available: aiAvailable(env), on: Boolean(row) && aiAvailable(env), since: row ? iso(row.on_since) : null };
+    const on = aiAvailable(env) && (!c || c.on);
+    return { available: aiAvailable(env), on, choice: c ? (c.on ? "on" : "off") : null, since: on && row ? iso(row.on_since) : null };
   };
   if (method === "GET") return json(await state(), 200, cors);
   if (method !== "POST") return json({ error: "not_found" }, 404, cors);
@@ -149,10 +160,12 @@ export async function handleAiReadingRoute(path, method, request, env, cors, sho
   if (!b || typeof b.on !== "boolean") return json({ error: "invalid_request" }, 400, cors);
   if (b.on) {
     if (!aiAvailable(env)) return json({ error: "ai_off" }, 503, cors);
-    await db.prepare("INSERT OR IGNORE INTO ai_reading (shopper_id, on_since) VALUES (?, ?)").bind(shopper.id, now).run();
+    await db.batch([db.prepare("INSERT OR IGNORE INTO ai_reading (shopper_id, on_since) VALUES (?, ?)").bind(shopper.id, now),
+      aiChoiceStatement(db, shopper.id, "receipts", true, now)]);
   } else {
     await db.batch([db.prepare("DELETE FROM ai_reading WHERE shopper_id = ?").bind(shopper.id),
-      db.prepare("DELETE FROM receipt_ai_reads WHERE shopper_id = ?").bind(shopper.id)]);
+      db.prepare("DELETE FROM receipt_ai_reads WHERE shopper_id = ?").bind(shopper.id),
+      aiChoiceStatement(db, shopper.id, "receipts", false, now)]);
   }
   return json(await state(), 200, cors);
 }
