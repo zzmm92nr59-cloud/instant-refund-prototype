@@ -204,20 +204,26 @@ assert.doesNotMatch(await page.locator(".dc-cardwrap").filter({ hasText: "Canvas
 await polished("discover preview", ".main");
 await beanie.locator(".dc-card").click();
 await page.locator(".dc-page h2", { hasText: "Wool Beanie" }).waitFor();
-// Signed in, Buy fills in the shop's checkout with the shopper's delivery details (test-delivery-ui.mjs has the rest).
-await page.getByRole("button", { name: "Buy at Hollow Pine" }).waitFor();
+// Bought from the bag (test-bag-ui.mjs); the page says once when Relay last checked, and that you pay at the shop.
+await page.locator("#bagAdd").waitFor();
+assert.equal(await page.getByRole("button", { name: /Buy at/ }).count(), 0, "no Buy button now the bag exists");
 const when = new Date(CHECKED).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
-assert.match(await page.locator("#watchNote").innerText(), new RegExp("^Relay fills in your delivery details at Hollow Pine's checkout\\. Price and stock as Hollow Pine's website showed them (today|yesterday) at " + when + "\\. You pay there, not through Relay\\.$"));
+const checkedAt = new Date(CHECKED).toLocaleDateString("en-GB", { day: "numeric", month: "long" }) + ", " + when;
+assert.equal(await page.locator(".dc-checked b").innerText(), checkedAt);
+assert.equal((await page.locator(".dc-page").innerText()).split(when).length, 2, "the time Relay checked is said once");
+assert.equal(await page.locator("#watchNote").innerText(), "You pay at Hollow Pine, not through Relay.");
 assert.equal(await page.getByRole("button", { name: /Watch price/ }).count(), 1, "a shop website's product page can watch its price (Connor, 15 Nov; checked once a day)");
 await page.getByRole("button", { name: /^Navy/ }).click();
 assert.equal(await page.getByRole("link", { name: "See it on Hollow Pine's website" }).getAttribute("href"), web[0].productUrl, "a sold-out colour opens its own page, not a checkout");
-assert.match(await page.locator("#watchNote").innerText(), new RegExp("^Sold out on Hollow Pine's website when Relay checked (today|yesterday) at " + when + "\\."));
+assert.equal(await page.locator("#watchNote").innerText(), "Sold out on Hollow Pine's website when Relay last checked.");
+assert.equal(await page.locator(".dc-checked b").innerText(), checkedAt);
 await polished("website product", ".main");
 // Every colour sold out: its page says so, with where it came from and when.
 await page.getByRole("button", { name: "Back" }).click();
 await page.locator(".dc-cardwrap").filter({ hasText: "Linen Scarf" }).locator(".dc-card").click();
 await page.locator(".dc-page h2", { hasText: "Linen Scarf" }).waitFor();
-assert.match(await page.locator("#watchNote").innerText(), new RegExp("^Sold out on Hollow Pine's website when Relay checked (today|yesterday) at " + when + "\\."));
+assert.equal(await page.locator("#watchNote").innerText(), "Sold out on Hollow Pine's website when Relay last checked.");
+assert.equal(await page.locator(".dc-checked b").innerText(), checkedAt);
 assert.equal(await page.getByRole("link", { name: "See it on Hollow Pine's website" }).getAttribute("href"), web.find(w => w.product === "Linen Scarf").productUrl);
 console.log("ok - testing tools: shops' websites in Discover, no price alerts, bought on the shop's website, with when Relay checked");
 
@@ -237,7 +243,7 @@ await sheet.getByText("Looks like: grey wool beanie").waitFor();
 assert.equal(st.posts.at(-1).test, true, "testing tools ask for test shops and shops' websites too");
 await sheet.getByRole("button", { name: "Wool Beanie, From £25.00, from Hollow Pine" }).click();
 await page.locator(".dc-page h2", { hasText: "Wool Beanie" }).waitFor();
-await page.getByRole("button", { name: "Buy at Hollow Pine" }).waitFor();
+await page.getByRole("link", { name: "View on their website" }).waitFor();
 console.log("ok - testing tools: off explains the key; on, searches shops' websites too and opens them");
 
 assert.deepEqual(errors, []);

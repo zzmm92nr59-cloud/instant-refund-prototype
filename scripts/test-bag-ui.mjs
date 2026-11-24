@@ -223,7 +223,8 @@ const sheet = (page) => page.locator(".rl-back .rl-sheet").last();
   // The bag: grouped by shop, subtotals, one Pay button each.
   await page.locator("#bagPage .bg-group").first().waitFor();
   assert.equal(await page.locator("#view > .title").innerText(), "Your bag");
-  assert.equal(await page.locator("#bagPage .bg-intro").innerText(), "Each shop is paid separately, at its own checkout. Delivery is added there.");
+  assert.equal(await page.locator("#bagPage .bg-intro").count(), 0, "no grey explaining line under the title (rule 17)");
+  assert.deepEqual(await page.locator("#bagPage .bg-sub span").allInnerTexts(), ["Subtotal before delivery", "Subtotal before delivery"], "each subtotal says delivery comes on top");
   const groups = await page.$$eval("#bagPage .bg-group", gs => gs.map(g => ({ shop: g.querySelector(".bg-shop-n").textContent, cards: [...g.querySelectorAll(".wl-card")].map(c => c.innerText.split("\n").filter(Boolean)), sub: g.querySelector(".bg-sub b").textContent, pay: g.querySelector(".bg-pay").textContent })));
   assert.deepEqual(groups, [
     { shop: "Hollow Pine", cards: [["Ribbed Jumper", "L", "Quantity 3", "£237.00", "£79.00 each"], ["Wool Beanie", "Quantity 1", "£28.00"]], sub: "£265.00", pay: "Pay at Hollow Pine" },

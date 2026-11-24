@@ -251,7 +251,6 @@ html.on-me .topline .avatar{display:none}#view:has(#mePage>.rl-abar)>.rl-navback
 .dc-card.dc-web .dc-row{padding-top:2px}.dc-card.dc-web .dc-shop{padding-top:1px}
 .dc-shopb .dc-shopb-l .ico-i{width:24px;height:24px}
 .dc-checked{display:flex;flex-wrap:wrap;justify-content:space-between;gap:2px 12px;margin:14px 0 4px;padding:13px 16px;border-radius:14px;background:var(--rl-card);font-size:15px}.dc-checked span{color:var(--rl-text2);white-space:nowrap}.dc-checked b{font-weight:600;white-space:nowrap}
-.dc-pricefrom{font-size:13px;color:var(--rl-text2);margin:10px 0 0}
 /* A product's page: a screen of its own, with a big picture, the name and price, the sizes and one main button. */
 #dcRoot.dc-detail>.title,#dcRoot.dc-detail>.dc-shortcuts,#dcRoot.dc-detail>#dcForYou,#dcRoot.dc-detail>.dc-bar,#dcRoot.dc-detail>.dc-chips,#dcRoot.dc-detail>#storeAlert,#dcRoot.dc-detail>#dcPreview{display:none}
 #dcRoot.dc-detail>.dc-grid{display:block;margin-top:0}
@@ -842,7 +841,7 @@ function dcOptions(g){const o=[...new Set(g.options)];if(!o.length)return"";cons
  const uk=vary.map(x=>/^uk\s?(\d+(\.5)?)$/i.exec(x));let list;
  if(uk.every(Boolean)&&vary.length>2){const n=uk.map(m=>Number(m[1])).sort((a,b)=>a-b);list="UK "+n[0]+"–"+n[n.length-1]}
  else list=vary.slice(0,4).join(", ")+(vary.length>4?" +"+(vary.length-4)+" more":"");
- return (common.length?common.join(" / ")+" · ":"")+list}
+ return (common.length?common.join(" / ")+" in ":"")+list}
 function dcStock(g){return g.left===0?'<span class="dc-stock out">Out of stock</span>':g.left!==null&&g.left<=5?'<span class="dc-stock low">Only '+g.left+' left</span>':""}
 function dcPicture(g,px){if(/^https:\/\//.test(g.imageUrl))return '<img class="dc-photo" alt="" loading="lazy" referrerpolicy="no-referrer" src="'+safe(g.imageUrl)+'" onerror="this.remove()">'+(dcDrawing()?dcDrawing().html(g.draw,g.kind==="pets"?"home":g.kind,px||56):"");
  return dcDrawing()?dcDrawing().html(g.draw,g.kind==="pets"?"home":g.kind,px||56):""}
@@ -903,11 +902,8 @@ function photoSearch(){const A=window.RelayAccount;if(A&&A.photoSearch)A.photoSe
 // A photo search result: its product page, or (not in the catalogue here) a search for its name.
 function relayOpenProduct(sku,name){dcShow("shops");if(catalog.some(x=>x.sku===sku)){chooseSku(sku);return}relaySearchFor(name)}
 function relaySearchFor(text){dcShow("shops");const q=$("query");if(!q)return;q.value=String(text||"").slice(0,80);storeFilter="all";discoverKind="all";renderCatalog();q.scrollIntoView({block:"center"})}
-// When Relay last read a shop's website: "today at 14:05", "yesterday at 09:10" or "on 3 November".
-function checkedWhen(iso){const d=new Date(iso);if(!Number.isFinite(d.getTime()))return"recently";const day=x=>new Date(x.getFullYear(),x.getMonth(),x.getDate()).getTime(),n=(day(new Date())-day(d))/864e5,t=d.toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"});return n<1?"today at "+t:n<2?"yesterday at "+t:"on "+d.toLocaleDateString("en-GB",{day:"numeric",month:"long"})}
-// The same, as a date and time ("13 November, 14:05"), and as a date ("13 November").
+// When Relay last read a shop's website, as a date and time ("13 November, 14:05").
 function checkedLong(iso){const d=new Date(iso);return Number.isFinite(d.getTime())?d.toLocaleDateString("en-GB",{day:"numeric",month:"long"})+", "+d.toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"}):"Recently"}
-function checkedOn(iso){const d=new Date(iso);return Number.isFinite(d.getTime())?d.toLocaleDateString("en-GB",{day:"numeric",month:"long"}):"the day Relay last checked"}
 function dcChip(label,on,attr){return '<button type="button" class="dc-chip'+(on?' on':'')+'" aria-pressed="'+(on?'true':'false')+'" '+attr+'>'+label+'</button>'}
 // Interests (Profile, Your interests): shops of the kinds the shopper picked come first in Shops on Relay. A shop's kind is
 // the one Relay's server gives it (shopCategory); a shop it can't tell about is never moved. Receipts come first once there
@@ -991,29 +987,28 @@ function shopperProductPage(box,sku){const p=catalog.find(x=>x.sku===sku);if(!p)
  const opts=g&&g.variants.length>1?'<div class="dc-sizes" role="group" aria-label="Sizes and colours">'+g.variants.map(v=>{const q=p.provider==="web"||v.quantity==null||v.quantity===""?null:Number(v.quantity);return '<button type="button" class="dc-size'+(v.sku===sku?' on':'')+(q===0?' out':'')+'" data-size="'+safe(v.sku)+'" aria-pressed="'+(v.sku===sku?'true':'false')+'">'+safe(v.variation||"One size")+(q===0?' <span>Sold out</span>':'')+'</button>'}).join("")+'</div>':'';
  const web=p.provider==="web"&&/^https:\/\//.test(String(p.productUrl||"")),shop=safe(storeOf(p));
  const checkout=web?webCheckoutUrl(p):null;
- // Signed in: Buy starts the shop's checkout with the shopper's delivery details filled in (account.js buyAtShop).
- const fills=!!(checkout&&window.RelayAccount&&RelayAccount.buyAtShop&&RelayAccount.signedIn&&RelayAccount.signedIn());
- // A shop's website: View on their website first (the product's own page), then Buy at the shop, quieter. With no checkout
- // to start (sold out, or nothing to go by), the one button is the product's own page.
+ // A shop's website: Add to bag is the main button (it's bought from the bag, at the shop's own checkout); View on their
+ // website and Watch price are quieter. With no basket to start (sold out, or a shop read from its pages) the link says
+ // "See it on <shop>'s website" instead.
  const shops=/['’]s$|s'$/i.test(shop)?shop:/s$/i.test(shop)?shop+"'":shop+"'s"; // JD Sports' website, not JD Sports's
  // The bag (account.js): a shop connected to Relay, or a shop's website Relay shows, can go in it; never a test shop's.
  const bagOk=!!(window.RelayAccount&&RelayAccount.bagAdd&&(p.provider==="web"||p.provider==="shopify")&&liveProduct(p)&&!p.testShop),soldOut=p.inStock===false||(p.provider!=="web"&&p.quantity!=null&&p.quantity!==""&&Number(p.quantity)<=0);
  const bag=bagOk?'<div class="dc-bagadd"><div class="dc-qty" role="group" aria-label="How many"><button type="button" class="dc-qb" id="bagLess" aria-label="One fewer"'+(dcBagQty<=1||soldOut?' disabled':'')+'>'+ic("minus")+'</button><span class="dc-qn" id="bagQty" aria-live="polite">'+dcBagQty+'</span><button type="button" class="dc-qb" id="bagMore" aria-label="One more"'+(dcBagQty>=10||soldOut?' disabled':'')+'>'+ic("plus")+'</button></div><button type="button" class="darkbtn dc-buy dc-bagbuy" id="bagAdd"'+(soldOut?' disabled':'')+'>'+(soldOut?'Sold out':ic("bag")+' Add to bag')+'</button></div><div class="dc-bagnote" id="bagNote" role="status"></div>':'';
- const view=web&&checkout?'<a class="'+(bagOk?'outline':'darkbtn')+' dc-buy" id="viewOnSite" href="'+safe(p.productUrl)+'" target="_blank" rel="noopener noreferrer">View on their website'+ic("ext")+'</a>':'';
+ const view=web?'<a class="'+(bagOk?'outline':'darkbtn')+' dc-buy" id="viewOnSite" href="'+safe(p.productUrl)+'" target="_blank" rel="noopener noreferrer">'+(checkout?'View on their website':'See it on '+shops+' website')+ic("ext")+'</a>':'';
  // A product that's one of your picks can be turned down here ("Not for me"): Relay learns from it (see notForMe).
  const picked=!!(personalise&&g&&dcPicks(dcGroups(shownProducts())).some(x=>x.g.key===g.key));
- const act=web?view+(fills?'<button class="'+(view?'outline':'darkbtn')+' dc-buy" id="buyOnSite">Buy at '+shop+'</button>':'<a class="'+(view?'outline':'darkbtn')+' dc-buy" id="buyOnSite" href="'+safe(checkout||p.productUrl)+'" target="_blank" rel="noopener noreferrer">'+(checkout?'Buy at '+shop:'See it on '+shops+' website')+ic("ext")+'</a>')
+ const act=web?view
   :'<button class="'+(on?'outline':'darkbtn')+'" id="watchSelected" aria-pressed="'+(on?'true':'false')+'">'+(on?ic("check")+' Watching the price':ic("bell")+' Watch price')+'</button>';
  // A shop's website can be watched too (Connor, 15 Nov): Relay reads its prices once a day and says when one falls.
  const webWatch=web?'<button class="outline dc-buy" id="watchSelected" aria-pressed="'+(on?'true':'false')+'">'+(on?ic("check")+' Watching the price':ic("bell")+' Watch price')+'</button>':'';
- const note=web?(fills?'Relay fills in your delivery details at '+shops+' checkout. ':checkout?'Opens '+shops+' own checkout with this one in the basket. ':'')+(p.inStock===false?'Sold out on '+shops+' website when Relay checked ':p.inStock?'Price and stock as '+shops+' website showed them ':'Price as '+shops+' website showed it ')+checkedWhen(p.checkedAt)+'. You pay there, not through Relay.':on?'Relay tells you when the price drops.':'';
+ // When Relay last read the shop's website is said once, in the box under the price.
+ const note=web?(p.inStock===false?'Sold out on '+shops+' website when Relay last checked.':'You pay at '+shop+', not through Relay.'):on?'Relay tells you when the price drops.':'';
  {const r=$("dcRoot");if(r&&r.classList&&r.classList.add)r.classList.add("dc-detail")}
- box.innerHTML='<div class="dc-page" style="grid-column:1/-1"><button class="rl-navback" data-back id="backToResults">'+ic("back")+'<span>Back</span></button><div class="dc-pagepic">'+(g?dcPicture(g,96):"")+'</div><div class="dc-shop">'+shop+'</div><h2>'+safe(p.product)+'</h2>'+(p.variation&&!opts?'<p class="muted">'+safe(p.variation)+'</p>':'')+'<div class="price">'+priceIn(p.priceMinor,p.currency)+'</div>'+(stock&&!web?'<p class="small muted">'+safe(stock)+'</p>':'')+(web?'<div class="dc-checked"><span>When Relay last checked</span><b>'+safe(checkedLong(p.checkedAt))+'</b></div>':'')+opts+bag+'<div class="actions">'+act+webWatch+'</div>'+(picked?'<button type="button" class="link dc-notfor" id="notForMe">Not for me</button>':'')+'<p class="small muted" id="watchNote" aria-live="polite">'+note+'</p>'+(web?'<p class="dc-pricefrom">Prices from '+shop+'\'s website on '+safe(checkedOn(p.checkedAt))+'.</p>':'')+'</div>';
+ box.innerHTML='<div class="dc-page" style="grid-column:1/-1"><button class="rl-navback" data-back id="backToResults">'+ic("back")+'<span>Back</span></button><div class="dc-pagepic">'+(g?dcPicture(g,96):"")+'</div><div class="dc-shop">'+shop+'</div><h2>'+safe(p.product)+'</h2>'+(p.variation&&!opts?'<p class="muted">'+safe(p.variation)+'</p>':'')+'<div class="price">'+priceIn(p.priceMinor,p.currency)+'</div>'+(stock&&!web?'<p class="small muted">'+safe(stock)+'</p>':'')+(web?'<div class="dc-checked"><span>When Relay last checked</span><b>'+safe(checkedLong(p.checkedAt))+'</b></div>':'')+opts+bag+'<div class="actions">'+act+webWatch+'</div>'+(picked?'<button type="button" class="link dc-notfor" id="notForMe">Not for me</button>':'')+'<p class="small muted" id="watchNote" aria-live="polite">'+note+'</p></div>';
  $("backToResults").onclick=()=>{renderCatalog();scrollBack(dcListY)};
  if(bagOk)dcBagWire(p);
  if($("watchSelected"))$("watchSelected").onclick=()=>{toggleWatch(sku,true);chooseSku(sku)};
  if($("notForMe"))$("notForMe").onclick=()=>notForMe(sku);
- if(fills&&$("buyOnSite"))$("buyOnSite").onclick=()=>RelayAccount.buyAtShop({sku:p.sku,title:p.product,variation:p.variation||"",price:priceIn(p.priceMinor,p.currency),shop:storeOf(p),fallbackUrl:checkout});
  box.querySelectorAll("[data-size]").forEach(b=>b.onclick=()=>chooseSku(b.dataset.size));
  if(fresh)window.scrollTo(0,0);
 }

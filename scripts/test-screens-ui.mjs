@@ -60,6 +60,8 @@ function stub(who) {
     if (p === "/relay/my/wrapped") return j(full ? W.wrapped(RECEIPTS) : { receipts: 0, years: [] });
     if (p === "/relay/my/help/chat") return j({ available: true, messages: [] });
     if (p === "/relay/my/delivery") return j({ delivery: null });
+    if (p === "/relay/my/bag" && m === "GET") return j({ items: full ? W.bag() : [], updatedAt: Date.now() });
+    if (p === "/relay/my/bag/check") { let b = {}; try { b = JSON.parse(req.postData() || "{}"); } catch (e) {} return j(W.bagCheck(W.bag(), b.shop)); }
     if (p === "/relay/my/interests") return j({ interests: ["fashion", "home"] });
     if (p === "/relay/my/passkeys") return j({ passkeys: [] });
     if (p === "/relay/my/devices") return j({ devices: [] });
@@ -221,6 +223,7 @@ screen("new-receipts", "new", async (page, cfg) => { await tabTo(page, "receipts
 screen("new-browse", "new", async (page, cfg) => { await tabTo(page, "discover"); await look(page, cfg, "new-browse"); });
 screen("new-watching", "new", async (page, cfg) => { await tabTo(page, "profile"); await homeReady(page); await page.locator("#view .h2-chip", { hasText: "Watching" }).click(); await look(page, cfg, "new-watching"); });
 screen("new-bank", "new", async (page, cfg) => { await tabTo(page, "profile"); await tapPicture(page); await page.locator("#mePage .rl-arow:visible", { hasText: "Bank and cards" }).first().click(); await settle(page, 700); await look(page, cfg, "new-bank"); });
+screen("new-bag", "new", async (page, cfg) => { await tabTo(page, "bag"); await page.locator("#bagPage .bg-empty").waitFor(); await look(page, cfg, "new-bag"); });
 screen("new-inboxes", "new", async (page, cfg) => { await tabTo(page, "profile"); await tapPicture(page); await page.locator("#mePage .rl-arow:visible", { hasText: "Inboxes" }).first().click(); await settle(page, 700); await look(page, cfg, "new-inboxes"); });
 
 // The full account.
@@ -232,6 +235,12 @@ for (const c of CHIPS) screen("home-" + c.toLowerCase().replace(/\W+/g, "-"), "f
 });
 screen("ask", "full", async (page, cfg) => { await tabTo(page, "ask"); await look(page, cfg, "ask"); });
 screen("browse", "full", async (page, cfg) => { await tabTo(page, "discover"); await settle(page, 800); await look(page, cfg, "browse"); });
+// The bag: two shops' things, and Pay at a shop with a price that went up since it was added.
+screen("bag", "full", async (page, cfg) => { await tabTo(page, "bag"); await page.locator("#bagPage .bg-group").first().waitFor(); await settle(page, 700); await look(page, cfg, "bag"); });
+screen("bag-pay-price-changed", "full", async (page, cfg) => {
+  await tabTo(page, "bag"); await page.locator("#bagPage .bg-pay").first().waitFor(); await waitOutDoubleTap(page);
+  await page.locator("#bagPage .bg-pay").first().click(); await sheet(page).getByText(/is now £/).waitFor(); await settle(page, 500); await look(page, cfg, "bag-pay-price-changed");
+});
 screen("receipts", "full", async (page, cfg) => { await tabTo(page, "receipts"); await page.locator("#receiptsPage .rl-rr-row, #receiptsPage button").first().waitFor(); await settle(page, 800); await look(page, cfg, "receipts"); });
 // Each kind of receipt's page, from the Receipts list.
 const RECEIPT_PAGES = [["long-name", "Extraordinarily"], ["several-items", "Harlow"], ["on-its-way", "Northfold"], ["returning", "Kick Lane"], ["refunded", "Glow Lab"], ["cancelled", "Brindle"],

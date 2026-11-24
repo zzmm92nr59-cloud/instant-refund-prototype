@@ -1,10 +1,9 @@
-// Browser test: delivery details, and Buy filling in a shop's checkout with them. Stubbed Relay server, made-up person,
-// shop and product; nothing reaches a shop.
+// Browser test: delivery details (given to a shop only when the shopper wins its auction). Stubbed Relay server, made-up
+// person, shop and product; nothing reaches a shop.
 // Checks: Profile has a Delivery details tile; the form names what to fix in plain words, saves once, and the row shows
-// the address; on a product from a shop's website, Buy opens a sheet saying what goes to the shop, Continue asks Relay once
-// (a double tap too), then says what was filled in (only what the shop took) with the shop's checkout to open; without
-// details it offers to add them first, or to go without; when the shop can't be asked, it says so and offers the shop's
-// basket. The shared reviewer account has no Delivery details. Passes the polish rules in light and dark, at phone size.
+// the address; it says who gets them; removing them asks first; a product from a shop's website has no Buy button (things
+// are bought from the bag) and promises no filled-in checkout; Find address fills the rest in from the postcode. The
+// shared reviewer account has no Delivery details. Passes the polish rules in light and dark, at phone size.
 import assert from "node:assert/strict";
 import { createRequire } from "node:module"; import { createServer } from "node:http"; import { readFile, mkdir } from "node:fs/promises"; import { resolve, extname } from "node:path";
 import { skipInterests, homeReady, openShops } from "./relay-places.mjs";
@@ -124,74 +123,31 @@ await row.getByText("SW11 1AA", { exact: true }).waitFor();
 assert.deepEqual(st.saves[1], { firstName: "Jess", lastName: "Tester", line1: "12 High Street", line2: "", town: "London", county: "", postcode: "sw11 1aa", phone: "07700 900456" });
 console.log("ok - Profile: a Delivery details row; the form says what to fix, saves once, and the row shows the postcode");
 
-// 2. Buy on a product from a shop's website: what goes to the shop, then the checkout with it filled in.
+// 2. The product page has no Buy button any more: things are bought from the bag, at the shop's own checkout (Connor,
+// 24 Nov 2026). Nothing on the page says Relay fills in the shop's checkout, and nothing is sent to the shop.
 await openShops(page);
 await page.getByRole("button", { name: /^Wool Beanie, / }).click();
-const buy = page.locator("#buyOnSite");
-await buy.waitFor();
-assert.equal(await buy.evaluate(n => n.tagName), "BUTTON", "a button now, not a plain link");
-assert.match(await page.locator("#watchNote").innerText(), /^Relay fills in your delivery details at Hollow Pine's checkout\. /);
-await buy.click();
-const sheet = page.locator(".rl-sheet");
-await sheet.getByRole("heading", { name: "Buy at Hollow Pine" }).waitFor();
-await sheet.getByText("Wool Beanie", { exact: true }).waitFor();
-await sheet.getByText("Navy, £28.00").waitFor();
-assert.match(await sheet.locator(".rl-dl-to").innerText(), /Deliver to\s+Jess Tester\s+12 High Street\s+London\s+SW11 1AA\s+Email\s+jess\.tester@example\.com\s+Phone\s+07700 900456/);
-await sheet.getByText("Relay fills these in at Hollow Pine's checkout. You choose delivery and pay there, not through Relay.").waitFor();
-await polished("buy", ".rl-sheet");
-await sheet.getByRole("button", { name: "Continue to Hollow Pine" }).dblclick();
-await sheet.getByRole("heading", { name: "Ready at Hollow Pine" }).waitFor();
-assert.equal(st.checkouts.length, 1, "asked once for a double tap");
-assert.deepEqual(st.checkouts[0], { sku: "web:hollow-pine.test:72" });
-assert.deepEqual(await sheet.locator(".rl-dl-tick").allInnerTexts(), ["Wool Beanie is in your basket", "Your email is filled in", "Your delivery address is filled in"]);
-const openLink = sheet.getByRole("link", { name: "Open Hollow Pine's checkout" });
-assert.equal(await openLink.getAttribute("href"), "https://hollow-pine.test/checkouts/cn/abc");
-assert.equal(await openLink.getAttribute("target"), "_blank");
-assert.equal(await sheet.locator(".rl-dl-tick svg").count(), 3, "drawn ticks, not symbols");
-await polished("ready", ".rl-sheet");
-await sheet.getByRole("button", { name: "Not now" }).click();
-console.log("ok - Buy says what goes to the shop, asks Relay once, then says what was filled in and opens the shop's checkout");
+await page.locator(".dc-page h2", { hasText: "Wool Beanie" }).waitFor();
+await page.locator("#bagAdd").waitFor();
+assert.equal(await page.locator("#buyOnSite").count(), 0, "no Buy at <shop> button");
+assert.equal(await page.locator(".dc-page").getByText(/Buy at|fills in|filled in/).count(), 0, "nothing promises a filled-in checkout");
+assert.equal(await page.locator("#watchNote").innerText(), "You pay at Hollow Pine, not through Relay.");
+assert.equal(st.checkouts.length, 0, "no checkout started at the shop");
+await page.getByRole("button", { name: "Back" }).click();
+console.log("ok - a product from a shop's website has no Buy button and promises no filled-in checkout");
 
-// 3. The shop didn't take the address: said plainly.
-st.checkout = { status: 200, body: { url: "https://hollow-pine.test/checkouts/cn/def", shop: "Hollow Pine", emailFilled: true, addressFilled: false } };
-await buy.click();
-await sheet.getByRole("button", { name: "Continue to Hollow Pine" }).click();
-await sheet.getByText("Hollow Pine's checkout didn't take your address, so type it there").waitFor();
-await sheet.getByRole("button", { name: "Not now" }).click();
-// The shop couldn't be asked: plain words, and its basket instead.
-st.checkout = { status: 502, body: { error: "shop_checkout_failed" } };
-await buy.click();
-await sheet.getByRole("button", { name: "Continue to Hollow Pine" }).click();
-await sheet.getByText("Couldn't fill in Hollow Pine's checkout just now. You can still buy it there and type your details.").waitFor();
-assert.equal(await sheet.getByRole("link", { name: "Go to Hollow Pine" }).getAttribute("href"), "https://hollow-pine.test/cart/72:1");
-await sheet.getByRole("button", { name: "Cancel" }).click();
-console.log("ok - when the shop doesn't take the address it says so; when the shop can't be asked, plain words and its basket");
-
-// 4. Without delivery details: add them first, or go without.
+// 3. The details are only for auctions now, and the form says so; they can be removed.
 await page.evaluate(() => window.go("me"));
 await page.locator("#mePage .rl-arow", { hasText: "Settings" }).first().click(); await page.waitForTimeout(450);
 await row.click();
+await page.getByText("Relay gives these only to a shop whose auction you win, so it can send what you won to you.").waitFor();
 await page.getByRole("button", { name: "Remove my delivery details" }).click();
 await page.getByRole("alertdialog").getByRole("button", { name: "Remove" }).click();
 await row.getByText("Add your address").waitFor();
 assert.equal(st.removes, 1);
-await openShops(page);
-await page.getByRole("button", { name: /^Wool Beanie, / }).click();
-st.checkout = null;
-await page.locator("#buyOnSite").click();
-await sheet.getByText("Add your delivery details once, and Relay fills them in at shops' checkouts for you.").waitFor();
-assert.equal(await sheet.getByRole("link", { name: "Go to Hollow Pine without filling in" }).getAttribute("href"), "https://hollow-pine.test/cart/72:1");
-await sheet.getByRole("button", { name: "Add delivery details" }).click();
-await field("First name").fill("Jess"); await field("Last name").fill("Tester"); await field("Address").fill("12 High Street");
-await field("Town or city").fill("London"); await field("Postcode").fill("SW11 1AA");
-await sheet.getByRole("button", { name: "Save and continue" }).click();
-await sheet.getByRole("button", { name: "Continue to Hollow Pine" }).waitFor();
-assert.ok(!/Phone/.test(await sheet.locator(".rl-dl-to").innerText()), "no phone line without a phone number");
-await polished("buy after adding", ".rl-sheet");
-await sheet.getByRole("button", { name: "Cancel" }).click();
-console.log("ok - without delivery details, Buy offers to add them first (then carries on) or to go without");
+console.log("ok - the form says who gets the details; removing them asks first, then the row asks for an address again");
 
-// 5. Find address: type the postcode, pick from the addresses there, and the rest is filled in.
+// 4. Find address: type the postcode, pick from the addresses there, and the rest is filled in.
 assert.equal(await page.getByRole("button", { name: "Find address" }).count(), 0, "no Find address while Relay's postcode lookup is off");
 st.lookup = true;
 await openShops(page); await page.evaluate(() => window.go("me"));
@@ -215,6 +171,9 @@ await page.getByText("Filled in. Check it, then save.").waitFor();
 assert.deepEqual(await Promise.all(["Address", "Flat, floor or building (optional)", "Town or city", "County (optional)", "Postcode"].map(n => field(n).inputValue())),
   ["12 High Street", "Flat 2", "London", "London", "SW11 1AA"]);
 assert.deepEqual(st.lookups, ["SW11 1AX", "SW11 1AA"], "one lookup per tap");
+await field("First name").fill("Jess"); await field("Last name").fill("Tester");
+// (Save is the form's last button: scrolled up clear of the floating tab bar, the way a thumb would.)
+await page.getByRole("button", { name: "Save", exact: true }).evaluate(b => b.scrollIntoView({ block: "center" }));
 await page.getByRole("button", { name: "Save", exact: true }).click();
 await row.getByText("SW11 1AA", { exact: true }).waitFor();
 assert.equal(st.saves.at(-1).line2, "Flat 2");
@@ -226,5 +185,5 @@ await page.getByText("Type the whole postcode, like SW11 1AA.").waitFor();
 assert.equal(st.lookups.length, 2);
 console.log("ok - Find address: the postcode first, a list of the addresses there, one tap fills the rest in; a wrong postcode says so");
 assert.deepEqual(errors, [], "no page errors");
-console.log("PASS delivery details and Buy filling in the shop's checkout");
+console.log("PASS delivery details");
 await browser.close(); server.close();
