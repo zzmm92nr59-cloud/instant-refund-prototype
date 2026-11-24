@@ -11,6 +11,14 @@
 //  7. Ship24 for the return parcel: off until the key is set; only the tracking number; shares the 10-a-month allowance
 //     and the 3-per-shopper limit with deliveries.
 //  8. Own receipts only (404), the input rules (400), Download my data, and account deletion.
+//  9. (24 Nov 2026) Only what an email says has happened counts: a label email's "once you've dropped it off", a reminder,
+//     "we'll let you know when it's delivered" and "we'll process your refund" are not a drop-off, an arrival or a refund.
+//     A shop's own return-label email with the parcel's tracking number starts the return on the order it names.
+// 10. A step nobody told Relay about is never ticked, even when a later one is.
+// 11. A refund seen in the shopper's own bank payments: only on a return already known, only when the bank's text names
+//     the shop and the amount fits, never a guess between two, never enough to make returnReceived true.
+// 12. onItsWay, the one fact a future instant refund asks for: who confirmed the parcel left the shopper, how, and the
+//     carrier's first scan time; never the carrier's expected day, a label made, or the shopper's word.
 // Shops, people, order and tracking numbers are made up.
 import { DatabaseSync } from "node:sqlite";
 import { readFileSync, readdirSync } from "node:fs";
@@ -18,6 +26,9 @@ import assert from "node:assert/strict";
 import { handleAuthRoute } from "../worker/auth.js";
 import { parseReturnParcelEmail, parseReturnUpdateEmail, parseDeliveryEmail, returnCarrierOf } from "../worker/receipt-parser.js";
 import { attachReturnTracking, guessCarrier, cleanTrackingNumber, cleanReturnSent, returnFacts, STEPS } from "../worker/return-tracking.js";
+import { firstScan } from "../worker/parcel-tracking.js";
+import { namesShop, ensureBankTables } from "../worker/bank.js";
+import { classifyEmail } from "../worker/gmail.js";
 import { liveParcel } from "../worker/parcel-tracking.js";
 import { returnFactsFor } from "../worker/gmail.js";
 
@@ -63,6 +74,43 @@ const mail = (from, subject, body, d = TODAY) => `From: ${from}\r\nTo: sam@examp
   // The shop's own word on arrival and refunds still comes from its own emails.
   assert.equal(parseReturnUpdateEmail(mail("Kestrel Outdoor <returns@kestrel-outdoor.example>", "We've received your return", "We've received your return for order KO-1001.")).stage, "received");
   console.log("ok - carriers' (all seven) and shops' return emails: label, dropped off or on its way back, delivered to the shop; ordinary deliveries and failed ones aren't returns");
+
+  // 9. Only what the email says has happened. Each of these used to be read as dropped off, delivered or refunded.
+  const RM = "Royal Mail <no-reply@royalmail.com>", EV = "Evri <noreply@evri.com>", IP = "InPost <no-reply@inpost.co.uk>", SHOP = "Kestrel Outdoor <returns@kestrel-outdoor.example>";
+  const parcel = (from, subject, body) => parseReturnParcelEmail(mail(from, subject, body));
+  const labels = [
+    [RM, "Your return label is ready", "Here's your return label for Kestrel Outdoor.\nOnce you've dropped off your parcel at a Post Office we'll email you.\nTracking number: KO123456789GB"],
+    [EV, "Your Evri return QR code", "Show this QR code at a ParcelShop. You can track your return once it is in transit.\nTracking number: H01HYA0087654321"],
+    [IP, "Your return QR code for Kestrel Outdoor", "Take your return parcel to any InPost locker. When your parcel has been dropped off we will let the retailer know."],
+    [RM, "Your return label expires soon", "You have not yet dropped off your return to Kestrel Outdoor. Your label is still valid.\nTracking number: KO123456789GB"],
+    [EV, "Your return label", "Has your return been dropped off? If it has been dropped off, you can ignore this email. Print your label again here.\nTracking number: H01HYA0087654321"],
+    [RM, "Your return label is ready", "After you've dropped off your return at a Post Office it's on its way back to Kestrel Outdoor.\nTracking number: KO123456789GB"]];
+  for (const [from, subject, body] of labels) assert.equal(parcel(from, subject, body).stage, "started", "a label, not a drop-off: " + subject + " / " + body.slice(0, 50));
+  assert.equal(parcel(EV, "Don't forget to drop off your return", "Your return to Kestrel Outdoor hasn't been dropped off yet. Tracking number: H01HYA0087654321").ok, false, "a reminder says nothing happened");
+  const thanks = parcel(RM, "Thanks for dropping off your return", "We'll let you know when your return has been delivered to Kestrel Outdoor.\nTracking number: KO123456789GB");
+  assert.deepEqual([thanks.stage, thanks.trackingNumber], ["sent", "KO123456789GB"], "dropped off; 'when it has been delivered' is not delivered");
+  const onWay = parcel(EV, "Your return is on its way", "Your return to Kestrel Outdoor will be delivered to the retailer in 2-3 days.\nTracking number: H01HYA0087654321");
+  assert.deepEqual([onWay.stage, onWay.shop], ["sent", "Kestrel Outdoor"], "on its way; 'will be delivered' is not delivered");
+  assert.equal(parcel(RM, "Your return has been delivered", "Your return to Kestrel Outdoor has been delivered and will be processed by the retailer.\nTracking number: KO123456789GB").stage, "received", "said plainly, it still counts");
+  const update = (subject, body) => parseReturnUpdateEmail(mail(SHOP, subject, body));
+  for (const body of ["We've received your return for order KO-1001. We'll process your refund within 5 working days.", "We've received your return for order KO-1001. Your refund will be issued once we've checked the items.",
+    "We have received your return for order KO-1001.\nOnce your return has been inspected, we will send you a refund confirmation.", "We've received your return for order KO-1001. If you have any questions about your refund, reply to this email.",
+    "We've received your return for order KO-1001. Your refund can take up to 10 days.", "We've received your return for order KO-1001. Your refund has not been processed yet."])
+    assert.equal(update("We've received your return", body).stage, "received", "received, and a refund only promised: " + body.slice(40));
+  assert.equal(update("Your return has been registered", "Your return for order KO-1001 is registered. When we have received your return, a refund of £30.00 will be issued.").ok, false, "registered: neither received nor refunded");
+  for (const [subject, body] of [["Your refund is on its way", "We've refunded £30.00 for order KO-1001."], ["We've received your return", "We've received your return for order KO-1001 and we have processed your refund of £30.00. It will reach your account within 5 days."],
+    ["Your refund", "We can confirm your refund of £30.00 for order KO-1001 has been issued and will show on your statement shortly."], ["Refund for your Kestrel Outdoor order KO-1001", "We've processed the refund for your returned items. Refund total £30.00"]]) {
+    const r = update(subject, body);
+    assert.deepEqual([r.stage, r.amountPence], ["refunded", 3000], "a refund the shop says it has made: " + subject);
+  }
+  const shopSent = classifyEmail(mail(SHOP, "Your return is on its way to us", "Thanks, your return for order KO-1001 is on its way back to us. Once we receive it, your refund will be processed.")).details;
+  assert.deepEqual([shopSent.kind, shopSent.stage, shopSent.fromCarrier], ["return_update", "sent", false], "the shop says it's on its way; the refund is only promised");
+  // A shop's own return-label email: the return started, with the parcel's tracking number, on the order it names.
+  const shopLabel = classifyEmail(mail(SHOP, "Your return label for order KO-1001", "Your Royal Mail return label is attached. Tracking number: KO123456789GB. Drop it off at any Post Office. Once it has been dropped off, it is on its way back to us.")).details;
+  assert.deepEqual([shopLabel.kind, shopLabel.orderRef, shopLabel.trackingNumber], ["return_instructions", "KO-1001", "KO123456789GB"]);
+  assert.notEqual(classifyEmail(mail(SHOP, "Your return label", "Print the attached label and drop your parcel off at any Post Office.")).details.kind, "return_instructions", "no tracking number or order number: not read as one");
+  assert.notEqual(classifyEmail(mail(SHOP, "Free returns label with every order", "Order number: KO-1001. Shop the sale now.")).details.kind, "return_instructions", "an advert isn't a return");
+  console.log("ok - only what an email says has happened: labels, reminders, 'when it's delivered' and 'we'll process your refund' are not drop-offs, arrivals or refunds; a shop's label email starts the return with its tracking number");
 }
 
 // ---- 2 and 4. Matching and the states ----
@@ -89,8 +137,10 @@ const mail = (from, subject, body, d = TODAY) => `From: ${from}\r\nTo: sam@examp
     const a = order("a", kestrel, "KO-1001", ago(20), 8900), b = order("b", kestrel, "KO-1002", ago(18), 8900), c = order("c", larks, "KO-1001", ago(20), 8900);
     attachReturnTracking([a, b, c], { today: TODAY, updates: [upd({ stage: "received", at: ago(3), orderRef: "KO-1001", retailer: kestrel })] });
     assert.equal(a.returnTracking.state, "received"); assert.equal(b.returnTracking, undefined); assert.equal(c.returnTracking, undefined, "another shop's order with the same number");
-    assert.deepEqual(a.returnTracking.steps.map((s) => [s.step, s.done, s.at, s.from && s.from.by]), [["started", true, null, null], ["sent", true, null, null], ["received", true, ago(3), "shop"], ["refunded", false, null, null]],
-      "the steps in order; the earlier ones done (it arrived, so it was sent) but with no day or source, since nobody said");
+    assert.deepEqual(a.returnTracking.steps.map((s) => [s.step, s.done, s.at, s.from && s.from.by]), [["started", false, null, null], ["sent", false, null, null], ["received", true, ago(3), "shop"], ["refunded", false, null, null]],
+      "the steps in order; the earlier ones not ticked, since nobody told Relay about them (24 Nov 2026: it used to tick them)");
+    assert.deepEqual(a.returnTracking.steps.map((s) => Boolean(s.missed)), [true, true, false, false], "marked as steps Relay wasn't told about; the refund is just still to come");
+    assert.deepEqual(a.returnTracking.onItsWay, { by: "shop", name: "Kestrel Outdoor", at: ago(3), via: "email", atTime: null, arrived: true }, "the shop has it, so it left the shopper, though nobody said when");
     assert.equal(a.returnReceived, true); assert.equal(a.returnInTransit, false);
   }
   // By the return's tracking number: a carrier email that names no order.
@@ -103,7 +153,8 @@ const mail = (from, subject, body, d = TODAY) => `From: ${from}\r\nTo: sam@examp
     assert.deepEqual(t.steps.map((s) => [s.step, s.at, s.from && s.from.by, s.from && s.from.name]),
       [["started", null, null, null], ["sent", ago(3), "carrier", "Royal Mail"], ["received", ago(1), "carrier", "Royal Mail"], ["refunded", null, null, null]], "the carrier's word over the shopper's");
     assert.deepEqual([t.trackingNumber, t.carrier, t.trackUrl], ["KO123456789GB", "Royal Mail", "https://www.royalmail.com/track-your-item#/tracking-results/KO123456789GB"]);
-    assert.deepEqual(returnFacts({ id: "a", returnTracking: t }), { receiptId: "a", returnInTransit: false, returnReceived: true, confirmedBy: { by: "carrier", name: "Royal Mail", at: ago(1) }, trackingNumber: "KO123456789GB", state: "received" });
+    assert.deepEqual(returnFacts({ id: "a", returnTracking: t }), { receiptId: "a", returnInTransit: false, returnReceived: true, confirmedBy: { by: "carrier", name: "Royal Mail", at: ago(1), via: "email", atTime: null },
+      onItsWay: { by: "carrier", name: "Royal Mail", at: ago(3), via: "email", atTime: null }, statement: "On its way: confirmed by Royal Mail's email on " + ago(3), trackingNumber: "KO123456789GB", state: "received" });
   }
   // A carrier email whose number Relay learns from the shop's email (matched by order number) the first time round.
   {
@@ -171,6 +222,96 @@ const mail = (from, subject, body, d = TODAY) => `From: ${from}\r\nTo: sam@examp
     assert.equal(a.returnTracking.refundNotSeen, null, "only sent (by the shopper's word): Relay never saw it arrive, so no nudge");
   }
   console.log("ok - Refund not seen yet: only 14 days after Relay saw the shop receive it, and never once refunded");
+}
+
+// ---- 11. A refund seen in the shopper's own bank payments ----
+{
+  const R = (name, domain) => ({ name, domain });
+  const kestrel = R("Kestrel Outdoor", "kestrel-outdoor.example");
+  const order = (id, ref, date, total, items) => ({ id, retailer: kestrel, orderRef: ref, orderDate: date, totalPence: total, currency: "GBP", items: items || [{ name: "Thing", qty: 1, pricePence: total }] });
+  const upd = (o) => ({ kind: "return_update", source: "shopper_email", retailer: kestrel, ...o });
+  const credit = (pence, on, text = "KESTREL OUTDOOR LTD", o = {}) => ({ id: "c-" + pence + on, on, pence, currency: "GBP", account: "Everyday Account ending 4321", text, ...o });
+  const run = (orders, o) => { attachReturnTracking(orders, { today: TODAY, names: namesShop, ...o }); return orders; };
+  // The shop said it has the return; the money then shows in the bank: "Refund received", from the bank.
+  {
+    const [a] = run([order("a", "KO-1001", ago(20), 8900)], { updates: [upd({ stage: "received", at: ago(6), orderRef: "KO-1001" })], credits: [credit(8900, ago(2))] });
+    const t = a.returnTracking;
+    assert.deepEqual([t.state, t.steps[3]], ["refunded", { step: "refunded", done: true, at: ago(2), from: { by: "bank", name: "Everyday Account ending 4321", via: "bank" }, amountPence: 8900, currency: "GBP" }]);
+    assert.equal(t.refundNotSeen, null, "the refund was seen");
+    assert.deepEqual([a.returnReceived, t.confirmedBy.by, t.confirmedBy.at], [true, "shop", ago(6)], "received on the shop's word, as before");
+    assert.equal(a.returnProgress.refundedAt, null, "the older shape (Wrapped's refunds) only takes a shop's own word");
+  }
+  // The shop's refund email and the bank both: the shop's word is the step, the bank's is shown beside it.
+  {
+    const [a] = run([order("a", "KO-1001", ago(20), 8900, [{ name: "Hat", qty: 1, pricePence: 3000 }, { name: "Coat", qty: 1, pricePence: 5900 }])],
+      { updates: [upd({ stage: "refunded", at: ago(4), orderRef: "KO-1001", amountPence: 3000, currency: "GBP" })], credits: [credit(5900, ago(3)), credit(3000, ago(2))] });
+    const s = a.returnTracking.steps[3];
+    assert.deepEqual([s.from.by, s.at, s.amountPence, s.seenInBank], ["shop", ago(4), 3000, { at: ago(2), account: "Everyday Account ending 4321" }], "only the credit of the amount the shop said (£30), not the £59 one");
+  }
+  // On the shopper's word alone, a credit shows the refund but confirms nothing.
+  {
+    const [a] = run([order("a", "KO-1001", ago(20), 8900)], { typed: [{ receipt_id: "a", tracking_number: null, carrier: null, sent_on: ago(8) }], credits: [credit(8900, ago(1))] });
+    assert.deepEqual([a.returnTracking.state, a.returnTracking.steps[3].from.by, a.returnReceived, a.returnInTransit, a.returnTracking.onItsWay], ["refunded", "bank", false, false, null],
+      "a bank payment that looks like the refund never says the shop has the parcel, or that it was sent");
+    assert.deepEqual(a.returnTracking.steps.map((s) => [s.done, Boolean(s.missed)]), [[false, true], [true, false], [false, true], [true, false]]);
+  }
+  // Left out, each for its own reason.
+  const none = (why, orders, o) => { run(orders, o); for (const x of orders) assert.ok(!x.returnTracking || x.returnTracking.steps[3].done === false, "no refund shown: " + why); };
+  const started = (id) => ({ id, i: 0, status: "returning", at: NOW - 9 * DAY });
+  none("no return known on the receipt", [order("a", "KO-1001", ago(20), 8900)], { credits: [credit(8900, ago(2))] });
+  none("the bank's text doesn't name the shop", [order("a", "KO-1001", ago(20), 8900)], { marks: [started("a")], credits: [credit(8900, ago(2), "FASTER PAYMENT FROM A FRIEND")] });
+  none("an amount that fits nothing on the order", [order("a", "KO-1001", ago(20), 8900)], { marks: [started("a")], credits: [credit(8899, ago(2))] });
+  none("money that came in before the return started", [order("a", "KO-1001", ago(20), 8900)], { marks: [started("a")], credits: [credit(8900, ago(12))] });
+  none("another currency", [order("a", "KO-1001", ago(20), 8900)], { marks: [started("a")], credits: [credit(8900, ago(2), "KESTREL OUTDOOR LTD", { currency: "EUR" })] });
+  none("two receipts it could be", [order("a", "KO-1001", ago(20), 8900), order("b", "KO-1002", ago(19), 8900)], { marks: [started("a"), started("b")], credits: [credit(8900, ago(2))] });
+  none("two credits that both fit", [order("a", "KO-1001", ago(20), 8900)], { marks: [started("a")], credits: [credit(8900, ago(2)), credit(8900, ago(1))] });
+  none("long after the order", [order("a", "KO-1001", ago(200), 8900)], { typed: [{ receipt_id: "a", tracking_number: null, carrier: null, sent_on: ago(190) }], credits: [credit(8900, ago(2))] });
+  none("no way to check the name (names not given)", [order("a", "KO-1001", ago(20), 8900)], { marks: [started("a")], credits: [credit(8900, ago(2))], names: null });
+  console.log("ok - a refund seen in the bank: only on a known return, the shop named, the amount fitting, after the return started; never a guess; it never confirms the parcel was sent or received");
+}
+
+// ---- 12. The carrier's first scan, and the one fact to pay on ----
+{
+  const kestrel = { name: "Kestrel Outdoor", domain: "kestrel-outdoor.example" };
+  const order = () => ({ id: "a", retailer: kestrel, orderRef: "KO-1001", orderDate: ago(20), totalPence: 8900, currency: "GBP", items: [{ name: "Thing", qty: 1, pricePence: 8900 }] });
+  const ev = (m, when) => ({ statusMilestone: m, occurrenceDatetime: when });
+  const body = (events) => ({ data: { trackings: [{ shipment: {}, events }] } });
+  assert.equal(firstScan(body([ev("info_received", ago(5) + "T08:00:00"), ev("in_transit", ago(3) + "T14:05:00"), ev("in_transit", ago(4) + "T09:14:00"), ev("delivered", ago(1) + "T11:00:00")])), ago(4) + "T09:14:00", "the earliest real scan");
+  assert.equal(firstScan(body([ev("pending", ago(5) + "T08:00:00"), ev("info_received", ago(5) + "T08:01:00")])), null, "a label made is not a scan");
+  assert.equal(firstScan(body([ev("exception", ago(2) + "T08:00:00")])), null, "a problem report is not a scan");
+  assert.equal(firstScan(body([ev("in_transit", "yesterday"), ev("in_transit", "2026-13-45T99:00:00")])), null, "a time that isn't one is never kept");
+  assert.equal(firstScan(body([ev("in_transit", ago(4) + "T09:14:00+00:00")])), ago(4) + "T09:14:00+00:00");
+  assert.equal(firstScan(null), null);
+  const typed = [{ receipt_id: "a", tracking_number: "KO123456789GB", carrier: "Royal Mail", sent_on: ago(5) }];
+  const track = (row) => { const a = order(); attachReturnTracking([a], { today: TODAY, typed, tracked: [{ tracking_number: "KO123456789GB", ...row }] }); return a; };
+  // Scanned: on its way, with the scan's own time. The carrier's expected day (a day still to come) is never the day it was sent.
+  let a = track({ status: "due", at: ago(-2), first_scan: ago(4) + "T09:14:00" });
+  assert.deepEqual(a.returnTracking.steps[1], { step: "sent", done: true, at: ago(4), from: { by: "carrier", name: "Royal Mail", via: "tracking" }, atTime: ago(4) + "T09:14:00" });
+  assert.deepEqual(returnFacts(a), { receiptId: "a", returnInTransit: true, returnReceived: false, confirmedBy: { by: "carrier", name: "Royal Mail", at: ago(4), via: "tracking", atTime: ago(4) + "T09:14:00" },
+    onItsWay: { by: "carrier", name: "Royal Mail", at: ago(4), via: "tracking", atTime: ago(4) + "T09:14:00" }, statement: "On its way: confirmed by Royal Mail's tracking, first scan " + ago(4) + "T09:14:00", trackingNumber: "KO123456789GB", state: "sent" });
+  // A parcel looked up before the scan time was kept: on its way, but Relay doesn't put the expected day in its place.
+  a = track({ status: "due", at: ago(-2) });
+  assert.deepEqual([a.returnTracking.steps[1].at, a.returnTracking.steps[1].done, a.returnInTransit, a.returnTracking.onItsWay.at, a.returnTracking.onItsWay.atTime], [null, true, true, null, null]);
+  a = track({ status: "in_transit", at: ago(2) });
+  assert.deepEqual([a.returnTracking.steps[1].at, a.returnTracking.onItsWay.at], [ago(2), ago(2)], "the day of the carrier's latest news");
+  // Delivered to the shop: both steps, each with its own day.
+  a = track({ status: "delivered", at: ago(1), first_scan: ago(4) + "T09:14:00" });
+  assert.deepEqual(a.returnTracking.steps.slice(1, 3).map((s) => [s.done, s.at, s.from.via]), [[true, ago(4), "tracking"], [true, ago(1), "tracking"]]);
+  assert.deepEqual([a.returnReceived, a.returnInTransit, a.returnTracking.onItsWay.atTime, a.returnTracking.onItsWay.arrived], [true, false, ago(4) + "T09:14:00", undefined]);
+  // The carrier's tracking is believed before its email, and its email before the shop's.
+  a = order(); attachReturnTracking([a], { today: TODAY, typed, tracked: [{ tracking_number: "KO123456789GB", status: "in_transit", at: ago(2), first_scan: ago(3) + "T18:40:00" }],
+    updates: [{ kind: "return_update", stage: "sent", fromCarrier: true, carrier: "Royal Mail", trackingNumber: "KO123456789GB", at: ago(4) }, { kind: "return_update", stage: "sent", orderRef: "KO-1001", retailer: kestrel, at: ago(5) }] });
+  assert.deepEqual([a.returnTracking.steps[1].from, a.returnTracking.steps[1].at], [{ by: "carrier", name: "Royal Mail", via: "tracking" }, ago(3)]);
+  // A problem with no scan: the carrier never had it, so it isn't on its way.
+  a = track({ status: "problem", at: ago(1) });
+  assert.deepEqual([a.returnTracking.steps[1].from.by, a.returnInTransit, a.returnTracking.onItsWay, Boolean(a.returnTracking.problem)], ["you", false, null, true]);
+  a = track({ status: "problem", at: ago(1), first_scan: ago(4) + "T09:14:00" });
+  assert.deepEqual([a.returnTracking.steps[1].at, a.returnTracking.problem.at, a.returnTracking.onItsWay.by], [ago(4), ago(1), "carrier"], "scanned, then a problem: sent on the scan's day, the problem on its own");
+  // The shopper's word alone, with a tracking number and nothing from the carrier: not on its way.
+  a = order(); attachReturnTracking([a], { today: TODAY, typed });
+  assert.deepEqual([returnFacts(a).onItsWay, returnFacts(a).statement], [null, "Not confirmed on its way"]);
+  assert.equal(returnFacts(null).onItsWay, null); assert.equal(returnFacts({ id: "x" }).statement, "Not confirmed on its way");
+  console.log("ok - onItsWay: the carrier's first scan with its own time, never its expected day, a label, a problem with no scan or the shopper's word; tracking believed before emails");
 }
 
 // ---- The server: own receipts, the input rules, Ship24, export and deletion ----
@@ -260,7 +401,7 @@ const sent = (id, body, token = alice) => call("/relay/my/receipts/" + id + "/re
   const c = await card(alice, RA);
   assert.equal(c.returnTracking.state, "sent", "it's on the receipt in the list too");
   assert.ok(c.returnProgress, "and in the older shape Home reads");
-  assert.deepEqual(await returnFactsFor(env, A, RA), { receiptId: RA, returnInTransit: false, returnReceived: false, confirmedBy: null, trackingNumber: "KO123456789GB", state: "sent" });
+  assert.deepEqual(await returnFactsFor(env, A, RA), { receiptId: RA, returnInTransit: false, returnReceived: false, confirmedBy: null, onItsWay: null, statement: "Not confirmed on its way", trackingNumber: "KO123456789GB", state: "sent" });
   assert.equal(await returnFactsFor(env, B, RA), null, "not bob's");
   console.log("ok - I've sent it back: on its own, with a number and the carrier asked, or with the carrier guessed from Royal Mail's format");
 }
@@ -277,6 +418,10 @@ const sent = (id, body, token = alice) => call("/relay/my/receipts/" + id + "/re
   assert.deepEqual(JSON.parse(ship[0].init.body), { trackingNumber: "KO123456789GB", destinationCountryCode: "GB", courierCode: ["gb-post"] }, "only the tracking number goes to Ship24");
   assert.ok(!JSON.stringify(ship[0]).includes("alice") && !JSON.stringify(ship[0]).includes("KO-1001"), "nothing about the shopper or the order");
   assert.deepEqual([j.returnTracking.steps[1].from, j.returnTracking.steps[1].at, j.returnInTransit], [{ by: "carrier", name: "Royal Mail", via: "tracking" }, ago(1), true], "the carrier's own word: on its way");
+  assert.deepEqual(j.onItsWay, { by: "carrier", name: "Royal Mail", at: ago(1), via: "tracking", atTime: ago(1) + "T09:00:00" }, "with the time of the carrier's first scan, in the route's answer");
+  assert.deepEqual((await returnFactsFor(env, A, RA)).onItsWay, j.onItsWay, "and on the server, for a future instant refund");
+  assert.equal((await returnFactsFor(env, A, RA)).statement, "On its way: confirmed by Royal Mail's tracking, first scan " + ago(1) + "T09:00:00");
+  assert.equal(sqlite.prepare("SELECT first_scan FROM parcel_tracks WHERE shopper_id = ? AND tracking_number = 'KO123456789GB'").get(A).first_scan, ago(1) + "T09:00:00", "kept with what the carrier said");
   await call("/relay/my/receipts/" + RA + "/return-parcel", { token: alice });
   assert.equal(ship.length, 1, "opened again soon after: not asked again (2 hours)");
   // The allowance is shared with deliveries: the return took this month's 1st; with 2 in the month, a delivery gets the last.
@@ -301,6 +446,22 @@ const sent = (id, body, token = alice) => call("/relay/my/receipts/" + id + "/re
   delete env.PARCEL_TRACKS_PER_MONTH;
   console.log("ok - Ship24 for the return parcel: off until the key is set, only the tracking number, asked when the receipt is opened, the 10-a-month and 3-a-shopper limits shared with deliveries");
 }
+// A refund seen in the bank, through the receipts list: bob's own payments only.
+{
+  await ensureBankTables(db);
+  const pay = (shopper, id, on, minor, description) => sqlite.prepare("INSERT INTO bank_payments (shopper_id, payment_id, connection_id, account, paid_on, amount_minor, currency, description, merchant, created_at) VALUES (?,?,?,?,?,?,?,?,?,?)")
+    .run(shopper, id, "conn-" + shopper, "Everyday Account ending 4321", on, minor, "GBP", description, null, NOW);
+  pay(B, "p1", ago(3), -8900, "KESTREL OUTDOOR LTD REFUND");
+  pay(B, "p2", ago(28), 8900, "KESTREL OUTDOOR LTD");          // what he paid: money out is never a refund
+  pay(B, "p3", ago(2), -8900, "TRANSFER FROM SAVINGS");        // money in that isn't from the shop
+  const b = await card(bob, RB), a = await card(alice, RA);
+  assert.deepEqual(b.returnTracking.steps[3], { step: "refunded", done: true, at: ago(3), from: { by: "bank", name: "Everyday Account ending 4321", via: "bank" }, amountPence: 8900, currency: "GBP" });
+  assert.equal(b.returnTracking.refundNotSeen, null, "so the refund is no longer 'not seen'");
+  assert.ok(!a.returnTracking.steps[3].done, "bob's bank payments never reach alice's receipt, though shop, order number and price are the same");
+  sqlite.prepare("INSERT INTO bank_not_mine (shopper_id, kind, key, created_at) VALUES (?,?,?,?)").run(B, "payment", "p1", NOW);
+  assert.ok(!(await card(bob, RB)).returnTracking.steps[3].done, "a payment he said isn't his is never used");
+  console.log("ok - a refund seen in the shopper's own bank payments shows on their receipt, never anyone else's, never a payment marked not theirs");
+}
 // Undo, Download my data and deletion.
 {
   await sent(RA, { trackingNumber: "KO123456789GB", sentOn: ago(1) });
@@ -315,4 +476,4 @@ const sent = (id, body, token = alice) => call("/relay/my/receipts/" + id + "/re
   assert.equal(sqlite.prepare("SELECT COUNT(*) AS n FROM parcel_tracks WHERE shopper_id = ?").get(A).n, 0, "and what the carrier said");
   console.log("ok - undo, Download my data, and deleting the account removes it");
 }
-console.log("PASS return tracking: emails read and matched to the shopper's own receipt, typed numbers, carrier guessed only when sure, states in order, refund-not-seen at 14 days, Ship24 off until set and sharing the allowance, own receipts only, input rules, export and deletion");
+console.log("PASS return tracking: only what emails say has happened, steps nobody told Relay about never ticked, a refund seen in the bank, the carrier's first scan and the on-its-way fact, emails read and matched to the shopper's own receipt, typed numbers, carrier guessed only when sure, states in order, refund-not-seen at 14 days, Ship24 off until set and sharing the allowance, own receipts only, input rules, export and deletion");

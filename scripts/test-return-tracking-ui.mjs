@@ -10,6 +10,10 @@
 //  3. "I've sent it back": a number whose carrier the format doesn't give asks who's carrying it; Royal Mail's format
 //     doesn't; the day; one tap saves once (a double tap doesn't send twice); plain words for a refusal; the timeline then
 //     shows "You said".
+//  5. (24 Nov 2026) Where Relay learned each step: "From Royal Mail's tracking" with the time of the carrier's first scan,
+//     "From Royal Mail's email", "From Glow Lab's email", "Seen on your <account>" for a refund seen in the bank ("Refund
+//     … received", where the shop's email only says "issued"). A step nobody told Relay about is never ticked, even when
+//     a later one is: it says "Relay wasn't told".
 //  4. The polish rules on all of it: 44px taps, no text under 13px, no symbol icons, no dot-joined facts, no test wording,
 //     the page never wider than the phone; and no page errors.
 // Screenshots go to RELAY_RETURNS_SHOTS (or /tmp/shots).
@@ -29,25 +33,40 @@ const shortDay = d => new Date(d + "T00:00:00Z").toLocaleDateString("en-GB", { d
 const receipt = (id, shop, item, pence, ago, extra) => ({ id, status: "confirmed", kind: "receipt", retailer: { name: shop, domain: null }, orderRef: "R-" + id.slice(0, 4), orderDate: day(-ago), totalPence: pence, currency: "GBP",
   category: "fashion", returnable: true, items: [{ name: item, qty: 1, pricePence: pence, category: "fashion" }], returns: null, reminder: "off", ...extra });
 const step = (s, done, at, from, more) => ({ step: s, done, at: at || null, from: from || null, ...(more || {}) });
-const RM = { by: "carrier", name: "Royal Mail", via: "email" };
-// On its way back, on Royal Mail's word (its email), with the number the shopper typed.
+const RM = { by: "carrier", name: "Royal Mail", via: "tracking" }, missed = (s) => ({ step: s, done: false, at: null, from: null, missed: true });
+// On its way back, on Royal Mail's word (its tracking: the first scan, with its time), with the number the shopper typed.
 const COAT = receipt("22222222-2222-4222-8222-222222222222", "Harlow & Co", "Wool Coat", 12000, 20, {
-  returnTracking: { state: "sent", steps: [step("started", true, day(-6), { by: "shop", name: "Harlow & Co", via: "email" }), step("sent", true, day(-3), RM), step("received", false), step("refunded", false)],
+  returnTracking: { state: "sent", steps: [step("started", true, day(-6), { by: "shop", name: "Harlow & Co", via: "email" }), step("sent", true, day(-3), RM, { atTime: day(-3) + "T09:14:00" }), step("received", false), step("refunded", false)],
     trackingNumber: "KO123456789GB", carrier: "Royal Mail", trackUrl: "https://www.royalmail.com/track-your-item#/tracking-results/KO123456789GB", typed: null,
-    returnInTransit: true, returnReceived: false, confirmedBy: { by: "carrier", name: "Royal Mail", at: day(-3) }, refundNotSeen: null, liveTracking: true },
+    returnInTransit: true, returnReceived: false, confirmedBy: { by: "carrier", name: "Royal Mail", at: day(-3), via: "tracking", atTime: day(-3) + "T09:14:00" },
+    onItsWay: { by: "carrier", name: "Royal Mail", at: day(-3), via: "tracking", atTime: day(-3) + "T09:14:00" }, refundNotSeen: null, liveTracking: true },
   returnInTransit: true, returnReceived: false, returnProgress: { trackingNumber: "KO123456789GB", carrier: "Royal Mail", parcel: null, receivedAt: null, refundedAt: null, refundPence: null, currency: null } });
 // At the shop for 16 days, no refund seen.
 const SERUM = receipt("11111111-1111-4111-8111-111111111111", "Glow Lab", "Vitamin C Serum", 2400, 40, {
   returns: { portalUrl: "https://returns.glowlab.example/help" },
-  returnTracking: { state: "received", steps: [step("started", true), step("sent", true, day(-20), { by: "you", name: null, via: "app" }), step("received", true, day(-16), { by: "shop", name: "Glow Lab", via: "email" }), step("refunded", false)],
+  returnTracking: { state: "received", steps: [missed("started"), step("sent", true, day(-20), { by: "you", name: null, via: "app" }), step("received", true, day(-16), { by: "shop", name: "Glow Lab", via: "email" }), step("refunded", false)],
     trackingNumber: null, carrier: null, trackUrl: null, typed: { trackingNumber: null, carrier: null, sentOn: day(-20) }, returnInTransit: false, returnReceived: true,
     confirmedBy: { by: "shop", name: "Glow Lab", at: day(-16) }, refundNotSeen: { since: day(-16), days: 16 }, liveTracking: false },
   returnInTransit: false, returnReceived: true, returnProgress: { trackingNumber: null, carrier: null, parcel: null, receivedAt: day(-16), refundedAt: null, refundPence: null, currency: null } });
+// Refunded: the shop's own email started it, Royal Mail's email said it was dropped off, nobody said it arrived, and the
+// money was seen in the shopper's bank payments.
+const KETTLE = receipt("66666666-6666-4666-8666-666666666666", "Fern & Finch", "Copper Kettle", 4500, 30, { category: "home", items: [{ name: "Copper Kettle", qty: 1, pricePence: 4500, category: "home" }],
+  returnTracking: { state: "refunded", steps: [step("started", true, day(-14), { by: "shop", name: "Fern & Finch", via: "email" }), step("sent", true, day(-12), { by: "carrier", name: "Royal Mail", via: "email" }), missed("received"),
+    step("refunded", true, day(-4), { by: "bank", name: "Everyday Account ending 4321", via: "bank" }, { amountPence: 4500, currency: "GBP" })],
+    trackingNumber: "FF123456789GB", carrier: "Royal Mail", trackUrl: "https://www.royalmail.com/track-your-item#/tracking-results/FF123456789GB", typed: null, returnInTransit: true, returnReceived: false,
+    confirmedBy: { by: "carrier", name: "Royal Mail", at: day(-12), via: "email", atTime: null }, onItsWay: { by: "carrier", name: "Royal Mail", at: day(-12), via: "email", atTime: null }, refundNotSeen: null, liveTracking: false },
+  returnInTransit: true, returnReceived: false });
+// Refunded on the shop's own word, with the money also seen in the bank; nobody told Relay about the parcel.
+const SCARF = receipt("77777777-7777-4777-8777-777777777777", "Tall Pines", "Lambswool Scarf", 3000, 35, {
+  returnTracking: { state: "refunded", steps: [missed("started"), missed("sent"), missed("received"),
+    step("refunded", true, day(-9), { by: "shop", name: "Tall Pines", via: "email" }, { amountPence: 3000, currency: "GBP", seenInBank: { at: day(-7), account: "Everyday Account ending 4321" } })],
+    trackingNumber: null, carrier: null, trackUrl: null, typed: null, returnInTransit: false, returnReceived: true, confirmedBy: { by: "shop", name: "Tall Pines", at: day(-9), via: "email", atTime: null }, onItsWay: null, refundNotSeen: null, liveTracking: false },
+  returnInTransit: false, returnReceived: true, returnProgress: { trackingNumber: null, carrier: null, parcel: null, receivedAt: null, refundedAt: day(-9), refundPence: 3000, currency: "GBP" } });
 // Nothing sent yet: "I've sent it back" is on its page.
 const SHOES = receipt("44444444-4444-4444-8444-444444444444", "Kick Lane", "Court Classic Trainers", 8500, 5, { returns: { deadline: day(12) } });
 const LAMP = receipt("55555555-5555-4555-8555-555555555555", "Larkspur Home", "Brass Table Lamp", 6000, 3, { category: "home", items: [{ name: "Brass Table Lamp", qty: 1, pricePence: 6000, category: "home" }], returns: { deadline: day(25) } });
 let st;
-const reset = (o = {}) => { st = { receipts: [COAT, SERUM, SHOES, LAMP], log: [], posts: [], parcel: { available: true }, sentReply: null, ...o }; };
+const reset = (o = {}) => { st = { receipts: [COAT, SERUM, SHOES, LAMP, KETTLE, SCARF].map(r => JSON.parse(JSON.stringify(r))), log: [], posts: [], parcel: { available: true }, sentReply: null, ...o }; };
 reset();
 const H = { "access-control-allow-origin": "*", "access-control-allow-headers": "*", "access-control-allow-methods": "*" };
 const browser = await chromium.launch();
@@ -75,7 +94,7 @@ async function shopper() {
       await new Promise(r => setTimeout(r, 300));    // a slow server, so a second tap lands while the first is on its way
       if (st.sentReply) return j(st.sentReply.body, st.sentReply.status);
       const x = st.receipts.find(r => r.id === rs[1]);
-      const t = { state: "sent", steps: [step("started", true), step("sent", true, body.sentOn, { by: "you", name: null, via: "app" }), step("received", false), step("refunded", false)],
+      const t = { state: "sent", steps: [missed("started"), step("sent", true, body.sentOn, { by: "you", name: null, via: "app" }), step("received", false), step("refunded", false)],
         trackingNumber: body.trackingNumber || null, carrier: body.carrier || null, trackUrl: body.carrier === "DPD" ? "https://track.dpd.co.uk/parcels/" + body.trackingNumber : null,
         typed: { trackingNumber: body.trackingNumber || null, carrier: body.carrier || null, sentOn: body.sentOn }, returnInTransit: false, returnReceived: false, confirmedBy: null, refundNotSeen: null, liveTracking: Boolean(body.trackingNumber) };
       x.returnTracking = t; x.returnProgress = { trackingNumber: t.trackingNumber, carrier: t.carrier, parcel: null, receivedAt: null, refundedAt: null, refundPence: null, currency: null };
@@ -152,8 +171,8 @@ const allErrors = [];
   const sh = sheet(page); await sh.locator(".rl-rt").waitFor();
   await page.waitForTimeout(500);
   const steps = await sh.locator(".rl-rt-step").evaluateAll(xs => xs.map(x => [x.classList.contains("done"), x.innerText.replace(/\s+/g, " ").trim()]));
-  assert.deepEqual(steps, [[true, "Return started From Harlow & Co's email, " + shortDay(day(-6))], [true, "Sent back, on its way to Harlow & Co From Royal Mail, " + shortDay(day(-3))],
-    [false, "Received by Harlow & Co"], [false, "Refund issued"]], "the steps in order, each with who said so and when");
+  assert.deepEqual(steps, [[true, "Return started From Harlow & Co's email, " + shortDay(day(-6))], [true, "Sent back, on its way to Harlow & Co From Royal Mail's tracking, " + shortDay(day(-3)) + " at 09:14"],
+    [false, "Received by Harlow & Co"], [false, "Refund issued"]], "the steps in order, each with who said so and when: the carrier's first scan with its time");
   assert.match(await sh.locator(".rl-rt-tn").innerText(), /Tracking number KO123456789GB with Royal Mail/);
   assert.equal(await sh.locator(".rl-rt a.rl-ret-go").getAttribute("href"), "https://www.royalmail.com/track-your-item#/tracking-results/KO123456789GB");
   assert.equal(st.log.filter(l => /GET \/relay\/my\/receipts\/2222.*\/return-parcel/.test(l)).length, 1, "opening it asks the carrier once");
@@ -169,13 +188,39 @@ const allErrors = [];
   const s2 = sheet(page); await s2.locator(".rl-rt-nudge").waitFor();
   assert.match(await s2.locator(".rl-rt-nudge").innerText(), new RegExp("Refund not seen yet\\s+Glow Lab had your return on " + shortDay(day(-16)) + ", and Relay hasn't seen a refund email since\\. Contact Glow Lab with your order number, R-1111, and ask when they'll refund you\\."));
   assert.equal(await s2.locator(".rl-rt-nudge a").getAttribute("href"), "https://returns.glowlab.example/help");
-  const s2steps = await s2.locator(".rl-rt-step").evaluateAll(xs => xs.map(x => x.innerText.replace(/\s+/g, " ").trim()));
-  assert.deepEqual(s2steps, ["Return started", "Sent back You said, " + shortDay(day(-20)), "Received by Glow Lab From Glow Lab's email, " + shortDay(day(-16)), "Refund issued"]);
+  const s2steps = await s2.locator(".rl-rt-step").evaluateAll(xs => xs.map(x => [x.classList.contains("done"), x.innerText.replace(/\s+/g, " ").trim()]));
+  assert.deepEqual(s2steps, [[false, "Return started Relay wasn't told"], [true, "Sent back You said, " + shortDay(day(-20))], [true, "Received by Glow Lab From Glow Lab's email, " + shortDay(day(-16))], [false, "Refund issued"]],
+    "a step nobody told Relay about isn't ticked, though later ones are; the refund is just still to come");
   assert.equal(st.log.filter(l => /1111.*return-parcel/.test(l)).length, 0, "no tracking number, or already at the shop: the carrier isn't asked");
   assert.deepEqual(await measure(page, ".rl-back:last-of-type .rl-sheet"), clean);
   await page.screenshot({ path: SHOTS + "/receipt-refund-not-seen.png" });
   allErrors.push(...errors); await ctx.close();
   console.log("ok - the receipt's page: the four steps in order with who said so and when, the tracking number and the carrier's link, Refund not seen yet with what to do; the carrier asked once on opening");
+}
+
+// 5. Where Relay learned each step: the carrier's email, the bank, and steps it wasn't told about.
+{
+  reset();
+  const { ctx, page, errors } = await shopper();
+  const open = async (shop) => { await page.locator("#homePage .hl-sq", { hasText: shop }).first().click(); const sh = sheet(page); await sh.locator(".rl-rt").waitFor(); await page.waitForTimeout(400); return sh; };
+  const read = (sh) => sh.locator(".rl-rt-step").evaluateAll(xs => xs.map(x => [x.classList.contains("done"), x.innerText.replace(/\s+/g, " ").trim()]));
+  let sh = await open("Fern & Finch");
+  assert.deepEqual(await read(sh), [[true, "Return started From Fern & Finch's email, " + shortDay(day(-14))], [true, "Sent back From Royal Mail's email, " + shortDay(day(-12))],
+    [false, "Received by Fern & Finch Relay wasn't told"], [true, "Refund of £45.00 received Seen on your Everyday Account ending 4321, " + shortDay(day(-4))]], "a refund seen in the bank says received, and where Relay saw it");
+  assert.equal(st.log.filter(l => /6666.*return-parcel/.test(l)).length, 0, "refunded: the carrier isn't asked");
+  assert.equal(await sh.locator("button", { hasText: "I've sent it back" }).count(), 0);
+  assert.deepEqual(await measure(page, ".rl-back:last-of-type .rl-sheet"), clean, "polish");
+  await sh.evaluate(el => { el.scrollTop = 0; }); await page.waitForTimeout(200);
+  await page.screenshot({ path: SHOTS + "/receipt-refund-seen-in-bank.png" });
+  await closeTop(page);
+  sh = await open("Tall Pines");
+  assert.deepEqual(await read(sh), [[false, "Return started Relay wasn't told"], [false, "Sent back Relay wasn't told"], [false, "Received by Tall Pines Relay wasn't told"],
+    [true, "Refund of £30.00 issued From Tall Pines' email, " + shortDay(day(-9)) + " Seen on your Everyday Account ending 4321, " + shortDay(day(-7))]], "the shop's word that it refunded, the bank's beside it, and nothing ticked that nobody said");
+  assert.deepEqual(await measure(page, ".rl-back:last-of-type .rl-sheet"), clean, "polish");
+  await sh.evaluate(el => { el.scrollTop = 0; }); await page.waitForTimeout(200);
+  await page.screenshot({ path: SHOTS + "/receipt-refund-issued-and-seen.png" });
+  allErrors.push(...errors); await ctx.close();
+  console.log("ok - each step says where Relay learned it (the carrier's tracking or email, the shop's email, the bank); steps nobody told Relay about say so and aren't ticked");
 }
 
 // 2b. Tracking not available: said plainly.
@@ -226,7 +271,7 @@ const allErrors = [];
   assert.equal(st.posts.length, 1, "a double tap saves once");
   assert.deepEqual(st.posts[0], { sentOn: day(-1), trackingNumber: "15501234567890", carrier: "DPD" }, "the number tidied, the carrier and the day");
   const steps = await sh.locator(".rl-rt-step").evaluateAll(xs => xs.map(x => x.innerText.replace(/\s+/g, " ").trim()));
-  assert.deepEqual(steps, ["Return started", "Sent back, on its way to Kick Lane You said, " + shortDay(day(-1)), "Received by Kick Lane", "Refund issued"], "the timeline shows it at once");
+  assert.deepEqual(steps, ["Return started Relay wasn't told", "Sent back, on its way to Kick Lane You said, " + shortDay(day(-1)), "Received by Kick Lane", "Refund issued"], "the timeline shows it at once");
   assert.ok(await sh.locator("button", { hasText: "Change what you told Relay" }).isVisible(), "and it can be changed");
   await page.screenshot({ path: SHOTS + "/sent-it-back-saved.png" });
   allErrors.push(...errors); await ctx.close();

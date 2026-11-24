@@ -10,6 +10,7 @@ import { deliveryForExport } from "./delivery.js";
 import { bagForExport } from "./bag.js";
 import { auctionsForExport } from "./auctions.js";
 import { ensureBankColumns, visibleSql } from "./bank.js";
+import { ensureParcelColumns } from "./parcel-tracking.js";
 import { aiChoicesForExport } from "./ai-choice.js";
 const json = (body, status, cors) => Response.json(body, { status, headers: { ...cors, "Cache-Control": "no-store" } });
 const iso = (ms) => (Number.isFinite(ms) && ms > 0 ? new Date(ms).toISOString() : null);
@@ -38,6 +39,7 @@ export async function exportShopperData(env, shopper, now = Date.now()) {
   const totp = await one("SELECT enabled, enabled_at AS enabledAt FROM auth_totp WHERE shopper_id = ?", id);
   const devices = await one("SELECT COUNT(*) AS n FROM push_subscriptions WHERE shopper_id = ?", id);
   const sessions = await rows("SELECT created_at AS createdAt, expires_at AS expiresAt FROM auth_sessions WHERE shopper_id = ? AND expires_at > ?", id, now);
+  await ensureParcelColumns(db);   // the carrier's first scan time (added 24 Nov 2026), so parcels below are always read
   await ensureBankColumns(db);   // TrueLayer's label column (added 17 Nov 2026), so the payments below are always read
   const myRequests = "(SELECT id FROM resale_requests WHERE asker_id = ? OR listing_id IN (SELECT id FROM resale_listings WHERE seller_id = ?))";
 
@@ -128,7 +130,7 @@ export async function exportShopperData(env, shopper, now = Date.now()) {
         items: (await rows("SELECT name_key AS item, data, created_at AS at FROM item_kinds WHERE shopper_id = ? ORDER BY created_at", id)).map((r) => ({ item: r.item, read: parse(r.data), at: iso(r.at) })) };
     })(),
     // Live parcel tracking: each tracking number Relay asked the carrier about (through Ship24), and what it said.
-    parcels: (await rows("SELECT tracking_number AS trackingNumber, status, at, checked_at AS checkedAt FROM parcel_tracks WHERE shopper_id = ? ORDER BY created_at", id)).map((r) => ({ ...r, checkedAt: iso(r.checkedAt) })),
+    parcels: (await rows("SELECT tracking_number AS trackingNumber, status, at, first_scan AS firstScan, checked_at AS checkedAt FROM parcel_tracks WHERE shopper_id = ? ORDER BY created_at", id)).map((r) => ({ ...r, checkedAt: iso(r.checkedAt) })),
     // Return tracking: each receipt you said you'd sent back, with the return's tracking number and carrier if you gave
     // them (what the carriers and shops said is in the emails above, and in parcels for the carrier's own tracking).
     returnsSentBack: (await rows("SELECT receipt_id AS receiptId, tracking_number AS trackingNumber, carrier, sent_on AS sentOn, created_at AS createdAt, updated_at AS updatedAt FROM return_tracks WHERE shopper_id = ? ORDER BY created_at", id))

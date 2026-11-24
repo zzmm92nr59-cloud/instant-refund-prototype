@@ -10262,8 +10262,10 @@
     return pool.reduce(function (best, i) { return cost(i) > cost(best) ? i : best; }, pool[0]);
   }
   // ---- Return tracking (worker/return-tracking.js) ----
-  // Where a return has got to: Return started, Sent back, Received by the shop, Refund issued. Each step has the day and who
-  // said so (a carrier, the shop's email, or "you said"); Relay shows only what it was told.
+  // Where a return has got to: Return started, Sent back, Received by the shop, Refund issued (or received, when it was seen
+  // in the shopper's bank payments). Each step has the day and who said so (the carrier's tracking or its email, the shop's
+  // email, the bank, or "you said"); Relay shows only what it was told. A step nobody told Relay about is never ticked, even
+  // when a later one is: it says "Relay wasn't told" (24 Nov 2026).
   var RET_CARRIERS = ["Royal Mail", "Parcelforce", "Evri", "InPost", "DPD", "Collect+", "Yodel", "DHL", "UPS", "FedEx"];
   // Only formats that belong to one carrier (as the server's guessCarrier): otherwise the shopper is asked.
   function retGuessCarrier(tn) {
@@ -10289,13 +10291,18 @@
     if (!f) return "";
     if (f.by === "you") return "You said";
     if (f.by === "shop") return "From " + possessive(f.name || who) + " email";
-    return "From " + (f.name || "the carrier");
+    if (f.by === "bank") return f.name ? "Seen on your " + f.name : "Seen in your bank payments";
+    return "From " + possessive(f.name || "the carrier") + (f.via === "tracking" ? " tracking" : " email");
   }
+  // The time of a carrier's scan, as the carrier wrote it ("2026-11-23T09:14:00" is 09:14): never moved to another time zone.
+  function retClock(t) { var m = /^\d{4}-\d{2}-\d{2}T(\d{2}:\d{2})/.exec(String(t || "")); return m ? m[1] : ""; }
   function retStepName(s, who) {
     if (s.step === "started") return "Return started";
     if (s.step === "sent") return "Sent back";
     if (s.step === "received") return "Received by " + who;
-    return s.amountPence != null ? "Refund of " + money(s.amountPence, s.currency || "GBP") + " issued" : "Refund issued";
+    // The shop's email says a refund was issued; the bank shows it arriving. Each is said as what it is.
+    var end = s.from && s.from.by === "bank" ? " received" : " issued";
+    return s.amountPence != null ? "Refund of " + money(s.amountPence, s.currency || "GBP") + end : "Refund" + end;
   }
   // Could this receipt be sent back (so "I've sent it back" makes sense)? Not apps or food, not long ago.
   function retCanSend(x) {
@@ -10321,11 +10328,14 @@
         box.appendChild(el("b", { className: "rl-ret-h", text: "Your return" }));
         var list = el("ol", { className: "rl-rt-steps" });
         t.steps.forEach(function (s) {
-          var when = s.at ? dayWords(s.at) : "", from = retFrom(s.from, who);
-          var sub = s.done && (from || when) ? [from, when].filter(Boolean).join(", ") : "";
-          var name = retStepName(s, who) + (s.step === "sent" && t.state === "sent" && !t.problem ? ", on its way to " + who : "");
+          var clock = s.atTime ? retClock(s.atTime) : "";
+          var when = s.at ? dayWords(s.at) + (clock ? " at " + clock : "") : "", from = retFrom(s.from, who);
+          // Told: who said so and when. Not told, with a later step that was: said plainly. Still to come: just greyed.
+          var sub = s.done && (from || when) ? [from, when].filter(Boolean).join(", ") : s.missed ? "Relay wasn't told" : "";
+          var bank = s.done && s.seenInBank ? [s.seenInBank.account ? "Seen on your " + s.seenInBank.account : "Seen in your bank payments", s.seenInBank.at ? dayWords(s.seenInBank.at) : ""].filter(Boolean).join(", ") : "";
+          var name = retStepName(s, who) + (s.step === "sent" && s.done && t.state === "sent" && !t.problem ? ", on its way to " + who : "");
           list.appendChild(el("li", { className: "rl-rt-step" + (s.done ? " done" : "") }, [el("span", { className: "rl-rt-dot" }, [jIc(s.done ? "check" : "dot", 16)]),
-            el("span", { className: "rl-rt-t" }, [el("b", { text: name })].concat(sub ? [el("span", { text: sub })] : []))]));
+            el("span", { className: "rl-rt-t" }, [el("b", { text: name })].concat(sub ? [el("span", { text: sub })] : [], bank ? [el("span", { text: bank })] : []))]));
         });
         box.appendChild(list);
         if (t.problem) box.appendChild(el("p", { className: "rl-rt-note", text: (t.problem.name || "The carrier") + " says there's a problem with the parcel. Check with " + (t.problem.name || "the carrier") + " using the tracking number." }));

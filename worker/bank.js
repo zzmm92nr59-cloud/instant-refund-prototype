@@ -12,6 +12,9 @@
 //  * Disconnecting deletes the connection and every payment read from it; so does deleting the account.
 //  * Only spending is kept: date, amount, the bank's description and merchant, TrueLayer's label for it (e.g. Shopping,
 //    Clothing), which account, and the receipt it matches.
+//  * Money that came in on those cards and accounts is kept the same way (it always was), and is used for one thing only:
+//    to show a refund arriving on a return Relay already knows of (refundCredits below, return-tracking.js). It is never
+//    listed as a payment, matched to a receipt as a purchase, or counted as spending.
 //
 // Routes: GET /relay/my/bank, POST /relay/my/bank/connect, GET /relay/bank/callback (the bank's page sends the browser back
 // here), POST /relay/my/bank/sync, GET /relay/my/bank/payments, POST /relay/my/bank/disconnect { id },
@@ -475,6 +478,24 @@ export async function receiptsToAdd(env, shopperId, now) {
     // photoRead: whether Relay can read a photo of the receipt (the AI reader is on), so the app says what will happen.
     return rows.filter((r) => likelyNeedsReceipt(r, not, dir)).slice(0, 5).map((r) => ({ ...paymentForApp(r), photoRead: aiAvailable(env) }));
   } catch { return []; }   // no bank tables yet: nothing to say
+}
+
+// Money back, for a return's "Refund received" (return-tracking.js, 24 Nov 2026): money that came in on the shopper's own
+// cards and accounts (never one that isn't theirs, or a payment or shop they said isn't theirs), newest first. Only the
+// day, the amount, the bank's own text for it and which card or account; which return it belongs to, if any, is worked
+// out there against that shopper's own receipts. Nothing when no bank is connected. Read with the receipts list, which the
+// app already asks for, so it costs no extra request.
+export async function refundCredits(env, shopperId) {
+  try {
+    await ensureBankColumns(env.RELAY_DB);
+    const rows = (await env.RELAY_DB.prepare(`SELECT payment_id, account, paid_on, amount_minor, currency, description, merchant FROM bank_payments
+      WHERE shopper_id = ? AND amount_minor < 0 AND ${visibleSql("bank_payments")} ORDER BY paid_on DESC, payment_id LIMIT 300`).bind(shopperId).all()).results || [];
+    if (!rows.length) return [];
+    const not = await notMineOf(env.RELAY_DB, shopperId);
+    return rows.filter((r) => !isNotMine(not, r.payment_id, shopName(r.description, r.merchant)))
+      .map((r) => ({ id: r.payment_id, on: r.paid_on, pence: -r.amount_minor, currency: r.currency || "GBP", account: r.account || null,
+        text: ((r.merchant || "") + " " + statementShop(r.description)).trim() }));
+  } catch { return []; }   // no bank tables yet: no bank connected
 }
 
 // The bank's page sends the browser back here with a code. The single-use state ties it to the shopper who started.
