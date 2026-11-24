@@ -77,6 +77,9 @@ async function ensureResaleTablesRun(db) {
 const MY_REQUESTS = "(SELECT q.id FROM resale_requests q WHERE q.asker_id = ? UNION SELECT q.id FROM resale_requests q JOIN resale_listings l ON l.id = q.listing_id WHERE l.seller_id = ?)";
 export function resaleDeleteStatements(db, shopperId) {
   return [
+    // Someone else's item matched with them (their accepted request) goes back on sale, or it would stay "matched" with
+    // nobody to talk to and never show in Browse again.
+    db.prepare("UPDATE resale_listings SET status = 'active' WHERE status = 'matched' AND seller_id != ? AND id IN (SELECT listing_id FROM resale_requests WHERE asker_id = ? AND status = 'accepted')").bind(shopperId, shopperId),
     // (Their own messages go even from a conversation whose request is already gone.)
     db.prepare("DELETE FROM resale_messages WHERE sender_id = ? OR request_id IN " + MY_REQUESTS).bind(shopperId, shopperId, shopperId),
     db.prepare("DELETE FROM resale_reports WHERE reporter_id = ? OR request_id IN " + MY_REQUESTS).bind(shopperId, shopperId, shopperId),
@@ -338,7 +341,11 @@ export async function handleResaleRoute(request, env, url, cors, shopper, opts) 
   // A blocked member can still read and withdraw, but cannot list, ask or message.
   if (m === "POST" && /\/resale\/(listings|listings\/[0-9a-f-]{36}\/ask|requests\/[0-9a-f-]{36}\/messages)$/.test(path) && await isBlocked(env, shopper))
     return json({ error: "account_restricted" }, 403, cors);
-  const body = async () => { const t = await request.text(); if (t.length > 5000) return null; try { return JSON.parse(t || "{}"); } catch (e) { return null; } };
+  // A new listing carries up to 4 photos (each up to 450 KB, made smaller on the phone first), so it may be as big as
+  // validate.js lets it be; everything else here is a few words. (Until 24 Nov 2026 every body was cut off at 5,000
+  // characters, so a listing with a real photo always failed.)
+  const most = path === "/relay/my/resale/listings" ? 2600 * 1024 : 5000;
+  const body = async () => { const t = await request.text(); if (t.length > most) return null; try { return JSON.parse(t || "{}"); } catch (e) { return null; } };
   const send = r => json(r.body, r.status, cors);
   if (path === "/relay/my/resale/items" && m === "GET") return json({ items: await listable(env, shopper.id, opts.now) }, 200, cors);
   if (path === "/relay/my/resale/feed" && m === "GET") return json({ listings: await feed(env, shopper) }, 200, cors);

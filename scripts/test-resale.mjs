@@ -116,7 +116,9 @@ assert.equal((await get(`/relay/my/resale/listings/${L1}/image`)).status, 401);
 assert.equal((await get(`/relay/my/resale/listings/${L2}/image`, bob)).status, 404, "a multi-item order's photo is not assumed to be this item's");
 // The seller's own photos (up to 4): the first is the listing's picture; members see them, as with the receipt's photo.
 {
-  const JPG = "data:image/jpeg;base64," + Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(400, 9)]).toString("base64");
+  // As big as a phone's photo is once the app has made it smaller (until 24 Nov 2026 these were 400 bytes, and a listing
+  // with a real photo was refused for being over 5,000 characters).
+  const JPG = "data:image/jpeg;base64," + Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(150 * 1024, 9)]).toString("base64");
   assert.equal((await post("/relay/my/resale/listings", alice, { receiptId: A3, itemIndex: 1, condition: "good", agree: true, photos: ["data:image/png;base64,AAAA"] })).status, 400, "not really a picture");
   assert.equal((await post("/relay/my/resale/listings", alice, { receiptId: A3, itemIndex: 1, condition: "good", agree: true, photos: [JPG, JPG, JPG, JPG, JPG] })).status, 400, "at most 4");
   const ok = await post("/relay/my/resale/listings", alice, { receiptId: A3, itemIndex: 1, condition: "good", agree: true, photos: [JPG, JPG] });
@@ -212,4 +214,17 @@ assert.equal((await post("/relay/my/delete", bob)).status, 200);
 assert.equal(sqlite.prepare("SELECT COUNT(*) n FROM resale_listings WHERE seller_id = ?").get(idOf("alice@example.com")).n > 0, true);
 assert.equal(sqlite.prepare("SELECT COUNT(*) n FROM resale_requests WHERE asker_id = ?").get(idOf("carol@example.com")).n, 1, "other members' requests stay");
 assert.equal(sqlite.prepare("SELECT COUNT(*) n FROM resale_messages WHERE request_id = ?").get(reqId).n, 0, "deleting an account deletes its conversations");
+// A buyer who deletes their account while matched with someone's item: that item goes back on sale (it stayed "matched",
+// out of Browse, with nobody to talk to, until 24 Nov 2026).
+{
+  const C1 = "55555555-5555-4555-8555-555555555555";
+  seed("carol@example.com", C1, { kind: "receipt", retailer: { name: "Example Outfitters" }, orderRef: "EO-7", currency: "GBP", items: [{ name: "Wool hat", qty: 1, pricePence: 2500 }], parserVersion: 5 });
+  const hat = (await (await post("/relay/my/resale/listings", carol, { receiptId: C1, itemIndex: 0, condition: "good", agree: true })).json()).id;
+  assert.equal((await ask(alice, hat, { kind: "buy" })).status, 200);
+  const q = sqlite.prepare("SELECT id FROM resale_requests WHERE listing_id = ?").get(hat).id;
+  assert.equal((await post(`/relay/my/resale/requests/${q}/accept`, carol)).status, 200);
+  assert.equal(sqlite.prepare("SELECT status FROM resale_listings WHERE id = ?").get(hat).status, "matched");
+  assert.equal((await post("/relay/my/delete", alice)).status, 200);
+  assert.equal(sqlite.prepare("SELECT status FROM resale_listings WHERE id = ?").get(hat).status, "active", "back on sale when the buyer it was matched with deletes their account");
+}
 console.log("PASS resale v1 + messages: ownership, receipt-sourced titles, privacy of sellers and askers, photos, requests, matching, withdrawal, deletion");
