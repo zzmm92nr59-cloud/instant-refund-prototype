@@ -16,6 +16,8 @@
 //     direction-flipping characters removed), ending and reporting, taking down, a blocked member can't list, ask or
 //     message, deleting an account removes their listings, requests and messages and puts others' items back on sale.
 //     Eve can never read or change anything that isn't hers: every route tried with her session.
+//     The seller's answer reaches whoever asked: accepted, declined, or gone to another member (also for someone only
+//     chatting about it): one phone notification, a count until they've seen it, and said in their conversation.
 //   In the app: Sam lists an item with a photo, price, condition and handover; Bea finds it in Browse with its photo and
 //     asks for it (a double tap asks once); Sam accepts and messages; Bea replies (emoji, long text, Enter twice sends
 //     once); each sees the other's message arrive while the conversation is open; nothing is asked while it's closed or
@@ -31,6 +33,7 @@ import { readFile, mkdir } from "node:fs/promises";
 import { resolve, extname } from "node:path";
 import { startLocalWorker } from "./local-worker.mjs";
 import { _codeAt } from "../worker/totp.js";
+import { ANSWER_PUSH } from "../worker/resale.js";
 import { skipInterests, goTab, waitOutDoubleTap, openProfile } from "./relay-places.mjs";
 const require = createRequire(import.meta.url); const { chromium } = require("playwright");
 const started = Date.now();
@@ -258,12 +261,12 @@ const FAKE = "data:image/png;base64," + Buffer.from("<script>alert(1)</script>".
 
   // What's new: Bea and Finn ask about the mug. Sam gets a phone notification for each, and a count until Yours is opened.
   const kp = await crypto.subtle.generateKey({ name: "ECDH", namedCurve: "P-256" }, true, ["deriveBits"]);
-  const SAM_PUSH = "https://fcm.googleapis.com/fcm/send/made-up-sam-device", BEA_PUSH = "https://fcm.googleapis.com/fcm/send/made-up-bea-device";
-  for (const [who, endpoint] of [[sam, SAM_PUSH], [bea, BEA_PUSH]]) assert.equal((await call("/relay/my/push/subscribe", { method: "POST", token: who.token, body: { endpoint,
+  const SAM_PUSH = "https://fcm.googleapis.com/fcm/send/made-up-sam-device", BEA_PUSH = "https://fcm.googleapis.com/fcm/send/made-up-bea-device", FINN_PUSH = "https://fcm.googleapis.com/fcm/send/made-up-finn-device";
+  for (const [who, endpoint] of [[sam, SAM_PUSH], [bea, BEA_PUSH], [finn, FINN_PUSH]]) assert.equal((await call("/relay/my/push/subscribe", { method: "POST", token: who.token, body: { endpoint,
     keys: { p256dh: Buffer.from(await crypto.subtle.exportKey("raw", kp.publicKey)).toString("base64url"), auth: Buffer.alloc(16, 7).toString("base64url") } } })).status, 200);
   const pushed = endpoint => w.outside.filter(u => u === endpoint).length;
-  assert.deepEqual(await news(sam), { requests: 0, messages: 0, total: 0, active: true });
-  assert.deepEqual(await news(admin), { requests: 0, messages: 0, total: 0, active: false }, "nothing to wait for: the app stops asking");
+  assert.deepEqual(await news(sam), { requests: 0, messages: 0, answers: 0, total: 0, active: true });
+  assert.deepEqual(await news(admin), { requests: 0, messages: 0, answers: 0, total: 0, active: false }, "nothing to wait for: the app stops asking");
   assert.equal((await ask(bea, mug, { kind: "buy", message: "Lovely mug" })).status, 200);
   assert.equal(pushed(SAM_PUSH), 1, "Sam's phone is told about the request");
   assert.equal((await ask(finn, mug, { kind: "buy" })).status, 200);
@@ -279,6 +282,37 @@ const FAKE = "data:image/png;base64," + Buffer.from("<script>alert(1)</script>".
   assert.equal((await call("/relay/my/resale/requests/" + mugReq + "/accept", { method: "POST", token: sam.token })).status, 200);
   assert.equal((await edit(sam, mug, { askPence: 1 })).body.error, "listing_matched", "not while matched with someone");
 
+  // The seller's answer reaches whoever asked (Connor, 24 Nov 2026: a buyer heard nothing when their offer was accepted).
+  // Bea, accepted: one phone notification, a count until she has seen it, and the answer said in her conversation.
+  const mineOf = async (who, seen) => (await call("/relay/my/resale/mine" + (seen ? "?seen=1" : ""), { token: who.token })).body;
+  const convsOf = async who => (await call("/relay/my/resale/conversations", { token: who.token })).body.conversations;
+  assert.equal(pushed(BEA_PUSH), 1, "Bea's phone is told the seller said yes");
+  assert.deepEqual(await news(bea), { requests: 0, messages: 0, answers: 1, total: 1, active: true }, "and it counts in her red number");
+  assert.deepEqual(await news(sam), { requests: 0, messages: 0, answers: 0, total: 0, active: true }, "the seller's own answer is no news to the seller");
+  assert.deepEqual((await mineOf(bea)).myRequests.filter(q => q.id === mugReq).map(q => [q.status, q.answer, q.new]), [["accepted", "accepted", true]]);
+  assert.equal((await news(bea)).answers, 1, "a quiet look (Browse's copy) doesn't count as seeing it");
+  assert.deepEqual((await convsOf(bea)).filter(c => c.id === mugReq).map(c => [c.answer, c.answerNew, c.open]), [["accepted", true, true]], "her Messages list marks it new");
+  assert.deepEqual((await convsOf(sam)).filter(c => c.id === mugReq).map(c => [c.answer, c.answerNew]), [["accepted", undefined]], "the seller's list doesn't");
+  assert.equal((await msgs(sam, mugReq)).status, 200); assert.equal((await news(bea)).answers, 1, "the seller reading it doesn't see it for her");
+  const beaTold = (await msgs(bea, mugReq)).body;
+  assert.deepEqual([beaTold.answer, beaTold.kind, beaTold.open, beaTold.matched, beaTold.news.answers], ["accepted", "buy", true, true, 0], "her conversation says it, and opening it is seeing it");
+  assert.deepEqual([(await news(bea)).total, (await convsOf(bea)).find(c => c.id === mugReq).answerNew], [0, undefined]);
+  // Finn asked for the same mug: he is told it went to another member, once, and Yours says so until he has seen it.
+  assert.equal(pushed(FINN_PUSH), 1, "Finn's phone is told the seller accepted someone else");
+  assert.deepEqual(await news(finn), { requests: 0, messages: 0, answers: 1, total: 1, active: true });
+  const finnMug = q => q.title === "Stoneware Mug";
+  assert.deepEqual((await mineOf(finn, true)).myRequests.filter(finnMug).map(q => [q.status, q.answer, q.new, q.itemGone]), [["declined", "other", true, true]], "opening Yours still says it was new");
+  assert.equal((await news(finn)).total, 0, "and then it's seen");
+  assert.deepEqual((await mineOf(finn)).myRequests.filter(finnMug).map(q => [q.answer, q.new]), [["other", undefined]]);
+  // What the phone is told: only what happened. Relay takes no payment, so nothing says paid, sold, bought or sent.
+  const told = ANSWER_PUSH.accepted("Stoneware Mug", mugReq, "buy"), toldNo = ANSWER_PUSH.declined("Stoneware Mug"), toldOther = ANSWER_PUSH.other("Stoneware Mug");
+  assert.deepEqual([told.title, told.body, told.url], ["The seller said yes", "They accepted your request for Stoneware Mug. Open Relay to agree the handover with them.", "./#open=market&chat=" + mugReq]);
+  assert.deepEqual([toldNo.title, toldNo.body, toldNo.url], ["The seller said no", "They declined your request for Stoneware Mug.", "./#open=market&tab=mine"]);
+  assert.deepEqual([toldOther.title, toldOther.body, toldOther.url], ["No longer available", "The seller of Stoneware Mug accepted another member's request.", "./#open=market&tab=mine"]);
+  assert.match(ANSWER_PUSH.accepted("Stoneware Mug", mugReq, "swap").body, /^They accepted your swap offer for Stoneware Mug\./);
+  for (const m of [told, toldNo, toldOther]) assert.ok(!/\b(paid|payment|sold|bought|sent|posted|yours|refund)\b/i.test(m.title + " " + m.body) && !/sam|bea|finn|example\.com/i.test(m.title + " " + m.body), "never a claim Relay can't know, never who");
+  console.log("ok - server: when a seller accepts, the member who asked gets one phone notification, a count until they've seen it and the answer in their conversation; someone else who asked is told it went to another member");
+
   // Messages: a count of unread ones for whoever they're for, and one notification per batch (not one per message).
   assert.equal((await say(bea, "Hello! When could I collect?", mugReq)).status, 200);
   assert.equal(pushed(SAM_PUSH), 3, "the first new message is notified");
@@ -291,11 +325,29 @@ const FAKE = "data:image/png;base64," + Buffer.from("<script>alert(1)</script>".
   assert.equal((await say(bea, "Thanks!", mugReq)).status, 200);
   assert.equal(pushed(SAM_PUSH), 4, "after reading, the next new message is notified again");
   assert.equal((await say(sam, "Tuesday at six?", mugReq)).status, 200);
-  assert.equal(pushed(BEA_PUSH), 1, "and the buyer is told about the seller's reply");
+  assert.equal(pushed(BEA_PUSH), 2, "and the buyer is told about the seller's reply");
   assert.equal((await news(bea)).messages, 1);
   assert.equal((await call("/relay/my/resale/mine", { token: bea.token })).body.myRequests.find(q => q.id === mugReq).unread, 1);
-  assert.equal((await news(finn)).total, 0, "Finn, declined, has nothing new");
+  assert.equal((await news(finn)).total, 0, "Finn, who has seen the seller's answer, has nothing new");
   console.log("ok - server: new requests and unread messages are counted until seen, and each sends one phone notification (no more per message until read)");
+
+  // Declined: Finn asks for Sam's bag and Sam says no. Finn is told once (a second tap, or anyone else, tells nobody).
+  assert.equal((await ask(finn, bag, { kind: "buy" })).status, 200);
+  const bagReq = (await mineOf(finn)).myRequests.find(q => q.title === "Canvas Tote Bag").id;
+  const decline = who => call("/relay/my/resale/requests/" + bagReq + "/decline", { method: "POST", token: who.token });
+  for (const who of [bea, finn, admin]) assert.equal((await decline(who)).status, 404, "only the seller can answer");
+  assert.deepEqual([pushed(FINN_PUSH), (await news(finn)).answers], [1, 0], "and nobody was told anything");
+  assert.equal((await decline(sam)).status, 200);
+  assert.equal((await decline(sam)).status, 404, "answered once");
+  assert.equal(pushed(FINN_PUSH), 2, "Finn's phone is told once");
+  assert.deepEqual(await news(finn), { requests: 0, messages: 0, answers: 1, total: 1, active: true });
+  assert.equal(row(bag).status, "active", "the bag stays on sale: nothing says it has gone");
+  assert.deepEqual((await mineOf(finn)).myRequests.filter(q => q.id === bagReq).map(q => [q.status, q.answer, q.new, q.itemGone]), [["declined", "declined", true, undefined]]);
+  const finnTold = (await msgs(finn, bagReq)).body;
+  assert.deepEqual([finnTold.answer, finnTold.open, finnTold.itemGone, finnTold.matched, finnTold.news.answers], ["declined", false, undefined, false, 0], "his conversation says it, takes no more messages, and opening it is seeing it");
+  assert.equal((await say(finn, "Are you sure?", bagReq)).body.error, "conversation_closed");
+  assert.equal(count("SELECT COUNT(*) FROM resale_requests WHERE asker_seen = 0"), 0, "everything answered so far has been seen");
+  console.log("ok - server: when a seller declines, the member who asked gets one phone notification, a count until they've seen it and the answer in their conversation; only the seller can answer, once");
 
   // Sam blocks Bea from the conversation: it ends, neither sees the other's listings, and Bea can't ask about Sam's again.
   const reportsBefore = count("SELECT COUNT(*) FROM resale_reports") + count("SELECT COUNT(*) FROM resale_listing_reports");
@@ -353,8 +405,15 @@ const FAKE = "data:image/png;base64," + Buffer.from("<script>alert(1)</script>".
   lampMine = (await call("/relay/my/resale/mine", { token: sam.token })).body;
   const gReq = lampMine.listings.find(l => l.id === rl).requests.find(q => q.id === g);
   assert.deepEqual([gReq.kind, gReq.new], ["buy", true], "his chat became his request: the same conversation carries on");
+  // Finn opens a chat about it and writes nothing: that was never a conversation, so the seller's answer isn't his news.
+  const emptyChat = (await chat(finn)).requestId, finnPushes = pushed(FINN_PUSH);
   assert.equal((await call("/relay/my/resale/requests/" + g + "/accept", { method: "POST", token: sam.token })).status, 200);
+  // Hana was chatting about it: she is told it went to another member (a count, and said in her conversation); Gus is told yes.
+  assert.deepEqual([(await news(hana)).answers, (await news(gus)).answers, (await news(finn)).answers, pushed(FINN_PUSH) - finnPushes], [1, 1, 0, 0], "everyone who was in a conversation about it is told; an empty chat isn't");
+  assert.deepEqual([one("SELECT status, outcome FROM resale_requests WHERE id = ?", emptyChat).status, one("SELECT status, outcome FROM resale_requests WHERE id = ?", emptyChat).outcome], ["declined", null]);
+  assert.deepEqual((await convsOf(hana)).map(c => [c.id, c.answer, c.answerNew, c.itemGone]), [[h, "other", true, true]]);
   const hanaThread = (await msgs(hana, h)).body;
+  assert.deepEqual([hanaThread.answer, hanaThread.news.answers], ["other", 0], "her conversation says the seller accepted another member's request, and opening it is seeing it");
   assert.deepEqual([hanaThread.open, hanaThread.itemGone, hanaThread.messages.length], [false, true, 2], "Hana's chat stays readable and says the item has gone");
   assert.equal((await say(hana, "Is it still there?", h)).body.error, "item_gone", "and takes no more messages");
   assert.equal((await say(sam, "Sorry!", h)).body.error, "item_gone", "from either side");
@@ -661,8 +720,45 @@ let samChat;
   assert.equal(S.asked.filter(a => a.method === "POST" && /\/accept$/.test(a.path)).length, 1, "accepted once for a double tap");
   assert.equal(one("SELECT status FROM resale_listings WHERE title = 'Linen Overshirt'").status, "matched");
   await shot(S, "04-sam-accepts");
+  // Bea hears about it (Connor, 24 Nov 2026: she used to hear nothing). Opening Relay: a red 1 on Browse, asked for once.
+  // It leads to Yours, where her request says Accepted and is marked new; her conversation says what happened and what
+  // to do next, in words that are true (Relay takes no payment and arranges no postage). Seeing it clears the number.
+  {
+    const from = B.asked.length;
+    await B.page.reload(); await B.page.locator("#foot button").first().waitFor();
+    await tabBadge(B).waitFor({ timeout: 10000 });
+    assert.equal(await tabBadge(B).innerText(), "1", "a red 1 on Browse for the seller's answer");
+    assert.match(await B.page.locator('#foot [data-tab="discover"]').getAttribute("aria-label"), /1 new in Swap & resell/);
+    assert.equal(B.asked.slice(from).filter(a => a.path === "/relay/my/resale/news").length, 1, "asked once on opening");
+    await shot(B, "04d-bea-red-number-seller-said-yes");
+    const bs = await openMarket(B);
+    await bs.locator('.rl-mk-tabs [data-tab="mine"][aria-pressed="true"]').waitFor();
+    const mineCard = bs.locator(".rl-mk-tapcard", { hasText: "Linen Overshirt" });
+    await mineCard.getByText("You'd like to buy it. Accepted.").waitFor({ timeout: 10000 });
+    assert.equal(await mineCard.locator(".rl-mk-new").innerText(), "New");
+    await mineCard.locator(".rl-mk-count", { hasText: "1" }).waitFor();
+    await noButtonsOnCards(bs);
+    await shot(B, "04e-bea-yours-accepted");
+    await tabBadge(B).waitFor({ state: "detached" });
+    assert.equal(await bs.locator('.rl-mk-tabs [data-tab="mine"] .rl-mk-count').count(), 0, "seen: the red numbers go");
+    await mineCard.click();
+    const line = bs.locator(".rl-mk-answer");
+    await line.waitFor();
+    assert.equal(await line.innerText(), "The seller accepted your request. Next, agree here how you'll pay and how it gets to you. Relay doesn't take payment or arrange postage.");
+    assert.deepEqual(await line.evaluate(e => [e.getAttribute("role"), parseFloat(getComputedStyle(e).fontSize) >= 13, getComputedStyle(e).position, getComputedStyle(e).backgroundImage]), ["status", true, "static", "none"], "a line in the conversation: readable, flat, nothing floating");
+    assert.equal(await bs.getByText("Relay doesn't handle payment or postage, so agree them here.").count(), 0, "said once");
+    assert.ok(!/\b(paid|sold|bought|sent|refund)\b/i.test(await bs.innerText()), "nothing Relay can't know");
+    assert.deepEqual(await B.page.evaluate(() => [...document.querySelectorAll("body *")].filter(e => getComputedStyle(e).position === "fixed" && e.getBoundingClientRect().height > 0 && !e.closest("#foot, #side, .rl-back, .rl-ptr") && !e.querySelector("#foot")).map(e => e.tagName + "#" + e.id + "." + e.className)), [], "nothing floats over the page but the tab bar (and pull to refresh's own arrow, off screen until pulled): rule 19");
+    await shot(B, "04f-bea-conversation-seller-said-yes");
+    await B.page.reload(); await B.page.locator("#foot button").first().waitFor();
+    await B.page.waitForFunction(() => window.__relayMarketNews);
+    assert.equal(await tabBadge(B).count(), 0, "seen once, it doesn't come back");
+    assert.equal(one("SELECT asker_seen FROM resale_requests WHERE id = ?", requestId).asker_seen, 1);
+    console.log("ok - app: Bea is told the seller accepted: a red number on Browse leading to Yours, her request marked new, and a plain line in the conversation saying what happens next; seeing it clears it");
+  }
   await layer(S).getByRole("button", { name: "Open messages" }).click();
   await sheet.getByText("No messages yet. Say hello and agree how this will work.").waitFor();
+  assert.equal(await sheet.locator(".rl-mk-answer").innerText(), "You accepted their request. Next, agree here how they'll pay and how it gets to them. Relay doesn't take payment or arrange postage.", "the seller's side says the same thing, as theirs");
   samChat = sheet;
   await sheet.getByPlaceholder("Write a message").fill("Hi! 👋 It's yours. Could you collect on Saturday?");
   await sheet.getByRole("button", { name: "Send", exact: true }).dblclick();
@@ -908,12 +1004,96 @@ const E = await phone(await signUp("erin.third@example.com", "Erin Third"));
   assert.equal(one("SELECT status FROM resale_listings WHERE id = ?", board).status, "matched");
   // Erin's conversation is still open on her phone: its next look (every 30 seconds while on screen) shows the item has gone.
   await es.getByText("Yes, last week").waitFor({ timeout: 40000 });
-  await es.getByText("This item has gone, so this conversation has ended. You can still read it.").waitFor({ timeout: 40000 });
+  await es.getByText("The seller accepted another member's request, so this conversation has ended. You can still read it.").waitFor({ timeout: 40000 });
   assert.equal(await es.getByPlaceholder("Write a message").isVisible(), false, "no more messages about it");
+  assert.equal(await es.locator(".rl-mk-answer").isVisible(), false, "no 'accepted' line: it wasn't her request that was accepted");
+  assert.equal(await es.getByText("Relay doesn't handle payment or postage, so agree them here.").count(), 0, "nothing left to agree");
+  // She saw it happen in the open conversation, so it isn't news to her afterwards.
+  assert.deepEqual(Object.values(one("SELECT outcome, asker_seen FROM resale_requests WHERE listing_id = ? AND kind = 'chat'", board)), ["other", 1]);
   await shot(E, "17-erin-chat-item-gone");
   await E.page.keyboard.press("Escape"); await closeLayers(S);
   await call("/relay/my/resale/listings/" + board + "/withdraw", { method: "POST", token: sam.token });
-  console.log("ok - app: Erin messages the seller before asking; Bea chats and asks in her own conversation; Sam sees both and matches Bea; Erin's chat says the item has gone and stays readable");
+  console.log("ok - app: Erin messages the seller before asking; Bea chats and asks in her own conversation; Sam sees both and matches Bea; Erin's chat says the seller accepted another member's request and stays readable");
+}
+
+// The seller's answer when Relay wasn't open (Connor, 24 Nov 2026). Erin asks for a jug and messages Sam about a tray,
+// then closes Relay. Sam declines the jug (a double tap declines once) and accepts Bea's request for the tray. Erin opens
+// Relay: a red 2 on Browse, asked for once; it leads to Yours, where each says what happened; seeing them clears it.
+{
+  const jugR = await paste(sam, "Kiln Road", "Enamel Jug", 2400, "KR-412"), trayR = await paste(sam, "Larkspur Home", "Walnut Serving Tray", 3200, "LK-95");
+  const sell = async rid => (await call("/relay/my/resale/listings", { method: "POST", token: sam.token, body: { receiptId: rid, itemIndex: 0, condition: "good", askPence: 900, agree: true, handover: "post" } })).body.id;
+  const jug = await sell(jugR), tray = await sell(trayR);
+  await E.page.reload(); await E.page.locator("#foot button").first().waitFor();
+  const es = await openMarket(E);
+  await part(E, "Browse");
+  await cardOf(es, "Enamel Jug").click();
+  await layer(E).getByRole("button", { name: "I'd like this" }).click();
+  await es.getByText("Sent. The seller sees your request from “Member”, not your name.").waitFor();
+  await cardOf(es, "Walnut Serving Tray").click();
+  await layer(E).getByRole("button", { name: "Message the seller" }).click();
+  await es.getByRole("heading", { name: "Walnut Serving Tray" }).waitFor();
+  await es.getByPlaceholder("Write a message").fill("Is it solid walnut?");
+  await es.getByRole("button", { name: "Send", exact: true }).click();
+  await es.locator(".rl-mk-bubble.mine", { hasText: "Is it solid walnut?" }).waitFor();
+  // Erin puts Relay away (the page is gone: nothing is asked for her meanwhile).
+  await E.page.goto("about:blank");
+  const quietFrom = E.asked.length;
+  assert.equal((await call("/relay/my/resale/listings/" + tray + "/ask", { method: "POST", token: bea.token, body: { kind: "buy" } })).status, 200);
+  await S.page.reload(); await S.page.locator("#foot button").first().waitFor();
+  const ss = await openMarket(S);
+  await part(S, "Yours");
+  await cardOf(ss, "Enamel Jug").click();
+  const declinesBefore = S.asked.filter(a => a.method === "POST" && /\/decline$/.test(a.path)).length;
+  await layer(S).locator(".rl-mk-req", { hasText: "would like to buy" }).getByRole("button", { name: "Decline" }).dblclick();
+  await ss.getByText("Declined.").first().waitFor();
+  assert.equal(S.asked.filter(a => a.method === "POST" && /\/decline$/.test(a.path)).length - declinesBefore, 1, "declined once for a double tap");
+  await closeLayers(S);
+  await cardOf(ss, "Walnut Serving Tray").click();
+  await layer(S).locator(".rl-mk-req", { hasText: "would like to buy" }).getByRole("button", { name: "Accept" }).click();
+  await ss.getByText("Accepted. Message them to agree payment and handover.").waitFor();
+  await closeLayers(S);
+  const erinId = one("SELECT id FROM shoppers WHERE email = ?", E.who.email).id;
+  assert.deepEqual(w.sqlite.prepare("SELECT l.title, q.status, q.outcome, q.asker_seen FROM resale_requests q JOIN resale_listings l ON l.id = q.listing_id WHERE q.asker_id = ? AND l.id IN (?, ?) ORDER BY l.title").all(erinId, jug, tray).map(r => Object.values(r)),
+    [["Enamel Jug", "declined", "declined", 0], ["Walnut Serving Tray", "declined", "other", 0]]);
+  assert.equal(E.asked.length, quietFrom, "nothing was asked for Erin while Relay was closed (no timer)");
+  // Erin opens Relay again.
+  await E.page.goto(APP + "/index.html"); await E.page.locator("#foot button").first().waitFor();
+  await tabBadge(E).waitFor({ timeout: 10000 });
+  assert.equal(await tabBadge(E).innerText(), "2", "a red 2 on Browse: two answers");
+  assert.equal(E.asked.slice(quietFrom).filter(a => a.path === "/relay/my/resale/news").length, 1, "asked once on opening");
+  await shot(E, "17b-erin-red-number-two-answers");
+  const es2 = await openMarket(E);
+  await es2.locator('.rl-mk-tabs [data-tab="mine"][aria-pressed="true"]').waitFor();
+  const jugCard = es2.locator(".rl-mk-asked", { hasText: "Enamel Jug" }), trayCard = es2.locator(".rl-mk-asked", { hasText: "Walnut Serving Tray" });
+  await jugCard.getByText("You'd like to buy it. Declined.").waitFor({ timeout: 10000 });
+  await trayCard.getByText("You messaged the seller. The seller accepted another member's request.").waitFor();
+  assert.deepEqual([await jugCard.locator(".rl-mk-new").innerText(), await trayCard.locator(".rl-mk-new").innerText()], ["New", "New"]);
+  await noButtonsOnCards(es2);
+  assert.ok(!/\b(paid|sold|bought|refund)\b/i.test(await es2.innerText()), "nothing Relay can't know");
+  const look = await E.page.evaluate(() => { const root = document.querySelector("#dcAlt"), out = { tiny: [], wide: document.documentElement.scrollWidth > innerWidth };
+    for (const e of root.querySelectorAll(".rl-mk-asked *")) { if (![...e.childNodes].some(n => n.nodeType === 3 && n.textContent.trim())) continue; if (parseFloat(getComputedStyle(e).fontSize) < 13) out.tiny.push(e.textContent.trim().slice(0, 30)); }
+    return out; });
+  assert.deepEqual(look, { tiny: [], wide: false }, "readable, and on the page");
+  await shot(E, "17c-erin-yours-declined-and-gone");
+  await tabBadge(E).waitFor({ state: "detached" });
+  // The tray's conversation is still there to read, and says why it ended.
+  await trayCard.click();
+  await es2.getByText("The seller accepted another member's request, so this conversation has ended. You can still read it.").waitFor();
+  await es2.getByText("Is it solid walnut?").waitFor();
+  assert.equal(await es2.getByPlaceholder("Write a message").isVisible(), false);
+  await shot(E, "17d-erin-conversation-went-to-another");
+  await es2.getByRole("button", { name: "Back to Swap & resell" }).click();
+  await es2.locator(".rl-mk-tabs").waitFor();
+  await part(E, "Yours");
+  await es2.locator(".rl-mk-asked", { hasText: "Enamel Jug" }).getByText("You'd like to buy it. Declined.").waitFor();
+  assert.equal(await es2.locator(".rl-mk-asked .rl-mk-new").count(), 0, "seen: no longer marked new");
+  const againFrom = E.asked.length;
+  await E.page.reload(); await E.page.locator("#foot button").first().waitFor();
+  await E.page.waitForTimeout(2500);
+  assert.equal(await tabBadge(E).count(), 0, "and the red number doesn't come back");
+  assert.equal(E.asked.slice(againFrom).filter(a => a.path === "/relay/my/resale/news").length, 0, "with nothing left to wait for, her phone stops asking");
+  for (const id of [jug, tray]) await call("/relay/my/resale/listings/" + id + "/withdraw", { method: "POST", token: sam.token });
+  console.log("ok - app: with Relay closed, a declined request and an item that went to another member show as a red number on opening, leading to Yours where each is said plainly; nothing is asked on a timer; seeing them clears it");
 }
 
 // Bea blocks the seller from a conversation (her own choice, not a report): it ends, and she can unblock in Profile.
