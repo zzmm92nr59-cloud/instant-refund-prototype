@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 // Relay's real server (worker/worker.js, the same code Cloudflare runs) on this computer, for end-to-end tests.
 //
 // What is real: every route, every check and every SQL statement in worker/, run by worker.js's own fetch() against a real
@@ -50,7 +51,7 @@ export async function startLocalWorker({ appOrigin, file = ":memory:", port = 0 
   };
   const worker = (await import("../worker/worker.js")).default;
   const env = {
-    RELAY_DB: d1(sqlite), AUTH_SECRET: "local-e2e-auth-secret-" + "0123456789abcdef", RESEND_API_KEY: "local-not-a-key",
+    RELAY_DB: d1(sqlite), AUTH_SECRET: randomBytes(32).toString("hex"), RESEND_API_KEY: "local-not-a-key",
     RELAY_APP_URL: appOrigin + "/index.html", RELAY_ALLOWED_ORIGINS: appOrigin, RELAY_ADMIN_EMAILS: "team.admin@example.com",
     SECOND_STEP_REQUIRED: "on", LEGACY_TEST_ROUTES: "off", SHOPIFY_SHOP_DOMAIN: "made-up-local.myshopify.com"
   };
