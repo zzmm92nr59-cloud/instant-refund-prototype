@@ -1385,7 +1385,7 @@ function shellRefresh(){const A=window.RelayAccount,jobs=[];if(A&&A.forget)A.for
 function openLink(href){const h=String(href||"").split("#")[1]||"",q=new URLSearchParams(h.replace(/^\?/,"")),what=q.get("open");if(!what)return false;
  if(what==="receipts")go("receipts");else if(what==="alerts")go("radar");else if(what==="profile")go("me");else if(what==="health"){go("me");if(window.relayOpenHealth)window.relayOpenHealth();else window.__relayWantHealth=true}else if(what==="home")go("profile");
  // Swap & resell (a new request or message, from a phone notification): its page on Browse, at Yours or the conversation.
- else if(what==="market"){const chat=q.get("chat")||"",tab=q.get("tab")||"";window.__relayMarketWant=/^[0-9a-f-]{36}$/.test(chat)?{chat}:{tab:tab==="mine"?"mine":"browse"};if(page==="discover"&&dcMode==="market"){dcMode=null;}dcShow("market")}
+ else if(what==="market"){const chat=q.get("chat")||"",tab=q.get("tab")||"";window.__relayMarketWant=/^[0-9a-f-]{36}$/.test(chat)?{chat}:{tab:tab==="mine"||tab==="messages"?tab:"browse"};if(page==="discover"&&dcMode==="market"){dcMode=null;}dcShow("market")}
  else if(what==="auction"||what==="auctions"){const id=q.get("id")||"";go("discover");let n=0;(function when(){if(window.RelayAccount&&RelayAccount.openAuctions){openAuctions(/^[0-9a-f-]{36}$/.test(id)?id:"");return}if(++n<80)setTimeout(when,100)})()}
  else if(what==="product"){const sku=q.get("sku")||"";dcShow("shops");let n=0;(function when(){const p=sku&&catalog.find(x=>x.sku===sku);if(p&&$("catalogResults")){chooseSku(sku);window.scrollTo({top:0,behavior:"instant"});return}if(++n<80)setTimeout(when,100)})()}
  else return false;

@@ -96,7 +96,11 @@ export function systemPrompt(account, receipt) {
     "- Never promise a refund, a return, a delivery or what a shop will do. Refunds always come from the shop.",
     "- If asked, say you're an AI and can get things wrong.",
     "- Never ask for passwords, sign-in codes, card numbers or other secrets. If someone shares one, tell them not to share it with anyone, including here.",
-    "- Be brief and warm: two to five short sentences in plain British English. Use a short numbered list only for steps. No emoji, no markdown headings.",
+    // Connor, 24 Nov 2026: answers were too long ("too much going on"). Short, plain, one question at most, no tour of the app.
+    "- Be brief and warm: two or three short sentences in plain British English, answering only what was asked. Use a short numbered list (three steps at most) only when they ask how to do something.",
+    "- Ask at most one question, and only when you can't answer without it. Don't offer a menu of other things you could help with.",
+    "- Never list or describe the app's tabs, or say what Relay is in general, unless they ask about that.",
+    "- No emoji, no markdown headings, no bold.",
     "",
     "Facts about Relay:",
     qa,
@@ -190,7 +194,7 @@ export async function handleSupportRoute(path, method, request, env, cors, shopp
     res = await claudeFetch(env, "help_chat", fetchImpl, {
       method: "POST",
       headers: { "x-api-key": env.ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json" },
-      body: JSON.stringify({ model: env.SUPPORT_CHAT_MODEL || DEFAULT_MODEL, max_tokens: 450, system,
+      body: JSON.stringify({ model: env.SUPPORT_CHAT_MODEL || DEFAULT_MODEL, max_tokens: 300, system,
         messages: turns.map(t => ({ role: t.role, content: t.text })) })
     });
   } catch (e) { console.error("help_chat_failed", String(e && e.name || "error")); return json({ error: "chat_unavailable" }, 502, cors); }

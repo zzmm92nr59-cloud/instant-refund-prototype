@@ -84,12 +84,15 @@ assert.equal(r.status, 200);
 assert.deepEqual(await r.json(), { reply: anthropic.text });
 const sent = asked[0];
 assert.equal(sent.headers["x-api-key"], "fake-anthropic-key"); assert.equal(sent.headers["anthropic-version"], "2023-06-01");
-assert.equal(sent.body.model, "claude-haiku-5-5"); assert.equal(sent.body.max_tokens, 450);
+assert.equal(sent.body.model, "claude-haiku-5-5"); assert.equal(sent.body.max_tokens, 300);
 assert.deepEqual(sent.body.messages, [{ role: "user", content: Q[0].text }]);
 const sys = sent.body.system, all = JSON.stringify(sent.body);
 for (const [q, a] of HELP_QA) assert.ok(sys.includes(q) && sys.includes(a), "the Help page is in what it's told: " + q);
 assert.match(sys, /Inboxes connected: Gmail\n/); assert.match(sys, /Relay last checked their inbox: today at 19:41/); assert.match(sys, /Two-step sign-in: off/);
 assert.match(sys, /Never promise a refund/); assert.match(sys, /can't change anything in their account/);
+// Short answers (Connor, 24 Nov 2026: too long, and a tour of the tabs nobody asked for).
+assert.match(sys, /two or three short sentences/); assert.match(sys, /Ask at most one question/); assert.match(sys, /Never list or describe the app's tabs/);
+assert.doesNotMatch(sys, /two to five/, "no longer allowed up to five sentences");
 for (const secret of ["Secret Merino Scarf", "BR-SECRET-7", "Brindle", "45.99", "4599", "jess.private@example.com", "jess.inbox@example.com", J])
   assert.ok(!all.includes(secret), "nothing from the email or the account's address goes to Anthropic: " + secret);
 env.SUPPORT_CHAT_MODEL = "claude-sonnet-5-5"; await chat(Q); assert.equal(asked[1].body.model, "claude-sonnet-5-5", "the model can be changed without a code change"); delete env.SUPPORT_CHAT_MODEL;

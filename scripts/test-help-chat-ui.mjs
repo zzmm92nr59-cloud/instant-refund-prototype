@@ -1,6 +1,6 @@
 // Browser test: the help chat's look and feel (a tall sheet from the bottom, as Connor asked on 23 Nov 2026). Stubbed
 // Relay server; the assistant's answers are made up here.
-// Checks: the Ask tab's "Try asking" chevron opens a tall sheet with rounded top corners, Relay's round logo, its name in
+// Checks: Chat with us (Profile, Help and legal) opens a tall sheet with rounded top corners, Relay's round logo, its name in
 // bold, "The team can also help" under it and a round close button at the top right; Relay's messages sit on the left
 // in grey bubbles under its small logo and name ("AI assistant" said once, as its own label, never glued on with a dot);
 // the shopper's sit on the right in the accent blue with white words, fully rounded; topics are outlined pills, wrapped
@@ -10,7 +10,7 @@
 // still fits; everything is 44px to tap, 13px or more, and passes the polish rules in light and dark.
 import assert from "node:assert/strict";
 import { createRequire } from "node:module"; import { createServer } from "node:http"; import { readFile, mkdir } from "node:fs/promises"; import { resolve, extname } from "node:path";
-import { skipInterests } from "./relay-places.mjs";
+import { skipInterests, openAccountRow } from "./relay-places.mjs";
 const require = createRequire(import.meta.url); const { chromium } = require("playwright");
 const server = createServer(async (req, res) => { try { const p = resolve(".", "." + new URL(req.url, "http://x").pathname.replace(/\/$/, "/index.html")); res.setHeader("Content-Type", extname(p) === ".js" ? "text/javascript" : extname(p) === ".png" ? "image/png" : "text/html"); res.end(await readFile(p)); } catch { res.statusCode = 404; res.end(); } });
 await new Promise(r => server.listen(0, "127.0.0.1", r)); const origin = "http://127.0.0.1:" + server.address().port;
@@ -85,9 +85,14 @@ const openAsk = async () => {
   await page.goto(origin + "/index.html");
   await page.waitForFunction(() => document.querySelectorAll("#foot button").length === 4);
   await page.evaluate(() => window.tabTap("ask"));
-  await page.locator("#askPage .rl-ask-q").first().waitFor();
+  await page.locator("#askPage .rl-ask-pill").first().waitFor();
 };
-const openChat = async () => { await page.getByRole("button", { name: /^Try asking\./ }).click(); await chat.waitFor(); await page.waitForTimeout(450); };
+// The chat with its topics: Carry on your chat on the Ask tab once one is under way; before that, Chat with us in
+// Profile's Help and legal (the Ask tab itself only offers three questions to send: Connor, 24 Nov 2026).
+const openChat = async () => {
+  const carry = page.locator("#askPage .rl-ask-pill", { hasText: "Carry on your chat" });
+  if (await carry.count()) await carry.click(); else await openAccountRow(page, "Chat with us");
+  await chat.waitFor(); await page.waitForTimeout(450); };
 const accent = await (async () => { await openAsk(); return page.evaluate(() => { const p = document.createElement("span"); p.style.color = "var(--rl-accent)"; document.body.appendChild(p); const c = getComputedStyle(p).color; p.remove(); return c; }); })();
 const greyCard = await page.evaluate(() => { const p = document.createElement("span"); p.style.background = "var(--rl-card)"; document.body.appendChild(p); const c = getComputedStyle(p).backgroundColor; p.remove(); return c; });
 
@@ -170,6 +175,9 @@ await chat.getByText(/A stand-in answer/).nth(1).waitFor();
 await page.waitForTimeout(300);
 assert.equal(st.chats.length, 2, "a double tap on send sends once");
 assert.deepEqual(st.chats[1].messages.map(t => t.role + ":" + t.text.slice(0, 12)), ["user:Where's my r", "assistant:A stand-in a", "user:And for a gi"], "the chat so far goes with it, never the topics tapped");
+// Cleaner (Connor, 24 Nov 2026): nothing floats in the conversation but the messages and the pills; no search link.
+assert.equal(await chat.getByText(/Search your receipts/).count(), 0, "no search link in the chat");
+assert.equal(await chat.locator(".rl-chat-b.me > :not(p)").count(), 0, "the shopper's messages are just their words");
 // An error is plain English, and the question comes back.
 st.fail = { status: 500, error: "upstream_error" };
 await box.fill("One more thing"); await box.press("Enter");

@@ -59,6 +59,15 @@ function stub(who) {
     if (p === "/relay/my/bank/payments") return j(full ? W.bankPayments() : { payments: [] });
     if (p === "/relay/my/wrapped") return j(full ? W.wrapped(RECEIPTS) : { receipts: 0, years: [] });
     if (p === "/relay/my/help/chat") return j({ available: true, messages: [] });
+    // Swap & resell: Messages and a new listing (24 Nov 2026), with made-up conversations and one item to list.
+    if (p === "/relay/my/resale/conversations") return j({ conversations: full ? [
+      { id: "c1111111-1111-4111-8111-111111111111", title: "Extraordinarily Long Named Waxed Cotton Field Jacket With Corduroy Collar", store: "Harlow", with: "Buyer", selling: true, open: true, lastAt: Date.now() - 6e5, last: { mine: false, body: "Hi! Is this still available? I could collect on Saturday morning if that works for you." }, unread: 2 },
+      { id: "c2222222-2222-4222-8222-222222222222", title: "Linen Overshirt", store: "Fennel", with: "Seller", selling: false, open: false, itemGone: true, lastAt: Date.now() - 3 * 864e5, last: { mine: true, body: "Thanks anyway" }, unread: 0 }] : [],
+      news: { requests: 0, messages: full ? 2 : 0, total: full ? 2 : 0, active: full } });
+    if (p === "/relay/my/resale/items") return j({ items: full ? [{ receiptId: "d1111111-1111-4111-8111-111111111111", itemIndex: 0, title: "Merino Crew Jumper", store: "Fennel", size: "M", colour: "Sage green", pricePence: 6900, currency: "GBP", hasImage: false, photo: false, orderDate: "2026-09-02", returnWindowOpen: false, returnDeadline: null, alreadyListed: false }] : [],
+      defaults: full ? { area: "SW11", handover: "either", swapOk: true } : {} });
+    if (p === "/relay/my/resale/describe") return j({ description: "A merino crew-neck jumper from Fennel in sage green. It's a size M." });
+    if (p === "/relay/my/resale/feed" || p === "/relay/my/resale/mine") return j({ listings: [], myRequests: [] });
     if (p === "/relay/my/delivery") return j({ delivery: null });
     if (p === "/relay/my/bag" && m === "GET") return j({ items: full ? W.bag() : [], updatedAt: Date.now() });
     if (p === "/relay/my/bag/check") { let b = {}; try { b = JSON.parse(req.postData() || "{}"); } catch (e) {} return j(W.bagCheck(W.bag(), b.shop)); }
@@ -234,6 +243,13 @@ for (const c of CHIPS) screen("home-" + c.toLowerCase().replace(/\W+/g, "-"), "f
   await unbig(page); await waitOutDoubleTap(page); await chip.click(); await settle(page, 900); await look(page, cfg, "home-" + c.toLowerCase().replace(/\W+/g, "-"));
 });
 screen("ask", "full", async (page, cfg) => { await tabTo(page, "ask"); await look(page, cfg, "ask"); });
+// The Ask tab's box looking through receipts as it's typed in, and the whole of what the short line says.
+screen("ask-search", "full", async (page, cfg) => { await tabTo(page, "ask"); await page.locator("#askPage .rl-chat-in").fill("harlow"); await page.locator("#askPage .rl-chat-in").dispatchEvent("input"); await page.locator("#askPage .rl-ask-hit").first().waitFor(); await look(page, cfg, "ask-search", { bar: false }); await page.locator("#askPage .rl-chat-in").fill(""); await page.locator("#askPage .rl-chat-in").dispatchEvent("input"); });
+screen("ask-about", "full", async (page, cfg) => { await tabTo(page, "ask"); await waitOutDoubleTap(page); await page.locator("#askPage .rl-ask-note").click(); await page.locator(".rl-ask-about").waitFor(); await look(page, cfg, "ask-about"); });
+// Swap & resell's Messages, and a new listing filled in, with its AI description.
+const toMarket = async (page) => { await tabTo(page, "discover"); await page.evaluate(() => window.dcShow("market")); await page.locator("#dcAlt .rl-mk-tabs").waitFor(); await settle(page, 300); };
+screen("market-messages", "full", async (page, cfg) => { await toMarket(page); await waitOutDoubleTap(page); await page.locator('#dcAlt [data-tab="messages"]').click(); await page.locator("#dcAlt .rl-mk-conv").first().waitFor(); await look(page, cfg, "market-messages"); });
+screen("market-sell", "full", async (page, cfg) => { await toMarket(page); await waitOutDoubleTap(page); await page.locator('#dcAlt [data-tab="sell"]').click(); await page.getByRole("button", { name: "List this" }).first().click(); await page.locator("#dcAlt .rl-mk-aitag").waitFor(); await look(page, cfg, "market-sell"); });
 screen("browse", "full", async (page, cfg) => { await tabTo(page, "discover"); await settle(page, 800); await look(page, cfg, "browse"); });
 // The bag: two shops' things, and Pay at a shop with a price that went up since it was added.
 screen("bag", "full", async (page, cfg) => { await tabTo(page, "bag"); await page.locator("#bagPage .bg-group").first().waitFor(); await settle(page, 700); await look(page, cfg, "bag"); });
