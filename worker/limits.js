@@ -8,8 +8,9 @@
 //     network) don't share one allowance between them;
 //   - a tighter allowance for the requests that are worth attacking or cost the most: signing in, checking codes and
 //     connecting accounts (per address), and searching or reading someone's mailbox at Google or Microsoft (per credential).
-// Shopify's and Square's webhooks aren't limited here: each is checked by its signature, and those senders retry in bursts.
-// Nor are Gmail's and Outlook's new-mail notices (mail-push.js), checked by Google's signature and by the subscription's secret.
+// Shopify's and Square's webhooks count against their sender's address only (they're signed, but the body has to be read
+// to check that, so a flood of fakes is stopped here). Gmail's and Outlook's new-mail notices (mail-push.js) aren't limited:
+// they're checked by Google's signature and by the subscription's secret before anything is read.
 // Relay's existing limits stay as they are on top of these (sign-in links per email address, wrong codes, texts, test
 // pushes, resale requests and the rest, kept in the database).
 //
@@ -28,7 +29,7 @@ export const LIMITS = {
 
 // Signing in, checking a code, and the pages Google, Microsoft, Square and Shopify send people back to.
 const SIGN_IN = new Set([
-  "/relay/auth/request", "/relay/auth/verify", "/relay/auth/claim", "/relay/auth/verify-code", "/relay/auth/google/start", "/relay/auth/microsoft/start",
+  "/relay/auth/request", "/relay/auth/verify", "/relay/auth/claim", "/relay/auth/confirm", "/relay/auth/verify-code", "/relay/auth/google/start", "/relay/auth/microsoft/start",
   "/relay/auth/passkey/options", "/relay/auth/passkey/verify", "/relay/auth/phone/start", "/relay/my/devices/look", "/relay/my/devices/approve", "/relay/auth/2fa/verify", "/relay/auth/2fa/text",
   "/relay/gmail/callback", "/relay/microsoft/callback", "/relay/bank/callback",
   "/relay/square/connect", "/relay/square/oauth/callback",
@@ -44,7 +45,11 @@ const MAIL_OUTLOOK_RE = /^\/relay\/my\/outlook\/message\/[^/]{1,1600}$/;
 const PICTURE_RE = /^\/relay\/my\/(logo\/[^/]{1,100}|receipts\/[0-9a-f-]{36}\/image|receipts\/[0-9a-f-]{36}\/receipt-photo|receipts\/[0-9a-f-]{36}\/codes\/\d{1,2}|resale\/listings\/[0-9a-f-]{36}\/image)$/;
 // Signed by Shopify or Square; checked there. Gmail's notices come signed by Google, and Outlook's carry each subscription's
 // secret (mail-push.js): they come in bursts from a few of Google's and Microsoft's addresses, for every shopper at once.
-const WEBHOOKS = new Set(["/relay/webhooks/shopify", "/relay/webhooks/square", "/relay/webhooks/gmail", "/relay/webhooks/outlook", "/relay/webhooks/outlook/lifecycle"]);
+const WEBHOOKS = new Set(["/relay/webhooks/gmail", "/relay/webhooks/outlook", "/relay/webhooks/outlook/lifecycle"]);
+// Shopify's and Square's notices are signed too, but anyone can post to their addresses, and a body has to be read before
+// its signature can be checked: they count against the sending address's allowance like any request (and nothing else,
+// as they carry no credential). Over it, Shopify and Square are answered 429 and send the notice again later.
+const SIGNED_WEBHOOKS = new Set(["/relay/webhooks/shopify", "/relay/webhooks/square"]);
 
 // The address a request came from. Cloudflare sets cf-connecting-ip on every request it passes on.
 // An IPv6 home or phone usually has a whole /64 block to itself, so those addresses are counted by their first half:
@@ -102,6 +107,7 @@ export async function checkRateLimits(request, env, url, now = Date.now()) {
   const address = addressOf(request);
   let wait = await count(env, "ip", address, now);
   if (wait) return { scope: "address", retryAfterMs: wait };
+  if (SIGNED_WEBHOOKS.has(path)) return null;
   if (SIGN_IN.has(path)) {
     wait = await count(env, "signIn", address, now);
     if (wait) return { scope: "sign_in", retryAfterMs: wait };

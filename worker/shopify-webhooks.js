@@ -1,4 +1,5 @@
 import { getShopifyStores } from "./shopify.js";
+import { readCappedBytes } from "./validate.js";
 import { normaliseEmail, emailHash, ensureAuthTables } from "./auth.js";
 import { forgetShopifyShop, removeShopifyItems, shopifyApps } from "./shopify-connect.js";
 import { ensureReturnsTables } from "./returns.js";
@@ -105,8 +106,11 @@ export async function receiveShopifyWebhook(request, env, o = {}) {
   const topic = String(request.headers.get("x-shopify-topic") || "").toLowerCase();
   const deliveryId = String(request.headers.get("x-shopify-webhook-id") || "");
   if (!deliveryId || deliveryId.length > 128) return new Response("Missing delivery ID", { status: 400 });
-  const body = await request.arrayBuffer();
-  if (body.byteLength > MAX_BYTES) return new Response("Payload too large", { status: 413 });
+  // No signature at all: turned away before a byte of the body is read. Otherwise the body is read only up to 256 KB,
+  // refused on its declared size first; the signature is checked over the exact bytes sent.
+  if (!request.headers.get("x-shopify-hmac-sha256")) return new Response("Invalid signature", { status: 401 });
+  const body = await readCappedBytes(request, MAX_BYTES);
+  if (body === null) return new Response("Payload too large", { status: 413 });
   let signed = false;
   for (const secret of secrets) if (await validSignature(body, request.headers.get("x-shopify-hmac-sha256"), secret)) { signed = true; break; }
   if (!signed) return new Response("Invalid signature", { status: 401 });

@@ -114,6 +114,41 @@ const gcode = codeOf(emails[0]);
 const bad = gcode === "000000" ? "111111" : "000000";
 for (let i = 0; i < 5; i++) assert.equal((await call("/relay/auth/verify-code", { method: "POST", body: { email: "gus@example.com", code: bad } })).status, 400);
 assert.equal((await call("/relay/auth/verify-code", { method: "POST", body: { email: "gus@example.com", code: gcode } })).status, 429, "locked after 5 wrong codes");
+// Guesses sent all at once can't get past the limit: each code lets 5 guesses through in all, however they arrive.
+{
+  const verifyCode = (email, code, ip) => call("/relay/auth/verify-code", { method: "POST", body: { email, code }, ip });
+  emails = [];
+  await call("/relay/auth/request", { method: "POST", body: { email: "ivy@example.com" }, ip: "8.8.1.1" });
+  const icode = codeOf(emails[0]);
+  const others = Array.from({ length: 29 }, (_, i) => String(100000 + i)).map(c => c === icode ? "999999" : c);
+  const answers = await Promise.all([...others, icode].map(c => verifyCode("ivy@example.com", c, "8.8.1.2")));
+  assert.equal(answers.filter(x => x.status === 200).length, 0, "29 wrong guesses and then the right one, all at once: nobody is signed in");
+  assert.equal(sqlite.prepare("SELECT COUNT(*) n FROM auth_code_failures WHERE email = 'ivy@example.com'").get().n, 5, "only 5 guesses were ever checked against the code");
+  assert.equal(sqlite.prepare("SELECT COUNT(*) n FROM auth_sessions a JOIN shoppers s ON s.id = a.shopper_id WHERE s.email = 'ivy@example.com'").get().n, 0);
+  // Someone else's wrong guesses don't keep the owner out: a new code works straight away (it used to be refused for 15 minutes).
+  emails = [];
+  assert.equal((await call("/relay/auth/request", { method: "POST", body: { email: "ivy@example.com" }, ip: "8.8.1.1" })).status, 200);
+  const fresh = codeOf(emails[0]);
+  assert.equal((await verifyCode("ivy@example.com", fresh, "8.8.1.1")).status, 200, "a new code works at once after someone's wrong guesses");
+  // Only the newest code works: asking again cancels the one before.
+  emails = [];
+  await call("/relay/auth/request", { method: "POST", body: { email: "jo@example.com" }, ip: "8.8.2.1" });
+  const first = codeOf(emails[0]);
+  await call("/relay/auth/request", { method: "POST", body: { email: "jo@example.com" }, ip: "8.8.2.1" });
+  const second = codeOf(emails[1]);
+  if (first !== second) assert.equal((await verifyCode("jo@example.com", first, "8.8.2.1")).status, 400, "the earlier code stopped working when a new one was sent");
+  assert.equal(sqlite.prepare("SELECT COUNT(*) n FROM auth_login_tokens WHERE email = 'code:jo@example.com' AND used_at IS NULL").get().n, 1, "one live code per address");
+  assert.equal((await verifyCode("jo@example.com", second, "8.8.2.1")).status, 200, "the newest code works");
+  // An email that fails to send doesn't cancel the code already in someone's inbox.
+  emails = [];
+  await call("/relay/auth/request", { method: "POST", body: { email: "kit@example.com" }, ip: "8.8.3.1" });
+  const kcode = codeOf(emails[0]);
+  failEmail = true;
+  assert.equal((await call("/relay/auth/request", { method: "POST", body: { email: "kit@example.com" }, ip: "8.8.3.1" })).status, 502);
+  failEmail = false;
+  assert.equal((await verifyCode("kit@example.com", kcode, "8.8.3.1")).status, 200, "the code that did arrive still works");
+  console.log("ok - sign-in codes: 5 guesses a code even when sent at once, only the newest code works, wrong guesses don't lock the owner out");
+}
 clock += 16 * 60 * 1000;
 emails = [];
 await call("/relay/auth/request", { method: "POST", body: { email: "hal@example.com" }, ip: "9.9.9.9" });
@@ -238,7 +273,7 @@ assert.equal(await handleAuthRoute(new Request("https://w.test/relay/shopify/sta
     return new Response("blocked", { status: 500 });
   };
   const gcall = (path, { method = "GET", body, token } = {}) =>
-    handleAuthRoute(new Request("https://w.test" + path, { method, headers: { "content-type": "application/json", "cf-connecting-ip": "9.9.9.9", ...(token ? { authorization: "Bearer " + token } : {}) },
+    handleAuthRoute(new Request("https://w.test" + path, { method, headers: { "content-type": "application/json", "cf-connecting-ip": "9.9.9.9", origin: "https://zzmm92nr59-cloud.github.io", ...(token ? { authorization: "Bearer " + token } : {}) },
       body: body ? JSON.stringify(body) : undefined }), genv, new URL("https://w.test" + path), {}, { now: clock, fetchImpl: gfetch });
   async function flow(code = "good-code", extra = "", startBody = {}) {
     const nonce = nonceOf();
@@ -248,7 +283,7 @@ assert.equal(await handleAuthRoute(new Request("https://w.test/relay/shopify/sta
     return { nonce, u, cb, loc: cb.headers.get("location") || "" };
   }
   assert.equal((await gcall("/relay/auth/google/start", { method: "POST", body: {} })).status, 400, "start needs a browser secret");
-  assert.equal((await handleAuthRoute(new Request("https://w.test/relay/auth/google/start", { method: "POST", body: JSON.stringify({ nonce: nonceOf() }) }), env, new URL("https://w.test/relay/auth/google/start"), {}, { now: clock, fetchImpl: gfetch })).status, 503, "off until Google is configured");
+  assert.equal((await handleAuthRoute(new Request("https://w.test/relay/auth/google/start", { method: "POST", headers: { origin: "https://zzmm92nr59-cloud.github.io" }, body: JSON.stringify({ nonce: nonceOf() }) }), env, new URL("https://w.test/relay/auth/google/start"), {}, { now: clock, fetchImpl: gfetch })).status, 503, "off until Google is configured");
   assert.equal((await gcall("/relay/auth/google/start", { method: "POST", body: { nonce: "x" } })).status, 400);
   const a = await flow();
   assert.equal(a.u.origin + a.u.pathname, "https://accounts.google.com/o/oauth2/v2/auth");
@@ -307,13 +342,18 @@ assert.equal(await handleAuthRoute(new Request("https://w.test/relay/shopify/sta
   assert.equal(v2.outlookConnected, undefined);
   const aliceId = sqlite.prepare("SELECT id FROM shoppers WHERE email = 'alice@example.com'").get().id;
   // An iPhone home-screen app hands Google to a separate browser, which comes back to Relay without the app's secret:
-  // it can't finish (and doesn't use the sign-in up); the app, back on screen, claims it with its secret, once.
+  // it can't finish (and doesn't use the sign-in up); once that browser has confirmed it, the app, back on screen, claims it
+  // with its secret, once.
   {
     const o6 = await flow("good-code", "", { consentVersion: CONSENT_VERSION });
     const t6 = /#signin=([A-Za-z0-9_-]{43})$/.exec(o6.loc)[1];
     assert.equal((await gcall("/relay/auth/verify", { method: "POST", body: { token: t6 } })).status, 400, "the other browser can't finish it");
     assert.equal((await gcall("/relay/auth/claim", { method: "POST", body: { nonce: nonceOf() } })).status, 404, "someone else's secret: nothing");
     assert.equal((await gcall("/relay/auth/claim", { method: "POST", body: { nonce: "short" } })).status, 400);
+    // The secret alone is not enough (whoever starts a sign-in chooses it): the browser that came back has to say so
+    // first, here by holding the secret too (scripts/test-signin-claim.mjs covers the rest).
+    assert.equal((await gcall("/relay/auth/claim", { method: "POST", body: { nonce: o6.nonce } })).status, 404, "not by the secret alone");
+    assert.equal((await gcall("/relay/auth/confirm", { method: "POST", body: { token: t6, nonce: o6.nonce } })).status, 200, "the browser that came back proves it started it");
     const c6 = await gcall("/relay/auth/claim", { method: "POST", body: { nonce: o6.nonce } });
     assert.equal(c6.status, 200, "the app claims it");
     const v6 = await c6.json();

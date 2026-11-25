@@ -206,11 +206,12 @@ export async function confirmedPhone(env, shopperId) {
 export async function confirmNumberWithCode(env, shopperId, code, now, opts = {}) {
   const used = await useTextCode(env, shopperId, "confirm", "confirm:" + shopperId, code, now);
   if (!used) return null;
-  await env.RELAY_DB.prepare(
+  // opts.with: statements to run in the same step (switching on the account's first second step, second-step.js).
+  await env.RELAY_DB.batch([env.RELAY_DB.prepare(
     `INSERT INTO auth_phone (shopper_id, phone_enc, phone_end, confirmed_at, two_step, two_step_at) VALUES (?,?,?,?,?,?)
      ON CONFLICT(shopper_id) DO UPDATE SET phone_enc = excluded.phone_enc, phone_end = excluded.phone_end, confirmed_at = excluded.confirmed_at,
        two_step = excluded.two_step, two_step_at = excluded.two_step_at`)
-    .bind(shopperId, used.phone_enc, used.phone_end, now, opts.twoStep ? 1 : 0, opts.twoStep ? now : null).run();
+    .bind(shopperId, used.phone_enc, used.phone_end, now, opts.twoStep ? 1 : 0, opts.twoStep ? now : null), ...(opts.with || [])]);
   return { ending: used.phone_end };
 }
 

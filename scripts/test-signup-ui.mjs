@@ -26,8 +26,10 @@ await ctx.route("https://**/*", async route => {
   const body = () => { try { return JSON.parse(route.request().postData() || "{}"); } catch { return {}; } };
   if (p === "/relay/auth/providers") return j({ email: true, google: true, microsoft: true, consent: CONSENT });
   if ((p === "/relay/auth/google/start" || p === "/relay/auth/microsoft/start") && st.slowStart) { await new Promise(r => setTimeout(r, 2500)); return j({ error: "google_not_configured" }, 503); }
-  if (p === "/relay/auth/google/start" || p === "/relay/auth/microsoft/start") { st.starts.push({ p, ...body() }); return j({ url: p.includes("google") ? "https://accounts.google.com/o/oauth2/v2/auth?x=1" : "https://login.microsoftonline.com/consumers/oauth2/v2.0/authorize?x=1" }); }
+  if (p === "/relay/auth/google/start" || p === "/relay/auth/microsoft/start") { st.starts.push({ p, ...body() }); return j({ url: p.includes("google") ? "https://accounts.google.com/o/oauth2/v2/auth?x=1" : "https://login.microsoftonline.com/consumers/oauth2/v2.0/authorize?x=1", ...(st.startCode ? { code: st.startCode } : {}) }); }
   if (p === "/relay/auth/claim") { st.claims = (st.claims || 0) + 1; if (!st.claimReady) return j({ error: "not_yet" }, 404); st.claimReady = false; Object.assign(st, st.onVerify || {}); return j({ sessionToken: TOKEN, email: st.email, expiresAt: Date.now() + 864e5, ...st.verify }); }
+  if (p === "/relay/auth/confirm") { st.confirms = (st.confirms || []).concat([body()]); return st.confirmGone ? j({ error: "invalid_or_expired_link" }, 400) : j({ ok: true }); }
+  if (p === "/relay/auth/verify" && st.confirmCode) { st.verifyBodies = (st.verifyBodies || []).concat([body()]); return j({ error: "confirm_needed", code: st.confirmCode }, 400); }
   if (p === "/relay/auth/verify") { st.verifies = (st.verifies || 0) + 1; Object.assign(st, st.onVerify || {}); return j({ sessionToken: TOKEN, email: st.email, expiresAt: Date.now() + 864e5, ...st.verify }); }
   if (p === "/relay/auth/request") return j({ ok: true });
   if (p === "/relay/auth/verify-code") return body().code === "123456" ? j({ sessionToken: TOKEN, email: st.email, expiresAt: Date.now() + 864e5 }) : j({ error: "invalid_or_expired_code" }, 400);
@@ -427,6 +429,9 @@ console.log("ok - seeing getting started again: every step, with the account as 
   await other.goto(origin + "/index.html#signin=" + LINK);
   await other.getByRole("heading", { name: "Nearly there" }).waitFor();
   assert.equal(st.verifies || 0, 0, "the separate browser doesn't use the sign-in up");
+  assert.equal(st.confirms.length, 1, "it tells Relay, once, that the app may finish");
+  assert.equal(st.confirms[0].token, LINK); assert.equal(st.confirms[0].nonce, st.starts[0].nonce, "with the app's secret, which it holds too: proof it's the same person");
+  assert.equal(st.confirms[0].agree, undefined);
   await other.close();
   // The app back on screen: it asks, and finishes signing in.
   st.claimReady = true;
@@ -437,6 +442,59 @@ console.log("ok - seeing getting started again: every step, with the account as 
   await app.close();
 }
 console.log("ok - from the home-screen app: the separate browser says to go back; the app finishes signing in");
+
+// 4c. Google comes back in a browser that holds no secret (not the one that started: the installed app's separate browser on
+// some phones, or someone who was sent a sign-in link by somebody else). Nothing is finished there: the page shows a short
+// code and asks. Continue lets the app finish; "This wasn't me" cancels; nothing is sent until one is tapped.
+{
+  const SHOTS = process.env.SEC_SHOTS || "/tmp/shots";
+  await mkdir(SHOTS, { recursive: true });
+  await page.goto(origin + "/terms.html"); await page.evaluate(() => localStorage.clear()); reset({ confirmCode: "KQ7M2P" });
+  await page.goto(origin + "/index.html#signin=" + LINK);
+  await sheet.getByRole("heading", { name: "Finish signing in to Relay?" }).waitFor();
+  assert.match(await sheet.innerText(), /Only continue if the Relay app on your phone shows this same code\. If someone sent you this link, close this page\./);
+  assert.equal((await sheet.locator(".rl-pcode").innerText()).trim(), "KQ7 M2P", "the code, in two halves");
+  assert.deepEqual(st.verifyBodies, [{ token: LINK }]);
+  assert.equal(st.confirms, undefined, "nothing is confirmed until the person says so");
+  assert.equal(await page.evaluate(() => localStorage.getItem("relay.session.v1")), null, "and nobody is signed in on this page");
+  await polished("confirm a sign-in that came back elsewhere");
+  await page.screenshot({ path: SHOTS + "/signin-confirm-elsewhere.png" });
+  await sheet.getByRole("button", { name: "Continue", exact: true }).dblclick();
+  await sheet.getByRole("heading", { name: "Nearly there" }).waitFor();
+  assert.deepEqual(st.confirms, [{ token: LINK, agree: true }], "confirmed once (a double tap too), by the token alone");
+  assert.equal(await page.evaluate(() => localStorage.getItem("relay.session.v1")), null, "this page never signs in: the app does");
+  await page.screenshot({ path: SHOTS + "/signin-confirmed-go-back.png" });
+  // "This wasn't me": cancelled.
+  await page.goto(origin + "/terms.html"); reset({ confirmCode: "KQ7M2P" });
+  await page.goto(origin + "/index.html#signin=" + LINK);
+  await sheet.getByRole("button", { name: "This wasn't me" }).click();
+  await sheet.getByRole("heading", { name: "Sign-in cancelled" }).waitFor();
+  assert.deepEqual(st.confirms, [{ token: LINK, deny: true }]);
+  await polished("sign-in cancelled");
+  await page.screenshot({ path: SHOTS + "/signin-cancelled.png" });
+  // Too late (it ran out, or was already used): said plainly.
+  await page.goto(origin + "/terms.html"); reset({ confirmCode: "KQ7M2P", confirmGone: true });
+  await page.goto(origin + "/index.html#signin=" + LINK);
+  await sheet.getByRole("button", { name: "Continue", exact: true }).click();
+  await sheet.getByRole("heading", { name: "That sign-in has run out" }).waitFor();
+  await polished("sign-in ran out");
+  // The installed app that started it shows the same code when it's back on screen.
+  await page.goto(origin + "/terms.html"); await page.evaluate(() => localStorage.clear()); reset({ email: "jess.tester@gmail.com" });
+  const app = await ctx.newPage(); await app.addInitScript(() => { Object.defineProperty(navigator, "standalone", { get: () => true }); });
+  await app.goto(origin + "/index.html");
+  await app.getByRole("button", { name: "Get started" }).click();
+  const appSheet = app.locator(".rl-back .rl-sheet").last();
+  await appSheet.locator(".rl-sperm").waitFor();
+  st.startCode = "KQ7M2P";
+  await appSheet.getByRole("button", { name: "Continue with Google" }).click();
+  await app.waitForURL(/accounts\.google\.com/);
+  await app.goto(origin + "/index.html");
+  await app.getByText("If the other window asks, your code is KQ7 M2P.").waitFor();
+  await app.waitForTimeout(1500);
+  await app.screenshot({ path: SHOTS + "/signin-app-shows-code.png" });
+  await app.close();
+}
+console.log("ok - a sign-in that comes back in a browser without the secret is finished only after it's confirmed there, by a matching code");
 
 // 5. Coming back ("I already have an account"): Google just signs in. No agreement sent, no inbox requested.
 await page.evaluate(() => localStorage.clear()); reset();
