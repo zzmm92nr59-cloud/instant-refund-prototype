@@ -51,6 +51,7 @@ const ROUTES = new Map(Object.entries({
   "/relay/auth/request": { fields: { email: str(320) } },
   "/relay/auth/verify": { fields: { token: str(200), nonce: str(200) } },
   "/relay/auth/claim": { fields: { nonce: str(200) } },
+  "/relay/auth/confirm": { fields: { token: str(200), nonce: str(200), agree: bool, deny: bool } },
   "/relay/auth/verify-code": { fields: { email: str(320), code: str(40) } },
   "/relay/auth/google/start": { fields: { nonce: str(200), consentVersion: str(40) } },
   "/relay/auth/microsoft/start": { fields: { nonce: str(200), consentVersion: str(40) } },
@@ -306,11 +307,13 @@ export function validateBody(schema, body) {
   }
 }
 
-// Reads at most `limit` bytes of the body. Returns the text, or null when it's bigger than that.
-async function readCapped(request, limit) {
+// Reads at most `limit` bytes of the body, as the exact bytes sent (what a webhook's signature is worked out over).
+// Returns null when it's bigger than that: turned away on its declared size before anything is read, or as soon as more
+// than the limit has arrived, so a huge body is never held in memory.
+export async function readCappedBytes(request, limit) {
   const declared = Number(request.headers.get("content-length"));
   if (Number.isFinite(declared) && declared > limit) return null;
-  if (!request.body) return "";
+  if (!request.body) return new Uint8Array(0);
   const reader = request.body.getReader();
   const parts = [];
   let size = 0;
@@ -324,7 +327,12 @@ async function readCapped(request, limit) {
   const all = new Uint8Array(size);
   let at = 0;
   for (const p of parts) { all.set(p, at); at += p.byteLength; }
-  return new TextDecoder("utf-8", { fatal: true }).decode(all);
+  return all;
+}
+// The same, as text. Returns null when it's too big; throws when it isn't UTF-8.
+async function readCapped(request, limit) {
+  const all = await readCappedBytes(request, limit);
+  return all === null ? null : new TextDecoder("utf-8", { fatal: true }).decode(all);
 }
 
 function refuse(status, body, cors) {

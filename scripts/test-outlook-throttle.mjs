@@ -88,7 +88,7 @@ const fetchImpl = async (url, init = {}) => {
 };
 const call = (path, { method = "GET", body, token } = {}) =>
   handleAuthRoute(new Request("https://w.test" + path, { method,
-    headers: { "content-type": "application/json", "cf-connecting-ip": "1.1.1.1", ...(token ? { authorization: "Bearer " + token } : {}) },
+    headers: { "content-type": "application/json", "cf-connecting-ip": "1.1.1.1", origin: "https://zzmm92nr59-cloud.github.io", ...(token ? { authorization: "Bearer " + token } : {}) },
     body: body ? JSON.stringify(body) : undefined }), env, new URL("https://w.test" + path), {}, { now: clock, fetchImpl });
 const NONCE = "N".repeat(43);
 

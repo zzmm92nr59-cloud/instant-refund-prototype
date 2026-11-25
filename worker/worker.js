@@ -287,31 +287,18 @@ const relayWorker = {
       }
     }
 
-    // Public connectivity metadata only; tokens and unpublished stores stay private.
+    // Public, with no sign-in: counts and yes/no only. No shop's address, no figures for any one shop and no error text;
+    // those are for Relay's team, on the health page (health.js shopifyDetail).
     if (url.pathname === "/relay/shopify/status" && request.method === "GET") {
       const configuredStores = getShopifyStores(env), shown = await shopifyShopsForDisplay(env);
       const stores = [...new Set([...configuredStores.map(s => s.domain), ...shown.map(s => s.domain)])], published = shown;
-      // Latest sync outcome only: counts and a short error code, no shop name, tokens or raw errors.
+      // Latest catalogue sync: when, whether it worked, and totals across every shop.
       let lastSync = null;
       try {
         const row = env.RELAY_DB && await env.RELAY_DB.prepare(
           "SELECT created_at,metadata_json FROM audit_events WHERE event_type='shopify_catalogue_sync' ORDER BY created_at DESC LIMIT 1").first();
-        if (row) { const m = JSON.parse(row.metadata_json); lastSync = {at:row.created_at, success:!!m.success,
-          products:m.products ?? null, variants:m.variants ?? null, images:m.images ?? null, error:m.error || null}; }
-      } catch {}
-      // The catch-up read of each shop's recent paid orders (counts only).
-      let orderCatchUp = [];
-      try {
-        const rows = env.RELAY_DB && ((await env.RELAY_DB.prepare(`SELECT subject_id AS shop, created_at AS at, metadata_json FROM audit_events WHERE event_type='shopify_orders_backfill'
-          AND created_at = (SELECT MAX(created_at) FROM audit_events a2 WHERE a2.event_type='shopify_orders_backfill' AND a2.subject_id = audit_events.subject_id) LIMIT 50`).all()).results || []);
-        orderCatchUp = (rows || []).map(r => ({ shop: r.shop, at: r.at, ...JSON.parse(r.metadata_json) }));
-      } catch {}
-      // Whether Shopify was asked to send change notices, per connected shop (latest attempt only; no tokens or shop data).
-      let webhooks = [];
-      try {
-        const rows = env.RELAY_DB && ((await env.RELAY_DB.prepare(`SELECT subject_id AS shop, created_at AS at, metadata_json FROM audit_events WHERE event_type='shopify_webhooks_registered'
-          AND created_at = (SELECT MAX(created_at) FROM audit_events a2 WHERE a2.event_type='shopify_webhooks_registered' AND a2.subject_id = audit_events.subject_id) LIMIT 50`).all()).results || []);
-        webhooks = (rows || []).map(r => { const m = JSON.parse(r.metadata_json); return { shop: r.shop, at: r.at, created: m.created || 0, alreadyThere: m.alreadyThere || 0, failed: (m.failed || []).slice(0, 4) }; });
+        if (row) { const m = JSON.parse(row.metadata_json); const num = v => Number.isFinite(Number(v)) && v != null ? Number(v) : null;
+          lastSync = {at:row.created_at, success:!!m.success, products:num(m.products), variants:num(m.variants), images:num(m.images)}; }
       } catch {}
       return Response.json({
         success: true, configured: stores.length > 0, connectedStoreCount: stores.length,
@@ -319,8 +306,9 @@ const relayWorker = {
         paidOrderWebhookConfigured: configuredStores.some(s => Boolean(s.webhookSecret)),
         selfConnectedStoreCount: shown.filter(s => s.connected).length, connectWithShopify: Boolean(env.SHOPIFY_CLIENT_ID && env.SHOPIFY_CLIENT_SECRET),
         historicalOrdersConnected: false, publicCatalogueEnabled: published.length > 0,
-        publishedStores: published.map(s => ({name:s.label, domain:s.domain})),
-        lastSync, webhooks, orderCatchUp, ukShopsOnly: true,
+        // The names shoppers already see in Browse; never a shop's myshopify address.
+        publishedStores: published.map(s => ({name:s.label})),
+        lastSync, ukShopsOnly: true,
         note: "Store-by-store authorisation is required. Unpublished catalogues and all customer orders remain private."
       }, {headers:{...corsHeaders,"Cache-Control":"no-store"}});
     }

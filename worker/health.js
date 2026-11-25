@@ -37,6 +37,24 @@ export async function handleHealthRoute(path, method, env, cors, shopper, o) {
   return json(await relayHealth(env, shopper, (o && o.now) || Date.now()), 200, cors);
 }
 
+// For Relay's team only (it used to be on the public /relay/shopify/status): each connected Shopify shop's latest catch-up
+// read of its paid orders (counts, and whether it failed) and whether Shopify was asked to send it change notices. Shops'
+// addresses and figures, so never public; the error itself stays in the logs, here only that there was one.
+export async function shopifyDetail(db) {
+  const latest = async (type) => {
+    try {
+      return (await db.prepare(`SELECT subject_id AS shop, created_at AS at, metadata_json FROM audit_events WHERE event_type = ?
+        AND created_at = (SELECT MAX(created_at) FROM audit_events a2 WHERE a2.event_type = ? AND a2.subject_id = audit_events.subject_id) LIMIT 50`).bind(type, type).all()).results || [];
+    } catch { return []; }
+  };
+  const meta = (r) => { try { const m = JSON.parse(r.metadata_json); return m && typeof m === "object" ? m : {}; } catch { return {}; } };
+  const num = (v) => Number(v) || 0;
+  return {
+    orderCatchUp: (await latest("shopify_orders_backfill")).map((r) => { const m = meta(r); return { shop: r.shop, at: r.at, orders: num(m.orders), emailLinked: num(m.emailLinked), skipped: num(m.skipped), failed: Boolean(m.error) }; }),
+    webhooks: (await latest("shopify_webhooks_registered")).map((r) => { const m = meta(r); return { shop: r.shop, at: r.at, created: num(m.created), alreadyThere: num(m.alreadyThere), failed: Array.isArray(m.failed) ? m.failed.length : 0 }; })
+  };
+}
+
 // Likely reading problems by shop (the "Likely reading problems" part of the page): counts only, never an email's contents,
 // a shopper, an order number or an amount. mine: only the admin's own receipts (named with no minimum, as "Your own
 // receipts"). Each count is one GROUP BY over the receipts, so it stays quick with thousands of receipts per account.
@@ -248,6 +266,7 @@ export async function relayHealth(env, me, now = Date.now()) {
     extras: { gifts: n(gifts.n), giftGivers: n(giftShoppers.n), earlierYearsRead: n(history.n),
       notificationDevices: n(pushes.n), notificationPeople: n(pushes.people), priceWatches: n(watches.n), watchers: n(watches.people) },
     shopsConnected: { shopify: n(shopify.n), shopifyTest: n(shopifyTest.n), square: n(square.n) },
+    shopifyDetail: await shopifyDetail(db),
     security: { wrongCodesToday: n(codeFails.n) },
     mail: { ownAddress: sendsFromOwnAddress(env), returnsShopNotEmailedThisWeek: n(notEmailed.n) },
     helpChat: { on: chatAvailable(env), messagesToday: n(chat.today), messagesThisWeek: n(chat.m), handoffsThisWeek: n(chat.h), peopleThisWeek: n(chat.people) },

@@ -29,6 +29,8 @@ await ctx.route("https://**/*", async route => {
   if (p === "/relay/auth/request") return j({ ok: true });
   if (p === "/relay/auth/verify-code") return j(st.verify || { sessionToken: TOKEN, email: st.email, expiresAt: Date.now() + 864e5 });
   if (p === "/relay/auth/logout") return j({ ok: true });
+  // The server's rule for a session that never passed the second step, once the account has one: ended, sign in again.
+  if (p.startsWith("/relay/my/") && st.ended) { st.endedAnswers = (st.endedAnswers || 0) + 1; return j({ error: "sign_in_again" }, 401); }
   // The server's rule: until the account has a second step, only these answer.
   if (p.startsWith("/relay/my/") && !st.done && !OPEN.test(p)) { st.gated++; return j({ error: "second_step_needed" }, 403); }
   if (p === "/relay/my/second-step") return j({ required: true, done: st.done, checked: st.done, app: st.app, text: false, passkeys: st.passkeys });
@@ -171,6 +173,22 @@ await page.getByRole("button", { name: "Use Face ID or a passkey" }).waitFor();
 assert.equal(await page.evaluate(() => Boolean(JSON.parse(localStorage.getItem("relay.session.v1") || "null"))), false, "not signed in on the email code alone");
 await polished("finish with passkey", ".rl-sheet");
 console.log("ok - a passkey-only account finishes signing in with its passkey");
+
+// A phone signed in before the account had its second step (set up since, on another device): Relay ends that sign-in.
+// The app signs out, shows the sign-in page once, and says why in plain words.
+await page.goto(origin + "/terms.html"); await page.evaluate(() => localStorage.clear()); reset({ done: true, app: true, ended: true });
+await page.evaluate(([t, e]) => localStorage.setItem("relay.session.v1", JSON.stringify({ token: t, email: e, expiresAt: Date.now() + 864e5 })), [TOKEN, st.email]);
+await page.goto(origin + "/index.html");
+await page.getByText("Two-step sign-in is now on for your account, so please sign in again.").waitFor();
+await page.getByRole("heading", { name: "Welcome back" }).waitFor();
+assert.equal(await page.evaluate(() => localStorage.getItem("relay.session.v1")), null, "signed out on this phone");
+assert.equal(await page.locator(".rl-back .rl-sheet").count(), 1, "one sign-in page, however many requests were refused");
+assert.ok(st.endedAnswers >= 1);
+assert.doesNotMatch(await page.locator(".rl-back .rl-sheet").innerText(), /sign_in_again|401/, "no raw error");
+await polished("sign in again", ".rl-sheet");
+await page.waitForTimeout(900);
+await page.screenshot({ path: (process.env.SEC_SHOTS || "/tmp/shots") + "/signin-again-after-two-step.png" });
+console.log("ok - a sign-in from before the second step is ended: the app signs out and asks for a fresh sign-in, saying why");
 
 assert.deepEqual(errors, []);
 await browser.close(); server.close();

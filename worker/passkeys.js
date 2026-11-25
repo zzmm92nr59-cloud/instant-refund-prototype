@@ -8,7 +8,7 @@
 //  * A passkey signs in the shopper it was registered for. No shopper ID is ever taken from the client.
 //  * Attestation is "none": we do not claim to know what kind of authenticator it is.
 import { tellShopper } from "./security-mail.js";
-import { secondSteps, hasSecondStep, markSessionChecked, lastSecondStep } from "./second-step.js";
+import { secondSteps, hasSecondStep, firstSecondStepStatements, lastSecondStep } from "./second-step.js";
 const enc = new TextEncoder();
 const HOUR_MS = 60 * 60 * 1000;
 const CHALLENGE_TTL_MS = 5 * 60 * 1000;
@@ -227,10 +227,10 @@ export async function handlePasskeyShopperRoute(path, method, request, env, cors
       if (taken) return fail();
       const name = String(body.name || "").replace(/[^\p{L}\p{N} .'-]/gu, "").trim().slice(0, 40) || "This device";
       const before = await secondSteps(env, shopper.id);
-      await env.RELAY_DB.prepare("INSERT INTO auth_passkeys (credential_id,shopper_id,public_key,sign_count,name,created_at) VALUES (?,?,?,?,?,?)")
-        .bind(id, shopper.id, b64u(pub), ad.signCount, name, now).run();
-      // The account's first second step, made in this session (with Face ID or the like): the session counts as checked.
-      if (!hasSecondStep(before)) await markSessionChecked(env, shopper.sessionHash);
+      // The account's first second step, made in this session (with Face ID or the like): in the same step, the session
+      // counts as checked and the account's other sessions end (second-step.js).
+      await env.RELAY_DB.batch([env.RELAY_DB.prepare("INSERT INTO auth_passkeys (credential_id,shopper_id,public_key,sign_count,name,created_at) VALUES (?,?,?,?,?,?)")
+        .bind(id, shopper.id, b64u(pub), ad.signCount, name, now), ...(!hasSecondStep(before) ? firstSecondStepStatements(env, shopper) : [])]);
       await tellShopper(env, o, shopper.email, "passkey_added", { name });
       return h.json({ ok: true, name }, 200, cors);
     } catch { return fail(); }
