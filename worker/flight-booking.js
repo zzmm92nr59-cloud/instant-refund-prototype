@@ -258,8 +258,15 @@ function paidBelow(lines, i) {
 }
 // (A travel site's price under the flights, "1 passenger · £189.40": what was paid for them all. Round 24.)
 const PASSENGERS_PAID = /^[\s|]*\d{1,2} (?:passengers?|adults?|travell?ers?)[ \t]*[·•|,-][ \t]*(£|€|\$)\s?(\d{1,3}(?:,\d{3})*\.\d{2})[\s|]*$/i;
+// A total of one part of the booking is not what was paid: "Total taxes and fees £58.30", "Total for seats £24.00",
+// "Total discount £10.00", "Total per passenger £122.99".
+const PART_TOTAL = /\b(?:tax(?:es)?|fees?|charges|surcharges?|discounts?|savings?|saved|seats?|bags?|baggage|luggage|insurance|extras?|add-?ons?|vat|deposit|outstanding|balance|due|points|avios|miles|each|per\s+(?:person|passenger|adult|child|travell?er|guest|ticket))\b/i;
+const SAYS_PAID = /\b(?:paid|charged|grand\s+total)\b/i;
+// The amount paid: the first line that says what was paid or charged ("Total paid", "Amount charged", "Grand total");
+// only when there is none, the first total that isn't a part's.
 function paidOf(text) {
   const lines = String(text || "").split(/\n/);
+  let other = null;
   for (let i = 0; i < lines.length; i++) {
     let line = lines[i];
     const pp = PASSENGERS_PAID.exec(line);
@@ -273,9 +280,14 @@ function paidOf(text) {
     // "189,00" is 189 euros; "1,234.56" is over a thousand.
     if (/^\d+,\d{2}$/.test(n)) n = n.replace(",", ".");
     const pence = Math.round(Number(n.replace(/,/g, "")) * 100);
-    if (Number.isFinite(pence) && pence > 0) return { pence, currency: cur };
+    if (!(Number.isFinite(pence) && pence > 0)) continue;
+    // What the line calls the amount: its words up to the figure.
+    const label = line.slice(0, m.index + m[0].length).replace(/[£€$]?\s?[\d.,]+\s?(?:GBP|EUR|USD)?\s*$/i, "");
+    if (PART_TOTAL.test(label)) continue;
+    if (SAYS_PAID.test(label)) return { pence, currency: cur };
+    if (!other) other = { pence, currency: cur };
   }
-  return null;
+  return other;
 }
 // (Booking.com's flights: "Customer reference" over "40-123456789", the reference its help centre asks for. Round 24.)
 const CUSTOMER_REF = /^[ \t|]*customer reference[ \t|:]*(?:\n[ \t|]*){0,6}(\d{2}-\d{6,12})[ \t|]*$/im;

@@ -255,7 +255,7 @@ async function refundDifference(shop, token, orderGid, amountMinor, label, f) {
   try {
     const d = await gql(shop, token, `query RelayTx($id: ID!) { order(id: $id) { transactions(first: 20) { id kind status gateway amountSet { shopMoney { amount } } } } }`, { id: orderGid }, f);
     const txs = (d.order && d.order.transactions) || [];
-    const parent = txs.find(t => (t.kind === "SALE" || t.kind === "CAPTURE") && t.status === "SUCCESS" && Number(t.amountSet && t.amountSet.shopMoney && t.amountSet.shopMoney.amount) * 100 >= amountMinor);
+    const parent = txs.find(t => (t.kind === "SALE" || t.kind === "CAPTURE") && t.status === "SUCCESS" && Math.round(Number(t.amountSet && t.amountSet.shopMoney && t.amountSet.shopMoney.amount) * 100) >= amountMinor);
     if (!parent) return false;
     const key = "relay-refund-" + crypto.randomUUID();
     const r = await gql(shop, token, `mutation RelayRefund($input: RefundInput!) { refundCreate(input: $input) @idempotent(key: "${key}") { refund { id } userErrors { message } } }`,
@@ -356,7 +356,9 @@ async function doExchange(env, shopper, body, o) {
       : byCard ? "Customer paid the " + moneyText(diff) + " difference by card through Relay (Stripe TEST MODE, no real money; ref " + hold.paymentIntent + ")" +
         (hold.destination ? ", paid into your Stripe account." : ". Relay owes the shop " + moneyText(diff) + ".")
       : diff > 0 ? "The new item costs " + moneyText(diff) + " more. Shopify has asked the customer to pay the " + moneyText(diff) + " balance. Please don't send it until it's paid."
-      : "The new item costs " + moneyText(-diff) + " less. Relay is refunding the customer " + moneyText(-diff) + " from this order.");
+      // Written before the refund is tried (the change has to be saved first), so it says only what is true either way.
+      : "The new item costs " + moneyText(-diff) + " less, so the customer is owed " + moneyText(-diff) + ". Relay tries to refund it from this order straight after this change. If no refund of " +
+        moneyText(-diff) + " shows on this order, Relay couldn't make it: please refund the customer " + moneyText(-diff) + " yourself.");
     // Through Shopify: Shopify's own "order updated" email goes to the customer with a link to pay the balance.
     const commit = await gql(owned.shop, store.token, `mutation RelayEditCommit($id: ID!, $note: String, $notify: Boolean) { orderEditCommit(id: $id, notifyCustomer: $notify, staffNote: $note) {
       order { id currentTotalPriceSet { shopMoney { amount } } lineItems(first: 100) { nodes { id currentQuantity variant { id } } } } userErrors { message } } }`,
@@ -378,7 +380,8 @@ async function doExchange(env, shopper, body, o) {
       : byCard ? (paid ? moneyText(diff) + " was taken from your card (test mode, no real money)." : "We couldn't take the " + moneyText(diff) + " from your card, so Relay will be in touch.")
       : diff > 0 ? "Pay the " + moneyText(diff) + " difference to " + store_ + " to finish. " + (payUrl ? "Use the button below, or the link in " + store_ + "'s email." : store_ + " has emailed you a link to pay it.") + " You can pay however " + store_ + " accepts."
       : refunded ? store_ + " has refunded the " + moneyText(-diff) + " difference to how you paid. It can take a few days to show."
-      : store_ + " will refund the " + moneyText(-diff) + " difference to how you paid.");
+      // Relay couldn't make the refund itself. The shop has been asked, in its own order notes, to refund it: say exactly that.
+      : "Relay couldn't refund the " + moneyText(-diff) + " difference itself, so it has asked " + store_ + " to refund it to how you paid. If it hasn't arrived in a few days, contact " + store_ + ".");
     return [200, { exchanged: true, to: choice.title, priceDiffMinor: diff, paid: byCard ? paid : null, payBy: diff > 0 ? (byCard ? "card" : "shopify") : null,
       payUrl, refunded: diff < 0 ? Boolean(refunded) : null, message }];
   } catch (e) {

@@ -625,7 +625,7 @@ $("rmOff").onclick = async () => {
   } catch { rmSay("bad", "Couldn't reach Relay just now."); }
 };
 // ---- Auctions ----
-const AUC_ERR = { needs_order_permission: "Relay needs your permission to create orders in Shopify first. Open Relay from your Shopify admin and accept it.",
+const AUC_ERR = { shop_not_checked_yet: "Relay is still setting up your shop. Try again in a minute.", needs_order_permission: "Relay needs your permission to create orders in Shopify first. Open Relay from your Shopify admin and accept it.",
   agree_needed: "Tick the box to say you'll send it once it's paid and nobody for you will bid.", bad_condition: "Choose the condition.",
   bad_start: "Enter a starting bid between £1 and £10,000.", bad_delivery: "Enter a delivery price up to £50, or 0 for free.", bad_duration: "Choose how long it runs.",
   not_your_item: "Choose an item from your shop.", title_needed: "Say what it is.", photo_needed: "Add at least one photo.", bad_photo: "That photo couldn't be read. Try a JPEG or PNG.",

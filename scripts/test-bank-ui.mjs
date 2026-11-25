@@ -1,5 +1,5 @@
 // Browser test: Bank and cards (Profile). Stubbed Relay server, made-up bank, shops and payments.
-// Checks: hidden until Relay can offer it to this account; says what it does (read-only, the bank's own page); Connect goes to
+// Checks: hidden until Relay can offer it to this account, and while there are only test banks without the testing tools; says what it does (read-only, the bank's own page); Connect goes to
 // the bank's page; coming back opens the page with what happened; connected banks and card payments, each saying which
 // receipt it matches (or that there's none yet); disconnecting asks first. Passes the polish rules.
 import assert from "node:assert/strict";
@@ -27,6 +27,10 @@ await ctx.route("https://**/*", async route => {
   if (p === "/relay/my/bank") return j(st.available ? { available: true, testBanks: !st.live, ...(st.live ? { choices: st.choices } : {}), connections: st.links } : { available: false, connections: [] });
   if (p === "/relay/my/bank/sync") { st.syncs++; if (st.syncDelay) await new Promise(r => setTimeout(r, st.syncDelay)); return j({ read: 0, gone: 0, matched: 1 }); }
   if (p === "/relay/my/bank/connect") { st.connectBodies = (st.connectBodies || []).concat([route.request().postData() ? JSON.parse(route.request().postData()) : null]); } 
+  // Back from the bank's page: the app hands in the single-use code (worker/bank.js finishBank).
+  if (p === "/relay/my/bank/finish") { const b = JSON.parse(route.request().postData() || "{}"); st.finishes = (st.finishes || []).concat([b]);
+    if (st.finishAnswer === "not_your_link") return j({ error: "not_your_link" }, 403);
+    st.links = st.pending || st.links; return j({ ok: true, id: "00000000-0000-4000-8000-0000000000aa" }); }
   if (p === "/relay/my/bank/connect") return j({ url: "https://auth.truelayer-sandbox.com/?response_type=code&state=" + "s".repeat(43) });
   if (p === "/relay/my/bank/payments") return j({ payments: st.links.length ? [
     { id: "a", account: "Current account", date: day(-4), amountPence: 4500, currency: "GBP", description: "BRINDLE AND CO LONDON", merchant: null, shop: "Brindle and Co", receiptId: ID1, match: "sure" },
@@ -88,6 +92,15 @@ console.log("ok - hidden until Relay can offer it");
 // 2. Offered: says what it does; Connect goes to the bank's own page.
 st.available = true;
 await page.reload(); await openProfile(); // what the app already loaded is reused until it opens again
+// While Relay can only offer test banks (made-up payments), that is for people testing Relay (CLAUDE.md rule 15): a
+// shopper without the testing tools gets no Bank and cards row, and so never reads "Test banks… Mock Bank".
+await page.waitForTimeout(600);
+assert.equal(await view.locator(".rl-arow", { hasText: "Bank and cards" }).isVisible(), false, "test banks only: nothing for a shopper without the testing tools");
+assert.doesNotMatch(await view.innerText(), /Test banks|Mock Bank/);
+console.log("ok - test banks only: hidden without the testing tools");
+// With the testing tools on, it's offered, with the words for testers.
+await page.evaluate(() => localStorage.setItem("relay-testing-tools", "1"));
+await page.reload(); await openProfile();
 await view.locator(".rl-arow", { hasText: "Bank and cards" }).click();
 await view.getByRole("button", { name: "Connect a bank or card" }).waitFor();
 await view.getByText("Test banks only for now.", { exact: false }).waitFor();
@@ -100,19 +113,36 @@ await view.getByRole("button", { name: "Connect a bank or card" }).click();
 await page.waitForURL(/auth\.truelayer-sandbox\.com/);
 assert.match(st.went, /response_type=code/);
 console.log("ok - says what it does; Connect goes to the bank's own page");
+// Testing tools off again for the rest: someone who has a test bank connected still has the row (to see it and to remove
+// it), without the words for testers and without a way to connect another.
+await page.goto(origin + "/index.html"); await page.evaluate(() => localStorage.removeItem("relay-testing-tools"));
 
-// 3. Back from the bank: Profile opens Bank and cards, says it's connected, and shows the card payments and their receipts.
-st.links = [{ id: "00000000-0000-4000-8000-0000000000aa", bank: "Mock Bank", connectedAt: new Date().toISOString(), syncedAt: new Date().toISOString(), needsReconnect: false, payments: 2, matched: 1 }];
-await page.goto(origin + "/index.html#bank=connected");
+// 3. Back from the bank (#bank=finish&bankcode=…): the app hands the code to Relay, signed in, and Relay finishes the
+// connection. A link started on another device is refused, and said plainly. Then Profile opens Bank and cards, says
+// it's connected, and shows the card payments and their receipts.
+const CODE = "c".repeat(43);
+st.finishAnswer = "not_your_link";
+await page.goto(origin + "/index.html#bank=finish&bankcode=" + CODE);
+await view.getByText("That bank link was started on another device. Start again here.").waitFor();
+assert.equal(await page.evaluate(() => location.hash), "", "the code is taken out of the address at once");
+assert.deepEqual(st.finishes, [{ code: CODE }], "the code is handed to Relay once");
+assert.equal(st.links.length, 0);
+st.finishAnswer = null; st.finishes = [];
+st.pending = [{ id: "00000000-0000-4000-8000-0000000000aa", bank: "Mock Bank", label: "Mock Bank", connectedAt: new Date().toISOString(), syncedAt: new Date().toISOString(), needsReconnect: false, payments: 2, matched: 1 }];
+// (A fresh open, as when the bank sends the shopper back.)
+await page.goto(origin + "/index.html"); await page.goto(origin + "/index.html#bank=finish&bankcode=" + CODE);
 await view.getByText("Connected. Relay is matching your payments to your receipts.").waitFor();
+assert.deepEqual(st.finishes, [{ code: CODE }]);
 assert.equal(await page.evaluate(() => location.hash), "", "the address is tidied");
 await view.locator(".rl-bk-row").first().waitFor();
+assert.doesNotMatch(await view.innerText(), /Test banks only|john and doe/, "no words for testers without the testing tools");
+assert.equal(await view.getByRole("button", { name: /Connect a bank or card|Another bank or card/ }).isVisible(), false, "and no way to connect another test bank");
 const rows = await view.locator(".rl-bk-row").allInnerTexts();
 assert.match(rows[0], /Brindle & Co\s+Matches your receipt\s+£45\.00/, "a matched payment carries its receipt's shop name");
 assert.match(rows[1], /Coffee Corner\s+No receipt yet\s+£3\.20/);
 assert.match(await view.locator(".rl-arow", { hasText: "Mock Bank" }).innerText(), /Read just now, 1 receipt matched/);
 await polished("bank page connected", "#mePage");
-console.log("ok - back from the bank: connected, card payments with the receipt each matches");
+console.log("ok - back from the bank: the code finishes it (refused, plainly, when started elsewhere); connected, card payments with the receipt each matches");
 
 // Not mine (a shared card): tap a payment, say it isn't yours (or nothing from that shop is); it says so, and This is mine undoes it.
 st.notMines = st.notMines || [];
@@ -146,14 +176,18 @@ await view.locator(".rl-bk-row").first().waitFor();
 // 3d. Real banks (Connor, 17 Nov 2026): the page shows what Relay already has straight away, not after the banks are
 // read again (seconds); the usual banks TrueLayer offers are a tap each, less ones connected; a tap opens that bank.
 st.live = true; st.choices = ["amex", "santander", "monzo"]; st.syncDelay = 8000;
-const realLink = { id: "00000000-0000-4000-8000-0000000000bb", bank: "Santander Personal", connectedAt: new Date().toISOString(), syncedAt: new Date().toISOString(), needsReconnect: false, payments: 2, matched: 1 };
-st.links = [realLink, ...st.links];
+// Two connections to the same bank are told apart by the cards on each (Relay's label), and one whose last read didn't
+// finish says so plainly instead of an old "Read" time passing for up to date.
+const realLink = { id: "00000000-0000-4000-8000-0000000000bb", bank: "Santander Personal", label: "Santander Personal, Current account ending 1234", connectedAt: new Date().toISOString(), syncedAt: new Date().toISOString(), needsReconnect: false, payments: 2, matched: 1 };
+const realLink2 = { id: "00000000-0000-4000-8000-0000000000cc", bank: "Santander Personal", label: "Santander Personal, Credit card ending 9876", connectedAt: new Date().toISOString(), syncedAt: new Date(Date.now() - 864e5).toISOString(), needsReconnect: false, payments: 0, matched: 0, readProblem: "bank", triedAt: new Date().toISOString() };
+st.links = [realLink, realLink2, ...st.links];
 await page.goto(origin + "/index.html"); await openProfile();
 const opened = Date.now(), syncsBefore = st.syncs;
 await view.locator(".rl-arow", { hasText: "Bank and cards" }).click();
 await view.locator(".rl-bk-row").first().waitFor();
 assert.ok(Date.now() - opened < 4000, "payments show before the banks are read again");
-assert.ok(await view.locator(".rl-arow", { hasText: "Santander Personal" }).isVisible());
+assert.ok(await view.locator(".rl-arow", { hasText: "Santander Personal, Current account ending 1234" }).isVisible());
+assert.match(await view.locator(".rl-arow", { hasText: "Credit card ending 9876" }).innerText(), /Couldn't read just now\. Pull down to try again\./);
 const bankTiles = view.getByRole("group", { name: "Choose your bank or card" }).getByRole("button");
 assert.deepEqual(await bankTiles.evaluateAll(b => b.map(x => x.lastChild.textContent)), ["Amex", "Monzo"], "only banks TrueLayer offers, less the one connected");
 assert.ok(await view.getByRole("button", { name: "Another bank or card" }).isVisible());
@@ -163,7 +197,7 @@ st.syncDelay = 0;
 await bankTiles.filter({ hasText: "Amex" }).dblclick();
 await page.waitForURL(/auth\.truelayer-sandbox\.com/);
 assert.deepEqual(st.connectBodies.at(-1), { bank: "amex" }); assert.equal(st.connectBodies.filter(b => b && b.bank).length, 1, "once for a double tap");
-st.live = false; st.links = st.links.filter(l => l !== realLink);
+st.live = false; st.links = st.links.filter(l => l !== realLink && l !== realLink2);
 await page.goto(origin + "/index.html"); await openProfile();
 await view.locator(".rl-arow", { hasText: "Bank and cards" }).click();
 await view.locator(".rl-bk-row").first().waitFor();

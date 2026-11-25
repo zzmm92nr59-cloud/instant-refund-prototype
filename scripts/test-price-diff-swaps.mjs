@@ -3,6 +3,7 @@
 import { DatabaseSync } from "node:sqlite";
 import { readFileSync, readdirSync } from "node:fs";
 import assert from "node:assert/strict";
+import { ensureShopPlanTable } from "../worker/shopify.js";
 import { handleExchangeRoute } from "../worker/exchange.js";
 import { handleCardRoute, paymentsEnabled } from "../worker/payments.js";
 import { emailHash } from "../worker/auth.js";
@@ -46,6 +47,10 @@ const order = (ext, qty = 1) => {
     .run(id + ":item:9" + ext, id, "9" + ext, "1", "11", "Logo Cap", qty, 2000, "GBP");
   return id;
 };
+// Paying a swap's difference by card through Relay moves only Stripe's test money, so it exists only at Relay's own test
+// shops (Shopify development stores). This shop is one. (Review E-2; the real-shop case is at the end.)
+await ensureShopPlanTable(db);
+sqlite.prepare("INSERT INTO shopify_shop_plan (domain, test_shop, plan, checked_at) VALUES (?, 1, 'partner_test', 0)").run(SHOP);
 const oDear = order(600), oFail = order(601), oDecline = order(602), oCheap = order(603), oTwo = order(604, 2), oCheap2 = order(605);
 
 // Stand-ins for Stripe and Shopify.
@@ -184,7 +189,14 @@ assert.equal(sqlite.prepare("SELECT detail FROM relay_exchanges WHERE order_id =
 refundAllowed = false; shopifyCalls = [];
 r = await swapCall(env, "/relay/my/exchange", { orderId: oCheap2, lineId: "9605", variantKey: V(15), agreedDiffMinor: -500 });
 assert.equal(r.status, 200, JSON.stringify(r.body)); assert.equal(r.body.refunded, false);
-assert.match(r.body.message, /Kick Lane will refund the £5\.00 difference to how you paid/);
+// (Review E-1: this used to say "Kick Lane will refund", while the shop's own note said "Relay is refunding": each was
+// told the other would do it. Now the shopper is told what really happened, and the shop's note asks it to refund.)
+assert.match(r.body.message, /Relay couldn't refund the £5\.00 difference itself, so it has asked Kick Lane to refund it to how you paid\. If it hasn't arrived in a few days, contact Kick Lane\./);
+{
+  const shopNote = shopifyCalls.find(s => /orderEditCommit/.test(s.query)).variables.note;
+  assert.doesNotMatch(shopNote, /Relay is refunding/, "the shop is never told a refund is being made before it has been");
+  assert.match(shopNote, /the customer is owed £5\.00\..+If no refund of £5\.00 shows on this order, Relay couldn't make it: please refund the customer £5\.00 yourself\./, "and is asked to refund if Relay's doesn't show");
+}
 assert.equal(sqlite.prepare("SELECT detail FROM relay_exchanges WHERE order_id = ? AND status = 'done'").get(oCheap2).detail, "shop to refund 500");
 refundAllowed = true;
 
@@ -192,6 +204,23 @@ refundAllowed = true;
 x = await opts(env, oTwo);
 assert.deepEqual(x.options.filter(v => v.priceDiffMinor !== 0).map(v => [v.title, v.available, v.reason]),
   [["Kids", false, "Different price (only for a single item)"], ["Large", false, "Different price (only for a single item)"]]);
+
+// 8b. A real shop (and one Relay hasn't checked yet) never gets card mode, even with "card" saved and a ready Stripe
+// account: a dearer swap goes through the shop's own Shopify checkout, no test money moves, and the real order isn't discounted.
+for (const plan of [0, null]) {
+  if (plan === null) sqlite.prepare("DELETE FROM shopify_shop_plan WHERE domain = ?").run(SHOP);
+  else sqlite.prepare("UPDATE shopify_shop_plan SET test_shop = 0, plan = 'basic' WHERE domain = ?").run(SHOP);
+  const real = order(plan === null ? 611 : 610);
+  x = await opts(env, real);
+  assert.equal(x.options.find(v => v.title === "Large").payBy, "shopify", "a real shop's dearer swap is paid at the shop");
+  stripeCalls = []; shopifyCalls = [];
+  r = await swapCall(env, "/relay/my/exchange", { orderId: real, lineId: String(real).endsWith("611") ? "9611" : "9610", variantKey: V(14), agreedDiffMinor: 500 });
+  assert.equal(r.status, 200, JSON.stringify(r.body)); assert.equal(r.body.payBy, "shopify");
+  assert.equal(stripeCalls.length, 0, "no test money moves for a real shop");
+  assert.equal(shopifyCalls.filter(s => /orderEditAddLineItemDiscount/.test(s.query)).length, 0, "and its real order isn't discounted");
+  assert.doesNotMatch(r.body.message, /test mode/i);
+}
+sqlite.prepare("INSERT INTO shopify_shop_plan (domain, test_shop, plan, checked_at) VALUES (?, 1, 'partner_test', 0)").run(SHOP);
 
 // 9. Removing the card detaches it at Stripe and forgets it here.
 stripeCalls = [];

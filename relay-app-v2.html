@@ -284,7 +284,7 @@ html.on-me .topline .avatar{display:none}#view:has(#mePage>.rl-abar)>.rl-navback
 .dc-bagnote{font-size:15px;line-height:21px;margin:10px 0 0;color:var(--rl-text)}.dc-bagnote:empty{display:none}.dc-bagnote.err{color:var(--rl-danger)}
 .dc-bagnote.ok{display:flex;align-items:center;justify-content:space-between;gap:4px 10px;flex-wrap:wrap}
 .dc-seebag{all:unset;box-sizing:border-box;min-height:44px;padding:0 4px;display:inline-flex;align-items:center;color:var(--rl-accent);font-weight:600;cursor:pointer;-webkit-tap-highlight-color:transparent}.dc-seebag:active{opacity:.6}
-</style></head><body><div class="app"><aside class="sidebar"><div class="logo">relay<span>✦</span></div><nav class="side-nav" id="side" aria-label="Relay"></nav><div class="sidebar-note"><strong>Everything you buy, in one place.</strong><p>Receipts, returns and price drops, sorted for you.</p></div><p class="small muted" id="testingLink" style="margin:25px 12px;display:none"><a href="./testing.html" style="display:inline-flex;align-items:center;min-height:44px">Testing tools</a></p></aside><main class="main"><div class="topline"><div><div class="eyebrow">YOUR RELAY SPACE</div><div class="small muted" id="greeting">Everything you buy. One place.</div></div><div class="split"><button id="modeToggle" class="toggle hidden" onclick="toggleDemo()" aria-hidden="true"></button><div class="avatar">R</div></div></div><div id="view"><div class="rl-boot" aria-hidden="true"><div class="skel" style="height:48px;border-radius:24px;margin:6px 0 18px"></div><div class="skel" style="height:296px;border-radius:28px;margin:0 0 14px"></div><div class="skel" style="height:296px;border-radius:28px"></div></div></div></main></div><nav class="footnav" id="foot" aria-label="Relay"></nav><div class="nextup" id="nextUp" hidden></div><script src="./relay-exchange-engine.js?v=20261014-simulate"></script><script src="./worker/item-kind-core.js?v=20261119-kinds5" defer></script><script src="./relay-recommendation-engine.js?v=20261119-kinds5" defer></script><script src="./relay-wallet-ledger.js?v=20261018-exchange-wallet"></script><script>(function(){try{
+</style></head><body><div class="app"><aside class="sidebar"><div class="logo">relay<span>✦</span></div><nav class="side-nav" id="side" aria-label="Relay"></nav><div class="sidebar-note"><strong>Everything you buy, in one place.</strong><p>Receipts, returns and price drops, sorted for you.</p></div><p class="small muted" id="testingLink" style="margin:25px 12px;display:none"><a href="./testing.html" style="display:inline-flex;align-items:center;min-height:44px">Testing tools</a></p></aside><main class="main"><div class="topline"><div><div class="eyebrow">YOUR RELAY SPACE</div><div class="small muted" id="greeting">Everything you buy. One place.</div></div><div class="split"><button id="modeToggle" class="toggle hidden" onclick="toggleDemo()" aria-hidden="true"></button><div class="avatar">R</div></div></div><div id="view"><div class="rl-boot" aria-hidden="true"><div class="skel" style="height:48px;border-radius:24px;margin:6px 0 18px"></div><div class="skel" style="height:296px;border-radius:28px;margin:0 0 14px"></div><div class="skel" style="height:296px;border-radius:28px"></div></div></div></main></div><nav class="footnav" id="foot" aria-label="Relay"></nav><div class="nextup" id="nextUp" hidden></div><script src="./relay-exchange-engine.js?v=20261014-simulate" defer></script><script src="./worker/item-kind-core.js?v=20261119-kinds5" defer></script><script src="./relay-recommendation-engine.js?v=20261119-kinds5" defer></script><script src="./relay-wallet-ledger.js?v=20261018-exchange-wallet" defer></script><script>(function(){try{var startupFailed=function(e){console.error("Relay startup error",e);const root=document.getElementById("view");if(root)root.innerHTML="<div class=\"card\"><h2>Something went wrong</h2><p class=\"sub\">Please reload Relay. If it keeps happening, try again in a few minutes.</p><button class=\"darkbtn\" onclick=\"location.reload()\">Reload</button></div>"};
 
 const testing=new URLSearchParams(location.search).get("testing")==="1";
 // The shops' websites preview used to come only with the testing tools; it now has its own switch (Relay's team, Profile
@@ -447,7 +447,9 @@ function openAuctions(id){const A=window.RelayAccount;if(!A)return;if(id&&A.open
 function marketRow(){const signed=window.RelayAccount&&RelayAccount.signedIn&&RelayAccount.signedIn();if(!signed)return"";return '<button class="card profile-row" onclick="openMarket()"><span class="row-ic">'+ic("swap")+'</span><span class="grow"><b>Swap &amp; resell</b><span class="small muted">What other members are selling or swapping</span></span>'+ic("chev")+'</button>'}
 function openMarket(){if(window.RelayAccount&&RelayAccount.openMarket)RelayAccount.openMarket()}
 function navIcon(key){return '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">'+(NAV_ICON[key]||"")+'</svg>'}
-let personalise=false,personaliseAsked=false;
+// Today's date in the UK (account.js works it out in Europe/London; the date in UTC is a day behind for an hour a night in summer).
+const ukToday=()=>{try{if(window.relayUkToday)return window.relayUkToday()}catch(e){}return new Date().toISOString().slice(0,10)};
+let personalise=false,personaliseAsked=false,picksMemo=null;
 try{personalise=localStorage.getItem("relay-discover-personalise-v1")==="true";personaliseAsked=localStorage.getItem("relay-discover-personalise-v1")!==null}catch{}
 function togglePersonalise(){
  personalise=!personalise;personaliseAsked=true;
@@ -456,7 +458,8 @@ function togglePersonalise(){
 }
 function personalisationHistory(){return getPurchases().filter(p=>p.demo===true||p.verified===true).concat(receiptBuys)}
 // What Relay has noticed about taste: items from the shopper's own receipts and products they opened or watched. Stored on this device only.
-window.relayNeedCatalog=()=>{if(!catalogReady)needCatalog();return catalogReady};
+// (True once the shops have answered: only then is something missing from the catalogue really gone.)
+window.relayNeedCatalog=()=>{if(!catalogFresh)needCatalog();return catalogFresh};
 // Watched things for Home's Watching list. Looked up by sku in one pass (a catalogue of thousands of products, every time
 // Home is drawn, used to be searched once per watched thing), and what was found (photo, shop, its web address, today's
 // price) is kept with the watch, written once, so the list shows at once next time, before the catalogue has come (rule 5).
@@ -467,7 +470,8 @@ window.relayLocalWatches=()=>{let changed=false;const keep=(w,k,v)=>{if(w[k]!==v
   if(p){const img=/^https:\/\//.test(String(p.imageUrl||""))?p.imageUrl:"";if(img)keep(w,"image",img);keep(w,"store",storeOf(p));keep(w,"dom",String(p.shopDomain||"").toLowerCase().replace(/^www\./,""));
    keep(w,"now",Number.isInteger(Number(p.priceMinor))?Number(p.priceMinor):null);keep(w,"cur",p.currency||"GBP");keep(w,"real",web||!!(!p.testShop&&!p.fixture))}
   // Until the catalogue is in: the copy kept with the watch. Once it's in, a shop's product it no longer has is left off.
-  const kept=!catalogReady&&!p;
+  // (Also when the shops couldn't be asked, or only the copy kept on this phone is in: a watch never vanishes because a load failed.)
+  const kept=!catalogFresh&&!p;
   return{sku,real:web||!!(p?!p.testShop&&!p.fixture&&!demo:kept&&w.real===true&&!demo),product:w.name,variation:w.variant,priceMinor:w.baseline,store:p?storeOf(p):(w.store||""),dom:w.dom||"",
    image:p&&/^https:\/\//.test(String(p.imageUrl||""))?p.imageUrl:(w.image||""),nowMinor:p?(Number.isInteger(Number(p.priceMinor))?Number(p.priceMinor):null):kept&&Number.isInteger(w.now)?w.now:null,currency:p?(p.currency||"GBP"):(w.cur||"GBP"),kept}});
  if(changed)try{localStorage.setItem("relay-radar-v2",JSON.stringify(watch))}catch{}
@@ -517,7 +521,7 @@ function notForMe(sku){const p=catalog.find(x=>x.sku===sku);if(!p||typeof RelayR
  lastNotFor=entry;renderCatalog();scrollBack(dcListY)}
 function undoNotFor(){if(!lastNotFor)return;const key=lastNotFor.key;try{localStorage.setItem(NOTFOR_KEY,JSON.stringify(getNotFor().filter(x=>x.key!==key)))}catch{}lastNotFor=null;renderCatalog()}
 // A pick counts as seen once a day; four days without being opened and it drops back.
-function markSeen(keys){const today=new Date().toISOString().slice(0,10),seen=getSeen();let changed=false;
+function markSeen(keys){const today=ukToday(),seen=getSeen();let changed=false;
  for(const k of keys){const x=seen[k]||{n:0,day:""};if(x.day!==today){seen[k]={n:x.n+1,day:today};changed=true}}
  if(changed)try{const e=Object.entries(seen).slice(-200);localStorage.setItem(SEEN_KEY,JSON.stringify(Object.fromEntries(e)))}catch{}}
 function hasLearned(){return getTaps().length>0||getNotFor().length>0||Object.keys(getSeen()).length>0}
@@ -640,7 +644,7 @@ function getPurchases(){return demo?RelayWalletLedger.project({purchases:[...rea
 // Watches are kept with the account too, so a phone that cleared Relay's storage (or a new phone) gets them back.
 let watchesRestored=false;
 function restoreWatches(){if(watchesRestored||demo||!window.RelayAccount||!RelayAccount.signedIn||!RelayAccount.signedIn()||!RelayAccount.alertStatus)return;watchesRestored=true;
- RelayAccount.alertStatus().then(st=>{let added=0;((st&&st.watches)||[]).forEach(w=>{if(w&&w.sku&&!watch[w.sku]){watch[w.sku]={name:String(w.product||"Watched item"),variant:String(w.variant||""),baseline:Number(w.lastSeenMinor)||0,created:new Date().toISOString()};added++}});
+ RelayAccount.alertStatus().then(st=>{let added=0;((st&&st.watches)||[]).forEach(w=>{if(w&&w.sku&&!watch[w.sku]){watch[w.sku]={name:String(w.product||"Watched item"),variant:String(w.variant||""),baseline:Number(w.baselineMinor)||Number(w.lastSeenMinor)||0,created:/^\d{4}-\d{2}-\d{2}/.test(String(w.createdAt||""))?String(w.createdAt):new Date().toISOString(),...(Number(w.baselineMinor)>0?{}:{from:"latest"})};added++}});
   if(added){try{localStorage.setItem("relay-radar-v2",JSON.stringify(watch))}catch(e){}if(page==="radar")showRadar();else if(page==="profile"||page==="discover")render()}}).catch(()=>{});}
 function render(){if(page==="wallet"&&!demo&&!testing)page="profile";if(page==="discover"||page==="radar"||page==="wallet")needCatalog();navRender();if(typeof setTimeout==="function")setTimeout(restoreWatches,0);{const tl=$("testingLink");if(tl)tl.style.display=testTools()?"":"none"}$("view").innerHTML=retailer?merchantView():page==="wallet"?wallet():page==="receipts"?receiptsView():page==="market"?marketView():page==="detail"?detailView():page==="refund"?refundView():page==="return"?returnView():page==="exchange"?exchangeView():page==="discover"?discoverView():page==="radar"?radarView():page==="wrapped"?wrappedView():page==="me"?meView():page==="ask"?askView():page==="bank"?bankView():page==="returns"?returnsView():page==="bag"?bagView():profileView();if(page==="wallet"&&!retailer){bindPurchaseCards();if(demo)loadReceiptPurchases();else if(window.RelayAccount&&RelayAccount.mountWallet)RelayAccount.mountWallet($("walletPage"))}if(document.documentElement&&document.documentElement.classList){document.documentElement.classList.toggle("h2-snap",!!$("homePage")||(page==="profile"&&!demo&&!retailer&&(()=>{try{return !!localStorage.getItem("relay.session.v1")}catch(e){return false}})()));document.documentElement.classList.toggle("on-me",page==="me"&&!demo&&!retailer);document.documentElement.classList.toggle("on-ask",page==="ask"&&!demo&&!retailer)}if(page==="ask"&&!retailer&&window.RelayAccount&&RelayAccount.mountAsk)RelayAccount.mountAsk($("askPage"));if(page==="returns"&&window.RelayAccount&&RelayAccount.mountReturns)RelayAccount.mountReturns($("returnsPage"));if(page==="bag"&&window.RelayAccount&&RelayAccount.mountBag)RelayAccount.mountBag($("bagPage"));if(page==="receipts"&&!retailer&&window.RelayAccount){RelayAccount.mountReceipts($("receiptsPage"),window.__relayReceiptsNote);window.__relayReceiptsNote=null}if(page==="market"&&!retailer&&window.RelayAccount){if(demo&&RelayAccount.mountDemoMarket)RelayAccount.mountDemoMarket($("marketPage"));else RelayAccount.mountMarket($("marketPage"))}if(page==="discover"){if(dcSigned()&&window.RelayAccount&&RelayAccount.bagLoad)RelayAccount.bagLoad();renderCatalog();dcMountAlt();browseGridDraw();loadReceiptTaste();loadAiKinds();loadAlertState()}if(page==="radar"){showRadar();if(window.RelayAccount&&RelayAccount.mountAlerts)RelayAccount.mountAlerts($("alertsCard"))}if(retailer)bindRetailerControls();if(page==="profile"&&!retailer){bindProfileControls();loadShopifyStatus();if(window.RelayAccount&&RelayAccount.onProfile&&$("homeHello")){const hh=$("homeHello");RelayAccount.onProfile(()=>{if(!document.body.contains(hh))return false;hh.textContent=homeHello()})}if(!demo&&window.RelayAccount&&RelayAccount.mountHome&&$("homePage"))RelayAccount.mountHome($("homePage"))}if(page==="wrapped"&&!retailer){if(window.RelayAccount)RelayAccount.mountWrapped($("wrappedPage"));else if(typeof setTimeout==="function")setTimeout(()=>{if(page==="wrapped"&&!retailer)render()},120)}if(page==="me"&&!retailer){if(window.RelayAccount&&RelayAccount.mountMe)RelayAccount.mountMe($("mePage"));else if(typeof setTimeout==="function")setTimeout(()=>{if(page==="me"&&!retailer)render()},120)}if(!retailer&&!demo&&window.RelayAccount&&RelayAccount.mountNextUp)RelayAccount.mountNextUp($("nextUp"));else{const nu=$("nextUp");if(nu)nu.hidden=true}}
 // While something is being typed, the floating bars step aside so the keyboard and the field have the room.
@@ -691,7 +695,7 @@ function loadReceiptPurchases(){
    const legal=x.returnBy&&x.returnable!==false?x.returnBy.date:"";
    const dl=(x.returnPlan&&x.returnPlan.deadline)||(x.returns&&x.returns.deadline)||legal;
    const fmt=d=>new Date(d+"T00:00:00Z").toLocaleDateString("en-GB",{day:"numeric",month:"short",timeZone:"UTC"});
-   const dv=x.delivery,today=new Date().toISOString().slice(0,10);
+   const dv=x.delivery,today=ukToday();
    const parcel=!dv?"":dv.status==="delivered"?"Delivered "+(dv.at===today?"today":dv.at?fmt(dv.at):""):dv.status==="out_for_delivery"?"Out for delivery":dv.status==="collect"?"Ready to collect":dv.status==="missed"?"Delivery attempted":dv.status==="problem"?"Delivery problem":dv.status==="due"?"Due "+(dv.at&&dv.at!==today?fmt(dv.at):"today"):"On its way";
    const note=parcel?parcel.trim()+(dv.carrier?" · "+dv.carrier:""):x.returnable===false?"Usually can't be returned":x.status==="confirmed"?"Checked by you":"Please check details";
    return mk("div",{className:"card product purchase-tile",role:"button",tabIndex:0,onclick:()=>go("receipts")},[mk("div",{className:"details"},[
@@ -770,7 +774,7 @@ function sameDesign(p){return sameFamily(p)&&withoutSize(p.variation)===withoutS
 function sameSize(p){const a=sizeOf(p.variation),b=sizeOf(selected.detail);return !!a&&!!b&&a===b}
 function selectStore(value){storeFilter=value;renderCatalog()}
 // Your shops (account.js): which shops are on Relay (their names and addresses; test shops marked), and opening one in Shops on Relay.
-function relayShopsOnRelay(){if(!catalogReady)return null;const seen=new Map();for(const p of catalog){if(p.fixture||p.provider==='relay_demo'||p.provider==='web')continue;const n=storeOf(p),k=storeKey(n);if(!seen.has(k))seen.set(k,{name:n,domain:String(p.shopDomain||'').toLowerCase().replace(/^www\./,''),test:!!p.testShop})}return [...seen.values()]}
+function relayShopsOnRelay(){if(!catalogReady||(catalogFailed&&!catalogFresh&&!catalogKeptShown))return null;const seen=new Map();for(const p of catalog){if(p.fixture||p.provider==='relay_demo'||p.provider==='web')continue;const n=storeOf(p),k=storeKey(n);if(!seen.has(k))seen.set(k,{name:n,domain:String(p.shopDomain||'').toLowerCase().replace(/^www\./,''),test:!!p.testShop})}return [...seen.values()]}
 // Relay's team (testing tools, or the team's Shops' websites switch): Browse shows real shops from their own websites.
 function teamShops(){return testTools()||webPreview()}
 // A shop's products from its own website, for its sheet in Your shops (team only): matched on its web address or name.
@@ -862,7 +866,7 @@ function browseGridDraw(){const box=$("browseGrid");if(!box)return;
  const all=dcGroups(shownProducts()).filter(g=>/^https:\/\//.test(g.imageUrl)),by=new Map();
  for(const g of all){const k=DC_KINDS[g.kind]?g.kind:"other";if(!by.has(k))by.set(k,[]);by.get(k).push(g)}
  const kinds=[...by.keys()].filter(k=>by.get(k).length>=2).sort((a,b)=>(a==="other")-(b==="other")||by.get(b).length-by.get(a).length).slice(0,BG_KINDS);
- if(!kinds.length){box.innerHTML="";return}
+ if(!kinds.length){box.innerHTML=catalogFailed&&!catalogFresh&&!all.length?CATALOG_FAILED_HTML:"";return}
  box.innerHTML=kinds.map(k=>'<section class="bg-sec"><button type="button" class="bg-h" data-bg-kind="'+k+'" aria-label="See all '+safe(DC_KINDS[k])+'"><h2>'+safe(DC_KINDS[k])+'</h2>'+ic("chev")+'</button><div class="bg-grid">'
   +dcMix(by.get(k)).slice(0,BG_EACH).map(g=>'<button type="button" class="bg-card" data-bg-sku="'+safe(g.lead.sku)+'" data-bg-name="'+safe(g.product)+'" aria-label="'+safe(g.product+", "+dcPrice(g)+", "+g.store)+'"><span class="bg-pic"><img alt="" loading="lazy" referrerpolicy="no-referrer" src="'+safe(g.imageUrl)+'" onerror="this.closest(\'.bg-card\').remove()"></span><span class="bg-shop"><span class="bg-logo" data-name="'+safe(g.store)+'" data-dom="'+safe(String(g.lead.shopDomain||""))+'" data-cat="'+safe(g.lead.shopCategory||"other")+'"></span><span class="bg-sn">'+safe(g.store)+'</span></span><span class="bg-name">'+safe(g.product)+'</span><b class="bg-price">'+dcPrice(g)+'</b></button>').join("")+'</div></section>').join("");
  box.querySelectorAll(".bg-logo").forEach(x=>{try{if(window.RelayAccount&&RelayAccount.shopBadge)x.appendChild(RelayAccount.shopBadge(x.dataset.name,x.dataset.dom,x.dataset.cat,24))}catch(e){}});
@@ -872,7 +876,16 @@ if(typeof addEventListener==="function")addEventListener("relay-catalogue",()=>{
 // Picks come from the things the shopper bought, not from where the money went (Connor, 15 Nov 2026): a TV is one purchase,
 // not a love of electronics. relay-recommendation-engine.js reads each bought item: more of a kind people buy again (leggings),
 // one companion for something that has one (a cup for coffee), nothing for one-offs or anything it can't place.
+// Worked out once for the same products and the same taste, not again for the row, the ordering and each product page
+// (each time took a few hundredths of a second on a computer, several times that on a phone): remembered until the
+// catalogue, what was bought, the AI's kinds, or anything learned on this phone (taps, Not for me, seen, watches) changes.
 function dcPicks(groups){if(!personalise||typeof RelayRecommendationEngine==="undefined"||!RelayRecommendationEngine.picks)return[];
+ let sig=null;if(!demo){try{sig=[localStorage.getItem(TAPS_KEY),localStorage.getItem(NOTFOR_KEY),localStorage.getItem(SEEN_KEY)].join("\u0001")+"\u0001"+Object.values(watch).map(w=>w&&w.name||"").join("\u0002")+"\u0001"+real.length+"\u0001"+groups.map(g=>g.key).join("\u0002")}catch(e){sig=null}}
+ if(sig!==null){if(!picksMemo||picksMemo.cat!==catalog||picksMemo.buys!==receiptBuys||picksMemo.ai!==aiKinds||picksMemo.real!==real)picksMemo={cat:catalog,buys:receiptBuys,ai:aiKinds,real,by:new Map()};const hit=picksMemo.by.get(sig);if(hit)return hit.slice()}
+ const out=dcPicksNow(groups);
+ if(sig!==null){if(picksMemo.by.size>=6)picksMemo.by.clear();picksMemo.by.set(sig,out)}
+ return out.slice()}
+function dcPicksNow(groups){
  const hist=personalisationHistory(),pr=RelayRecommendationEngine.profile(hist,getTaps());
  const sizes=[pr.sizes&&pr.sizes.clothing&&pr.sizes.clothing.value,pr.sizes&&pr.sizes.footwear&&pr.sizes.footwear.value].filter(Boolean);
  const seen=Object.fromEntries(Object.entries(getSeen()).map(([k,v])=>[k,Number(v&&v.n)||0]));
@@ -892,8 +905,8 @@ function shopperDiscoverView(){const signed=dcSigned();if(!signed)dcMode="shops"
  const back=signed?'<button type="button" class="rl-navback" data-back onclick="dcBack()">'+ic("back")+'<span>'+(dcFrom&&dcFrom!=="discover"?tabName(dcFrom):'Browse')+'</span></button>':'';
  if(dcMode!=="shops")return '<div id="dcRoot">'+back+'<h1 class="title">'+(dcMode==="market"?'Swap &amp; resell':'Auctions')+'</h1><div id="dcAlt"></div></div>';
  const head='<div id="dcRoot">'+bagButton()+back+'<h1 class="title">'+(signed?'Shops on Relay':'Browse')+'</h1>';
- return head+'<div class="dc-bar"><div class="dc-search" onclick="if(event.target===this)$(\'query\').focus()"><span class="dc-sic" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/></svg></span><input id="query" type="search" placeholder="Search" aria-label="Search products" oninput="renderCatalog()"><button type="button" class="dc-cam" id="dcCam" aria-label="Search by photo" onclick="photoSearch()"'+(photoShown()?'':' hidden')+'>'+ic("camera")+'</button></div><button type="button" class="dc-filt" id="dcFilt" aria-label="Sort and filter" aria-expanded="'+(dcFiltersOpen?'true':'false')+'" onclick="dcToggleFilters()">'+ic("filter")+'</button></div>'
- +'<div id="dcFilters"'+(dcFiltersOpen?'':' hidden')+'><label class="dc-sortrow"><span>Sort</span><select id="filter" aria-label="Sort" onchange="renderCatalog()"><option value="all">'+(personalise?'For you':'Newest')+'</option><option value="low">Lowest price</option><option value="high">Highest price</option></select></label>'
+ return head+'<div class="dc-bar"><div class="dc-search" onclick="if(event.target===this)$(\'query\').focus()"><span class="dc-sic" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/></svg></span><input id="query" type="search" placeholder="Search" aria-label="Search products" oninput="renderCatalogSoon()"><button type="button" class="dc-cam" id="dcCam" aria-label="Search by photo" onclick="photoSearch()"'+(photoShown()?'':' hidden')+'>'+ic("camera")+'</button></div><button type="button" class="dc-filt" id="dcFilt" aria-label="Sort and filter" aria-expanded="'+(dcFiltersOpen?'true':'false')+'" onclick="dcToggleFilters()">'+ic("filter")+'</button></div>'
+ +'<div id="dcFilters"'+(dcFiltersOpen?'':' hidden')+'><label class="dc-sortrow"><span>Sort</span><select id="filter" aria-label="Sort" onchange="renderCatalog()"><option value="all">'+(personalise?'For you':'A mix of shops')+'</option><option value="low">Lowest price</option><option value="high">Highest price</option></select></label>'
  +(teamShops()?'':'<div class="dc-chips" id="dcShops" role="group" aria-label="Shops"></div>')+'<div class="dc-chips" id="dcKinds" role="group" aria-label="Kinds of product"></div>'
  +(dcSigned()&&personaliseAsked?'<div class="dc-chips">'+dcChip("Picks for you",personalise,'onclick="togglePersonalise()"')+'</div>':'')+'</div>'
  // Relay's team sees the shops as a row of logos above the products, not behind Sort and filter.
@@ -919,6 +932,8 @@ window.relayInterestsChanged=()=>{if(page==="discover"&&dcMode==="shops"&&$("cat
 // No shops to show yet: one next step, never an empty screen. Without an inbox connected, connecting it (the same flow
 // Home's "Connect your email" opens, on Receipts); with one, the receipts Relay found. What this phone last knew shows
 // at once; Relay's answer (reused when just loaded) replaces it if it differs.
+// Typing in the search draws the list once the typing pauses, not on every letter.
+let catalogSoon=0;function renderCatalogSoon(){clearTimeout(catalogSoon);catalogSoon=setTimeout(renderCatalog,150)}
 function dcNextStep(){const A=window.RelayAccount;if(!$("dcNext")||!A||!A.mailConnected)return;
  const draw=on=>{const box=$("dcNext");if(!box||box.dataset.on===String(on))return;box.dataset.on=String(on);
   box.innerHTML='<button type="button" class="dc-nextbtn" onclick="go(\'receipts\')">'+ic(on?"receipt":"mail")+'<span>'+(on?'See your receipts':'Connect your email')+'</span></button>'};
@@ -960,8 +975,11 @@ function renderShopperCatalog(root){
  {const fb=$("dcFilt");if(fb&&fb.classList)fb.classList.toggle("on",storeFilter!=="all"||discoverKind!=="all"||sort!=="all")}
  const prev=$("dcPreview"),webShops=new Set(all.filter(g=>g.lead.provider==="web").map(g=>g.store));
  if(prev)prev.innerHTML=(testTools()||webPreview())&&webShops.size?'<div class="dc-preview">Products from '+webShops.size+' shops\' own websites, as Relay last read them. Only Relay\'s team and its testers see these.</div>':"";
- root.innerHTML=groups.length?groups.slice(0,60).map(g=>dcCard(g)).join(""):'<div class="dc-empty"><h3>'+(filtered?'Nothing matches that':'New products are on their way')+'</h3><p>'+(filtered?'Try another word, shop or kind.':'When shops join Relay, their newest products show up here.')+'</p>'+(!filtered&&dcSigned()?'<div class="dc-next" id="dcNext"></div>':'')+'</div>';
- if(!groups.length&&!filtered)dcNextStep();
+ // Nothing to show yet: greyed outlines while the shops are asked (never "no products" before they've answered), and if
+ // they couldn't be asked, that, with Try again. "New products are on their way" only once the shops said there are none.
+ const waiting=!groups.length&&!filtered&&(!catalogReady||(catalogBusy&&!catalogFresh)),failed=!groups.length&&!filtered&&!waiting&&catalogFailed&&!catalogFresh;
+ root.innerHTML=groups.length?groups.slice(0,60).map(g=>dcCard(g)).join(""):waiting?'<div class="skel" style="min-height:240px;border-radius:22px;margin:0"></div>'.repeat(4):failed?CATALOG_FAILED_HTML:'<div class="dc-empty"><h3>'+(filtered?'Nothing matches that':'New products are on their way')+'</h3><p>'+(filtered?'Try another word, shop or kind.':'When shops join Relay, their newest products show up here.')+'</p>'+(!filtered&&dcSigned()?'<div class="dc-next" id="dcNext"></div>':'')+'</div>';
+ if(!groups.length&&!filtered&&!waiting&&!failed)dcNextStep();
  const wire=box=>{if(!box)return;
   box.querySelectorAll("[data-watch]").forEach(b=>b.onclick=e=>{e.stopPropagation();toggleWatch(b.dataset.watch)});
   box.querySelectorAll("[data-card-select]").forEach(card=>{const open=()=>chooseSku(card.dataset.cardSelect);card.onclick=e=>{if(e.target.closest("[data-watch]"))return;open()};card.onkeydown=e=>{if((e.key==="Enter"||e.key===" ")&&!e.target.closest("button")){e.preventDefault();open()}}})};
@@ -996,7 +1014,7 @@ function shopperProductPage(box,sku){const p=catalog.find(x=>x.sku===sku);if(!p)
  const shops=/['’]s$|s'$/i.test(shop)?shop:/s$/i.test(shop)?shop+"'":shop+"'s"; // JD Sports' website, not JD Sports's
  // The bag (account.js): a shop connected to Relay, or a shop's website Relay shows, can go in it; never a test shop's.
  const bagOk=!!(window.RelayAccount&&RelayAccount.bagAdd&&(p.provider==="web"||p.provider==="shopify")&&liveProduct(p)&&!p.testShop),soldOut=p.inStock===false||(p.provider!=="web"&&p.quantity!=null&&p.quantity!==""&&Number(p.quantity)<=0);
- const bag=bagOk?'<div class="dc-bagadd"><div class="dc-qty" role="group" aria-label="How many"><button type="button" class="dc-qb" id="bagLess" aria-label="One fewer"'+(dcBagQty<=1||soldOut?' disabled':'')+'>'+ic("minus")+'</button><span class="dc-qn" id="bagQty" aria-live="polite">'+dcBagQty+'</span><button type="button" class="dc-qb" id="bagMore" aria-label="One more"'+(dcBagQty>=10||soldOut?' disabled':'')+'>'+ic("plus")+'</button></div><button type="button" class="darkbtn dc-buy dc-bagbuy" id="bagAdd"'+(soldOut?' disabled':'')+'>'+(soldOut?'Sold out':ic("bag")+' Add to bag')+'</button></div><div class="dc-bagnote" id="bagNote" role="status"></div>':'';
+ const bag=bagOk?'<div class="dc-bagadd"><div class="dc-qty" role="group" aria-label="How many"><button type="button" class="dc-qb" id="bagLess" data-repeat aria-label="One fewer"'+(dcBagQty<=1||soldOut?' disabled':'')+'>'+ic("minus")+'</button><span class="dc-qn" id="bagQty" aria-live="polite">'+dcBagQty+'</span><button type="button" class="dc-qb" id="bagMore" data-repeat aria-label="One more"'+(dcBagQty>=10||soldOut?' disabled':'')+'>'+ic("plus")+'</button></div><button type="button" class="darkbtn dc-buy dc-bagbuy" id="bagAdd"'+(soldOut?' disabled':'')+'>'+(soldOut?'Sold out':ic("bag")+' Add to bag')+'</button></div><div class="dc-bagnote" id="bagNote" role="status"></div>':'';
  const view=web?'<a class="'+(bagOk?'outline':'darkbtn')+' dc-buy" id="viewOnSite" href="'+safe(p.productUrl)+'" target="_blank" rel="noopener noreferrer">'+(checkout?'View on their website':'See it on '+shops+' website')+ic("ext")+'</a>':'';
  // A product that's one of your picks can be turned down here ("Not for me"): Relay learns from it (see notForMe).
  const picked=!!(personalise&&g&&dcPicks(dcGroups(shownProducts())).some(x=>x.g.key===g.key));
@@ -1054,7 +1072,7 @@ function renderCatalog(){
    }).join("");
  }
  const filtered=!!(query||storeQuery||(storeFilter&&storeFilter!=="all"));
- if(!markup&&!demo&&!exchangeContext)markup=!catalogReady?'<div class="skel" style="min-height:240px;border-radius:22px;margin:0"></div><div class="skel" style="min-height:240px;border-radius:22px;margin:0"></div>':'<div class="rl-empty" style="grid-column:1/-1"><h3>'+(filtered?'Nothing matches that':'New products are on their way')+'</h3><p>'+(filtered?'Try another word or shop.':'When shops join Relay, their newest products show up here.')+'</p></div>';
+ if(!markup&&!demo&&!exchangeContext)markup=!catalogReady||(catalogBusy&&!catalogFresh)?'<div class="skel" style="min-height:240px;border-radius:22px;margin:0"></div><div class="skel" style="min-height:240px;border-radius:22px;margin:0"></div>':catalogFailed&&!catalogFresh&&!filtered?CATALOG_FAILED_HTML:'<div class="rl-empty" style="grid-column:1/-1"><h3>'+(filtered?'Nothing matches that':'New products are on their way')+'</h3><p>'+(filtered?'Try another word or shop.':'When shops join Relay, their newest products show up here.')+'</p></div>';
  root.innerHTML=markup||'<div class="card" style="grid-column:1/-1"><h3>No matching alternatives found for this reason</h3><p class="sub">'+(sizeExchange?'This exact design has no other listed sizes. You can choose a different reason.':'Try another exchange reason or explore a different style. No unrelated items will be silently substituted.')+'</p><button class="outline" onclick="page=\'exchange\';render()">← Change exchange reason</button></div>';
  const status=$("catalogStatus");
  if(status)status.textContent=demo?rows.filter(p=>p.fixture&&Number(p.quantity)>0).length+" selectable, in-stock demo variants · "+rows.filter(p=>!p.fixture).length+" Square catalogue preview variants. All checkout and return actions are simulated.":"";
@@ -1233,7 +1251,14 @@ function shownWatches(){return Object.entries(watch).filter(([sku])=>showDemo()|
 function watchLine(){const n=shownWatches().length;return n?n+(n===1?" thing":" things")+" watched":"Watch things you like and hear when the price drops"}
 function toolsCard(){return testTools()?'<div class="card"><div class="split"><div><h3 style="margin:0 0 4px">Testing tools</h3><p class="small muted" style="margin:0">Test shop orders and sandbox items are showing.</p></div><button class="toggle on" aria-pressed="true" onclick="toggleTestTools()">On</button></div><p class="small" style="margin:10px 0 0"><a class="link" href="./testing.html">More testing tools →</a></p></div>':""}
 // How long the Profile page has waited for the account part of the app; after 12 seconds it says so instead of waiting on.
-let profileWaitStart=0;
+// Home is drawn the moment the account part arrives (it says so: relay:account-ready), not by looking for it every tenth
+// of a second; one timer is left for the 12 seconds, and if the account part arrives after that, Home still draws.
+let profileWaitStart=0,profileWaitTimer=0;
+window.addEventListener("relay:account-ready",()=>{profileWaitStart=0;if(profileWaitTimer){clearTimeout(profileWaitTimer);profileWaitTimer=0}if(page==="profile"&&!retailer)render()});
+// Sign in, tapped before the account part of the app has arrived (a slow first visit): it opens as soon as it has, with
+// the button showing it was pressed. Reloading (which started the download again) only if it never arrives.
+function openSignIn(b){if(window.RelayAccount&&RelayAccount.open)return RelayAccount.open();if(!b||b.disabled)return;b.disabled=true;b.classList.add("rl-working");
+ const give=setTimeout(()=>location.reload(),15000);window.addEventListener("relay:account-ready",()=>{clearTimeout(give);b.disabled=false;b.classList.remove("rl-working");if(window.RelayAccount&&RelayAccount.open)RelayAccount.open()},{once:true})}
 // The Home title: a hello for the time of day, with the shopper's first name once they've added one.
 const SEARCH_IC='<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/></svg>';
 // Home's search finds receipts: what was typed is handed to the Receipts tab, which shows what matches.
@@ -1280,9 +1305,9 @@ function profileView(){
  if(testing)return testingView();
  if(demo)return demoProfileView();
  const acct=window.RelayAccount,ready=!!(acct&&acct.signedIn);
- if(ready?!acct.signedIn():!hasSession())return '<h1 class="title">Welcome to Relay</h1><div class="card welcome-card"><h2>Everything you buy, in one place.</h2><p class="sub">Relay finds the receipts in your Gmail or Outlook, keeps track of return deadlines and tells you when prices drop.</p><button class="darkbtn" onclick="window.RelayAccount?RelayAccount.open():location.reload()">Sign in or create an account</button><p class="small muted" style="margin:12px 0 0">No password needed.</p></div>'+toolsCard();
+ if(ready?!acct.signedIn():!hasSession())return '<h1 class="title">Welcome to Relay</h1><div class="card welcome-card"><h2>Everything you buy, in one place.</h2><p class="sub">Relay finds the receipts in your Gmail or Outlook, keeps track of return deadlines and tells you when prices drop.</p><button class="darkbtn" onclick="openSignIn(this)">Sign in or create an account</button><p class="small muted" style="margin:12px 0 0">No password needed.</p></div>'+toolsCard();
  // Signed in, but the account code is still loading: show the page's shape and fill it in a moment.
- if(!ready){profileWaitStart=profileWaitStart||Date.now();if(Date.now()-profileWaitStart>12000)return '<h1 class="title">Home</h1><div class="card"><h2>Couldn&#39;t load your account</h2><p class="sub">Check your connection, then reload Relay.</p><button class="darkbtn" onclick="location.reload()">Reload</button></div>';if(typeof setTimeout==="function")setTimeout(()=>{if(page==="profile")render()},120);return '<div class="rl-boot" aria-hidden="true"><div class="skel" style="height:48px;border-radius:24px;margin:6px 0 18px"></div><div class="skel" style="height:296px;border-radius:28px;margin:0 0 14px"></div><div class="skel" style="height:296px;border-radius:28px"></div></div>'}
+ if(!ready){profileWaitStart=profileWaitStart||Date.now();if(Date.now()-profileWaitStart>12000)return '<h1 class="title">Home</h1><div class="card"><h2>Couldn&#39;t load your account</h2><p class="sub">Check your connection, then reload Relay.</p><button class="darkbtn" onclick="location.reload()">Reload</button></div>';if(!profileWaitTimer&&typeof setTimeout==="function")profileWaitTimer=setTimeout(()=>{profileWaitTimer=0;if(page==="profile"&&!(window.RelayAccount&&RelayAccount.signedIn))render()},12050-(Date.now()-profileWaitStart));return '<div class="rl-boot" aria-hidden="true"><div class="skel" style="height:48px;border-radius:24px;margin:6px 0 18px"></div><div class="skel" style="height:296px;border-radius:28px;margin:0 0 14px"></div><div class="skel" style="height:296px;border-radius:28px"></div></div>'}
  const nw=shownWatches().length;
  return '<div class="h2-top"><button type="button" class="h2-me" aria-label="Profile" onclick="go(\'me\')"><span class="avatar" aria-hidden="true"></span></button><form class="h2-search" role="search" onsubmit="return homeSearch(event)"><span class="dc-sic" aria-hidden="true">'+SEARCH_IC+'</span><input id="homeQuery" type="search" placeholder="Search your receipts" aria-label="Search your receipts" enterkeyhint="search" autocomplete="off"></form>'
   +'<button type="button" class="h2-bell" aria-label="Price alerts'+(nw?', '+nw+' watched':'')+'" onclick="go(\'radar\')"><span class="h2-bell-c">'+ic("bell")+'</span></button></div><div id="homePage"></div>';
@@ -1301,7 +1326,7 @@ function startSample(){
 }
 function testingView(){const orders=readDemoLog().filter(r=>r.customer===activeShopper());
  return '<h1 class="title">Profile</h1>'+planBanner()+bankConnectBlock()+'<div class="card"><h3>Wallet history</h3><p class="sub">Wallet history now starts empty. New test-store purchases and exchange events are tracked from your starting point. This does not delete financial or audit records.</p><button class="outline" onclick="resetWalletHistory()">Clear wallet and start fresh →</button></div>'+'<div class="card"><h3>Shopify integration</h3><p class="sub">Authorised Shopify product feeds and signed paid-order ingestion are being connected. Shopify customer orders remain private until verified.</p><p class="small muted" id="shopifyStatus">Checking Shopify connection…</p></div><div class="card"><div class="split"><div><h3>Exchange / refund test ledger</h3><p class="small muted">Demo payment, price-difference refund and return events, with unique references. Browser-only; not real Square or Plaid transactions.</p></div><button class="outline" id="resetTransactions">Reset tests</button></div>'+
- (orders.length?orders.map(o=>'<div style="padding:14px 0;border-top:1px solid var(--rl-line)"><strong>'+safe(o.product||o.originalProduct)+'</strong><div class="small muted">'+safe(o.store)+' · '+safe(o.variant||o.originalVariant||"")+' · '+safe(o.type||"ORDER")+'</div><div class="small muted">Request '+safe(o.id)+'</div><p><strong>'+safe(o.status)+'</strong> · '+(o.returnStatus?'Return: '+safe(o.returnStatus):'No return')+'</p><div class="small muted">'+(o.ledger||[]).map(e=>safe(e.type.replace(/_/g," "))+' '+money(e.amountMinor/100)+' ('+safe(e.status)+')').join(" · ")+'</div>'+(o.returnStatus&&o.returnStatus!=="RETURN_COMPLETED"?'<button class="outline" style="margin-top:12px" data-advance="'+safe(o.id)+'">Advance return →</button>':'')+'</div>').join(""):'<p class="muted">No requests yet. Open a demo purchase, select an eligible replacement, and confirm the test exchange.</p>')+'</div><div class="card"><h3>Editable retailer inventory</h3><p class="sub">Change stock and prices in North & Co., Relay Studio and Harbour Goods to test failures, different payment amounts and Radar discounts.</p><button class="darkbtn" onclick="retailer=true;render()">Open retailer inventory lab →</button></div><div class="card"><h3>Test exchange payments and refunds</h3><p class="small muted">Buy a product from the North &amp; Co. test store. In the wallet, choose Exchange and select an eligible in-stock alternative to see the original and replacement with separate statuses.</p><p class="small muted">For real Square <strong>Sandbox API calls</strong> (separate from this demo), open the manual workflow below. It creates test orders and checks a card charge and partial refund using Sandbox credentials only.</p><a class="outline" target="_blank" rel="noopener noreferrer" href="https://github.com/zzmm92nr59-cloud/instant-refund-prototype/actions/workflows/square-sandbox-exchange-test.yml">Run Square Sandbox API tests ↗</a></div><div class="card"><h3>Purchase matching</h3><p class="sub">Real purchases are shown only after verification. Demo checkout cannot move money or create a Square order.</p><button class="outline" onclick="location.href=\'./legacy-wallet.html\'">Developer / API tools →</button></div>';
+ (orders.length?orders.map(o=>'<div style="padding:14px 0;border-top:1px solid var(--rl-line)"><strong>'+safe(o.product||o.originalProduct)+'</strong><div class="small muted">'+safe(o.store)+' · '+safe(o.variant||o.originalVariant||"")+' · '+safe(o.type||"ORDER")+'</div><div class="small muted">Request '+safe(o.id)+'</div><p><strong>'+safe(o.status)+'</strong> · '+(o.returnStatus?'Return: '+safe(o.returnStatus):'No return')+'</p><div class="small muted">'+(o.ledger||[]).map(e=>safe(e.type.replace(/_/g," "))+' '+money(e.amountMinor/100)+' ('+safe(e.status)+')').join(" · ")+'</div>'+(o.returnStatus&&o.returnStatus!=="RETURN_COMPLETED"?'<button class="outline" style="margin-top:12px" data-advance="'+safe(o.id)+'">Advance return →</button>':'')+'</div>').join(""):'<p class="muted">No requests yet. Open a demo purchase, select an eligible replacement, and confirm the test exchange.</p>')+'</div><div class="card"><h3>Editable retailer inventory</h3><p class="sub">Change stock and prices in North & Co., Relay Studio and Harbour Goods to test failures, different payment amounts and Radar discounts.</p><button class="darkbtn" onclick="retailer=true;render()">Open retailer inventory lab →</button></div><div class="card"><h3>Test exchange payments and refunds</h3><p class="small muted">Buy a product from the North &amp; Co. test store. In the wallet, choose Exchange and select an eligible in-stock alternative to see the original and replacement with separate statuses.</p><p class="small muted">For real Square <strong>Sandbox API calls</strong> (separate from this demo), open the manual workflow below. It creates test orders and checks a card charge and partial refund using Sandbox credentials only.</p><a class="outline" target="_blank" rel="noopener noreferrer" href="https://github.com/zzmm92nr59-cloud/instant-refund-prototype/actions/workflows/square-sandbox-exchange-test.yml">Run Square Sandbox API tests ↗</a></div><div class="card"><h3>Purchase matching</h3><p class="sub">Real purchases are shown only after verification. Demo checkout cannot move money or create a Square order.</p></div>';
 }
 function bindProfileControls(){document.querySelectorAll("[data-advance]").forEach(b=>b.onclick=()=>{
  const orders=readDemoLog(),i=orders.findIndex(x=>x.id===b.dataset.advance);
@@ -1316,18 +1341,47 @@ return '<button class="link" data-back onclick="retailer=false;render()">← Bac
 }
 function bindRetailerControls(){document.querySelectorAll("[data-save-sku]").forEach(b=>b.onclick=()=>{const sku=b.dataset.saveSku;const price=Number($("price-"+sku)?.value),qty=Number($("qty-"+sku)?.value);if(!Number.isFinite(price)||price<1||!Number.isInteger(qty)||qty<0){alert("Enter a valid price and non-negative whole-number stock quantity.");return}inventoryChanges[sku]={...(inventoryChanges[sku]||{}),priceMinor:Math.round(price*100),quantity:qty,updatedAt:new Date().toISOString()};saveInventory()});document.querySelectorAll("[data-discount-sku]").forEach(b=>b.onclick=()=>applyDemoDiscount(b.dataset.discountSku));const reset=$("resetInventory");if(reset)reset.onclick=()=>{if(confirm("Reset all demo retailer prices and stock?"))resetDemoInventory()}}
 // Each catalogue is asked for at the same time and given 10 seconds, so one slow source never hides the others.
-function fetchWithin(url,ms){const c=typeof AbortController==="function"?new AbortController():null;const t=c?setTimeout(()=>c.abort(),ms):null;return fetch(url,{cache:"no-store",...(c?{signal:c.signal}:{})}).finally(()=>{if(t)clearTimeout(t)})}
-let catalogReady=false;
+function fetchWithin(url,ms){const c=typeof AbortController==="function"?new AbortController():null;const t=c?setTimeout(()=>c.abort(),ms):null;return fetch(url,{cache:"no-cache",...(c?{signal:c.signal}:{})}).finally(()=>{if(t)clearTimeout(t)})}
+// catalogReady: there is something to draw from (the copy kept on this phone, or the shops' answer). catalogFresh: the
+// shops have answered since Relay was opened, so what isn't in the catalogue really isn't on sale. catalogFailed: the last
+// try didn't get an answer. A try that fails never replaces a good catalogue with an empty one, and nothing on screen
+// says "no products" or "nothing watched" because of it: it says Relay couldn't load, with Try again.
+let catalogReady=false,catalogFresh=false,catalogFailed=false,catalogSeq=0,catalogBusy=false,catalogRetryAt=0,catalogSig="",catalogKeptShown=false;
+// The last good catalogue is kept on the phone (CLAUDE.md rule 5): Browse and Watching draw from it at once on the next
+// open, and it's what shows with no signal. It holds only what the shops publish, nothing about the member; one copy for
+// each set of shops this phone may see (testing tools and the shops' websites preview have their own).
+const catKey=()=>"catalogue|"+(testTools()||reviewAccount()?"t":"-")+(testTools()||webPreview()?"w":"-")+(showDemo()?"d":"-");
+const catStore=mode=>new Promise((res,rej)=>{try{const r=indexedDB.open("relay-shell-v1",1);r.onupgradeneeded=()=>{try{r.result.createObjectStore("kept")}catch(e){}};r.onsuccess=()=>{try{const db=r.result,tx=db.transaction("kept",mode);tx.oncomplete=tx.onabort=tx.onerror=()=>{try{db.close()}catch(e){}};res(tx.objectStore("kept"))}catch(e){rej(e)}};r.onerror=()=>rej(r.error)}catch(e){rej(e)}});
+const catKept=key=>catStore("readonly").then(st=>new Promise(res=>{const q=st.get(key);q.onsuccess=()=>res(q.result||null);q.onerror=()=>res(null)})).catch(()=>null);
+const catKeep=(key,v)=>catStore("readwrite").then(st=>{st.put(v,key)}).catch(()=>{});
+// The answer's fingerprint, worked out by the browser itself (not a loop over a megabyte of text on the page's own time).
+const textSig=async t=>{try{const d=new Uint8Array(await crypto.subtle.digest("SHA-256",new TextEncoder().encode(t)));let x="";for(let i=0;i<12;i++)x+=d[i].toString(16).padStart(2,"0");return t.length+":"+x}catch(e){return t.length+":"+Date.now()}};
+// Written to the phone when the page has a quiet moment, so copying thousands of products never lands on a tap.
+const whenQuiet=f=>{try{if(typeof requestIdleCallback==="function")return requestIdleCallback(f,{timeout:8000})}catch(e){}setTimeout(f,1500)};
 // The shop catalogue (Discover and price alerts) loads when one of those pages opens, or a few seconds after start, so
-// it doesn't hold up Home and Receipts.
-var catalogAsked;function needCatalog(){if(catalogAsked)return;catalogAsked=true;loadCatalog()}
+// it doesn't hold up Home and Receipts. After a try that failed, opening one of those pages again tries again (not more
+// than once in 15 seconds).
+var catalogAsked;function needCatalog(){if(catalogAsked&&!(catalogFailed&&!catalogBusy&&Date.now()>catalogRetryAt))return;catalogAsked=true;loadCatalog()}
+function catalogueChanged(){try{window.dispatchEvent(new Event("relay-catalogue"))}catch{}}
+// Whether the shops couldn't be loaded and there is nothing newer than the kept copy (account.js: Watching, Price alerts).
+window.relayCatalogFailed=()=>catalogFailed&&!catalogFresh;
+window.relayCatalogRetry=()=>{if(catalogBusy)return;catalogAsked=true;loadCatalog()};
+function retryCatalog(b){if(b){if(b.disabled)return;b.disabled=true}window.relayCatalogRetry()}
+const CATALOG_FAILED_HTML='<div class="dc-empty" id="dcFailed" role="status"><h3>Relay couldn\'t load the shops</h3><p>Check your connection and try again.</p><div class="dc-next"><button type="button" class="dc-nextbtn" onclick="retryCatalog(this)">Try again</button></div></div>';
 async function loadCatalog(manual=false){
- let next=demoProducts(),squareError=null;try{
+ // The newest call is the one that counts: an older one that answers late (testing tools switched, a pull to refresh)
+ // never overwrites it.
+ const my=++catalogSeq,key=catKey();catalogBusy=true;
+ let next=[],squareError=null,shopOk=false,webOk=false,sig="";try{
  // Relay's Square test shop is only ever shown in the demo or with testing tools (shownProducts), so an ordinary
  // shopper's app doesn't ask for it at all.
  const squareAsk=showDemo()?fetchWithin(API+"/relay/live-test/products",10000):null,shopifyAsk=fetchWithin(API+"/relay/shopify/catalogue"+(testTools()||reviewAccount()?"?test=1":""),10000);
  const webAsk=testTools()||webPreview()?fetchWithin(API+"/relay/web-shops",10000):null;
  if(squareAsk)squareAsk.catch(()=>{});shopifyAsk.catch(()=>{});if(webAsk)webAsk.catch(()=>{});
+ // What this phone kept last time shows while the shops are asked.
+ if(!catalogFresh&&!catalogKeptShown){const k=await catKept(key);
+  if(my===catalogSeq&&!catalogFresh&&!catalogKeptShown&&k&&Array.isArray(k.products)&&k.products.length){catalog=k.products.concat(demoProducts());catalogSig=String(k.sig||"");catalogKeptShown=true;catalogReady=true;catalogueChanged();
+   if(page==="discover"&&!$("backToResults"))renderCatalog();if(page==="radar")showRadar()}}
  if(squareAsk)try{
   const response=await squareAsk;
   if(!response.ok)throw Error("Square catalogue HTTP "+response.status);
@@ -1338,24 +1392,33 @@ async function loadCatalog(manual=false){
  try{
   const response=await shopifyAsk;
   if(response.ok){
-   const data=await response.json();
+   const text=await response.text(),data=JSON.parse(text);
+   shopOk=true;sig=(await textSig(text))+(squareAsk?"|sq"+next.length:"");
    if(data.published&&Array.isArray(data.products)){
     const published=data.products.filter(p=>p.sku&&Number.isFinite(Number(p.priceMinor))).map(p=>({...p,provider:"shopify",store:p.storeName||p.shopDomain||"Shopify retailer",fixture:false}));
     next.push(...published);
    }
   }
  }catch{}
- if(webAsk)try{const response=await webAsk;if(response.ok){const data=await response.json();const web=(Array.isArray(data.products)?data.products:[]).filter(p=>p.sku&&Number.isFinite(Number(p.priceMinor))&&p.webShop);
-  next.push(...web.map(p=>({...p,provider:"web",store:p.storeName,fixture:false})))}}catch{}
- catalog=next.filter(p=>!p.fixture).concat(demoProducts());
- }finally{catalogReady=true;try{window.dispatchEvent(new Event("relay-catalogue"))}catch{}}
+ if(webAsk)try{const response=await webAsk;if(response.ok){const text=await response.text(),data=JSON.parse(text);const web=(Array.isArray(data.products)?data.products:[]).filter(p=>p.sku&&Number.isFinite(Number(p.priceMinor))&&p.webShop);
+  webOk=true;sig+="|w"+(await textSig(text));next.push(...web.map(p=>({...p,provider:"web",store:p.storeName,fixture:false})))}}catch{}
+ if(my!==catalogSeq)return;
+ if(shopOk){
+  // The shops' websites didn't answer this time: the ones already here stay.
+  if(webAsk&&!webOk){next.push(...catalog.filter(p=>p.provider==="web"));sig+="|w-kept"}
+  // The same answer as the copy already in use: nothing is rebuilt or written again.
+  if(!(catalogSig&&sig===catalogSig&&(catalogFresh||catalogKeptShown))){const good=next.filter(p=>!p.fixture);catalog=good.concat(demoProducts());if(!webAsk||webOk){const keep={sig,at:Date.now(),products:good};whenQuiet(()=>catKeep(key,keep))}}
+  catalogSig=sig;catalogFresh=true;catalogFailed=false;
+ }else{catalogFailed=true;catalogRetryAt=Date.now()+15000}
+ }finally{if(my===catalogSeq){catalogBusy=false;catalogReady=true;catalogueChanged()}}
+ if(my!==catalogSeq)return;
  if(page==="wallet")render();
  if(manual){
   for(const [sku,w] of Object.entries(watch)){
    const p=catalog.find(x=>x.sku===sku);
    if(p&&history[sku]===undefined)history[sku]=w.baseline;
   }
-  localStorage.setItem("relay-radar-history-v2",JSON.stringify(history));
+  try{localStorage.setItem("relay-radar-history-v2",JSON.stringify(history))}catch(e){}
   if(squareError)console.warn("Square unavailable; independent demo/Shopify feeds remain available",squareError);
  }
  if(page==="discover"&&!$("backToResults"))renderCatalog();
@@ -1374,7 +1437,7 @@ async function loadShopifyStatus(){
 async function loadVerified(){try{const saved=localStorage.getItem("relayVerifiedOrder"),card=JSON.parse(localStorage.getItem("relayCard")||"null"),q=new URLSearchParams();if(saved)q.set("orderId",saved);if(card?.brand)q.set("brand",card.brand);if(card?.last4)q.set("last4",card.last4);const r=await fetch(VERIFIED+(q.size?"?"+q:""),{cache:"no-store"});if(!r.ok)throw Error("Verified purchase API returned "+r.status);const d=await r.json();real=[];for(const o of d.purchases||d.verifiedPurchases||[]){const orderTime=o.createdAt||o.authorizedAt||o.orderCreatedAt;if(!orderTime||!Number.isFinite(Date.parse(orderTime))||Date.parse(orderTime)<Date.parse(walletCutover))continue;if(o.verified===false||(o.matchStatus&&String(o.matchStatus).toUpperCase()!=="MATCHED"))continue;for(const [i,x] of (o.items||[]).entries())real.push({id:"sq-"+o.orderId+"-"+i,item:x.name||"Purchase",detail:x.variation||"Standard",merchant:o.merchant||"Retailer",price:Number(x.price??o.total??0),date:new Date(o.createdAt||Date.now()).toLocaleDateString("en-GB"),deadline:o.deadline||"Retailer policy",icon:"🛍️",demo:false,verified:true,createdAt:orderTime})}error=""}catch(e){real=[];error=e.message}if(page==="wallet")render()}
 // Compatibility for previously cached v4 handlers that called showCatalog.
 function showCatalog(){return renderCatalog()}
-Object.assign(window,{dcBack,relayShopsOnRelay,relayOpenShop,relayWebProductsFor,teamShops,meBack,dcPick,dcShow,dcToggleFilters,homeSearch,browseSearch,photoSearch,relayOpenProduct,relaySearchFor,testTools,webPreview,testToolsChanged,openMarket,openAuctions,tabTap,toggleTestTools,toggleStoreAlert,forgetTaste,undoNotFor,askAiPicks,notNowAiPicks,go,toggleDemo,openPurchase,render,setPlanPreview,startSample,switchShopper,checkSandboxBank,togglePersonalise,selectStore,renderCatalog,showCatalog,showRadar,chooseSku,placeDemoOrder,watchSku,unwatch,loadCatalog,simulateDemoRefund,simulateDemoReturn,resetDemoTransactions,resetWalletHistory,advanceDemoExchangeReturn});
+Object.assign(window,{dcBack,relayShopsOnRelay,relayOpenShop,relayWebProductsFor,teamShops,meBack,dcPick,dcShow,dcToggleFilters,homeSearch,browseSearch,photoSearch,relayOpenProduct,relaySearchFor,testTools,webPreview,testToolsChanged,openMarket,openAuctions,tabTap,toggleTestTools,toggleStoreAlert,forgetTaste,undoNotFor,askAiPicks,notNowAiPicks,go,toggleDemo,openPurchase,render,setPlanPreview,startSample,switchShopper,checkSandboxBank,togglePersonalise,selectStore,renderCatalog,renderCatalogSoon,retryCatalog,openSignIn,showCatalog,showRadar,chooseSku,placeDemoOrder,watchSku,unwatch,loadCatalog,simulateDemoRefund,simulateDemoReturn,resetDemoTransactions,resetWalletHistory,advanceDemoExchangeReturn});
 // For relay-gestures.js: is this a tab's own screen (pull to refresh works there), and refreshing it. Discover's catalogue
 // comes straight from the shops' feeds, so it's read again too; on Receipts the inbox is checked as well.
 window.RelayShell={isTabRoot:onTabRoot,refresh:shellRefresh,open:openLink};
@@ -1394,8 +1457,30 @@ function openLink(href){const h=String(href||"").split("#")[1]||"",q=new URLSear
  return true}
 if(navigator.serviceWorker&&navigator.serviceWorker.addEventListener)navigator.serviceWorker.addEventListener("message",e=>{if(e.data&&e.data.type==="relay-open")openLink(e.data.url)});
 window.addEventListener("hashchange",()=>{if(/[#&]open=/.test(location.hash))openLink(location.href)});
-Object.defineProperties(window,{page:{get:()=>page,set:v=>{page=v}},reason:{get:()=>reason,set:v=>{reason=v}},retailer:{get:()=>retailer,set:v=>{retailer=v}},demo:{get:()=>demo,set:v=>{demo=!!v}},exchangeContext:{get:()=>exchangeContext,set:v=>{exchangeContext=!!v}}});if(typeof document.addEventListener==="function"){const what=b=>b.id||[...b.attributes].filter(a=>/^data-|^onclick$|^href$/.test(a.name)).map(a=>a.name+"="+a.value).join("|")||(b.textContent||"").trim();let last={t:0,x:-99,y:-99,k:""};document.addEventListener("click",e=>{const b=e.target&&e.target.closest&&e.target.closest("button,a,[role=button],summary");if(!b||!e.isTrusted||demo)return;const t=Date.now(),k=what(b);if(t-last.t<400&&k===last.k&&Math.abs(e.clientX-last.x)<30&&Math.abs(e.clientY-last.y)<30){e.stopImmediatePropagation();e.preventDefault();return}last={t,x:e.clientX,y:e.clientY,k}},true);for(const ev of ["input","change"])document.addEventListener(ev,()=>{last.k=""},true)}
-window.addEventListener("relay:session",()=>{profileWaitStart=0;watchesRestored=false;if(!retailer)render()});window.addEventListener("storage",event=>{if(event.key==="relay-test-store-orders-v1"||event.key==="relay-demo-active-customer-v1"){if(page==="wallet"&&!retailer)render()}if(event.key===WALLET_RESET_KEY){walletCutover=localStorage.getItem(WALLET_RESET_KEY)||walletCutover;if(page==="wallet"&&!retailer)render()}if(event.key==="relay-retailer-inventory-v3"){try{inventoryChanges=JSON.parse(localStorage.getItem(demoInventoryKey)||"{}")||{}}catch{}catalog=catalog.filter(p=>!p.fixture).concat(demoProducts());if(page==="discover")renderCatalog();if(page==="radar")showRadar()}});
- catalog=demoProducts();if(demo){const t=$("modeToggle");t.textContent="✦ Demo on";t.classList.remove("hidden");t.classList.add("on");t.removeAttribute("aria-hidden")}render();if(showDemo())loadVerified();if(typeof setTimeout==="function")setTimeout(needCatalog,4000);if(/[#&]open=/.test(location.hash))openLink(location.href);
- 
-}catch(e){console.error("Relay startup error",e);const root=document.getElementById("view");if(root)root.innerHTML="<div class=\"card\"><h2>Something went wrong</h2><p class=\"sub\">Please reload Relay. If it keeps happening, try again in a few minutes.</p><button class=\"darkbtn\" onclick=\"location.reload()\">Reload</button></div>"}})();</script></body></html>
+Object.defineProperties(window,{page:{get:()=>page,set:v=>{page=v}},reason:{get:()=>reason,set:v=>{reason=v}},retailer:{get:()=>retailer,set:v=>{retailer=v}},demo:{get:()=>demo,set:v=>{demo=!!v}},exchangeContext:{get:()=>exchangeContext,set:v=>{exchangeContext=!!v}}});if(typeof document.addEventListener==="function"){const what=b=>b.id||[...b.attributes].filter(a=>/^data-|^onclick$|^href$/.test(a.name)).map(a=>a.name+"="+a.value).join("|")||(b.textContent||"").trim();let last={t:0,x:-99,y:-99,k:""};document.addEventListener("click",e=>{const b=e.target&&e.target.closest&&e.target.closest("button,a,[role=button],summary");if(!b||!e.isTrusted||demo)return;/* A control meant to be tapped again and again (one more, one fewer) says so with data-repeat: every tap counts. */if(b.hasAttribute("data-repeat"))return;const t=Date.now(),k=what(b);if(t-last.t<400&&k===last.k&&Math.abs(e.clientX-last.x)<30&&Math.abs(e.clientY-last.y)<30){e.stopImmediatePropagation();e.preventDefault();return}last={t,x:e.clientX,y:e.clientY,k}},true);for(const ev of ["input","change"])document.addEventListener(ev,()=>{last.k=""},true)}
+// What this phone keeps for the member who's signed in (what they watch, what Relay has learned of their style, whether
+// they asked for picks) belongs to them: signing out, or signing in as someone else, forgets it, so the next member never
+// sees the last one's (CLAUDE.md rule 5). Their watches come back from their account (restoreWatches); whether they
+// asked for picks is remembered per member (not by their address) and comes back when they do.
+const memberEmail=()=>{try{const x=JSON.parse(localStorage.getItem("relay.session.v1")||"null");return x&&x.token&&x.email?String(x.email).toLowerCase():""}catch(e){return""}};
+const memberMark=e=>{let h=5381;for(let i=0;i<e.length;i++)h=((h<<5)+h+e.charCodeAt(i))>>>0;return"m"+h.toString(36)};
+const PICKS_BY_KEY="relay-discover-personalise-by-v1";
+let memberWas=memberEmail();
+function memberChanged(){
+ const now=memberEmail();if(now===memberWas)return;
+ let by={};try{by=JSON.parse(localStorage.getItem(PICKS_BY_KEY)||"{}")||{}}catch(e){by={}}
+ if(memberWas){
+  if(personaliseAsked){by[memberMark(memberWas)]=personalise?1:0;try{const keep=Object.entries(by).slice(-12);localStorage.setItem(PICKS_BY_KEY,JSON.stringify(Object.fromEntries(keep)))}catch(e){}}
+  watch={};history={};watchIx=null;watchIxOf=null;lastNotFor=null;receiptBuys=[];tasteLoaded=false;tasteOff=false;aiKinds=null;aiPicks={available:false,on:false};aiPicksAsked=false;alertStores=[];picksMemo=null;
+  personalise=false;personaliseAsked=false;
+  try{["relay-radar-v2","relay-radar-history-v2",TAPS_KEY,NOTFOR_KEY,SEEN_KEY,"relay-picks-ai-asked","relay-discover-personalise-v1"].forEach(k=>localStorage.removeItem(k))}catch(e){}
+ }
+ if(now){const k=memberMark(now);if(Object.prototype.hasOwnProperty.call(by,k)&&!personaliseAsked){personalise=by[k]===1;personaliseAsked=true;try{localStorage.setItem("relay-discover-personalise-v1",String(personalise))}catch(e){}}}
+ memberWas=now;
+}
+window.addEventListener("relay:session",()=>{memberChanged();profileWaitStart=0;watchesRestored=false;if(!retailer)render()});window.addEventListener("storage",event=>{if(event.key==="relay-test-store-orders-v1"||event.key==="relay-demo-active-customer-v1"){if(page==="wallet"&&!retailer)render()}if(event.key===WALLET_RESET_KEY){walletCutover=localStorage.getItem(WALLET_RESET_KEY)||walletCutover;if(page==="wallet"&&!retailer)render()}if(event.key==="relay-retailer-inventory-v3"){try{inventoryChanges=JSON.parse(localStorage.getItem(demoInventoryKey)||"{}")||{}}catch{}catalog=catalog.filter(p=>!p.fixture).concat(demoProducts());if(page==="discover")renderCatalog();if(page==="radar")showRadar()}});
+ const boot=()=>{try{catalog=demoProducts();if(demo){const t=$("modeToggle");t.textContent="✦ Demo on";t.classList.remove("hidden");t.classList.add("on");t.removeAttribute("aria-hidden")}render();if(showDemo())loadVerified();if(typeof setTimeout==="function")setTimeout(needCatalog,4000);if(/[#&]open=/.test(location.hash))openLink(location.href)}catch(e){startupFailed(e)}};
+ // The two files only the demo and testing screens use (relay-exchange-engine.js, relay-wallet-ledger.js) no longer hold
+ // up the page for everyone: they load beside it, and only those screens wait the moment it takes for them to be in.
+ if((demo||testing)&&(typeof RelayExchangeEngine==="undefined"||typeof RelayWalletLedger==="undefined")&&document.readyState==="loading"&&document.addEventListener)document.addEventListener("DOMContentLoaded",boot,{once:true});else boot();
+}catch(e){startupFailed(e)}})();</script></body></html>

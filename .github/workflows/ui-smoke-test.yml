@@ -209,5 +209,13 @@ jobs:
         run: node --import ./scripts/record-app-requests.mjs scripts/test-wrapped-story.mjs
       - name: Words from outside (shop names, item names, links) are shown as text and never run
         run: node --import ./scripts/record-app-requests.mjs scripts/test-outside-words-ui.mjs
+      - name: Today is the UK's date (return countdowns at 00:30 BST on a deadline day and the day after, on any phone time zone)
+        run: node --import ./scripts/record-app-requests.mjs scripts/test-uk-today-ui.mjs
+      - name: Failed and slow loads say Relay couldn't load, with Try again (Receipts, Swap & resell, banks, the swap sheet, the shops' products)
+        run: node --import ./scripts/record-app-requests.mjs scripts/test-load-failures-ui.mjs
+      - name: Review fixes (group notes, same purchase by date, honest saves and totals, nothing left for the next member, Wrapped once, drawings)
+        run: node --import ./scripts/record-app-requests.mjs scripts/test-review-fixes-ui.mjs
+      - name: Connecting a bank end to end (Relay's real server and app on the runner; TrueLayer stands in) - the app finishes it with the bank's code, refused elsewhere
+        run: node scripts/test-bank-connect-e2e.mjs
       - name: Check everything the app sent passes the server's input rules (worker/validate.js)
         run: node scripts/test-validation.mjs

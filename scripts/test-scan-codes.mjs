@@ -14,7 +14,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import assert from "node:assert/strict";
 import { handleAuthRoute } from "../worker/auth.js";
 import { CONSENT_VERSION, sealToken, classifyEmail, PARSER_VERSION } from "../worker/gmail.js";
-import { findCodes, fetchCodeImage, checkedCodeImage, codeImageUrl, statedDate, CODE_MAX_BYTES } from "../worker/scan-codes.js";
+import { findCodes, fetchCodeImage, checkedCodeImage, codeImageUrl, statedDate, CODE_MAX_BYTES, deadlineIn } from "../worker/scan-codes.js";
 import { rawEmail, forwarded } from "./fixtures/receipt-emails/lib.mjs";
 import * as F from "./fixtures/scan-codes.mjs";
 
@@ -30,6 +30,27 @@ const read = (f, app, kind) => { const raw = rawEmail(app ? forwarded(f, app) : 
 const APPS = [null, "gmail", "outlook", "apple"];
 const each = (f, check) => { for (const app of APPS) check(read(f, app), (app ? "forwarded from " + app : "as sent") + ": " + f.id); };
 // A return barcode in a later shipping email: joins the order it names, with the shop's words exactly.
+// A code's deadline is only a date the email gives as the day to return, drop off, send back or collect by (review SC-1):
+// never a refund date, an ordering cut-off or a delivery date that happens to sit in a sentence about returns.
+{
+  const sent = new Date("2026-03-01T10:00:00Z");
+  for (const [text, want] of [
+    ["We'll send your refund by 12 March once it's back with us.", null],
+    ["Order by 20 December for Christmas, free returns.", null],
+    ["Your refund will be returned to your card by 5 March.", null],
+    ["Once you post it back, you'll receive your refund by 9 March.", null],
+    ["Return it within 30 days.", null],
+    ["Use this code for 10% off, offer valid until 31 March 2026.", null],
+    ["Your order will be delivered by 14 March, and returns are free.", null],
+    ["Please send your return back by Wed 24 Dec 2026", "2026-12-24"],
+    ["Please follow the instructions below to package and send it back no later than Wednesday, December 24", "2026-12-24"],
+    ["Drop off by: Sat, 6 Sept", "2026-09-06"],
+    ["Return your parcel before 20 March 2026 to get your money back.", "2026-03-20"],
+    ["Collect your order by 9 March 2026.", "2026-03-09"],
+    ["This QR code is valid until 10 March 2026.", "2026-03-10"]])
+    assert.equal(deadlineIn(text, sent), want, text);
+  console.log("ok - a code's deadline: only a date given for returning, dropping off, sending back or collecting; never a refund, order or delivery date");
+}
 each(F.fellShipping, (r, w) => {
   assert.equal(r.codes.length, 1, w);
   const c = r.codes[0];

@@ -41,6 +41,21 @@ export async function exportShopperData(env, shopper, now = Date.now()) {
   const sessions = await rows("SELECT created_at AS createdAt, expires_at AS expiresAt FROM auth_sessions WHERE shopper_id = ? AND expires_at > ?", id, now);
   await ensureParcelColumns(db);   // the carrier's first scan time (added 24 Nov 2026), so parcels below are always read
   await ensureBankColumns(db);   // TrueLayer's label column (added 17 Nov 2026), so the payments below are always read
+  // Photos are read one at a time (each can be over a megabyte), up to a limit that is said in the file, never cut silently.
+  const pictures = async (listSql, listArgs, oneSql, keyOf, cap) => {
+    const all = await rows(listSql, ...listArgs), out = [];
+    for (const r of all.slice(0, cap)) {
+      const p = await one(oneSql, ...keyOf(r));
+      if (p && p.data) out.push({ ...r, picture: "data:" + p.type + ";base64," + p.data });
+    }
+    return { out, left: Math.max(0, all.length - cap) };
+  };
+  const receiptPhotos = await pictures("SELECT receipt_id AS receiptId, created_at AS at FROM receipt_photos WHERE shopper_id = ? ORDER BY created_at DESC", [id],
+    "SELECT type, data FROM receipt_photos WHERE receipt_id = ? AND shopper_id = ?", (r) => [r.receiptId, id], 60);
+  const receiptPictures = await pictures("SELECT receipt_id AS receiptId, created_at AS at FROM receipt_images WHERE shopper_id = ? ORDER BY created_at DESC", [id],
+    "SELECT type, data FROM receipt_images WHERE receipt_id = ? AND shopper_id = ?", (r) => [r.receiptId, id], 150);
+  const listingPhotos = await pictures("SELECT p.listing_id AS listingId, p.n AS n FROM resale_photos p JOIN resale_listings l ON l.id = p.listing_id WHERE l.seller_id = ? ORDER BY l.created_at DESC, p.n", [id],
+    "SELECT type, data FROM resale_photos WHERE listing_id = ? AND n = ?", (r) => [r.listingId, r.n], 120);
   const myRequests = "(SELECT id FROM resale_requests WHERE asker_id = ? OR listing_id IN (SELECT id FROM resale_listings WHERE seller_id = ?))";
 
   return {
@@ -56,7 +71,10 @@ export async function exportShopperData(env, shopper, now = Date.now()) {
     // The shopping bag: what's in it, from which shop, how many and the price Relay last saw.
     bag: await bagForExport(env, id),
     // Auctions bid on (with the most they'd pay) and anything won or offered to them.
-    auctions: await auctionsForExport(env, id),
+    auctions: { ...(await auctionsForExport(env, id)),
+      // Wins you didn't pay for in time (two in 90 days pause bidding for 30 days).
+      unpaidWins: (await rows("SELECT a.title, a.store_label AS shop, s.at FROM auction_strikes s LEFT JOIN auctions a ON a.id = s.auction_id WHERE s.shopper_id = ? ORDER BY s.at", id))
+        .map((r) => ({ title: r.title || null, shop: r.shop || null, at: iso(r.at) })) },
     signIn: {
       activeSessions: sessions.map((s) => ({ startedAt: iso(s.createdAt), endsAt: iso(s.expiresAt) })),
       passkeys: (await rows("SELECT name, created_at AS createdAt, last_used_at AS lastUsedAt FROM auth_passkeys WHERE shopper_id = ?", id))
@@ -75,6 +93,17 @@ export async function exportShopperData(env, shopper, now = Date.now()) {
     otherEmailConnections: moreMail.map((m) => ({ inbox: Number(m.box.split("~")[1]), provider: m.provider === "microsoft" ? "Outlook" : "Gmail", address: m.address || null,
       connectedAt: iso(m.connectedAt), lastCheckedAt: iso(m.lastScanAt) })),
     receipts: captured.map((r) => ({ id: r.id, status: r.status, capturedAt: iso(r.createdAt), ...(parse(r.details) || {}) })),
+    // Your photos of paper receipts (Bank and cards, "Add a photo of the receipt"), each with the receipt Relay made from it.
+    receiptPhotos: receiptPhotos.out.map((r) => ({ receiptId: r.receiptId, addedAt: iso(r.at), picture: r.picture })),
+    ...(receiptPhotos.left ? { receiptPhotosNotInThisFile: receiptPhotos.left } : {}),
+    // The picture kept with a receipt: the product picture from its email, or your own photo of what you bought.
+    receiptPictures: receiptPictures.out.map((r) => ({ receiptId: r.receiptId, keptAt: iso(r.at), picture: r.picture })),
+    ...(receiptPictures.left ? { receiptPicturesNotInThisFile: receiptPictures.left } : {}),
+    // "Read it again": how many times you asked for a receipt to be read again (only counts are kept).
+    readAgain: (await rows("SELECT receipt_id AS receiptId, ai, outcome, created_at AS at FROM receipt_rereads WHERE shopper_id = ? ORDER BY created_at", id))
+      .map((r) => ({ receiptId: r.receiptId, aiAsked: Boolean(r.ai), outcome: r.outcome || null, at: iso(r.at) })),
+    // How much AI reading was done for your receipts each day (kept two days, for the daily limit): calls and estimated pence.
+    aiUse: await rows("SELECT day, calls, pence FROM ai_spend_shopper WHERE shopper_id = ? ORDER BY day", id),
     emailsLookedAtButNotKept: notReceipts ? notReceipts.n : 0,
     // Codes to show or scan that Relay kept from your emails (a return barcode, a drop-off QR code, a ticket): what each is
     // for, the shop's words, any date the email gave, and the picture itself when Relay could keep it.
@@ -162,8 +191,12 @@ export async function exportShopperData(env, shopper, now = Date.now()) {
     // Relay's team only: when they searched or read their own Outlook inbox (kept 2 days for the daily limits; nothing from the emails).
     outlookSearches: (await rows("SELECT kind, created_at AS at FROM outlook_search_uses WHERE shopper_id = ? ORDER BY created_at", id)).map((r) => ({ kind: r.kind, at: iso(r.at) })),
     swapAndSell: {
-      listings: (await rows("SELECT id, title, store, size, condition, ask_pence AS askPence, swap_ok AS swapOk, note, area, status, created_at AS createdAt FROM resale_listings WHERE seller_id = ?", id))
-        .map((l) => ({ ...l, swapOk: Boolean(l.swapOk), createdAt: iso(l.createdAt) })),
+      // Each listing with your own photos on it.
+      listings: (await rows("SELECT id, title, store, size, condition, ask_pence AS askPence, swap_ok AS swapOk, note, area, handover, status, created_at AS createdAt FROM resale_listings WHERE seller_id = ?", id))
+        .map((l) => ({ ...l, swapOk: Boolean(l.swapOk), createdAt: iso(l.createdAt), photos: listingPhotos.out.filter((p) => p.listingId === l.id).map((p) => p.picture) })),
+      ...(listingPhotos.left ? { listingPhotosNotInThisFile: listingPhotos.left } : {}),
+      // How many listing descriptions you asked the AI to write each day (kept two days, for the daily limit).
+      descriptionsWrittenByAi: await rows("SELECT day, n FROM resale_describe_usage WHERE shopper_id = ? ORDER BY day", id),
       requests: (await rows(`SELECT id, listing_id AS listingId, kind, message, status, created_at AS createdAt FROM resale_requests WHERE id IN ${myRequests}`, id, id))
         .map((r) => ({ ...r, createdAt: iso(r.createdAt) })),
       messages: (await rows(`SELECT request_id AS requestId, CASE WHEN sender_id = ? THEN 'you' ELSE 'the other member' END AS sentBy, body, created_at AS createdAt FROM resale_messages WHERE request_id IN ${myRequests} ORDER BY created_at`, id, id, id))
@@ -178,6 +211,9 @@ export async function exportShopperData(env, shopper, now = Date.now()) {
       conversationsRead: (await rows("SELECT request_id AS requestId, read_at AS readAt FROM resale_reads WHERE shopper_id = ?", id))
         .map((r) => ({ ...r, readAt: iso(r.readAt) })),
     },
+    // Relay's testing tools: test orders you placed at Relay's own test shops (kept for the daily limit).
+    testOrders: [...(await rows("SELECT order_id AS orderId, created_at AS at FROM square_test_orders WHERE shopper_id = ? ORDER BY created_at", id)).map((r) => ({ shop: "Square test shop", orderId: r.orderId, at: iso(r.at) })),
+      ...(await rows("SELECT shop, order_id AS orderId, created_at AS at FROM shopify_test_orders WHERE shopper_id = ? ORDER BY created_at", id)).map((r) => ({ shop: r.shop, orderId: r.orderId || null, at: iso(r.at) }))],
     inStorePurchaseSuggestions: (await rows("SELECT order_id AS orderId, brand, last4, amount_minor AS amountPence, currency, paid_at AS paidAt, store, status FROM square_instore_suggestions WHERE email_hash = ?", shopper.emailHash)),
     ordersFromConnectedShops: (await rows("SELECT order_id AS orderId FROM retailer_order_emails WHERE email_hash = ?", shopper.emailHash)).map((o) => o.orderId),
   };

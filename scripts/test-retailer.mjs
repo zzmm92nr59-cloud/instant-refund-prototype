@@ -160,6 +160,9 @@ const my = (id, path, body) => handlePushRoute(new Request("https://w.test" + pa
   env, new URL("https://w.test" + path), {}, { id }, { now, fetchImpl });
 assert.equal((await (await my("cara-id", "/relay/my/alerts/status")).json()).allShops, false, "watchlist only by default");
 assert.equal((await (await my("alice-id", "/relay/my/alerts/mode", { mode: "all" })).json()).allShops, true);
+// "Every shop" means real shops: Square's shops count once Square is live (while it's on Square's sandbox they are
+// Relay's own test shop and are left out: review P-1, tested in test-push.mjs). So this part runs with Square live.
+env.SQUARE_ENVIRONMENT = "production";
 await runPriceAlerts(env, { now, fetchImpl });            // first look only records every price
 pushes = [];
 sqlite.prepare("UPDATE retailer_catalog_variants SET price_minor = 2499 WHERE sku = 'ZAR-SKT-S'").run();   // nobody watches the skirt
