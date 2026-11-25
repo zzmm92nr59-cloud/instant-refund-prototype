@@ -172,6 +172,14 @@ const call = (path, { method = "GET", body, token } = {}) =>
   handleAuthRoute(new Request("https://w.test" + path, { method, headers: { "content-type": "application/json", "cf-connecting-ip": "5.5.5.5", ...(token ? { authorization: "Bearer " + token } : {}) },
     body: body ? JSON.stringify(body) : undefined }), env, new URL("https://w.test" + path), {}, { now: clock, fetchImpl });
 const post = (path, token, body) => call(path, { method: "POST", token, body });
+// "Connect" comes back with a single-use code the app hands in with the session that started it (gmail.js
+// finishMailConnect); this does that and gives back what the app would then be told, as "#gmail=<result>".
+const finishMail = async (res, token) => {
+  const at = res.headers.get("location") || "", m = /#(gmail|outlook)=finish&mailcode=([A-Za-z0-9_-]{43})$/.exec(at);
+  if (!m) return at;
+  const b = await (await post("/relay/my/gmail/finish", token, { code: m[2] })).json();
+  return "#" + m[1] + "=" + (b.result || b.error);
+};
 async function signIn(email) {
   emails = [];
   await post("/relay/auth/request", null, { email });
@@ -181,9 +189,9 @@ async function signIn(email) {
 const alice = await signIn("alice@example.com"), bob = await signIn("bob@example.com");
 for (const t of [alice, bob]) assert.equal((await post("/relay/my/consent", t, { version: CONSENT_VERSION })).status, 200);
 const gstate = new URL((await (await post("/relay/my/gmail/connect", alice)).json()).url).searchParams.get("state");
-assert.match((await call("/relay/gmail/callback?code=good&state=" + gstate)).headers.get("location"), /#gmail=connected$/);
+assert.match(await finishMail(await call("/relay/gmail/callback?code=good&state=" + gstate), alice), /#gmail=connected$/);
 const mstate = new URL((await (await post("/relay/my/gmail/connect", bob, { provider: "microsoft" })).json()).url).searchParams.get("state");
-assert.match((await call("/relay/microsoft/callback?code=mail-good&state=" + mstate)).headers.get("location"), /#outlook=connected$/);
+assert.match(await finishMail(await call("/relay/microsoft/callback?code=mail-good&state=" + mstate), bob), /#outlook=connected$/);
 // (Each connection starts its first full read; that's tested elsewhere. Here it has finished.)
 sqlite.prepare("UPDATE mail_scan_jobs SET state = 'done'").run();
 const aliceBox = sqlite.prepare("SELECT shopper_id FROM gmail_connections WHERE provider IS NULL").get().shopper_id;
@@ -536,7 +544,7 @@ const gmailPost = async (body, token) => pushCall("/relay/webhooks/gmail", { bod
   assert.equal(gmailCalls.length, 0, "a late notice for a disconnected inbox does nothing");
   // Connected again with a different Gmail: its own watch, not the old mailbox's.
   const s2 = new URL((await (await post("/relay/my/gmail/connect", alice)).json()).url).searchParams.get("state");
-  assert.match((await call("/relay/gmail/callback?code=good&state=" + s2)).headers.get("location"), /#gmail=connected$/);
+  assert.match(await finishMail(await call("/relay/gmail/callback?code=good&state=" + s2), alice), /#gmail=connected$/);
   sqlite.prepare("UPDATE mail_scan_jobs SET state = 'done'").run();
   assert.equal(row(aliceBox).push_expires_at, null, "no watch carried over");
   watchBodies.length = 0;

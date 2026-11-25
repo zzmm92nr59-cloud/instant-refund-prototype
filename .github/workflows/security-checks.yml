@@ -64,6 +64,8 @@ jobs:
         run: node scripts/test-outlook-search.mjs
       - name: Google and Microsoft sign-in can only be finished by the person who signed in (a sign-in started by someone else can't be claimed, and connects no inbox)
         run: node scripts/test-signin-claim.mjs
+      - name: Connect Gmail / Outlook can only be finished by the session that started it (a consent link sent to someone else connects nothing)
+        run: node scripts/test-mail-connect-session.mjs
       - name: Two-step sign-in (sessions from before the second step are ended; the first second step signs other devices out)
         run: node scripts/test-second-step.mjs
       - name: Public Shopify status gives counts only (no shop address, order counts or error text)

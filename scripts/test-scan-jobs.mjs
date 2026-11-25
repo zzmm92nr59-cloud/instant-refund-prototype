@@ -94,7 +94,7 @@ const minute = async (n = 1) => { let last; for (let i = 0; i < n; i++) { clock 
 
 // 1. Connecting starts the first read on Relay's side straight away.
 const state = new URL((await (await post("/relay/my/gmail/connect", alice)).json()).url).searchParams.get("state");
-await call("/relay/gmail/callback?code=good&state=" + state);
+await post("/relay/my/gmail/finish", alice, { code: /mailcode=([A-Za-z0-9_-]{43})/.exec((await call("/relay/gmail/callback?code=good&state=" + state)).headers.get("location"))[1] });
 assert.equal(job().state, "running", "the first read is waiting to run as soon as the mailbox is connected");
 console.log("ok - connecting the mailbox starts its first read on Relay's side");
 
@@ -178,7 +178,7 @@ console.log("ok - no background reading without permission");
 await post("/relay/my/gmail/disconnect", alice, {});
 assert.equal(sqlite.prepare("SELECT COUNT(*) n FROM mail_scan_jobs").get().n, 0, "disconnect removes it");
 const st2 = new URL((await (await post("/relay/my/gmail/connect", alice)).json()).url).searchParams.get("state");
-await call("/relay/gmail/callback?code=good&state=" + st2);
+await post("/relay/my/gmail/finish", alice, { code: /mailcode=([A-Za-z0-9_-]{43})/.exec((await call("/relay/gmail/callback?code=good&state=" + st2)).headers.get("location"))[1] });
 assert.equal(sqlite.prepare("SELECT COUNT(*) n FROM mail_scan_jobs").get().n, 1);
 assert.equal((await post("/relay/my/delete", alice, {})).status, 200);
 assert.equal(sqlite.prepare("SELECT COUNT(*) n FROM mail_scan_jobs").get().n, 0, "deleting the account removes it");

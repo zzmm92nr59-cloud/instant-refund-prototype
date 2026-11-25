@@ -143,7 +143,7 @@ async function world(mail) {
     body: JSON.stringify(body) }), env, new URL("https://w.test" + path), CORS, { now, fetchImpl: w.fetchImpl });
   await w.post("/relay/my/consent", { version: G.CONSENT_VERSION });
   const state = new URL((await (await w.post("/relay/my/gmail/connect")).json()).url).searchParams.get("state");
-  await w.call("/relay/gmail/callback?code=good&state=" + state);
+  await w.post("/relay/my/gmail/finish", { code: /mailcode=([A-Za-z0-9_-]{43})/.exec((await w.call("/relay/gmail/callback?code=good&state=" + state)).headers.get("location"))[1] });
   w.shopperId = sqlite.prepare("SELECT shopper_id FROM gmail_connections").get().shopper_id;
   // Everything the shopper already has was read by the reader before this one.
   const ins = sqlite.prepare("INSERT INTO captured_receipts (id,shopper_id,message_ref,status,details,created_at) VALUES (?,?,?,?,?,?)");

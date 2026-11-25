@@ -66,7 +66,7 @@ const alice = (await (await call("/relay/auth/verify", { method: "POST", body: {
 const post = (path, body) => call(path, { method: "POST", token: alice, body });
 await post("/relay/my/consent", { version: CONSENT_VERSION });
 const state = new URL((await (await post("/relay/my/gmail/connect")).json()).url).searchParams.get("state");
-await call("/relay/gmail/callback?code=good&state=" + state);
+await post("/relay/my/gmail/finish", { code: /mailcode=([A-Za-z0-9_-]{43})/.exec((await call("/relay/gmail/callback?code=good&state=" + state)).headers.get("location"))[1] });
 
 let cursor = "", more = true, rounds = 0;
 while (more && rounds < 80) { const j = await (await post("/relay/my/gmail/scan", cursor ? { cursor } : {})).json(); more = j.more; cursor = j.cursor; rounds++; }

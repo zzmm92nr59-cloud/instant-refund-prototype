@@ -164,12 +164,20 @@ assert.equal(sqlite.prepare("SELECT COUNT(*) n FROM gmail_oauth_states WHERE sta
 
 // 4. Callback: bad/forged/used/expired states are refused; good one connects Alice only.
 const loc = res => res.headers.get("location");
+// The callback connects nothing by itself: it sends the browser back with a single-use code, which the app hands in signed in
+// with the session that started (gmail.js finishMailConnect). This does that, and says what the app would then be told.
+const finished = async (res, token) => {
+  const m = /#gmail=finish&mailcode=([A-Za-z0-9_-]{43})$/.exec(loc(res) || "");
+  if (!m) return loc(res);
+  const b = await (await post("/relay/my/gmail/finish", token, { code: m[1] })).json();
+  return "#gmail=" + (b.result || b.error);
+};
 assert.match(loc(await cb("code=good-code&state=" + "x".repeat(43))), /#gmail=failed$/, "unknown state refused");
 assert.match(loc(await cb("code=good-code")), /#gmail=failed$/);
 assert.match(loc(await cb("error=access_denied&state=" + state)), /#gmail=denied$/);
 assert.match(loc(await cb("code=narrow-scope&state=" + state)), /#gmail=failed$/, "must have granted the Gmail read scope");
 const s2 = await stateFrom(alice);
-assert.match(loc(await cb("code=good-code&state=" + s2)), /#gmail=connected$/);
+assert.match(await finished(await cb("code=good-code&state=" + s2), alice), /#gmail=connected$/);
 assert.match(loc(await cb("code=good-code&state=" + s2)), /#gmail=failed$/, "state is single-use");
 const s3 = await stateFrom(alice);
 clock += 11 * 60 * 1000;
@@ -693,7 +701,7 @@ assert.equal((await (await call("/relay/my/consent", { token: alice })).json()).
 
 // 11. Withdrawing consent disconnects, deletes, and blocks further access.
 const s4 = await stateFrom(alice);
-assert.match(loc(await cb("code=good-code&state=" + s4)), /#gmail=connected$/);
+assert.match(await finished(await cb("code=good-code&state=" + s4), alice), /#gmail=connected$/);
 await post("/relay/my/gmail/scan", alice);
 const s5 = await stateFrom(alice);
 await post("/relay/my/consent/withdraw", alice);
@@ -706,7 +714,7 @@ assert.equal((await post("/relay/my/gmail/scan", alice)).status, 403);
 // 12. Deleting the account removes every Gmail-related row.
 await post("/relay/my/consent", bob, { version: CONSENT_VERSION });
 const s6 = await stateFrom(bob);
-await cb("code=good-code&state=" + s6);
+await finished(await cb("code=good-code&state=" + s6), bob);
 await post("/relay/my/gmail/scan", bob);
 assert.ok(sqlite.prepare("SELECT COUNT(*) n FROM captured_receipts").get().n > 0);
 const revokesBefore = calls.filter(c => c.url === "https://oauth2.googleapis.com/revoke").length;
