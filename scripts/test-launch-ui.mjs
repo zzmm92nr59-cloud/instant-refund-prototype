@@ -165,14 +165,15 @@ await page.locator("#mePage .rl-arow", { hasText: "Two-step sign-in" }).waitFor(
 sheet = await page.locator("#mePage").innerText();
 assert.doesNotMatch(sheet, /TEST MODE|Card for swaps/, "no test card in Security and privacy either");
 assert.doesNotMatch(sheet, SHOPPER_NEVER_SEES);
-// Someone who saved a card during a test-mode swap can always find it again to remove it (labelled as test mode).
+// Someone who saved a card during a test-mode swap can always find it again to remove it. Without the testing tools it
+// carries no test wording (CLAUDE.md rule 15: this used to say "TEST MODE · no real money" to shoppers).
 cardSaved = true;
 // The card was saved away from this screen, so the app learns about it the next time it opens (reads are reused for a minute).
 await reload();
 await homeShows(page, "J");
 await openAccountRow(page, "Card for swaps");
 await page.getByRole("button", { name: "Remove card" }).waitFor();
-await page.getByText("TEST MODE · no real money").waitFor();
+assert.doesNotMatch(await page.locator("#mePage").innerText(), /test mode|no real money/i, "no test wording for a shopper");
 await page.getByRole("button", { name: "Back to Settings" }).click();
 cardSaved = false;
 console.log("ok - Receipts, Wrapped and the Account page carry no test wording; Swap & resell is on Browse, not a tab; the test card is hidden (a saved card can still be removed)");
@@ -200,7 +201,7 @@ await page.locator('[data-card-select="shopify-v-1"]').waitFor();
 assert.equal(await page.locator("[data-card-select]", { hasText: "Sandbox Hoodie" }).count(), 0, "no test shop's products in Browse");
 assert.ok(catalogueAsks.slice(asksBefore).some(q => /test=1/.test(q)), "with testing tools on, Shops on Relay asks for test shops too");
 await openAccountRow(page, "Card for swaps");
-await page.getByText("TEST MODE · no real money").waitFor();
+await page.getByText("Test mode: no real money").waitFor();
 await page.goto(origin + "/index.html?testtools=0");
 await homeShows(page, "J");
 assert.deepEqual(await tabs(), TABS);

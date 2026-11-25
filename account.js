@@ -36,9 +36,32 @@
   var STORE_LOGOS = {"1password.com":"svg","abelandcole.co.uk":"png","abercrombie.com":"png","accessorize.com":"png","accor.com":"svg","addisonlee.com":"png","adidas.co.uk":"png","adobe.com":"png","aerlingus.com":"png","aesop.com":"png","airbnb.co.uk":"svg","airfrance.co.uk":"png","aldi.co.uk":"svg","aliexpress.com":"png","allbarone.co.uk":"png","allsaints.com":"svg","altontowers.com":"png","amazon.co.uk":"png","anthropic.com":"svg","ao.com":"png","apple.com":"png","appliancesdirect.co.uk":"png","argos.co.uk":"png","arket.com":"png","asda.com":"png","asics.com":"png","asos.com":"png","astridandmiyu.com":"png","atgtickets.com":"png","audible.co.uk":"png","avantiwestcoast.co.uk":"png","avis.co.uk":"png","axs.com":"png","backmarket.co.uk":"png","barbour.com":"png","beautybay.com":"png","beaverbrooks.co.uk":"png","beerhawk.co.uk":"png","bellaitalia.co.uk":"png","benefitcosmetics.com":"png","bensonsforbeds.co.uk":"png","berghaus.com":"png","bershka.com":"png","better.org.uk":"png","bettys.co.uk":"png","birkenstock.com":"svg","blacks.co.uk":"svg","blackwells.co.uk":"png","bloomandwild.com":"png","bmstores.co.uk":"png","boden.com":"png","bolt.eu":"png","bonmarche.co.uk":"png","boohoo.com":"svg","boohooman.com":"png","booking.com":"png","booths.co.uk":"png","boots.com":"png","bose.co.uk":"png","bowsandwhistles.co.uk":"png","box.co.uk":"png","brewdog.com":"svg","britishairways.com":"svg","brittany-ferries.co.uk":"png","bt.com":"svg","bulk.com":"png","bumble.com":"svg","burberry.com":"png","burgerking.co.uk":"png","burton.co.uk":"png","butternutbox.com":"png","buyagift.co.uk":"svg","cadburygiftsdirect.co.uk":"png","caferouge.com":"png","caffenero.com":"png","calm.com":"png","calvinklein.co.uk":"png","canva.com":"png","cardfactory.co.uk":"svg","carpetright.co.uk":"svg","castore.com":"png","chainreactioncycles.com":"png","charlottetilbury.com":"svg","chemist4u.com":"png","chipotle.co.uk":"png","cineworld.co.uk":"png","clarechampion.ie":"png","clarins.co.uk":"png","clarks.co.uk":"png","classpass.com":"png","clinique.co.uk":"png","coastfashion.com":"png","converse.com":"png","coop.co.uk":"png","cos.com":"png","costa.co.uk":"png","costco.co.uk":"png","cote.co.uk":"png","cotswoldco.com":"png","cotswoldoutdoor.com":"png","coxandcox.co.uk":"png","craghoppers.com":"png","crocs.co.uk":"png","crocus.co.uk":"svg","crosscountrytrains.co.uk":"png","ctshirts.com":"svg","cultbeauty.co.uk":"svg","cultfurniture.com":"png","currys.co.uk":"png","danielwellington.com":"png","davidlloyd.co.uk":"svg","dazn.com":"png","debenhams.com":"png","decathlon.co.uk":"png","deezer.com":"png","deliveroo.co.uk":"png","depop.com":"png","detalecph.com":"png","dfds.com":"png","dfs.co.uk":"png","dice.fm":"svg","discord.com":"png","dishoom.com":"svg","disneyplus.com":"svg","diy.com":"png","dobbies.com":"png","dominos.co.uk":"png","dorothyperkins.com":"png","dreams.co.uk":"png","drmartens.com":"svg","dropbox.com":"png","dulux.co.uk":"png","dunelm.com":"png","dunelondon.com":"svg","duolingo.com":"png","dyson.co.uk":"png","easyjet.com":"png","ebay.co.uk":"png","ebuyer.com":"png","economist.com":"png","ee.co.uk":"png","eflorist.co.uk":"png","elemis.com":"png","elevenlabs.io":"svg","emirates.com":"png","emma-sleep.co.uk":"png","endclothing.com":"png","english-heritage.org.uk":"png","enterprise.co.uk":"png","epicgames.com":"png","ernestjones.co.uk":"png","esteelauder.co.uk":"png","etsy.com":"png","europcar.co.uk":"png","eurostar.com":"png","evans.co.uk":"png","evanscycles.com":"png","eventbrite.co.uk":"png","eventim.co.uk":"png","everymancinema.com":"png","expedia.co.uk":"png","expressvpn.com":"png","farfetch.com":"png","farmfoods.co.uk":"png","farrow-ball.com":"png","fatface.com":"png","fenwick.co.uk":"png","firebox.com":"png","fiveguys.co.uk":"svg","flannels.com":"png","footlocker.co.uk":"png","fortnumandmason.com":"png","foyles.co.uk":"png","fragrancedirect.co.uk":"png","francomanca.co.uk":"png","frankieandbennys.com":"png","fredperry.com":"png","freemans.com":"png","freenow.com":"png","frugi.com":"png","fruugo.co.uk":"png","ft.com":"png","funkypigeon.com":"png","furniturevillage.co.uk":"png","gailsbread.co.uk":"svg","game.co.uk":"png","garmin.com":"svg","gbk.co.uk":"png","giffgaff.com":"png","gigantic.com":"png","github.com":"svg","glassesdirect.co.uk":"png","glossier.com":"png","goldsmiths.co.uk":"svg","google.com":"png","gordonramsayrestaurants.com":"png","gousto.co.uk":"png","graze.com":"png","greatbeanbags.com":"png","greeneking.co.uk":"png","greggs.co.uk":"svg","groupon.co.uk":"png","gruum.com":"png","gucci.com":"png","gumtree.com":"png","gwr.com":"png","gymshark.com":"png","habitat.co.uk":"png","halfords.com":"png","hamleys.com":"png","harrods.com":"png","harvester.co.uk":"png","headspace.com":"png","heals.com":"png","hellofresh.co.uk":"png","hertz.co.uk":"png","hilton.com":"png","hinge.co":"png","hm.com":"png","hmv.com":"png","hobbs.com":"png","hobbycraft.co.uk":"png","holidayextras.co.uk":"png","hollandandbarrett.com":"png","hollisterco.com":"png","hollywoodbowl.co.uk":"png","homary.com":"png","homebargains.co.uk":"svg","homebase.co.uk":"png","homesense.com":"svg","honestburgers.co.uk":"png","hotelchocolat.com":"png","hotels.com":"png","houseoffraser.co.uk":"png","howdens.com":"svg","hsamuel.co.uk":"png","hughes.co.uk":"png","hugoboss.com":"png","hunterboots.com":"png","iceland.co.uk":"png","idmobile.co.uk":"png","iguanas.co.uk":"png","ihg.com":"png","ikea.com":"png","interflora.co.uk":"png","inthestyle.com":"png","itsu.com":"png","itv.com":"png","jackjones.com":"png","jbl.com":"png","jdsports.co.uk":"png","jdwetherspoon.com":"png","jdwilliams.co.uk":"png","jessops.com":"png","jet2.com":"svg","jet2holidays.com":"svg","jigsaw-online.com":"png","johnlewis.com":"svg","jojomamanbebe.co.uk":"png","jollyes.co.uk":"png","jomalone.co.uk":"png","josephjoseph.com":"png","joules.com":"png","just-eat.co.uk":"png","justpark.com":"svg","karaca.co.uk":"png","karenmillen.com":"png","kayak.co.uk":"svg","kfc.co.uk":"png","kikocosmetics.com":"svg","klarna.com":"png","klm.com":"png","kobo.com":"png","krispykreme.co.uk":"png","kurtgeiger.com":"png","kwik-fit.com":"png","lacoste.com":"png","laithwaites.co.uk":"png","lakeland.co.uk":"png","laptopsdirect.co.uk":"png","laredoute.co.uk":"png","lastminute.com":"png","lebara.co.uk":"png","lego.com":"png","legoland.co.uk":"png","leon.co":"png","leshuttle.com":"svg","levi.com":"png","li.me":"png","libertylondon.com":"png","lidl.co.uk":"svg","lights4fun.co.uk":"svg","lilyskitchen.co.uk":"png","lindt.co.uk":"png","linkedin.com":"png","littlewoods.com":"png","lner.co.uk":"png","loaf.com":"png","loganair.co.uk":"png","londontheatredirect.com":"png","lookfantastic.com":"png","louisvuitton.com":"png","loveholidays.com":"png","lufthansa.com":"png","lululemon.com":"png","lush.com":"png","lwtheatres.co.uk":"svg","lycamobile.co.uk":"png","lyleandscott.com":"png","maccosmetics.co.uk":"png","made.com":"png","magnet.co.uk":"svg","majestic.co.uk":"png","mamasandpapas.com":"png","mandmdirect.com":"png","mango.com":"png","marksandspencer.com":"png","marriott.com":"png","massimodutti.com":"png","matalan.co.uk":"png","mcdonalds.com":"png","megabus.com":"png","menkind.co.uk":"png","meta.com":"png","microsoft.com":"png","millets.co.uk":"svg","mindfulchef.com":"png","mintvelvet.co.uk":"png","missguided.co.uk":"png","missoma.com":"png","mobiles.co.uk":"png","moltonbrown.co.uk":"svg","monicavinader.com":"png","monsoon.co.uk":"png","montane.com":"png","moonpig.com":"png","morrisons.com":"svg","moss.co.uk":"png","mothercare.com":"png","mountainwarehouse.com":"png","mrporter.com":"png","mulberry.com":"png","musicmagpie.co.uk":"png","myfitnesspal.com":"svg","myprotein.com":"png","mytheresa.com":"png","mytoggle.io":"png","myvue.com":"png","nakedwines.co.uk":"svg","nandos.co.uk":"png","nastygal.com":"png","nationalexpress.com":"svg","nationalrail.co.uk":"svg","nationaltrust.org.uk":"svg","nealsyardremedies.com":"png","neomwellbeing.com":"png","nespresso.com":"png","net-a-porter.com":"png","netflix.com":"png","newbalance.co.uk":"png","newlook.com":"png","next.co.uk":"png","nike.com":"png","ninjakitchen.co.uk":"png","nintendo.com":"png","nkuku.com":"png","nordvpn.com":"png","northernrailway.co.uk":"png","notcutts.co.uk":"png","notion.so":"png","notonthehighstreet.com":"png","nowtv.com":"png","nuffieldhealth.com":"png","o2.co.uk":"png","oakfurnitureland.co.uk":"png","oasis-stores.com":"png","ocado.com":"png","odeon.co.uk":"png","office.co.uk":"png","ohpolly.com":"png","oliverbonas.com":"png","onbuy.com":"png","onepeloton.co.uk":"png","onthebeach.co.uk":"png","openai.com":"svg","overclockers.co.uk":"svg","pactcoffee.com":"png","pandora.net":"png","papajohns.co.uk":"png","paramountplus.com":"png","patagonia.com":"png","patreon.com":"png","paybyphone.co.uk":"png","peacocks.co.uk":"svg","personalisedgiftsshop.co.uk":"png","petplanet.co.uk":"png","pets-corner.co.uk":"png","petsathome.com":"png","pharmacy2u.co.uk":"png","phase-eight.com":"png","picturehouses.com":"png","pizzaexpress.com":"svg","pizzahut.co.uk":"png","pizzapilgrims.co.uk":"png","playstation.com":"png","plusnet.com":"png","poferries.com":"png","poundland.co.uk":"png","premierinn.com":"png","prestigeflowers.co.uk":"png","pret.co.uk":"svg","prettylittlething.com":"png","prezzo.co.uk":"png","primark.com":"png","primevideo.com":"png","primrose.co.uk":"png","pullandbear.com":"png","puma.com":"png","puregym.com":"png","qatarairways.com":"png","qvcuk.com":"png","rains.com":"png","ralphlauren.co.uk":"png","reddragondarts.com":"png","redletterdays.co.uk":"svg","reebok.co.uk":"png","regatta.com":"png","reiss.com":"png","revolutionbeauty.com":"png","richersounds.com":"png","ring.com":"png","ringgo.co.uk":"png","riverford.co.uk":"png","riverisland.com":"png","robertdyas.co.uk":"png","roblox.com":"png","rohan.co.uk":"png","royalmail.com":"png","ryanair.com":"png","ryman.co.uk":"png","sainsburys.co.uk":"png","samsung.com":"png","scan.co.uk":"png","scotrail.co.uk":"png","screwfix.com":"svg","seasaltcornwall.com":"png","seetickets.com":"png","selfridges.com":"png","sephora.co.uk":"png","serenataflowers.com":"png","sevenoakssoundandvision.co.uk":"png","sharkclean.co.uk":"png","shein.com":"png","showcasecinemas.co.uk":"png","silentnight.co.uk":"png","simbasleep.com":"png","simplybe.co.uk":"png","simplycook.com":"png","sixt.co.uk":"png","size.co.uk":"png","skechers.co.uk":"png","skiddle.com":"png","sky.com":"png","skyscanner.net":"png","slugandlettuce.co.uk":"png","smarty.co.uk":"png","smythstoys.com":"png","sofology.co.uk":"png","sonos.com":"png","southernrailway.com":"png","southwesternrailway.com":"png","spacenk.com":"svg","spar.co.uk":"png","specsavers.co.uk":"png","sportsdirect.com":"png","spotify.com":"png","ssense.com":"png","starbucks.co.uk":"svg","steampowered.com":"png","stenaline.co.uk":"png","stonegatepubs.com":"png","stoneisland.com":"png","stories.com":"png","stradivarius.com":"png","strava.com":"png","stubhub.co.uk":"png","studio.co.uk":"png","superdrug.com":"png","superdry.com":"png","surfshark.com":"png","swarovski.com":"png","sweatybetty.com":"png","swooneditions.com":"png","tacobell.co.uk":"png","talktalk.co.uk":"png","tedbaker.com":"png","telegraph.co.uk":"svg","tempur.com":"svg","temu.com":"png","tesco.com":"png","tescomobile.com":"png","tfl.gov.uk":"png","tgifridays.co.uk":"png","thamesclippers.com":"svg","thameslinkrailway.com":"png","thebodyshop.com":"png","theguardian.com":"svg","thegymgroup.com":"png","theinkeylist.com":"png","thenorthface.co.uk":"png","theordinary.com":"png","theperfumeshop.com":"png","thepihut.com":"png","theproteinworks.com":"png","therange.co.uk":"png","thescentreserve.com":"png","thetimes.co.uk":"png","thetoyshop.com":"png","thewhitecompany.com":"png","theworks.co.uk":"png","thompson-morgan.com":"png","thorntons.co.uk":"png","thorpepark.com":"png","thortful.com":"png","three.co.uk":"png","ticketmaster.co.uk":"png","tidal.com":"png","timberland.co.uk":"png","tinder.com":"png","tkmaxx.com":"png","tmlewin.com":"svg","tobycarvery.co.uk":"png","todaytix.com":"png","tommy.com":"png","toolstation.com":"png","topshop.com":"svg","tortilla.co.uk":"png","trainline.com":"png","travelodge.co.uk":"png","trespass.com":"png","tui.co.uk":"png","turtlebay.co.uk":"png","twitch.tv":"png","uber.com":"png","ubereats.com":"png","ugg.com":"png","underarmour.co.uk":"png","uniqlo.com":"png","vans.co.uk":"png","vapeandgo.co.uk":"png","very.co.uk":"png","victorianplumbing.co.uk":"png","viking-direct.co.uk":"png","vinted.co.uk":"png","virginactive.co.uk":"png","virginatlantic.com":"svg","virginexperiencedays.co.uk":"png","virginmedia.com":"png","virginwines.co.uk":"png","visiondirect.co.uk":"png","vodafone.co.uk":"png","voxi.co.uk":"png","wagamama.com":"png","waitrose.com":"png","wallis.co.uk":"png","warehousefashion.com":"png","waterstones.com":"png","wayfair.co.uk":"png","webuy.com":"png","weekday.com":"png","weirdfish.co.uk":"svg","well.co.uk":"png","wexphotovideo.com":"png","whistles.com":"png","whitestuff.com":"png","whsmith.co.uk":"png","wickes.co.uk":"png","wilko.com":"png","wingstop.co.uk":"png","wizzair.com":"png","wordery.com":"png","worldofbooks.com":"svg","xbox.com":"png","yankeecandle.co.uk":"png","yosushi.com":"png","youtube.com":"png","zalando.co.uk":"svg","zara.com":"png","zavvi.com":"png","zipcar.co.uk":"png","zizzi.co.uk":"png","zooplus.co.uk":"png"};
   // Other addresses the same shops send email from (just-eat.com is Just Eat's just-eat.co.uk).
   var LOGO_ALIASES = {"adidas.com":"adidas.co.uk","airbnb.com":"airbnb.co.uk","amazon.com":"amazon.co.uk","argos.com":"argos.co.uk","asda.co.uk":"asda.com","asos.co.uk":"asos.com","ba.com":"britishairways.com","bandq.co.uk":"diy.com","bensons-for-beds.co.uk":"bensonsforbeds.co.uk","boohoo.co.uk":"boohoo.com","booking.co.uk":"booking.com","boots.co.uk":"boots.com","chatgpt.com":"openai.com","claude.ai":"anthropic.com","costa.com":"costa.co.uk","cultbeauty.com":"cultbeauty.co.uk","currys.com":"currys.co.uk","deliveroo.com":"deliveroo.co.uk","disneyplus.co.uk":"disneyplus.com","dominos.com":"dominos.co.uk","ebay.com":"ebay.co.uk","google.co.uk":"google.com","greggs.com":"greggs.co.uk","groupon.com":"groupon.co.uk","grouponmail.co.uk":"groupon.co.uk","hm.co.uk":"hm.com","holland-and-barrett.com":"hollandandbarrett.com","hollandandbarrett.co.uk":"hollandandbarrett.com","ikea.co.uk":"ikea.com","itunes.com":"apple.com","jdwetherspoon.co.uk":"jdwetherspoon.com","johnlewis.co.uk":"johnlewis.com","just-eat.com":"just-eat.co.uk","kfc.com":"kfc.co.uk","klarna.co.uk":"klarna.com","lego.co.uk":"lego.com","lululemon.co.uk":"lululemon.com","mcdonalds.co.uk":"mcdonalds.com","microsoft.co.uk":"microsoft.com","myeflorist.co.uk":"eflorist.co.uk","myvue.co.uk":"myvue.com","nakedwines.com":"nakedwines.co.uk","nandos.com":"nandos.co.uk","netflix.co.uk":"netflix.com","next.com":"next.co.uk","nike.co.uk":"nike.com","nordaccount.com":"nordvpn.com","oak-furniture-land.co.uk":"oakfurnitureland.co.uk","ocado.co.uk":"ocado.com","playstation.co.uk":"playstation.com","pret.com":"pret.co.uk","puma.co.uk":"puma.com","sainsburys.com":"sainsburys.co.uk","samsung.co.uk":"samsung.com","sharkninja.com":"ninjakitchen.co.uk","spotify.co.uk":"spotify.com","starbucks.com":"starbucks.co.uk","superdrug.co.uk":"superdrug.com","tempur.co.uk":"tempur.com","tesco.co.uk":"tesco.com","thetrainline.com":"trainline.com","ticketmaster.com":"ticketmaster.co.uk","tkmaxx.co.uk":"tkmaxx.com","trainline.co.uk":"trainline.com","uber.co.uk":"uber.com","uniqlo.co.uk":"uniqlo.com","waitrose.co.uk":"waitrose.com","zara.co.uk":"zara.com"};
+  // Today's date in the UK (YYYY-MM-DD), whatever the phone's clock or time zone says. Every "today", countdown and "is it
+  // past its date" goes through this: the date in UTC is still yesterday from midnight to 1am in British Summer Time, which
+  // made a last day read "1 day left" and a passed date read "Return today". shift moves it by whole days (-1: yesterday).
+  var ukDayFmt = null, ukDayAt = -1, ukDayIs = "";
+  function ukToday(shift) {
+    var now = Date.now(), min = Math.floor(now / 60000);
+    if (min !== ukDayAt) {
+      var day = "";
+      try {
+        ukDayFmt = ukDayFmt || new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/London", year: "numeric", month: "2-digit", day: "2-digit" });
+        var got = {}; ukDayFmt.formatToParts(new Date(now)).forEach(function (x) { got[x.type] = x.value; });
+        day = got.year + "-" + got.month + "-" + got.day;
+      } catch (e) {}
+      ukDayIs = /^\d{4}-\d{2}-\d{2}$/.test(day) ? day : new Date(now).toISOString().slice(0, 10); ukDayAt = min;
+    }
+    return shift ? new Date(Date.parse(ukDayIs + "T00:00:00Z") + shift * 864e5).toISOString().slice(0, 10) : ukDayIs;
+  }
+  window.relayUkToday = ukToday;
   var MEMO_MS = 5 * 60 * 1000;
   function memoFresh(e) { return e && Date.now() - e.at < MEMO_MS; }
-  function memoReset() { memo = { blobs: {}, consent: null, gmail: null, receipts: null, openCat: null, openIds: {} }; forgetKept(); }
+  function memoReset() {
+    // The last member's pictures are let go of, not held in memory until Relay is closed.
+    var old = memo && memo.blobs;
+    memo = { blobs: {}, consent: null, gmail: null, receipts: null, openCat: null, openIds: {} }; forgetKept();
+    if (old) Object.keys(old).forEach(function (k) { Promise.resolve(old[k]).then(function (u) { if (typeof u === "string" && u.indexOf("blob:") === 0) { try { URL.revokeObjectURL(u); } catch (e) {} } }, function () {}); });
+  }
   // The last receipts and shop orders are also kept on this device (for the signed-in account only, removed on sign-out),
   // so opening Relay shows them at once instead of a loading screen, then updates them.
   var DISK_KEY = "relay.cache.v1";
@@ -132,12 +155,28 @@
   function mailOwner() { return mailName() === "Outlook" ? "Microsoft" : "Google"; }
   // An email Relay can open again: its id in Gmail or in Outlook.
   function mailRef(x) { return x && (/^[A-Za-z0-9]{6,40}$/.test(x.gmailId || "") || /^[A-Za-z0-9_=+\/-]{16,512}$/.test(x.outlookId || "")); }
-  function save(v) { reads = {}; var was = load(); if (!v || (was && was.email !== v.email)) memoReset(); if (!v) { try { localStorage.removeItem(MAILBOX_KEY); localStorage.removeItem(PROFILE_KEY); localStorage.removeItem("relay.drafts.v1"); localStorage.removeItem("relay.pending-watches.v1"); localStorage.removeItem("relay.auctions.v1"); localStorage.removeItem("relay.bag.ask.v1"); localStorage.removeItem("relay.market.v1"); logoMisses = {}; window.__relayPayDue = 0; window.__relayMarket = 0; window.__relayMarketNews = null; } catch (e) {} } try { v ? localStorage.setItem(KEY, JSON.stringify(v)) : localStorage.removeItem(KEY); } catch (e) {} if (!v) paintAvatars();
+  // What this phone keeps for the member who's signed in. All of it goes on sign-out, and when a different member signs
+  // in without the last one signing out first (a sign-in link opened on a shared phone), so nobody is shown another
+  // member's things (CLAUDE.md rule 5). index.html clears what it keeps itself (watches, style) on the same event.
+  // Shops' own websites in Browse (relay-web-preview) goes too when Relay switched it on for a team or tester account,
+  // and stays when the phone itself was given it (?shops=1, or the switch: relay-web-preview-chosen).
+  var MEMBER_KEYS = [MAILBOX_KEY, PROFILE_KEY, "relay.drafts.v1", "relay.pending-watches.v1", "relay.auctions.v1", "relay.bag.ask.v1", "relay.market.v1", "relay.scanSeen", "relay-market-area", "relay.photo-ok", "relay.journey-plan.v1", "relay.interests.v1", "relay.ask.v1"];
+  function forgetMember() {
+    try {
+      MEMBER_KEYS.forEach(function (k) { localStorage.removeItem(k); });
+      // (Set to off, not removed: with nothing there, index.html takes it to be a phone from before the switch existed.)
+      if (localStorage.getItem("relay-web-preview-chosen") !== "1" && localStorage.getItem("relay-web-preview") === "1") localStorage.setItem("relay-web-preview", "0");
+    } catch (e) {}
+    logoMisses = {}; window.__relayPayDue = 0; window.__relayMarket = 0; window.__relayMarketNews = null; window.__relayInterestCats = [];
+    try { teamWebChecked = false; photoOn = null; } catch (e) {}
+  }
+  function save(v) { reads = {}; var was = load(), other = Boolean(was && v && was.email !== v.email); if (!v || other) memoReset(); if (!v || other) forgetMember(); try { v ? localStorage.setItem(KEY, JSON.stringify(v)) : localStorage.removeItem(KEY); } catch (e) {} if (!v) paintAvatars();
     if (((was && was.token) || null) !== ((v && v.token) || null)) { try { window.dispatchEvent(new Event("relay:session")); } catch (e) {} } }
   // Reads are shared and briefly remembered: two parts of a screen asking for the same thing make one request, and going
   // back to a tab within a minute reuses what was just loaded instead of asking Relay again. Any change (a POST) forgets
   // them all, so nothing out of date shows after an edit. fresh: true asks Relay regardless.
   var READ_REUSE_MS = 60 * 1000, reads = {};
+  var API_READ_WAIT_MS = 30 * 1000, API_SEND_WAIT_MS = 90 * 1000, API_BODY_WAIT_MS = 120 * 1000;
   // What only the shopper changes (their name, address, phone, card, how they sign in, what they've agreed to, whether
   // they're on Relay's team) is reused for ten minutes instead of one. Their own change forgets everything, so the only
   // way these go out of date is a change made on another device, which pulling down picks up at once.
@@ -154,6 +193,20 @@
   function forgetMail() {
     mailGen++; memo.gmail = null;
     Object.keys(reads).forEach(function (k) { if (k.slice(k.indexOf(" ") + 1) === MAIL_PATH) delete reads[k]; });
+  }
+  // Runs fn once ms have really passed, counted in five-second steps with a turn of the page between each: a clock that
+  // jumps (a phone that slept with a request on its way) costs one step, so an answer that's just about to land isn't
+  // thrown away. Returns the way to call it off.
+  function giveUpAfter(ms, fn) {
+    var left = Math.max(1, Math.ceil(ms / 5000)), t = 0, off = false;
+    function arm() { if (!off) t = setTimeout(step, 5000); }
+    function step() {
+      if (off) return;
+      if (--left <= 0) return fn();
+      try { var c = new MessageChannel(); c.port1.onmessage = function () { c.port1.close(); arm(); }; c.port2.postMessage(0); } catch (e) { arm(); }
+    }
+    arm();
+    return function () { off = true; clearTimeout(t); };
   }
   function api(path, opts) {
     opts = opts || {};
@@ -172,13 +225,20 @@
     var shown = method === "GET" && /^\/relay\/my\/receipts(?:\?|$)/.test(path) ? withoutTestShops : function (r) { return r; };
     if (hit && !opts.fresh && (hit.waiting || Date.now() - hit.at < (OWN_READS[path] ? OWN_REUSE_MS : READ_REUSE_MS))) return current(hit.answer.then(copyAnswer)).then(shown);
     inflight++;
-    var answer = fetch(API + path, { method: method, headers: headers, body: opts.body ? JSON.stringify(opts.body) : undefined })
+    // A request that Relay never answers is given up on (a read after 30 seconds, a change after 90), so the screen that asked
+    // can say it couldn't load instead of waiting for ever. It fails the same way a dropped connection does.
+    var stop = typeof AbortController === "function" ? new AbortController() : null;
+    var gaveUp = stop ? giveUpAfter(opts.wait || (method === "GET" ? API_READ_WAIT_MS : API_SEND_WAIT_MS), function () { try { stop.abort(); } catch (e) {} }) : null;
+    var answer = fetch(API + path, { method: method, headers: headers, body: opts.body ? JSON.stringify(opts.body) : undefined, signal: stop ? stop.signal : undefined })
       .then(function (r) {
+        // Relay has answered: a long list (thousands of receipts on a slow signal) is given two more minutes to arrive.
+        if (gaveUp) { gaveUp(); gaveUp = giveUpAfter(API_BODY_WAIT_MS, function () { try { stop.abort(); } catch (e) {} }); }
         var b = r.headers && r.headers.get && r.headers.get("x-d1-bookmark");
         if (b && /^[0-9A-Za-z._:-]{8,160}$/.test(b) && (!bookmark || b > bookmark)) { bookmark = b; try { localStorage.setItem(BOOKMARK_KEY, b); } catch (e) {} }
-        return r.text().then(function (t) { return { ok: r.ok, status: r.status, text: t }; }, function () { return { ok: r.ok, status: r.status, text: "" }; });
+        return r.text().then(function (t) { return { ok: r.ok, status: r.status, text: t }; }, function (e) { if (stop && stop.signal.aborted) throw e; return { ok: r.ok, status: r.status, text: "" }; });
       });
     answer.then(settled, settled);
+    if (gaveUp) answer.then(function () { gaveUp(); }, function () { gaveUp(); });
     // A change, once done: reads that started while it was on its way may be from before it, so none is reused.
     if (method !== "GET") answer.then(function () { reads = {}; }, function () { reads = {}; });
     answer.then(function (r) { if (r.status === 403 && /"second_step_needed"/.test(r.text || "")) needSecondStep(); }, function () {});
@@ -268,7 +328,7 @@
     var open = x.returnable !== false || Boolean(x.returnableItems && x.returnableItems.length);
     var by = open && x.returnBy && x.returnBy.date;
     // A date Relay worked out itself (counted from the order date) says nothing for sure once it has passed.
-    if (by && x.returnBy.estimate && by < new Date().toISOString().slice(0, 10)) by = null;
+    if (by && x.returnBy.estimate && by < ukToday()) by = null;
     return (x.returnPlan && x.returnPlan.deadline) || (x.kind === "return_instructions" && x.deadline) || (x.returns && x.returns.deadline) || by || null;
   }
   // A return date the shop itself gave: a date in its email, or its window counted from the day the parcel arrived. Only
@@ -337,6 +397,12 @@
     dress: '<path d="M9.5 3v3.5M14.5 3v3.5"/><path class="f" d="M9.5 6.5h5l-1 3.5h-3Z"/><path class="f m" d="M10.5 10h3l4 10.5h-11Z"/>',
     trousers: '<path class="f" d="M7 3h10l1.5 18H14l-2-10.5L10 21H5.5Z"/><path class="m" d="M7.2 6.2h9.6"/>',
     tshirt: '<path class="f" d="M9 3.5 4 5.8 2.5 10l3.2 1.3L7 10v10.5h10V10l1.3 1.3 3.2-1.3L20 5.8 15 3.5c-.4 1.5-1.6 2.5-3 2.5s-2.6-1-3-2.5Z"/><path class="m" d="M10 13h4"/>',
+    // Socks, hats and "some other piece of clothing" (a hanger) have their own drawings: a pair of wool socks was drawn as
+    // a T-shirt, and so was anything in Fashion the words didn't place (Connor, 25 Nov 2026). A drawing that is right, or a
+    // neutral one; never a wrong one.
+    sock: '<path class="f" d="M9 3h6v8.5l4 3.5a3.2 3.2 0 0 1-2.1 5.6H13.5A4.5 4.5 0 0 1 9 16.1Z"/><path class="m" d="M9 6.5h6"/>',
+    hat: '<path class="f" d="M5 16a7 7 0 0 1 14 0Z"/><path d="M4 16h16v3.5H4Z"/><circle class="m" cx="12" cy="7" r="1.8"/>',
+    hanger: '<path d="M12 8.5V7.2a2.2 2.2 0 1 0-2.2-2.2"/><path class="f m" d="M12 8.5 3.5 15.5a1.4 1.4 0 0 0 .9 2.5h15.2a1.4 1.4 0 0 0 .9-2.5Z"/>',
     gem: '<path class="f" d="M7 4h10l4 5-9 11L3 9Z"/><path d="M3 9h18M9.5 4 8 9l4 11 4-11-1.5-5"/><path class="m" d="M19.5 1.5v3M18 3h3"/>',
     bag: '<path class="f" d="M5 9h14l-1.2 11H6.2Z"/><path class="m" d="M9 9V7a3 3 0 0 1 6 0v2"/>',
     phone: '<rect class="f" x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M10.5 18.5h3"/><path class="m" d="M3.5 9.5a8 8 0 0 0 0 5M20.5 9.5a8 8 0 0 1 0 5"/>',
@@ -375,13 +441,16 @@
   };
   // What a receipt's words most likely mean, in order: the first rule that matches the item names, else the shop's name.
   var ILL_RULES = [
+    ["sock", /\b(socks|sock(?! boots?)|stockings|hosiery)\b/i],
     ["shoe", /\b(trainers?|sneakers?|runners?|shoes?|boots?|sandals?|loafers?|heels|sliders?|slippers?|cleats?)\b/i],
     ["jacket", /\b(jackets?|coats?|parkas?|puffer|gilets?|raincoats?|blazers?|anorak|fleece)\b/i],
     ["dress", /\b(dress(es)?|skirts?|jumpsuits?|playsuits?)\b/i],
     ["trousers", /\b(trousers|jeans|leggings|pants?|joggers|shorts|chinos|tights)\b/i],
     ["gem", /\b(rings?|necklaces?|bracelets?|earrings?|pendants?|jewell?ery|chains?|swarovski|goldsmiths|pandora|missoma|tiffany|beaverbrooks)\b/i],
     ["bag", /\b(handbags?|backpacks?|rucksacks?|totes?|purses?|wallets?|crossbody)\b/i],
-    ["tshirt", /\b(t-?shirts?|tees?|tops?|shirts?|hoodies?|jumpers?|sweaters?|sweatshirts?|knitwear|cardigans?|vests?|polos?|bras?|socks|underwear|swimwear|bikini)\b/i],
+    ["tshirt", /\b(t-?shirts?|tees?|tops?|shirts?|hoodies?|jumpers?|sweaters?|sweatshirts?|knitwear|cardigans?|vests?|polos?)\b/i],
+    ["hat", /\b(hats?|beanies?|(baseball|snapback|trucker|flat|bucket) caps?)\b/i],
+    ["hanger", /\b(bras?|bralettes?|underwear|briefs|boxers|knickers|lingerie|swimwear|swimsuits?|swim shorts|bikinis?|scar(f|ves)|gloves?|mittens|belts?|pyjamas?|nightwear|dressing gowns?)\b/i],
     ["phone", /\b(iphone|smartphone|mobile phone|galaxy s\d|pixel \d|sim only|sim card|top-?up|airtime|lycamobile|giffgaff|voxi|vodafone)\b/i],
     ["headphones", /\b(headphones?|earbuds?|earphones?|airpods|speakers?|soundbar|jbl|bose|sonos|beats)\b/i],
     ["gamepad", /\b(playstation|ps5|xbox|nintendo|switch oled|controller|console|steam|coins|gems|diamonds|v-?bucks|robux|match masters|royal match|candy crush|game pass|in-app)\b/i],
@@ -424,7 +493,7 @@
     ["dice", /\b(casino|bet|betting|bingo|lottery|lotto|slots|poker)\b/i],
     ["parcel", /\b(royal mail|parcels?|postage|stamps|evri|dpd|inpost)\b/i]
   ];
-  var KIND_ILL = { food: "bowl", fashion: "tshirt", electronics: "plug", home: "sofa", beauty: "jar", travel: "suitcase", digital: "app", experiences: "ticket", other: "shop" };
+  var KIND_ILL = { food: "bowl", fashion: "hanger", electronics: "plug", home: "sofa", beauty: "jar", travel: "suitcase", digital: "app", experiences: "ticket", other: "shop" };
   // A drawing only fits a thing of its own kind (worker/item-kind-core.js): Boots' meal deal or a supermarket's "boot" cake is
   // never drawn as a shoe, and the shop's name is only read for a drawing of the receipt's own kind.
   function illFits(key, group) { var g = ILL_KIND[key]; return !g || !group || group === "other" && g !== "fashion" && g !== "electronics" || g === group || (g === "pets" && group === "home"); }
@@ -452,7 +521,7 @@
       ILL[key].replace(/<(path|rect|circle)\b/g, '<$1 pathLength="1"') + "</svg>";
   }
   // The kind of shopping a thing belongs to, from its drawing: used by Discover to sort products into kinds.
-  var ILL_KIND = { shoe: "fashion", jacket: "fashion", dress: "fashion", trousers: "fashion", tshirt: "fashion", gem: "fashion", bag: "fashion",
+  var ILL_KIND = { shoe: "fashion", jacket: "fashion", dress: "fashion", trousers: "fashion", tshirt: "fashion", gem: "fashion", bag: "fashion", sock: "fashion", hat: "fashion", hanger: "fashion",
     phone: "electronics", headphones: "electronics", gamepad: "electronics", laptop: "electronics", plug: "electronics",
     bed: "home", sofa: "home", lamp: "home", candle: "home", flower: "home", pan: "home", wrench: "home", paw: "pets",
     perfume: "beauty", lipstick: "beauty", jar: "beauty", pill: "beauty", shaker: "beauty",
@@ -506,7 +575,7 @@
   }
   function daysLeft(dl) {
     if (!dl || !/^\d{4}-\d{2}-\d{2}$/.test(dl)) return null;
-    return Math.round((Date.parse(dl) - Date.parse(new Date().toISOString().slice(0, 10))) / 864e5);
+    return Math.round((Date.parse(dl) - Date.parse(ukToday())) / 864e5);
   }
   var css = document.createElement("style");
   css.textContent = ".rl-back{position:fixed;inset:0;background:rgba(15,27,51,.45);display:flex;align-items:flex-end;justify-content:center;z-index:9999}" +
@@ -535,6 +604,7 @@
     ".rl-sheet input{width:100%;box-sizing:border-box;padding:14px 16px;border:1px solid var(--rl-line);border-radius:16px;font-size:16px;background:var(--rl-card);margin-bottom:12px}" +
     ".rl-btn{display:block;width:100%;border:0;border-radius:999px;padding:14px 18px;font-size:16px;font-weight:600;background:#101828;color:#fff;cursor:pointer}.rl-jr .rl-btn:not(.ghost),.rl-signin .rl-btn:not(.ghost),.rl-sperm .rl-btn:not(.ghost){background:#fff;color:#101828}.rl-mk-tabs button[aria-pressed=true],.rl-pill.rl-pill-on,.rl-wr-kinds button.on{background:#101828!important;color:#fff!important}" +
     ".rl-btn.ghost{background:transparent;border:1px solid var(--rl-line);color:var(--rl-text);margin-top:10px}" +
+    ".rl-cantload{padding:6px 0 10px}.rl-cantload p{margin:0 0 4px;font-size:15px;line-height:1.45;color:var(--rl-text)}.rl-cantload .rl-btn{max-width:260px;min-height:44px}" +
     ".rl-btn:disabled{opacity:.6}.rl-msg{min-height:20px;font-size:14px;margin:8px 0 0;color:var(--rl-accent)}.rl-msg.err{color:var(--rl-danger)}" +
     ".rl-order{border:1px solid var(--rl-line);border-radius:18px;padding:12px 14px;margin:10px 0;background:var(--rl-card)}" +
     ".rl-po-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;margin:12px 0 8px}" +
@@ -1081,9 +1151,9 @@
     ".rl-ill svg :nth-child(2){animation-delay:.08s}.rl-ill svg :nth-child(3){animation-delay:.16s}.rl-ill svg :nth-child(n+4){animation-delay:.24s}@keyframes rlilldraw{to{stroke-dashoffset:0}}" +
     ".rl-ill svg .m{transform-box:fill-box;transform-origin:center;animation:rlilldraw .8s cubic-bezier(.4,0,.2,1) forwards,var(--mv,rlillhop) 1.1s ease-in-out .85s 2 alternate}" +
     ".ill-cup,.ill-pan,.ill-pint,.ill-candle{--mv:rlillrise}.ill-shoe,.ill-cake,.ill-gift,.ill-basket,.ill-paw,.ill-music,.ill-pizza,.ill-burger,.ill-shaker{--mv:rlillhop}" +
-    ".ill-tshirt,.ill-jacket,.ill-dress,.ill-trousers,.ill-bag,.ill-flower,.ill-wine,.ill-bowl,.ill-ticket,.ill-lipstick{--mv:rlillsway}.ill-phone,.ill-lamp,.ill-headphones,.ill-laptop,.ill-plug{--mv:rlillblink}" +
+    ".ill-tshirt,.ill-sock,.ill-hat,.ill-hanger,.ill-jacket,.ill-dress,.ill-trousers,.ill-bag,.ill-flower,.ill-wine,.ill-bowl,.ill-ticket,.ill-lipstick{--mv:rlillsway}.ill-phone,.ill-lamp,.ill-headphones,.ill-laptop,.ill-plug{--mv:rlillblink}" +
     ".ill-wrench,.ill-dice,.ill-key,.ill-pill{--mv:rlilltwist}.ill-plane,.ill-delivery,.ill-car,.ill-train,.ill-suitcase{--mv:rlillglide}.ill-gem,.ill-perfume,.ill-jar,.ill-cloud,.ill-app,.ill-newspaper,.ill-book,.ill-target,.ill-gamepad,.ill-bed,.ill-sofa,.ill-parcel,.ill-shop{--mv:rlillpop}" +
-    ".ill-sway .m,.ill-tshirt .m,.ill-jacket .m,.ill-dress .m,.ill-trousers .m,.ill-bag .m,.ill-flower .m{transform-origin:center top}" +
+    ".ill-sway .m,.ill-tshirt .m,.ill-sock .m,.ill-hat .m,.ill-hanger .m,.ill-jacket .m,.ill-dress .m,.ill-trousers .m,.ill-bag .m,.ill-flower .m{transform-origin:center top}" +
     "@keyframes rlillrise{from{transform:translateY(1px);opacity:.5}to{transform:translateY(-2px);opacity:1}}@keyframes rlillhop{from{transform:translateY(0)}to{transform:translateY(-2px)}}" +
     "@keyframes rlillsway{from{transform:rotate(-7deg)}to{transform:rotate(7deg)}}@keyframes rlillblink{from{opacity:.25}to{opacity:1}}@keyframes rlilltwist{from{transform:rotate(-12deg)}to{transform:rotate(12deg)}}" +
     "@keyframes rlillglide{from{transform:translate(-1.5px,1px)}to{transform:translate(1.5px,-1px)}}@keyframes rlillpop{from{transform:scale(.88)}to{transform:scale(1.06)}}" +
@@ -1895,7 +1965,7 @@
   function fixSheet(x, done) {
     var gbp = !x.currency || x.currency === "GBP", sym = moneySign(x.currency).trim();
     var shopNow = (x.retailer && (x.retailer.name || x.retailer.domain)) || "";
-    var today = new Date(Date.now() + 864e5).toISOString().slice(0, 10);
+    var today = ukToday();
     var toMoney = function (p) { return Number.isInteger(p) ? (p / 100).toFixed(2) : ""; };
     var readMoney = function (v) { var t = String(v || "").replace(/[£,\s]/g, ""); if (!t) return null; return /^\d{1,7}(\.\d{1,2})?$/.test(t) ? Math.round(parseFloat(t) * 100) : NaN; };
     var card = el("div", { className: "rl-sheet rl-fix", role: "dialog", ariaModal: "true", ariaLabel: "Fix this receipt" });
@@ -2085,6 +2155,14 @@
     last_second_step: "Relay needs at least one second step for signing in. Add another way first, then turn this one off.", second_step_needed: "Set up a second step for signing in first.",
     text_on: "Codes by text are on. Turn them off first to use an authenticator app instead.", app_on: "The authenticator app is on. Turn it off first to use texts instead.", sign_in_expired: "That sign-in timed out or was cancelled. Please start again." };
   function say(node, text, bad) { node.textContent = text; node.className = "rl-msg" + (bad ? " err" : ""); }
+  // A list that didn't load says so plainly, with a way to try again: never the "nothing here yet" words (which would be
+  // false) and never grey outlines left for ever. again asks once more (its button is off while it does).
+  function cantLoad(box, what, again) {
+    box.textContent = ""; box.removeAttribute("aria-busy");
+    var p = el("div", { className: "rl-cantload", role: "status" }, [el("p", { text: "Relay couldn't load " + what + ". Check your connection and try again." })]);
+    if (again) { var b = el("button", { type: "button", className: "rl-btn ghost", text: "Try again" }); b.onclick = function () { if (b.disabled) return; b.disabled = true; again(); }; p.appendChild(b); }
+    box.appendChild(p); return p;
+  }
   // Unfinished writing is kept on this device, for this account only, until it's sent: leaving the screen, the app closing
   // or a dropped connection doesn't lose it. Drafts go when sent, after a week, and on sign-out.
   var DRAFTS_KEY = "relay.drafts.v1", DRAFT_MS = 7 * 864e5;
@@ -2780,7 +2858,7 @@
         var fl = replay ? {} : obGet(email);
         var st = { email: email, name: replay ? p.name || "" : undefined, interests: (r[3] || []).slice(), consent: c, connected: Boolean(g && g.connected), provider: g && g.provider, scan: g && g.scan, suggested: info.suggestedName || "", justConnected: Boolean(info.justConnected), viaProvider: Boolean(info.viaProvider), mailNote: info.mailNote || null,
           inboxes: g && g.connected ? [{ provider: g.provider, email: g.email }].concat((g.others || []).map(function (x) { return { provider: x.provider, email: x.email }; })) : [], maxInboxes: (g && g.maxInboxes) || 5,
-          bankOn: bk.available === true, testBanks: bk.testBanks === true, bankChoices: Array.isArray(bk.choices) ? bk.choices : null, banks: bk.connections || [], bankNote: info.bankNote || null };
+          bankOn: bk.available === true && !(bk.testBanks === true && !testingOn()), testBanks: bk.testBanks === true && testingOn(), bankChoices: Array.isArray(bk.choices) ? bk.choices : null, banks: bk.connections || [], bankNote: info.bankNote || null };
         // Getting started, in this order: your name, your inboxes, your cards and banks, what you shop for, then all set.
         // Only what's still needed... but once someone is getting started, the inbox and bank steps stay in, so they can add
         // another (and coming back from Google, Microsoft or a bank lands on the step they left).
@@ -2982,10 +3060,11 @@
       var bodyB = jFrame(sheet, { goingBack: wentBack, stage: jStage("bank", [jBankFan(st.banks)]), back: back, of: of, at: at, closeText: st.banks.length ? "Skip" : "Later",
         onClose: function () { if (!st.banks.length) obSet(st.email, { bankLater: true }); next(); },
         title: "Your cards and banks", sub: "Relay matches what you paid to your receipts, and finds purchases that never sent one. It can only read, never move money." });
-      if (st.testBanks) bodyB.appendChild(el("p", { className: "rl-jnote", text: "Test banks only for now. Choose Mock Bank, then sign in with john and doe." }));
+      if (st.testBanks && testingOn()) bodyB.appendChild(el("p", { className: "rl-jnote", text: "Test banks only for now. Choose Mock Bank, then sign in with john and doe." }));
       var noteB = el("div", { className: "rl-msg" }); noteB.setAttribute("role", "status");
       var BN = { connected: ["Connected. Relay has read your payments and is matching them to your receipts.", false], denied: ["Not connected. You can try again, or add it later from your picture, then Bank and cards.", true],
-        failed: ["That didn't connect. Please try again.", true], expired: ["That took too long, so it didn't connect. Start again and finish within 15 minutes.", true], not_configured: ["Bank connections aren't switched on yet.", true] };
+        failed: ["That didn't connect. Please try again.", true], expired: ["That took too long, so it didn't connect. Start again and finish within 15 minutes.", true], not_configured: ["Bank connections aren't switched on yet.", true],
+        not_yours: [BANK_NOT_YOURS, true], too_many: ["That's the most banks and cards Relay can connect. Disconnect one first.", true], unreached: [BANK_UNREACHED, true] };
       if (st.bankNote && BN[st.bankNote]) { say(noteB, BN[st.bankNote][0], BN[st.bankNote][1]); bodyB.appendChild(noteB); }
       if (st.banks.length) {
         // One row a bank (two Santander accounts are one Santander), with what Relay found in it.
@@ -3133,10 +3212,12 @@
         // Apple Pay / Google Pay sheet showing £0.00.
         var pr = stripe.paymentRequest({ country: "GB", currency: "gbp", total: { label: "Relay card check (nothing charged)", amount: 0 } });
         var elements = stripe.elements();
-        var typeNote = el("p", { className: "small muted", text: "Type a card. Test mode: use 4242 4242 4242 4242, any future date, any 3 digits." });
+        // (How to pay with a test card is for people testing Relay: CLAUDE.md rule 15.)
+        var testHow = testingOn() ? " Test mode: use 4242 4242 4242 4242, any future date, any 3 digits." : "";
+        var typeNote = el("p", { className: "small muted", text: "Type a card." + testHow });
         pr.canMakePayment().then(function (can) {
           if (can) {
-            typeNote.textContent = "Or type a card. Test mode: use 4242 4242 4242 4242, any future date, any 3 digits.";
+            typeNote.textContent = "Or type a card." + testHow;
             var btnBox = el("div", { style: "margin-bottom:10px" }); holder.insertBefore(btnBox, holder.firstChild);
             elements.create("paymentRequestButton", { paymentRequest: pr }).mount(btnBox);
           }
@@ -3172,7 +3253,9 @@
       if (test && !testingOn() && !r.body.card) return;
       box.textContent = "";
       box.appendChild(el("h2", { text: "Card for swaps", style: "font-size:18px;margin-top:8px" }));
-      if (test) box.appendChild(el("span", { text: "TEST MODE · no real money", style: "display:inline-block;margin-bottom:6px;padding:3px 9px;border-radius:999px;font-size:11px;font-weight:800;background:#fff3d7;color:#7a540c" }));
+      // Test mode is said only to people testing Relay (CLAUDE.md rule 15). A shopper who saved a card still sees it here, to
+      // remove it, without the wording.
+      if (test && testingOn()) box.appendChild(el("span", { text: "Test mode: no real money", style: "display:inline-block;margin-bottom:6px;padding:4px 10px;border-radius:999px;font-size:13px;font-weight:700;background:#fff3d7;color:#7a540c" }));
       box.appendChild(el("p", { text: "Used only when you swap to a size or colour that costs more: you pay the difference, after you've agreed it. Saving it charges nothing." }));
       var note = el("div", { className: "rl-msg" });
       if (r.body.card) {
@@ -3759,7 +3842,7 @@
     if (!named.length || named.some(function (i) { return !Number.isInteger(i.pricePence) || i.cancelled === true; })) return null;
     var items = named.reduce(function (n, i) { return n + i.pricePence * (Number(i.qty) > 1 && !i.lineTotal ? Number(i.qty) : 1); }, 0);
     var added = fees.reduce(function (n, f) { return n + f.pence; }, 0), off = offs.reduce(function (n, p) { return n + p; }, 0);
-    if (Math.abs(items + added - off - x.totalPence) > 1) return null;
+    if (items + added - off !== x.totalPence) return null;   // to the penny, or it isn't said
     var parts = [money(items, x.currency) + " of items"].concat(added ? [money(added, x.currency) + " added"] : []).concat(off ? [money(off, x.currency) + " off"] : []);
     return parts.slice(0, -1).join(", ") + " and " + parts[parts.length - 1] + ": " + money(x.totalPence, x.currency) + ", what you paid.";
   }
@@ -3849,7 +3932,7 @@
   function receiptCard(x, refresh, slim, opts) {
     opts = opts || {};
     var who = (x.retailer && (x.retailer.name || x.retailer.domain)) || "Unknown store";
-    var names = (x.items || []).map(function (i) { return i.qty + " × " + i.name + (i.variant ? " (" + i.variant + ")" : ""); }).join(", ");
+    var names = (x.items || []).filter(function (i) { return i && i.name; }).map(function (i) { return (Number(i.qty) > 1 ? i.qty + " × " : "") + i.name + (i.variant ? " (" + i.variant + ")" : ""); }).join(", ");
     var card = el("div", { className: "rl-order" }, [el("b", { text: who + (x.orderRef ? ", order " + String(x.orderRef).replace(/^#/, "") : "") }),
       el("span", { text: [names, x.totalPence == null ? (x.detailsInAttachment ? "The amount is in the email's " + (x.detailsInAttachment === "image" ? "photo" : "PDF") : "No total in the email") : totalText(x), /^\d{4}-\d{2}-\d{2}$/.test(x.orderDate || "") ? shortDate(x.orderDate + "T12:00:00Z") : null].filter(Boolean).join(". ") })]);
     if (slim) { card.removeChild(card.firstChild); card.removeChild(card.firstChild); card.style.margin = "0"; card.style.padding = "0"; card.style.border = "0"; card.style.boxShadow = "none"; card.style.background = "none"; }
@@ -3996,7 +4079,7 @@
       pb.appendChild(el("b", { className: "rl-ret-h", text: retOf(x) ? "Sending it back" : "Your return" }));
       var pl = function (t, st) { pb.appendChild(el("span", { className: "rl-ret-why", text: t, style: st || "" })); };
       if (rp.deadline) {
-        var past = rp.deadline < new Date().toISOString().slice(0, 10);
+        var past = rp.deadline < ukToday();
         pl((past ? "Deadline passed: " : "Return by ") + day(rp.deadline), past ? "" : "color:var(--rl-text);font-weight:600");
       }
       // With return tracking, the receipt's page shows the steps above this card (returnBox), so they aren't repeated here.
@@ -4193,9 +4276,16 @@
   function subFitAll() {
     var now = subWait; subWait = [];
     var later = [], over = [];
+    // Lines that have left the page (the list was drawn again, the tab was left) are let go here, once per batch, not only
+    // when the window changes size: on a phone it never does, so every row ever drawn was kept for the whole visit.
+    subFits = subFits.filter(function (b) {
+      if (b.isConnected) { b.wasOn = true; return true; }
+      if (!b.wasOn && !b.gaveUp) return true;
+      b.fitOn = false; return false;
+    });
     now.forEach(function (b) {
       if (!b.over) return;
-      if (!b.isConnected) { if ((b.tries = (b.tries || 0) + 1) < 5) later.push(b); return; }
+      if (!b.isConnected) { if ((b.tries = (b.tries || 0) + 1) < 5) later.push(b); else b.gaveUp = true; return; }
       if (b.over()) over.push(b);
     });
     over.forEach(function (b) { if (b.next) b.next(); });
@@ -4213,7 +4303,7 @@
   // A parcel's latest news, in a line with a small drawing: on its way (with whom), due, or delivered.
   function shipWords(dv, short) {
     var day = function (d) { return new Date(d + "T00:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" }); };
-    var today = new Date().toISOString().slice(0, 10), done = dv.status === "delivered", by = dv.carrier && !short ? " with " + dv.carrier : "";
+    var today = ukToday(), done = dv.status === "delivered", by = dv.carrier && !short ? " with " + dv.carrier : "";
     // collect, missed and problem come only from the carrier itself (live tracking, worker/parcel-tracking.js).
     return done ? "Delivered" + (dv.at ? " " + (dv.at === today ? "today" : day(dv.at)) : "")
       : dv.status === "out_for_delivery" ? "Out for delivery" + by
@@ -4245,7 +4335,7 @@
         memo.gmail = null; memo.receipts = null; memo.walletPurchases = null; memo.openCat = null; forgetKept();
         if (x.body && x.body.nowFirst !== undefined) cachedGet("gmail", "/relay/my/gmail").then(function () { done(); }, done);
         else { rememberMailbox({ connected: false }); done(); }
-      });
+      }, function () { say(msg, "Couldn't reach Relay. Check your connection and try again.", true); });
     });
   }
   // Another inbox: Google's or Microsoft's own account picker, then back to Relay, which reads it in the background.
@@ -4344,7 +4434,7 @@
     cachedGet("gmail", "/relay/my/gmail").then(function (r) {
       if (r.status === 401) { save(null); close(); return; }
       if (!r.ok || !r.body.connected) list.textContent = "";
-      if (!r.ok) { box.appendChild(el("p", { text: "Couldn't load your email connection." })); return; }
+      if (!r.ok) { cantLoad(box, "your receipts", function () { memo.gmail = null; gmailSection(box, c, msg, onPage); }); return; }
       if (!r.body.connected) {
         var both = c.gmailAvailable && c.outlookAvailable;
         box.appendChild(el("p", { text: both ? "Connect the email you shop with, Gmail or Outlook, so Relay can find your order confirmations and receipts for you."
@@ -4505,9 +4595,16 @@
           var pick = el("select", { ariaLabel: "Group", className: "rl-rc-pick" });
           keys.forEach(function (k) { pick.appendChild(el("option", { value: k, text: groupNames[k] || k })); });
           pick.value = keys.indexOf(row.category) >= 0 ? row.category : "other";
+          var groupWas = pick.value;
           pick.onchange = function () {
             pick.disabled = true;
-            api("/relay/my/receipts/" + row.id + "/category", { method: "POST", body: { category: pick.value } }).then(function () { say(status, "Thanks, Relay will remember this for " + who + "."); loadList(); }); };
+            // Thanks only once Relay has saved it. If it didn't, the picker goes back to the group it's really in and says so.
+            var notSaved = function (why) { pick.disabled = false; pick.value = groupWas; say(status, why, true); };
+            api("/relay/my/receipts/" + row.id + "/category", { method: "POST", body: { category: pick.value } }).then(function (r) {
+              if (!r.ok) return notSaved("Couldn't save that. Please try again.");
+              groupWas = pick.value; pick.disabled = false;
+              say(status, "Thanks, Relay will remember this for " + who + "."); loadList();
+            }, function () { notSaved("Couldn't reach Relay. Check your connection and try again."); }); };
           detail.appendChild(el("label", { className: "rl-rc-group" }, [el("span", { text: row.categoryLearned ? "Group (as you taught Relay)" : "Group" }), el("span", { className: "rl-rc-pickw" }, [pick, jIc("down", 16)])]));
           detail.appendChild(giftControl(row, function () { subAll.textContent = subOf(); drawSub(subEl); giftMark(); find(); }));
           // Anything read wrong: fix it here (and say what was fixed, once it has been).
@@ -4611,9 +4708,14 @@
       // with each month's total. Long groups show 40 at a time.
       var GBP = function (rs) { return rs.reduce(function (n, r) { return n + spentOf(r); }, 0); };
       var REFUNDED = function (rs) { return rs.reduce(function (n, r) { return n + refundOf(r); }, 0); };
+      // How many of these receipts a total in pounds is added up from: not the ones with no amount Relay could read, or an
+      // amount that isn't in pounds. When that's fewer than the receipts shown, the total says so ("£84.00 from 7 of 10
+      // receipts"), as Wrapped does: a total that reads as the whole month's spending when it isn't would be false.
+      var ADDED = function (rs) { return rs.filter(function (r) { return Number.isInteger(r.totalPence) && !notPounds(r); }).length; };
+      var TOTAL_OF = function (rs, tot, noun) { var n = ADDED(rs); return money(tot, "GBP") + (n < rs.length ? " from " + n + " of " + noun(rs.length) : ""); };
       function drawCategory(k, rowsIn) {
         var rows = rowsIn.slice().sort(function (a, b) { return String(b.orderDate || "").localeCompare(String(a.orderDate || "")); });
-        var today = new Date().toISOString().slice(0, 10);
+        var today = ukToday();
         var canReturn = function (r) { var dl = deadlineOf(r); return Boolean(dl && dl >= today); };
         var years = []; rows.forEach(function (r) { var y = String(r.orderDate || "").slice(0, 4); if (/^\d{4}$/.test(y) && years.indexOf(y) === -1) years.push(y); });
         var c = CAT_ICONS[k] || CAT_ICONS.other;
@@ -4625,10 +4727,14 @@
         var isGifts = k === "gifts", ink = isGifts ? "#101828" : "#fff", noun = function (n) { return n + (isGifts ? (n === 1 ? " gift" : " gifts") : (n === 1 ? " receipt" : " receipts")); };
         var hero = el("div", { className: "rl-cat-hero", style: "background:" + (TILE_COLOURS[k] || TILE_COLOURS.other) + ";color:" + ink }, [catIcon(k, 52),
           el("div", { className: "rl-cat-hero-t" }, [el("h3", { text: groupNames[k] }),
-            el("span", { text: (spent ? money(spent, "GBP") + " across " : "") + noun(rows.length) + (oldest ? " since " + new Date(oldest.orderDate + "T12:00:00Z").toLocaleDateString("en-GB", { month: "long", year: "numeric" }) : "") + (spentBack ? ". " + money(spentBack, "GBP") + " of it was refunded" : "") })])]);
+            el("span", { text: (spent ? (ADDED(rows) < rows.length ? money(spent, "GBP") + " from " + ADDED(rows) + " of " : money(spent, "GBP") + " across ") : "") + noun(rows.length) + (oldest ? " since " + new Date(oldest.orderDate + "T12:00:00Z").toLocaleDateString("en-GB", { month: "long", year: "numeric" }) : "") + (spentBack ? ". " + money(spentBack, "GBP") + " of it was refunded" : "") })])]);
         hero.firstChild.style.background = isGifts ? "rgba(16,24,40,.1)" : "rgba(255,255,255,.2)"; hero.firstChild.style.color = ink;
         list.appendChild(hero);
-        if (!isGifts && rows[0] && rows[0].returnable === false && rows[0].notReturnableReason) list.appendChild(el("p", { className: "rl-cat-note", text: rows[0].notReturnableReason }));
+        // Why nothing here goes back, said once above the list: only when it's true of every receipt in the group (the
+        // newest one's reason alone would sit above receipts that can still be returned). Otherwise each says its own.
+        var whyNot = rows[0] && rows[0].returnable === false && rows[0].notReturnableReason;
+        if (!isGifts && whyNot && rows.every(function (r) { return r.returnable === false && r.notReturnableReason === whyNot && !(r.returnableItems && r.returnableItems.length); }))
+          list.appendChild(el("p", { className: "rl-cat-note", text: whyNot }));
         // Filters: all, what can still go back (when there is any), and each year.
         var filters = [["all", "All"]];
         if (rows.some(canReturn)) filters.push(["return", "Can still return"]);
@@ -4674,7 +4780,7 @@
               month = m;
               var inMonth = pick.filter(function (x) { return (x.orderDate ? x.orderDate.slice(0, 7) : "none") === m; }), tot = GBP(inMonth);
               body.appendChild(el("div", { className: "rl-cat-month" }, [el("b", { text: m === "none" ? "No date" : new Date(m + "-01T12:00:00Z").toLocaleDateString("en-GB", { month: "long", year: "numeric" }) }),
-                el("span", { text: tot ? money(tot, "GBP") : noun(inMonth.length) })]));
+                el("span", { text: tot ? TOTAL_OF(inMonth, tot, noun) : noun(inMonth.length) })]));
               card = el("div", { className: "rl-cat-list" }); body.appendChild(card);
             }
             card.appendChild(receiptRow(r));
@@ -4689,8 +4795,9 @@
         if (list.parentNode) list.parentNode.classList.remove("rl-in-cat");
         var rows = allRows;
         // An email from a shop on Relay is the same purchase as its shop order, which is already under "Shop orders".
-        if (onPage && shopRows.length) { var dup = {}; shopRows.forEach(function (x) { dup[label(x[0].store) + "|" + x[0].amountMinor] = true; });
-          rows = rows.filter(function (r) { return !dup[label(r.retailer && r.retailer.name) + "|" + r.totalPence]; }); }
+        // (The same shop, total and days: sameBuyAs. Another order at that shop for the same money stays in the list.)
+        if (onPage && shopRows.length) { var dupOrders = [], dupSeen = {}; shopRows.forEach(function (x) { if (!dupSeen[x[0].id]) { dupSeen[x[0].id] = 1; dupOrders.push(x[0]); } });
+          var dup = sameBuyAs(dupOrders); rows = rows.filter(function (r) { return !dup(r); }); }
         if (!rows.length && !shopRows.length) { list.appendChild(el("p", { text: "No receipts found yet." }));
           if (onPage) list.appendChild(el("div", { className: "rl-acard rl-rec-more" }, [accRow("doc", "Add a missing receipt", null, function () { open(function (sheet) { addReceiptView(sheet, close); }); })]));
           return; }
@@ -4701,7 +4808,7 @@
         var by = {}; sorted.forEach(function (r) { var k = r.category && groupNames[r.category] && r.category !== "gifts" ? r.category : "other"; (by[k] = by[k] || []).push(r); });
         var keys = Object.keys(by).sort(function (a, b) { var na = by[a][0].returnable === false ? 1 : 0, nb = by[b][0].returnable === false ? 1 : 0; return (a === "other") - (b === "other") || na - nb || by[b].length - by[a].length; });
         if (memo.openCat === "shop" && shopRows.length) {
-          list.appendChild(el("button", { className: "rl-po-secondary", text: "‹ All receipts", "data-back": "", style: "flex:none;padding:7px 14px;font-size:14px", onclick: function () { memo.openCat = null; drawList(); window.scrollTo && window.scrollTo(0, memo.catY || 0); } }));
+          list.appendChild(el("button", { type: "button", className: "rl-cat-back rl-navback", "data-back": "", onclick: function () { memo.openCat = null; drawList(); window.scrollTo && window.scrollTo(0, memo.catY || 0); } }, [jIc("back", 24), el("span", { text: "All receipts" })]));
           list.appendChild(el("h3", { style: "font-size:20px;margin:14px 0 8px;color:var(--rl-text);display:flex;align-items:center;gap:10px" }, [catIcon("shop", 32), el("span", { text: "Shop orders (" + shopRows.length + ")" })]));
           list.lastChild.firstChild.style.background = "#101828";
           var sq = el("input", { type: "search", placeholder: "Search shop orders", style: "margin:0 0 12px;width:100%;box-sizing:border-box;padding:12px 16px;border:1px solid var(--rl-line);border-radius:14px;font-size:15px;background:var(--rl-card);font-family:inherit" });
@@ -4769,7 +4876,7 @@
               month = m;
               var inMonth = newest.filter(function (x) { return (x.orderDate ? x.orderDate.slice(0, 7) : "none") === m; }), tot = GBP(inMonth), back = REFUNDED(inMonth);
               months.appendChild(el("div", { className: "rl-cat-month" }, [el("b", { text: m === "none" ? "No date" : new Date(m + "-01T12:00:00Z").toLocaleDateString("en-GB", { month: "long", year: "numeric" }) }),
-                el("span", { text: tot ? money(tot, "GBP") + (back ? ", " + money(back, "GBP") + " refunded" : "") : counted(inMonth.length) })]));
+                el("span", { text: tot ? TOTAL_OF(inMonth, tot, counted) + (back ? ", " + money(back, "GBP") + " refunded" : "") : counted(inMonth.length) })]));
               card = el("div", { className: "rl-cat-list" }); months.appendChild(card);
             }
             card.appendChild(receiptRow(r));
@@ -4811,15 +4918,17 @@
         }, function () { return false; });
         Promise.all([api("/relay/my/receipts" + (onPage ? "?all=1" : "")), shopsLoaded]).then(function (both) {
           var x = both[0], shopsChanged = both[1];
-          if (!x.ok) { if (drawnSig === null || shopsChanged) drawList(); return; }
-          if (!x.ok) { if (drawnSig === null) drawList(); return; }
+          // Relay didn't answer properly. With a kept copy on screen that stays (and any new shop orders join it); with
+          // nothing to show, say so: "No receipts found yet" would be false.
+          if (!x.ok) { if (drawnSig === null) listFailed(); else if (shopsChanged) drawList(); return; }
           var rows = (x.body && x.body.receipts) || [], sig = JSON.stringify(rows);
           keepReceipts(rows, sig);
           if (sig === drawnSig && !shopsChanged) return;
           if (sig !== drawnSig) memoDrop("wrapped");
           allRows = rows; drawnSig = sig; drawList();
-        });
+        }, function () { if (drawnSig === null) listFailed(); });
       }
+      function listFailed() { if (!list.isConnected && !document.body.contains(box)) return; cantLoad(list, "your receipts", loadList).classList.add("rl-list-failed"); }
       // Reading happens on Relay's side as a job, so it carries on if the shopper leaves the app (or the phone locks).
       // While this page is open the app asks for the rounds itself (quicker, with progress on screen); if Relay is already
       // busy with them, the app just shows how far it has got.
@@ -4833,7 +4942,14 @@
       var doScan = function (full) {
         if (scanning) return;
         scanning = true; scanBtn.disabled = true; say(status, lastScan && !full ? "Checking for new mail…" : "Scanning…");
-        var rounds = 0, tries = 0;
+        var rounds = 0, tries = 0, waits = 0, foundAt = null;
+        // The receipts are fetched again only when a round says there's something new (it added or changed some, or Relay's
+        // own count went up), not after every round: a long read used to download the whole list every four seconds.
+        function news(b) {
+          var f = b.job && Number.isFinite(b.job.found) ? b.job.found : null, yes = (b.added || 0) + (b.updated || 0) > 0 || (f !== null && foundAt !== null && f !== foundAt);
+          if (f !== null) foundAt = f;
+          return yes;
+        }
         // ended: Google or Microsoft ended Relay's access to the inbox, so the page shows the Connect again card at the top too.
         function finish(text, bad, ended) { scanning = false; scanBtn.disabled = false; memo.gmail = null; if (ended) { drawFix([{ provider: r.body.provider, email: r.body.email, mailbox: 1 }]);
           cachedGet("gmail", "/relay/my/gmail").then(function (g) { if (g.ok) mailFixBadge(g.body); }, function () {}); }
@@ -4858,9 +4974,15 @@
             var job = x.body.job;
             if (job && job.state === "failed") return job.error === "gmail_reconnect_needed" ? finish(owner + " has ended Relay's access to your " + MB + ". Tap Connect again at the top of this page. Your receipts stay as they are.", true, true) : finish("Couldn't finish reading " + MB + ". Please try again later.", true);
             // Relay is reading this mailbox right now: show its progress and look again in a moment.
-            if (x.body.busy) { progress(job); loadList(); return new Promise(function (res) { setTimeout(res, x.body.retryAfterMs || 4000); }).then(function () { return step(); }); }
+            // (While Relay does the reading itself the page only looks in on it, and not for ever: after 90 looks, about
+            // six minutes, it stops asking and says the reading carries on; the list is there next time it's opened.)
+            if (x.body.busy) {
+              progress(job); if (news(x.body)) loadList();
+              if (++waits >= 90) { loadList(); return finish("Still reading in the background. New receipts will appear here as they're found."); }
+              return new Promise(function (res) { setTimeout(res, x.body.retryAfterMs || 4000); }).then(function () { return step(); });
+            }
             rounds++;
-            loadList();
+            if (news(x.body) || !x.body.more || rounds >= 150) loadList();
             if (x.body.more && rounds < 150) { progress(job); return step(); }
             if (x.body.more) return finish("Still reading in the background. New receipts will appear here as they're found.");
             // "Connected. Scanning for receipts…" is out of date once the scan has finished. Any other note (connected again,
@@ -4886,7 +5008,7 @@
       };
       window.__relayScanResume = function () {
         if (scanning || !document.body.contains(status)) return;
-        api("/relay/my/gmail").then(function (g) { if (g.ok && g.body && g.body.scan) { loadList(); resume(g.body.scan); } });
+        api("/relay/my/gmail").then(function (g) { if (g.ok && g.body && g.body.scan) { loadList(); resume(g.body.scan); } }, function () {});
       };
       if (!window.__relayScanVisBound) {
         window.__relayScanVisBound = true;
@@ -4935,7 +5057,7 @@
       if (window.__relayAutoFull) { window.__relayAutoFull = false; window.__relayAutoScan = false; doScan(true); }
       else if (window.__relayAutoScan) { window.__relayAutoScan = false; scanBtn.onclick(); }
       else resume(r.body.scan);
-    }).catch(function () { box.appendChild(el("p", { text: "Couldn't reach Relay." })); });
+    }).catch(function () { cantLoad(box, "your receipts", function () { memo.gmail = null; gmailSection(box, c, msg, onPage); }); });
   }
 
   // ---- View original receipt: fetched live from Gmail or Outlook when opened; nothing is stored ----
@@ -4988,7 +5110,7 @@
   function shortDay(d) { return /^\d{4}-\d{2}-\d{2}/.test(d || "") ? new Date(d.slice(0, 10) + "T00:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" }) : ""; }
   // The shops this shopper buys from most (from the receipts already on this device), for one-tap searches.
   function usualShops() {
-    var rows = (memo.receipts && memo.receipts.rows) || [], n = {}, since = new Date(Date.now() - 365 * 864e5).toISOString().slice(0, 10);
+    var rows = (memo.receipts && memo.receipts.rows) || [], n = {}, since = ukToday(-365);
     rows.forEach(function (x) {
       var who = x && x.retailer && x.retailer.name;
       if (!who || who === "Forwarded receipt" || x.kind !== "receipt" || String(x.orderDate || "") < since) return;
@@ -5195,8 +5317,8 @@
         rows.forEach(function (x) {
           var card = el("div", { className: "rl-order" });
           card.appendChild(el("b", { text: x.reason || "(no reason given)" }));
-          card.appendChild(el("span", { text: x.item.title + (x.item.store ? " from " + x.item.store : "") + ", " + new Date(x.createdAt).toLocaleDateString("en-GB") }));
           var listing = x.kind === "listing", it = x.item || {};
+          card.appendChild(el("span", { text: (it.title || "A listing") + (it.store ? " from " + it.store : "") + ", " + new Date(x.createdAt).toLocaleDateString("en-GB") }));
           card.appendChild(el("span", { style: "display:block;margin-top:4px", text: (listing ? "A member reported this listing." : "Reported by the " + x.reporterRole + " about the " + x.reportedRole + ".") +
             " Reports against this " + (listing ? "seller" : "member") + ": " + x.reportsAgainstReported + (x.reportedAlreadyBlocked ? " (already blocked)" : "") + "." }));
           var log = el("div", { style: "margin:8px 0;max-height:180px;overflow:auto;border-top:1px solid var(--rl-line);padding-top:6px" });
@@ -5300,7 +5422,10 @@
       if (!document.body.contains(sheet)) return stop();
       // Asked of Relay itself each time (not a copy from the last minute), or a reply could sit unseen.
       api("/relay/my/resale/requests/" + requestId + "/messages", { fresh: true }).then(function (r) {
-        if (!r.ok) return say(msg, "Couldn't load this conversation.", true);
+        if (!r.ok) { if (!loaded) cantLoad(log, "this conversation", load); return; }
+        // Where the reader was: at the newest message (then they stay there as more arrive), or scrolled up reading (then
+        // the page doesn't jump under them each time Relay is asked).
+        var first = !loaded, atEnd = log.scrollHeight - log.scrollTop - log.clientHeight < 40, readAt = log.scrollTop;
         var b = r.body; isOpen = b.open; loaded = true;
         // Reading it is seeing it: the red number goes down by what was new here.
         if (b.news) mkNews(b.news);
@@ -5316,7 +5441,7 @@
           log.appendChild(el("div", { className: "rl-mk-bubble" + (m.mine ? " mine" : ""), text: m.body, style: "margin:6px 0;padding:8px 12px;border-radius:14px;max-width:85%;font-size:15px;" +
             (m.mine ? "margin-left:auto;background:#101828;color:#fff" : "background:var(--rl-fill);color:var(--rl-text)") }));
         });
-        log.scrollTop = log.scrollHeight;
+        log.scrollTop = first || atEnd ? log.scrollHeight : readAt;
         input.style.display = send.style.display = isOpen ? "" : "none";
         // Matched with someone else, or taken down: said plainly; what was written stays to read.
         // The seller said no, or said yes to someone else: said as what it was.
@@ -5328,12 +5453,14 @@
         if (isOpen && b.matched) {
           tools.appendChild(el("button", { className: "rl-btn ghost", text: "End conversation", onclick: function () {
             ask("End this conversation? The item goes back on sale.", "End conversation", function () {
-              api("/relay/my/resale/requests/" + requestId + "/end", { method: "POST", body: {} }).then(load); }); } }));
+              api("/relay/my/resale/requests/" + requestId + "/end", { method: "POST", body: {} }).then(function (x) { if (x.ok) load(); else say(msg, "Couldn't end the conversation. Please try again.", true); },
+                function () { say(msg, "Couldn't reach Relay. Check your connection and try again.", true); }); }); } }));
         }
         if (isOpen) {
           tools.appendChild(el("button", { className: "rl-btn ghost", text: "Report a problem", onclick: function () {
             askText("What went wrong? (for example: they wanted a bank transfer before you'd seen the item). Reporting lets the Relay team read this conversation to review it. They won't see who either of you is.", "Send report", function (why) {
-              api("/relay/my/resale/requests/" + requestId + "/report", { method: "POST", body: { reason: why } }).then(function (x) { if (x.ok) { notice = "Reported. Thank you."; load(); } else say(msg, "Couldn't send the report. Try again.", true); }); }); } }));
+              api("/relay/my/resale/requests/" + requestId + "/report", { method: "POST", body: { reason: why } }).then(function (x) { if (x.ok) { notice = "Reported. Thank you."; load(); } else say(msg, "Couldn't send the report. Try again.", true); },
+                function () { say(msg, "Couldn't reach Relay. Check your connection and try again.", true); }); }); } }));
         }
         // Blocking is the member's own choice, kept apart from reporting: nobody at Relay is asked to look.
         var blk = el("button", { className: "rl-btn ghost", text: "Block this member", onclick: function () {
@@ -5346,7 +5473,7 @@
             }, function () { blk.disabled = false; say(msg, "Couldn't reach Relay. Check your connection and try again.", true); });
           }); } });
         if (!blockedHere) tools.appendChild(blk);
-      });
+      }, function () { if (!loaded) cantLoad(log, "this conversation", load); });
     }
     send.onclick = function () {
       // Enter on the keyboard comes here too, past the disabled button: a second press while the first is on its way sends nothing.
@@ -5494,7 +5621,7 @@
       Promise.all([api("/relay/my/resale/feed", { fresh: true }), api("/relay/my/resale/mine")]).then(function (rs) {
         if (cur !== "browse") return;
         body.textContent = "";
-        if (!rs[0].ok) return body.appendChild(el("p", { text: "Couldn't load what's listed. Pull down to try again." }));
+        if (!rs[0].ok) return cantLoad(body, "what's listed", function () { if (cur === "browse") { body.textContent = ""; drawBrowse(openId); } });
         if (rs[1].ok && rs[1].body && rs[1].body.news) mkNews(rs[1].body.news);
         var mine = ((rs[1].body && rs[1].body.listings) || []).filter(function (l) { return l.status === "active"; });
         var rows = rs[0].body.listings || [];
@@ -5514,7 +5641,7 @@
           body.appendChild(mkCard(l, lines, 0, function () { browseSheet(l, mine); }));
         });
         if (openId) { var hit = rows.filter(function (l) { return l.id === openId; })[0]; if (hit) browseSheet(hit, mine); else tell("That's no longer available.", true); }
-      });
+      }, function () { if (cur === "browse") cantLoad(body, "what's listed", function () { if (cur === "browse") { body.textContent = ""; drawBrowse(openId); } }); });
     }
     // Messages: every conversation the member is in, as buyer or seller, newest first. Each row is one tap to the
     // conversation: the item's picture, its name, who it's with and the last message; a red number while some is unread.
@@ -5524,7 +5651,7 @@
       api("/relay/my/resale/conversations", { fresh: true }).then(function (r) {
         if (cur !== "messages") return;
         body.textContent = "";
-        if (!r.ok || !r.body) return body.appendChild(el("p", { text: "Couldn't load your messages. Pull down to try again." }));
+        if (!r.ok || !r.body) return cantLoad(body, "your messages", function () { if (cur === "messages") { body.textContent = ""; drawMessages(); } });
         if (r.body.news) mkNews(r.body.news);
         var cs = r.body.conversations || [];
         if (cs.length) mkUsed(true);
@@ -5550,7 +5677,7 @@
           list.appendChild(row);
         });
         body.appendChild(list);
-      }, function () { if (cur !== "messages") return; body.textContent = ""; body.appendChild(el("p", { text: "Couldn't reach Relay. Check your connection and try again." })); });
+      }, function () { if (cur === "messages") cantLoad(body, "your messages", function () { if (cur === "messages") { body.textContent = ""; drawMessages(); } }); });
     }
     // Someone else's listing: ask for it, offer a swap, message the seller once they've said yes, or report it.
     function browseSheet(l, mine) {
@@ -5623,7 +5750,7 @@
       api("/relay/my/resale/mine?seen=1", { fresh: true }).then(function (r) {
         if (cur !== "mine") return;
         body.textContent = "";
-        if (!r.ok) return body.appendChild(el("p", { text: "Couldn't load your listings. Pull down to try again." }));
+        if (!r.ok) return cantLoad(body, "your listings", function () { if (cur === "mine") { body.textContent = ""; drawMine(openId); } });
         var ls = r.body.listings || [], mr = r.body.myRequests || [];
         if (ls.length || mr.length) mkUsed(true);
         if (r.body.news) mkNews(r.body.news);
@@ -5656,7 +5783,7 @@
           });
         }
         if (openId) { var hit = ls.filter(function (l) { return l.id === openId; })[0]; if (hit) mineSheet(hit); }
-      });
+      }, function () { if (cur === "mine") cantLoad(body, "your listings", function () { if (cur === "mine") { body.textContent = ""; drawMine(openId); } }); });
     }
     // Your own listing: who asked (Accept or Decline), its conversation, changing its details, taking it down.
     function mineSheet(l) {
@@ -5763,12 +5890,12 @@
       api("/relay/my/resale/items").then(function (r) {
         if (cur !== "sell") return;
         body.textContent = "";
-        if (!r.ok) return body.appendChild(el("p", { text: "Couldn't load your items. Pull down to try again." }));
+        if (!r.ok) return cantLoad(body, "your items", function () { if (cur === "sell") { body.textContent = ""; drawSell(); } });
         var items = (r.body.items || []).filter(function (i) { return !i.alreadyListed && (!focusReceipt || i.receiptId === focusReceipt); }), defaults = r.body.defaults || {};
         if (!items.length) body.appendChild(el("p", { text: focusReceipt ? "That item is already listed." : "Nothing to list yet. Items come from the receipts Relay found in your email." }));
         items.forEach(function (i) { body.appendChild(sellCard(i, defaults)); });
         if (focusReceipt) body.appendChild(el("button", { className: "rl-btn ghost", text: "Show all my items", onclick: function () { focusReceipt = null; draw(); } }));
-      });
+      }, function () { if (cur === "sell") cantLoad(body, "your items", function () { if (cur === "sell") { body.textContent = ""; drawSell(); } }); });
     }
     // A new listing starts filled in with what Relay already knows (Connor, 24 Nov 2026: "Listings should autofill your
     // details like postcode etc and give an AI summary of the item"): the size from the receipt, what was paid, the
@@ -5819,7 +5946,8 @@
           note.classList.add("rl-mk-wait"); note.disabled = true; note.setAttribute("aria-busy", "true");
           var ask = memo.listingAi[key] || (memo.listingAi[key] = api("/relay/my/resale/describe", { method: "POST", body: { receiptId: i.receiptId, itemIndex: i.itemIndex } })
             .then(function (x) { return x.ok && x.body && typeof x.body.description === "string" ? x.body.description : null; }, function () { return null; }));
-          ask.then(put, function () { put(null); });
+          // (A description that didn't come is asked for again next time, not remembered as "none" until Relay is reopened.)
+          ask.then(function (d) { if (d === null && memo.listingAi[key] === ask) delete memo.listingAi[key]; put(d); }, function () { if (memo.listingAi[key] === ask) delete memo.listingAi[key]; put(null); });
         }
         // What was paid, beside the price (Relay never suggests a price of its own).
         var paidLine = i.pricePence != null && !(i.free === true && i.pricePence === 0) ? el("span", { className: "rl-mk-note", text: "You paid " + money(i.pricePence, i.currency) + "." }) : null;
@@ -5971,7 +6099,7 @@
     ["How do I stop Relay reading my email?", "Tap your picture at the top of the screen, then Inboxes, and choose Disconnect. Relay deletes every receipt it captured from that inbox. You can also withdraw your permission under Security and privacy, Email permission."],
     ["How do I get a copy of my data?", "Tap your picture at the top of the screen, then Security and privacy, then Download my data. You get one file with everything Relay keeps about you."],
     ["How do I make signing in safer?", "Tap your picture at the top of the screen, then Security and privacy, then Two-step sign-in. Relay can text a code to your phone, or you can use an authenticator app, so signing in with an email link, Google or Microsoft also needs that code. Keep the recovery codes it shows you in case you lose your phone."],
-    ["How do I delete my account?", "Tap your picture at the top of the screen, then Security and privacy, then Delete my account. Your sign-in and everything linked to it are deleted, and it can't be undone."],
+    ["How do I delete my account?", "Tap your picture at the top of the screen, then Security and privacy, then Delete my account. Your sign-in, your receipts and the rest of your account are deleted, and it can't be undone. Records of returns and swaps you made through Relay are kept, because the shops involved rely on them."],
     ["Can the help chat look at one of my receipts?", "Only if you choose. Open the receipt, tap Ask the assistant, then Show it. The assistant sees what Relay read from that receipt (the shop, date, total, items and return date), never the email itself, and only for that chat. Relay keeps no copy of the chat."]
   ];
   var CONSENT_FALLBACK = ["Relay reads your email in read-only mode and looks only for order confirmations, receipts and return emails.", "It never sends email from your account, never deletes or changes anything in your inbox, never sells what it finds and never uses it for adverts.", "When Relay's own rules can't work out a receipt, an AI reads that one email with your personal details hidden first. You can switch this off under AI help."];
@@ -6657,6 +6785,9 @@
       rows.push(bankRow);
       api("/relay/my/bank").then(function (r) {
         if (!r.ok || !r.body || !r.body.available) return;
+        // While Relay can only offer test banks (made-up payments), connecting one is for people testing Relay (CLAUDE.md rule
+        // 15): without the testing tools the row shows only for someone who already connected one, so they can remove it.
+        if (r.body.testBanks === true && !testingOn() && !(r.body.connections || []).length) return;
         bankRow.style.display = "";
         var n = (r.body.connections || []).length;
         var asks = (r.body.connections || []).some(function (c) { return c.needsChoice; });
@@ -6701,7 +6832,7 @@
     function settingsPage(b) {
       // Your details and how Relay works for you.
       var notifRow = accRow("bell", "Notifications", "", function () { if (window.go) window.go("radar"); });
-      try { notifRow.setDetail(!("Notification" in window) ? "" : Notification.permission === "granted" ? "On on this phone" : Notification.permission === "denied" ? "Blocked in this phone's settings" : "Off"); } catch (e) {}
+      try { notifRow.setDetail(!("Notification" in window) ? "" : Notification.permission === "granted" ? "On for this phone" : Notification.permission === "denied" ? "Blocked in this phone's settings" : "Off"); } catch (e) {}
       var lookNames = { wallet: "Wallet", today: "Today", cards: "Cards" };
       var lookRow = accRow("layout", "Home layout", lookNames[homeLook()] || "", function () { page("Home layout", homeLookPage); });
       b.appendChild(accGroup("You", [deliveryRow, interestsRow, lookRow, notifRow].filter(Boolean)));
@@ -6977,7 +7108,7 @@
       b.appendChild(el("button", { className: "rl-btn ghost", text: "Re-scan all my email", onclick: function () { window.__relayAutoFull = true; close(); window.go("receipts"); } }));
       b.appendChild(el("p", { className: "rl-anote", text: "A full re-scan looks through every email again. It can take a few minutes." }));
       b.appendChild(el("p", { className: "rl-anote", text: "Disconnecting an inbox deletes every receipt Relay captured from it. Receipts you added by hand stay." }));
-      function again() { memo.gmail = null; cachedGet("gmail", "/relay/my/gmail").then(function (g) { mailState = g.ok && g.body ? g.body : mailState; page("Inboxes", mailPage); }); }
+      function again() { memo.gmail = null; cachedGet("gmail", "/relay/my/gmail").then(function (g) { mailState = g.ok && g.body ? g.body : mailState; page("Inboxes", mailPage); }, function () { page("Inboxes", mailPage); }); }
       function disconnectInbox(x, next) {
         if (!x.mailbox && !next) return disconnectGmail(again, note);
         var who = x.email || inboxName(x.provider);
@@ -7078,7 +7209,8 @@
     function bankPage(b, back) {
       var note = el("div", { className: "rl-msg", role: "status" }), list = el("div"), pays = el("div");
       var NOTES = { connected: ["Connected. Relay is matching your payments to your receipts.", false], denied: ["Not connected. You can try again any time.", true],
-        failed: ["That didn't connect. Please try again.", true], expired: ["That took too long, so it didn't connect. Start again and finish within 15 minutes.", true], not_configured: ["Bank connections aren't switched on yet.", true] };
+        failed: ["That didn't connect. Please try again.", true], expired: ["That took too long, so it didn't connect. Start again and finish within 15 minutes.", true], not_configured: ["Bank connections aren't switched on yet.", true],
+        not_yours: [BANK_NOT_YOURS, true], too_many: ["That's the most banks and cards Relay can connect. Disconnect one first.", true], unreached: [BANK_UNREACHED, true] };
       b.appendChild(el("p", { text: "Connect your bank or card and Relay matches your card payments to your receipts, and finds purchases that never sent one. You sign in on your bank's own page. Relay can only read payments: it can't move money." }));
       var testLine = el("p", { className: "rl-anote" }); testLine.hidden = true; b.appendChild(testLine);
       var go = el("button", { type: "button", className: "rl-btn", text: "Connect a bank or card" });
@@ -7107,7 +7239,11 @@
         var grid = body.testBanks ? null : bankTiles(Array.isArray(body.choices) ? body.choices : null, body.connections || [], connectTo);
         if (grid) tilesBox.appendChild(grid);
         go.className = "rl-btn" + (grid ? " ghost" : ""); if (!go.disabled) go.textContent = goWord();
-        if (body.testBanks) { testLine.hidden = false; testLine.textContent = "Test banks only for now. Choose Mock Bank, then sign in with john and doe."; }
+        // Test banks are for people testing Relay: their wording, and connecting one, only with the testing tools on.
+        var testOnly = body.testBanks === true;
+        testLine.hidden = !(testOnly && testingOn());
+        if (!testLine.hidden) testLine.textContent = "Test banks only for now. Choose Mock Bank, then sign in with john and doe.";
+        go.style.display = testOnly && !testingOn() ? "none" : "";
         var cs = body.connections || [];
         if (!cs.length) return;
         // A bank that lists more than one card asks which are yours before any payment is read (worker/bank.js), right here.
@@ -7116,7 +7252,7 @@
         });
         list.appendChild(accGroup("Connected", cs.map(function (c) {
           var disconnect = function () {
-            ask("Disconnect " + (c.bank || "this bank") + "? Relay deletes the payments it read from it.", "Disconnect", function () {
+            ask("Disconnect " + (c.label || c.bank || "this bank") + "? Relay deletes the payments it read from it.", "Disconnect", function () {
               api("/relay/my/bank/disconnect", { method: "POST", body: { id: c.id } }).then(function (r) {
                 if (!r.ok) return say(note, "Couldn't disconnect it. Try again in a moment.", true);
                 say(note, "Disconnected. The payments read from it are deleted."); load();
@@ -7124,11 +7260,15 @@
             });
           };
           var yours = (c.cards || []).filter(function (k) { return k.mine === true; }).length;
+          // Its name as Relay tells them apart (two "Santander Personal" connections, by the cards on each: label), and a
+          // read that didn't finish said plainly instead of an old "Read 3 hours ago" passing for up to date.
+          var name = c.label || c.bank || "Bank";
           var detail = c.needsReconnect ? "Connect again to keep reading payments" : c.needsChoice ? "Choose which cards are yours"
+            : c.readProblem ? "Couldn't read just now. Pull down to try again."
             : when(c.syncedAt) + (c.cards ? ", " + (yours === 1 ? "1 card is yours" : yours + " cards are yours") : "") + (c.matched ? ", " + c.matched + (c.matched === 1 ? " receipt matched" : " receipts matched") : "");
-          return accRow("card", c.bank || "Bank", detail, function () {
+          return accRow("card", name, detail, function () {
             if (!c.cards) return disconnect();
-            chooseBox(c.bank || "Bank", [["Choose your cards", function () { cardsPage(c); }], ["Disconnect", disconnect]]);
+            chooseBox(name, [["Choose your cards", function () { cardsPage(c); }], ["Disconnect", disconnect]]);
           });
         })));
         // A card company that sends every card on the account together, without saying which card each payment was on.
@@ -7185,7 +7325,7 @@
         var needN = ps.slice(0, 60).filter(function (p) { return p.needsReceipt && !p.notMine; }).length;
         if (needN) pays.appendChild(el("p", { className: "rl-bk-need-note", text: needN === 1 ? "1 shop payment has no receipt. Tap it to add a photo of the receipt."
           : needN + " shop payments have no receipt. Tap one to add a photo of its receipt." }));
-        var again = function () { memo.bankPays = null; api("/relay/my/bank/payments", { fresh: true }).then(function (x) { if (x && x.ok) drawPays(x.body); }); };
+        var again = function () { memo.bankPays = null; api("/relay/my/bank/payments", { fresh: true }).then(function (x) { if (x && x.ok) drawPays(x.body); }, function () {}); };
         var box = el("div", { className: "rl-bk-list" });
         ps.slice(0, 60).forEach(function (p) {
           var shop = matchShop(p.receiptId), name = shop || p.shop || p.merchant || p.description || "Payment";
@@ -7207,7 +7347,7 @@
               api("/relay/my/bank/not-mine", { method: "POST", body: { id: p.id, on: on, everyFromShop: Boolean(every) } }).then(function (r) {
                 if (!r.ok) return say(note, "Couldn't change that. Try again in a moment.", true);
                 memo.bankPays = null; say(note, on ? (every ? "Got it: nothing from " + (p.shop || name) + " is yours." : "Got it: that one isn't yours.") : "Got it: that one's yours.");
-                api("/relay/my/bank/payments", { fresh: true }).then(function (x) { if (x && x.ok) drawPays(x.body); });
+                api("/relay/my/bank/payments", { fresh: true }).then(function (x) { if (x && x.ok) drawPays(x.body); }, function () {});
               }, function () { say(note, "Couldn't reach Relay. Check your connection and try again.", true); });
             };
             var what = name + ", " + money(p.amountPence, p.currency) + " on " + day;
@@ -7231,13 +7371,16 @@
         var rs = api("/relay/my/receipts", { fresh: false }).then(function (x) {
           ((x.ok && x.body && x.body.receipts) || []).forEach(function (c) { shops[c.id] = (c.retailer && (c.retailer.name || c.retailer.domain)) || ""; });
         }, function () {});
-        var ps = api("/relay/my/bank/payments", { fresh: true });
+        // (A payments list that doesn't arrive leaves the last one showing; it's asked for again with the banks.)
+        var ps = api("/relay/my/bank/payments", { fresh: true }).then(null, function () { return null; });
+        // Nothing to show and no answer: say so in place of the outline, with Try again. With the banks already listed they stay.
+        var failed = function () { if (list.querySelector(".rl-agroup, .rl-arow")) return say(note, "Couldn't reach Relay. Check your connection and try again.", true); go.style.display = "none"; cantLoad(list, "your banks and cards", function () { go.style.display = ""; list.textContent = ""; list.appendChild(el("div", { className: "rl-skel", style: "min-height:72px;border-radius:18px;margin-top:14px" })); load(); }); };
         return api("/relay/my/bank", { fresh: true }).then(function (r) {
-          if (!r.ok || !r.body) { if (!list.querySelector(".rl-agroup, .rl-arow")) list.textContent = ""; return say(note, "Couldn't load this. Try again in a moment.", true); }
+          if (!r.ok || !r.body) return failed();
           drawLinks(r.body);
           if (!(r.body.connections || []).length) { pays.textContent = ""; return; }
           return Promise.all([rs, ps]).then(function (x) { if (x[1] && x[1].ok) drawPays(x[1].body); });
-        }, function () { if (!list.querySelector(".rl-agroup, .rl-arow")) list.textContent = ""; say(note, "Couldn't reach Relay. Check your connection and try again.", true); });
+        }, failed);
       }
       // What Relay already has shows straight away (Connor, 17 Nov 2026: it used to wait for the banks to be read first,
       // which takes seconds); the banks are read again behind it (at most every 10 minutes, on Relay's side) and the page
@@ -7376,7 +7519,7 @@
         });
         wrap.appendChild(el("div", { className: "rl-hp-chead" }, [el("b", { text: "Receipts found each day" }), el("span", { text: "Most in a day: " + N(max === 1 && !days.some(function (d) { return d.kept; }) ? 0 : max) })]));
         wrap.appendChild(el("div", { className: "rl-hp-plot" }, [chart, tip]));
-        wrap.appendChild(el("div", { className: "rl-hp-axis" }, [el("span", { text: dname(days[0].day, { day: "numeric", month: "short" }) }), el("span", { text: "Today" })]));
+        wrap.appendChild(el("div", { className: "rl-hp-axis" }, [el("span", { text: days.length ? dname(days[0].day, { day: "numeric", month: "short" }) : "" }), el("span", { text: "Today" })]));
         // The same numbers as a table.
         var table = el("table", { className: "rl-hp-table" }, [el("thead", {}, [el("tr", {}, [el("th", { text: "Day" }), el("th", { text: "Receipts" }), el("th", { text: "Skipped" })])])]);
         var tb = el("tbody"); days.slice().reverse().forEach(function (d) { tb.appendChild(el("tr", {}, [el("td", { text: dname(d.day, { weekday: "short", day: "numeric", month: "short" }) }), el("td", { text: N(d.kept) }), el("td", { text: N(d.skipped) })])); });
@@ -7744,7 +7887,7 @@
         api("/relay/my/export").then(function (r) {
           if (!r.ok || !r.body) { say(note, "Couldn't prepare your file. Try again in a moment.", true); return; }
           var url = URL.createObjectURL(new Blob([JSON.stringify(r.body, null, 2)], { type: "application/json" }));
-          var a = el("a", { href: url }); a.setAttribute("download", "relay-my-data-" + new Date().toISOString().slice(0, 10) + ".json");
+          var a = el("a", { href: url }); a.setAttribute("download", "relay-my-data-" + ukToday() + ".json");
           document.body.appendChild(a); a.click(); a.remove();
           setTimeout(function () { URL.revokeObjectURL(url); }, 10000);
           say(note, "Your file is downloading. Keep it somewhere safe: it has your receipts in it.");
@@ -7759,7 +7902,7 @@
       b.appendChild(el("p", { text: "Records of returns and swaps you made through Relay are kept, because the shops involved rely on them. Deleting can't be undone." }));
       var d = el("button", { className: "rl-btn rl-danger", text: "Delete my account" });
       d.onclick = function () {
-        ask("Delete your Relay account and everything linked to it? This can't be undone.", "Delete my account", function () {
+        ask("Delete your Relay account? Records of returns and swaps you made through Relay are kept for the shops. This can't be undone.", "Delete my account", function () {
           d.disabled = true;
           api("/relay/my/delete", { method: "POST" }).then(function (r) { if (r.ok) { memoReset(); save(null); close(); if (window.go && window.page === "me") window.go("profile"); } else { d.disabled = false; say(note, "Couldn't delete your account. Try again.", true); } })
             .catch(function () { d.disabled = false; say(note, "Couldn't reach Relay. Check your connection.", true); });
@@ -7774,7 +7917,7 @@
       HELP.forEach(function (q) {
         b.appendChild(el("details", { className: "rl-faq" }, [el("summary", { text: q[0] }), el("p", { text: q[1] })]));
       });
-      b.appendChild(el("p", { className: "rl-anote", text: "Read the full terms and privacy policy under Help & legal." }));
+      b.appendChild(el("p", { className: "rl-anote", text: "Read the full terms and privacy policy under Help and legal." }));
     }
   }
   function show() {
@@ -7911,15 +8054,33 @@
     if (window.go) { window.__relayReceiptsNote = note; window.go("receipts"); return; }
     open(function (sheet) { gate(sheet, s.email || "", note); });
   }
+  // Back from the bank's own page. The bank's answer comes back as a single-use code (#bank=finish&bankcode=…), which this
+  // app, signed in with the session that started the connection, hands to Relay to finish it (worker/bank.js finishBank):
+  // a link opened anywhere else can't attach a bank to someone's account. The older answers (#bank=denied and so on) come
+  // straight back as they were.
+  var BANK_CODE = /^[A-Za-z0-9_-]{43}$/;
+  var BANK_NOT_YOURS = "That bank link was started on another device. Start again here.";
+  var BANK_UNREACHED = "Couldn't reach Relay to finish connecting your bank. Check your connection, then start again.";
   function completeBank() {
-    var m = /(?:^|[#&])bank=(connected|denied|failed|expired|not_configured)(?:&|$)/.exec(location.hash || "");
+    var hash = location.hash || "";
+    var m = /(?:^|[#&])bank=(finish|connected|denied|failed|expired|not_configured)(?:&|$)/.exec(hash);
     if (!m) return;
+    var code = (/(?:^|[#&])bankcode=([^&]*)/.exec(hash) || [])[1] || "";
     try { history.replaceState(null, "", location.pathname + location.search); } catch (e) {}
     var s = load(); if (!s) return;
-    if (obGet(s.email).back === "bank") { obSet(s.email, { back: null }); return startJourney({ at: "bank", bankNote: m[1] }); }
-    wantBank = m[1];
-    if (window.go) window.go("me");
-    setTimeout(function () { if (wantBank && openBankPage) openBankPage(); }, 0);
+    var show = function (note) {
+      if (obGet(s.email).back === "bank") { obSet(s.email, { back: null }); return startJourney({ at: "bank", bankNote: note }); }
+      wantBank = note;
+      if (window.go) window.go("me");
+      setTimeout(function () { if (wantBank && openBankPage) openBankPage(); }, 0);
+    };
+    if (m[1] !== "finish") return show(m[1]);
+    if (!BANK_CODE.test(code)) return show("failed");
+    api("/relay/my/bank/finish", { method: "POST", body: { code: code } }).then(function (r) {
+      memo.bankPays = null;
+      var err = r.body && r.body.error;
+      show(r.ok ? "connected" : err === "not_your_link" ? "not_yours" : err === "too_many_banks" ? "too_many" : r.status === 409 ? "expired" : "failed");
+    }, function () { show("unreached"); });
   }
   function completeGoogleNote() {
     var m = /(?:^|[#&])(gsignin|msignin)=(denied|failed|other_address)(?:&|$)/.exec(location.hash || "");
@@ -7962,7 +8123,7 @@
     cachedGet("consent", "/relay/my/consent").then(function (r) {
       host.textContent = "";
       if (r.status === 401) { save(null); mountReceipts(host); return; }
-      if (!r.ok) { host.appendChild(el("p", { text: "Couldn't reach Relay." })); return; }
+      if (!r.ok) { cantLoad(host, "your receipts", function () { mountReceipts(host, notice); }); return; }
       if (!r.body.accepted) {
         host.appendChild(el("p", { text: r.body.acceptedEarlier ? "Relay's permission wording changed: it now says how AI helps read your receipts, and how to switch that off. Agree again to keep your receipts updating."
           : "Relay needs your OK before it looks at your receipts. It takes a moment." }));
@@ -7973,7 +8134,7 @@
       host.appendChild(box); host.appendChild(msg);
       if (notice) { say(msg, notice.text, notice.bad); if (notice.passing) msg.setAttribute("data-passing", notice.text); }
       gmailSection(box, r.body, msg, true);
-    }).catch(function () { host.textContent = ""; host.appendChild(el("p", { text: "Couldn't reach Relay." })); });
+    }).catch(function () { cantLoad(host, "your receipts", function () { mountReceipts(host, notice); }); });
   }
   // The Market page: swap and resell with other members, on a page of its own.
   function mountMarket(host) {
@@ -7988,7 +8149,7 @@
     cachedGet("consent", "/relay/my/consent").then(function (r) {
       host.textContent = "";
       if (r.status === 401) { save(null); mountMarket(host); return; }
-      if (!r.ok) { host.appendChild(el("p", { text: "Couldn't reach Relay." })); return; }
+      if (!r.ok) { cantLoad(host, "Swap & resell", function () { mountMarket(host); }); return; }
       if (!r.body.accepted) {
         host.appendChild(el("p", { text: "Relay needs your OK before it can list anything from your receipts. It takes a moment." }));
         // Agreeing comes straight back here, not to the account sheet.
@@ -8001,7 +8162,7 @@
       // something you asked about (and nothing unread), on Yours, where it's said.
       var nw = window.__relayMarketNews;
       resaleView(host, null, null, nw && Number(nw.messages) > 0 ? "messages" : nw && Number(nw.answers) > 0 ? "mine" : "browse");
-    }).catch(function () { host.textContent = ""; host.appendChild(el("p", { text: "Couldn't reach Relay." })); });
+    }).catch(function () { cantLoad(host, "Swap & resell", function () { mountMarket(host); }); });
   }
 
   // ---- Wrapped: a year of purchases, built only from the shopper's own captured receipts ----
@@ -8051,21 +8212,22 @@
     };
     var tally = function (o, k) { if (k) o[k] = (o[k] || 0) + 1; };
     // Shop orders the shop confirmed to Relay (only with testing tools do Relay's own test shops send theirs).
-    var shopOrders = {};
+    var counted = [], shopOrders = null;
     (purchases || []).forEach(function (o) {
       if (o.test && !testing) return;
       var name = o.store || "", m = /^shopify:([a-z0-9-]+\.myshopify\.com)$/.exec(String(o.retailer || "")), dom = m ? m[1] : "";
       var keys = [ysName(name) && "n:" + ysName(name), dom && "d:" + dom].filter(Boolean); if (!keys.length) return;
-      shopOrders[ysName(name) + "|" + o.amountMinor] = true;
+      counted.push(o);
       join(keys, function (g) { tally(g.names, ysName(name)); tally(g.labels, name); if (dom) tally(g.domains, dom); tally(g.cats, "other");
         g.buys.push({ kind: "order", label: name, o: o, at: String(o.orderedAt || "").slice(0, 10), title: (o.items || []).map(function (i) { return i.title; }).filter(Boolean).join(", ") || name, total: Number.isInteger(o.amountMinor) ? money(o.amountMinor, o.currency) : "" }); });
     });
+    shopOrders = sameBuyAs(counted, ysName);
     orderRows(receipts || []).forEach(function (x) {
       if (isCarrier(x) || x.kind === "not_receipt" || x.status === "not_receipt" || x.status === "dismissed") return;
       if (x.testShop && !testing) return; // Relay's own test shops (the server marks them)
       var r = x.retailer || {}, name = r.name || "", dom = ysDomain(r.domain);
       // The same purchase as a shop order already counted.
-      if (shopOrders[ysName(name) + "|" + x.totalPence]) return;
+      if (shopOrders(x)) return;
       var keys = [ysName(name) && "n:" + ysName(name), dom && "d:" + dom].filter(Boolean); if (!keys.length) return;
       var named = (x.items || []).filter(function (i) { return i && i.name; });
       join(keys, function (g) { tally(g.names, ysName(name)); tally(g.labels, name); if (dom) tally(g.domains, dom); tally(g.cats, x.category || "other");
@@ -8250,7 +8412,8 @@
     var go = el("button", { className: "rl-po-primary", text: "Read these years", style: "max-width:260px", disabled: true });
     card.appendChild(chips); card.appendChild(go); card.appendChild(status);
     var have = {}; (w.years || []).forEach(function (y) { have[y.year] = y.receipts; });
-    api("/relay/my/gmail/history").then(function (r) {
+    // (If Relay can't say which years it has read, the years are still offered, without ticks.)
+    api("/relay/my/gmail/history").then(null, function () { return { ok: false }; }).then(function (r) {
       var doneYears = {}; ((r.ok && r.body.years) || []).forEach(function (y) { doneYears[y.year] = true; });
       var earliest = (r.ok && r.body.earliest) || thisYear - 10;
       for (var y = thisYear - 1; y >= Math.max(earliest, thisYear - 8); y--) (function (y) {
@@ -8270,10 +8433,17 @@
         if (k >= years.length) {
           status.textContent = "Done. Relay found " + found + " receipts in " + years.join(", ") + "." + (missed.length === 1 ? " Your " + missed[0] + " inbox needs connecting again before Relay can read it: tap your picture at the top of the screen, then Inboxes." :
             missed.length ? " Some of your inboxes need connecting again before Relay can read them: tap your picture at the top of the screen, then Inboxes." : "");
-          setTimeout(function () { done(years[0]); }, missed.length ? 4000 : 900); return;
+          setTimeout(function () { if (status.isConnected) done(years[0]); }, missed.length ? 4000 : 900); return;
         }
         var y = years[k], where = "";
         function round(cursor) {
+          // Nothing is asked for once this page has been left, or while Relay is in the background (CLAUDE.md rule 20): it
+          // carries on from the same place when Relay is in front again.
+          if (!status.isConnected) return;
+          if (document.hidden) {
+            var back = function () { if (document.hidden) return; document.removeEventListener("visibilitychange", back); round(cursor); };
+            document.addEventListener("visibilitychange", back); return;
+          }
           // With more than one inbox the cursor starts with the inbox's number ("b2|2025/03/01"); the date is after it.
           var day = String(cursor || "").replace(/^b\d{1,2}\|/, "").replace(/^(\d{4})\/(\d{2})\/(\d{2})$/, "$3/$2");
           status.textContent = "Reading " + y + where + (day ? ", back to " + day : "") + "… " + found + " receipts found so far. Keep this page open.";
@@ -8568,7 +8738,7 @@
         var lines = el("div", { className: "facts" });
         var row = function (label, value, more) { lines.appendChild(el("div", {}, [el("span", { text: label }), el("b", {}, [document.createTextNode(value)].concat(more ? [el("small", { text: more })] : []))])); };
         // A go-to is a shop gone back to (two orders or more); otherwise the shop that took the most is named as that.
-        if (c.topShop) row(K.go, c.topShop.name, c.topShop.receipts + " orders");
+        if (c.topShop) row(K.go, c.topShop.name, c.topShop.receipts + (c.topShop.receipts === 1 ? " order" : " orders"));
         else if (c.mostSpent) row("Most spent at", c.mostSpent.name, gbp(c.mostSpent.spentPence));
         if (c.topItem) row(K.repeat, c.topItem.name, c.topItem.times + " times");
         else if (c.biggest && c.biggest.item) row("Biggest", c.biggest.item, gbp(c.biggest.totalPence));
@@ -8584,7 +8754,7 @@
       b.appendChild(el("p", { className: "lead", text: "Your top shops" }));
       var ol = el("ol", { className: "rank" });
       w.topShops.forEach(function (sh, i) {
-        ol.appendChild(el("li", { style: "animation-delay:" + (0.15 + i * 0.18) + "s" }, [el("b", { text: String(i + 1) }), el("span", { text: sh.name }), el("em", { text: sh.spentPence ? gbp(sh.spentPence) : sh.receipts + " orders" })]));
+        ol.appendChild(el("li", { style: "animation-delay:" + (0.15 + i * 0.18) + "s" }, [el("b", { text: String(i + 1) }), el("span", { text: sh.name }), el("em", { text: sh.spentPence ? gbp(sh.spentPence) : sh.receipts + (sh.receipts === 1 ? " order" : " orders") })]));
       });
       b.appendChild(ol);
     } });
@@ -8627,7 +8797,7 @@
       var sub = (gf.withTotal ? "On " + many(gf.count, "gift", "gifts") : "") + (allNamed ? (gf.withTotal ? " for " : "For ") + (ppl.length === 1 ? ppl[0].name : ppl.length + " people") : "") + (gf.withTotal || allNamed ? "." : "") +
         (gf.share ? (gf.withTotal || allNamed ? " " : "") + "That's " + gf.share + "% of your spending." : "");
       if (sub) b.appendChild(el("p", { text: sub }));
-      if (gf.withTotal < gf.count) b.appendChild(el("p", { className: "fine", text: "Added up from " + gf.withTotal + " of " + many(gf.count, "gift", "gifts") + ". The others had no amount Relay could read." }));
+      if (gf.withTotal && gf.withTotal < gf.count) b.appendChild(el("p", { className: "fine", text: "Added up from " + gf.withTotal + " of " + many(gf.count, "gift", "gifts") + ". The others had no amount Relay could read." }));
       var lines = el("div", { className: "facts" }), top = ppl[0], big = (gf.list || [])[0];
       if (top && top.gifts >= 2 && (ppl.length === 1 || top.gifts > ppl[1].gifts) && !(allNamed && ppl.length === 1))
         lines.appendChild(el("div", {}, [el("span", { text: "Most went to" }), el("b", {}, [document.createTextNode(top.name), el("small", { text: many(top.gifts, "gift", "gifts") })])]));
@@ -9473,11 +9643,17 @@
   }
   // Home's Wrapped goes straight into this year's story (Connor, 18 Nov 2026: the Wrapped page is boring). The page with
   // every year stays in Receipts. With no receipts this year yet, the page says what to do first.
+  // One story at a time: a second tap while the year is still being fetched (nothing has opened yet on a slow connection)
+  // doesn't open a second story on top of the first, with a second soundtrack.
+  var storyComing = false;
   function playThisYear() {
-    var y = new Date().getFullYear(), page = function () { if (window.go) window.go("wrapped"); };
-    cachedGet("wrapped" + y, "/relay/my/wrapped?year=" + y).then(function (r) { if (r && r.ok && r.body && r.body.receipts) { try { playStory(r.body); } catch (e) { page(); } } else page(); }, page);
+    if (storyComing || document.querySelector(".rl-story")) return;
+    storyComing = true;
+    var y = new Date().getFullYear(), page = function () { storyComing = false; if (window.go) window.go("wrapped"); };
+    cachedGet("wrapped" + y, "/relay/my/wrapped?year=" + y).then(function (r) { if (r && r.ok && r.body && r.body.receipts) { storyComing = false; try { playStory(r.body); } catch (e) { page(); } } else page(); }, page);
   }
   function playStory(w) {
+    if (document.querySelector(".rl-story")) return;
     var slides = storySlides(w), i = 0, timer = null, paused = false, DUR = 6500;
     var root = el("div", { className: "rl-story", role: "dialog", ariaLabel: "Your " + w.year + " Wrapped" });
     var frame = el("div", { className: "rl-story-frame" });
@@ -9498,10 +9674,15 @@
     drawSound(); startMusic();
     frame.appendChild(bars); frame.appendChild(sound); frame.appendChild(closeBtn); frame.appendChild(body); root.appendChild(frame);
     document.body.appendChild(root); document.body.style.overflow = "hidden";
-    function close() { clearTimeout(timer); document.removeEventListener("keydown", key); if (music) { music.stop(); music = null; } root.remove(); document.body.style.overflow = ""; }
+    // A slide whose time ran out while it couldn't move on (held, or Relay in the background): it moves on when it can.
+    var missed = false;
+    function wake() { if (!document.hidden && missed && !paused && root.isConnected) { missed = false; clearTimeout(timer); if (!slides[i].summary) timer = setTimeout(turn, 1200); } }
+    function turn() { if (paused || document.hidden) { missed = true; return; } show(i + 1); }
+    document.addEventListener("visibilitychange", wake);
+    function close() { clearTimeout(timer); document.removeEventListener("keydown", key); document.removeEventListener("visibilitychange", wake); if (music) { music.stop(); music = null; } root.remove(); document.body.style.overflow = ""; }
     function show(n) {
       var was = i;
-      i = Math.max(0, Math.min(slides.length - 1, n)); clearTimeout(timer);
+      i = Math.max(0, Math.min(slides.length - 1, n)); clearTimeout(timer); missed = false;
       if (music) music.level(levelOf(i), i !== was);
       var sl = slides[i];
       frame.style.background = sl.bg; frame.style.color = sl.fg; frame.style.setProperty("--accent", sl.accent);
@@ -9509,7 +9690,7 @@
       body.textContent = ""; var inner = el("div", { className: "rl-story-slide" }); body.appendChild(inner);
       if (music) music.train(false);
       sl.build(inner, function () { show(0); }, close, { train: function (on) { if (music) music.train(on); } });
-      if (!sl.summary) timer = setTimeout(function () { if (!paused) show(i + 1); }, sl.dur || DUR);
+      if (!sl.summary) timer = setTimeout(turn, sl.dur || DUR);
     }
     function key(e) { if (e.key === "Escape") close(); else if (e.key === "ArrowRight") show(i + 1); else if (e.key === "ArrowLeft") show(i - 1); }
     document.addEventListener("keydown", key);
@@ -9517,7 +9698,10 @@
     // Tap the right side to go on, the left side to go back; press and hold to pause.
     frame.addEventListener("click", function (e) { if (e.target.closest("button")) return; var r = frame.getBoundingClientRect(); if (e.clientX - r.left < r.width * 0.33) show(i - 1); else if (!slides[i].summary) show(i + 1); });
     frame.addEventListener("pointerdown", function () { paused = true; frame.classList.add("paused"); if (music) music.hold(true); });
-    frame.addEventListener("pointerup", function () { if (!paused) return; paused = false; frame.classList.remove("paused"); if (music) music.hold(false); });
+    // Letting go carries on, however the press ended: lifted, or turned into a drag (the phone then sends pointercancel and
+    // no pointerup, which used to leave the story frozen and silent).
+    var letGo = function () { if (!paused) return; paused = false; frame.classList.remove("paused"); if (music) music.hold(false); wake(); };
+    ["pointerup", "pointercancel", "pointerleave"].forEach(function (ev) { frame.addEventListener(ev, letGo); });
     show(0);
   }
 
@@ -9633,7 +9817,9 @@
     pendingPut(key, job);
     return api(job.path, { method: "POST", body: job.body }).then(function (r) {
       // Sent, or refused for good (an item Relay no longer knows): either way it's done. Busy or offline: it waits.
-      if (r.ok || (r.status >= 400 && r.status < 500 && r.status !== 408 && r.status !== 429)) pendingPut(key, null);
+      // (Only if this is still the change waiting for that item: a newer one made meanwhile, watch then unwatch, keeps waiting.)
+      var cur = pendingAll().items[key];
+      if ((r.ok || (r.status >= 400 && r.status < 500 && r.status !== 408 && r.status !== 429)) && (!cur || JSON.stringify(cur) === JSON.stringify(job))) pendingPut(key, null);
       return r;
     }, function () { return { ok: false, status: 0, body: {} }; });
   }
@@ -9661,7 +9847,8 @@
             if (!r.ok) return { ok: false, reason: "server" };
             // Anything already on the watchlist starts being watched by the server too.
             var local = (window.relayLocalWatches && window.relayLocalWatches()) || [];
-            return Promise.all(local.map(function (p) { return syncWatch(p, true); })).then(function () { memoDrop("alerts"); return { ok: true }; });
+            // (One after another, not forty requests at once.)
+            return local.reduce(function (q, p) { return q.then(function () { return syncWatch(p, true); }); }, Promise.resolve()).then(function () { memoDrop("alerts"); return { ok: true }; });
           });
         });
       });
@@ -9690,7 +9877,9 @@
     var layer = el("div", { className: "rl-back" }, [sheet]);
     layer.addEventListener("click", function (e) { if (e.target === layer) close(); });
     document.body.appendChild(layer);
-    function close() { if (layer.parentNode) layer.parentNode.removeChild(layer); }
+    // Once the return is saved, closing the sheet any way (Done, or a tap outside) updates what's behind it.
+    var returnSaved = false;
+    function close() { if (!layer.parentNode) return; layer.parentNode.removeChild(layer); if (returnSaved && done) { var d = done; done = null; d(); } }
     var msg = el("div", { className: "rl-msg" });
     var step = "reason";
     var selectedReason = null;
@@ -9705,6 +9894,7 @@
 
     // A Royal Mail label is shown only when Royal Mail actually made one (the shop connected its own Click & Drop account).
     function showLabel(result) {
+      returnSaved = true;
       sheet.textContent = "";
       var shop = o.store || "the shop";
       var inner = el("div", { className: "sheet-inner" });
@@ -9740,6 +9930,7 @@
     // Say exactly what happened (a request saved in Relay) and what the shopper should do.
     function showSaved(result) {
       if (result.labelAvailable && result.trackingNumber) return showLabel(result);
+      returnSaved = true;
       sheet.textContent = "";
       var shop = o.store || "the shop";
       var inner = el("div", { className: "sheet-inner" });
@@ -9824,10 +10015,16 @@
       sheet.appendChild(el("h2", { text: "Swap " + it.title, style: "margin:0 0 4px" }));
       var have = "You have " + (it.variant || "this item") + " from " + (o.store || "the shop") + ".";
       var intro = el("p", { className: "small muted", text: have + " Choose what you'd like instead." }); sheet.appendChild(intro);
-      var list = el("div", {}, [el("p", { text: "Checking what the shop has in stock…" })]); sheet.appendChild(list);
+      var list = el("div"); sheet.appendChild(list);
+      // Greyed outlines of the choices while the shop's stock is asked for (no bare "Checking…").
+      var outlines = function () { list.textContent = ""; list.setAttribute("aria-busy", "true"); for (var k = 0; k < 3; k++) list.appendChild(el("div", { className: "rl-skel", style: "min-height:52px;border-radius:999px;margin:6px 0" })); };
+      outlines();
       var msg = el("div", { className: "rl-msg" }); sheet.appendChild(msg);
-      api("/relay/my/exchange/options?orderId=" + encodeURIComponent(o.id) + "&lineId=" + encodeURIComponent(it.lineId)).then(function (r) {
-        list.textContent = "";
+      // The choices didn't arrive (no signal, or Relay too slow): said plainly, with Try again, never outlines for ever.
+      var noChoices = function () { cantLoad(list, "what the shop has in stock", function () { outlines(); choices(); }); };
+      var choices = function () { api("/relay/my/exchange/options?orderId=" + encodeURIComponent(o.id) + "&lineId=" + encodeURIComponent(it.lineId)).then(function (r) {
+        if (!r.ok) return noChoices();
+        list.textContent = ""; list.removeAttribute("aria-busy");
         // The shop has sent the order, started on it or cancelled it: said now, before there's anything to choose, with
         // the way to return it instead when that's still open.
         var stop = r.ok && r.body && r.body.blocked;
@@ -9841,7 +10038,7 @@
           return;
         }
         var opts = (r.ok && r.body && r.body.options) || [];
-        if (!opts.length) { list.appendChild(el("p", { text: r.ok ? "This product has no other sizes or colours." : "Couldn't load the options." })); return; }
+        if (!opts.length) { list.appendChild(el("p", { text: "This product has no other sizes or colours." })); return; }
         var shop = o.store || "The shop", card = r.body.card;
         opts.forEach(function (x) {
           var d = x.priceDiffMinor || 0;
@@ -9859,7 +10056,7 @@
             var what = d === 0 ? "Same price, nothing to pay or refund."
               : d > 0 && x.payBy === "square" ? "It costs " + absPounds(d) + " more. You'll pay the " + absPounds(d) + " to " + shop + " on Square's secure payment page, and the swap is confirmed once it's paid."
               : viaShop ? "It costs " + absPounds(d) + " more. " + shop + " will update your order and send you a link to pay the " + absPounds(d) + ", using any way of paying " + shop + " accepts. Your new " + (x.title || "item") + " is kept for you."
-              : d > 0 ? "It costs " + absPounds(d) + " more. We'll take " + absPounds(d) + " from your " + (card ? cardText(card) : "card") + " only once the shop has updated your order. (Test mode: no real money.)"
+              : d > 0 ? "It costs " + absPounds(d) + " more. We'll take " + absPounds(d) + " from your " + (card ? cardText(card) : "card") + " only once the shop has updated your order." + (testingOn() ? " (Test mode: no real money.)" : "")
               : "It costs " + absPounds(d) + " less. " + shop + " will refund the " + absPounds(d) + " to how you paid.";
             ask("Swap " + (it.variant || it.title) + " for " + x.title + "? " + what, viaShop ? "Swap, then pay " + absPounds(d) : d > 0 ? "Swap and pay " + absPounds(d) : "Yes, swap it", function () {
               list.querySelectorAll("button").forEach(function (n) { n.disabled = true; });
@@ -9881,12 +10078,17 @@
                 }
                 say(msg, EXCHANGE_ERR[res.body && res.body.error] || "The shop didn't accept the change. Please try again, or contact the shop.", true);
                 list.querySelectorAll("button").forEach(function (n) { n.disabled = false; });
+              }, function () {
+                // No answer: Relay can't say whether the shop made the change, so it doesn't guess either way.
+                say(msg, "Couldn't reach Relay, so it can't say whether the swap went through. Close this and look at your order before trying again.", true);
+                list.querySelectorAll("button").forEach(function (n) { n.disabled = false; });
               });
             });
           };
           list.appendChild(b);
         });
-      });
+      }, noChoices); };
+      choices();
       sheet.appendChild(el("button", { className: "rl-btn ghost", text: "Close", style: "margin-top:10px", onclick: close }));
     });
   }
@@ -10486,7 +10688,7 @@
     var layer = el("div", { className: "rl-back", style: "z-index:10000" }, [card]);
     function shut() { layer.remove(); document.removeEventListener("keydown", onKey); }
     function onKey(e) { if (e.key === "Escape") shut(); }
-    var today = new Date().toISOString().slice(0, 10), yesterday = new Date(Date.now() - 864e5).toISOString().slice(0, 10);
+    var today = ukToday(), yesterday = ukToday(-1);
     card.appendChild(el("h2", { text: typed ? "Your return" : "I've sent it back" }));
     card.appendChild(el("p", { className: "rl-fix-lead", text: "Add the tracking number from your drop-off receipt or the carrier's email if you have one, and Relay follows the parcel back to " + who + "." }));
     var tn = el("input", { type: "text", id: "rl-rt-tn", value: (typed && typed.trackingNumber) || "", maxLength: 60, autocomplete: "off", enterKeyHint: "done", placeholder: "For example KO123456789GB" });
@@ -10577,7 +10779,7 @@
   function codeName(c) { return c.kind === "qr" ? "QR code" : c.kind === "barcode" ? "barcode" : "code"; }
   // What the dates say about one code: { line, passed }. Only dates the shop's own emails gave.
   function codeWhen(c, x) {
-    var today = new Date().toISOString().slice(0, 10), who = (x.retailer && (x.retailer.name || x.retailer.domain)) || "the shop";
+    var today = ukToday(), who = (x.retailer && (x.retailer.name || x.retailer.domain)) || "the shop";
     if (c.purpose === "ticket") return c.day ? (c.day < today ? { passed: true, line: "This was for " + codeDay(c.day) + "." } : { passed: false, line: "For " + codeDay(c.day) }) : { passed: false, line: "" };
     var by = c.purpose === "drop_off_return" ? "Drop off by " : c.purpose === "collection" ? "Collect by " : "Return by ";
     if (c.deadline) return c.deadline < today ? { passed: true, line: by + codeDay(c.deadline) + ". That date has passed." } : { passed: false, line: by + codeDay(c.deadline) };
@@ -11352,9 +11554,11 @@
     draw();
   }
   // Time left on every card or page on screen, kept up to date while it's open.
+  // One timer per box, however often the box is drawn again (each redraw used to start another and stop none).
   function auTick(box) {
-    var t = setInterval(function () {
-      if (!document.body.contains(box)) return clearInterval(t);
+    if (box._auT) clearInterval(box._auT);
+    var t = box._auT = setInterval(function () {
+      if (!document.body.contains(box)) { clearInterval(t); if (box._auT === t) box._auT = null; return; }
       Array.prototype.forEach.call(box.querySelectorAll("[data-ends]"), function (n) { n.textContent = auLeft(Number(n.getAttribute("data-ends"))); });
     }, 1000);
   }
@@ -11410,7 +11614,7 @@
       if (said) body.appendChild(el("p", { className: "rl-au-you big" + (you && AU_TODO[you.state] ? " todo" : you && you.state === "leading" ? " good" : ""), text: said }));
       var acts = el("div", { className: "rl-dt-acts" });
       if (you && (you.state === "pay" || you.state === "offered")) {
-        if (you.payUrl) acts.appendChild(el("a", { className: "rl-btn rl-au-pay", href: you.payUrl, target: "_blank", rel: "noopener noreferrer" }, [el("span", { text: "Pay " + money(you.totalMinor, "GBP") + " at " + a.shop }), jIc("ext", 18)]));
+        if (you.payUrl && /^https:\/\//.test(you.payUrl)) acts.appendChild(el("a", { className: "rl-btn rl-au-pay", href: you.payUrl, target: "_blank", rel: "noopener noreferrer" }, [el("span", { text: "Pay " + money(you.totalMinor, "GBP") + " at " + a.shop }), jIc("ext", 18)]));
         else acts.appendChild(el("p", { className: "rl-au-sub", text: "Relay is getting the link to pay from " + a.shop + ". Pull down or come back in a minute." }));
       }
       if (you && you.state === "add_address") acts.appendChild(el("button", { type: "button", className: "rl-btn", text: "Add delivery details", onclick: function () {
@@ -11837,9 +12041,24 @@
     });
   }
   function orderRows(rows) { return rows.filter(function (x) { return x.kind !== "return_instructions" && x.kind !== "delivery_update" && x.kind !== "return_update"; }); }
+  // Is this email receipt the same purchase as an order its shop confirmed to Relay? The same shop and the same total, and
+  // bought within three days of each other: two separate orders at one shop that happen to cost the same (the same thing
+  // bought again months later) are two purchases, and hiding one would lose its receipt and its return date. Only when a
+  // date is missing on one side does the shop and total alone decide. Returns the order's day, or null.
+  var SAME_BUY_MS = 3 * 864e5;
+  function dayMs(d) { var t = /^\d{4}-\d{2}-\d{2}/.test(String(d || "")) ? Date.parse(String(d).slice(0, 10) + "T00:00:00Z") : NaN; return t; }
+  function sameBuyAs(orders, nameOf) {
+    nameOf = nameOf || label; var by = {};
+    (orders || []).forEach(function (o) { var k = nameOf(o.store) + "|" + o.amountMinor; (by[k] = by[k] || []).push(dayMs(o.orderedAt)); });
+    return function (x) {
+      var days = by[nameOf(x.retailer && x.retailer.name) + "|" + x.totalPence]; if (!days) return false;
+      var d = dayMs(x.orderDate); if (isNaN(d)) return true;
+      return days.some(function (t) { return isNaN(t) || Math.abs(t - d) <= SAME_BUY_MS; });
+    };
+  }
   function notConfirmed(purchases) {
-    var seen = {}; purchases.forEach(function (o) { seen[label(o.store) + "|" + o.amountMinor] = true; });
-    return function (x) { return !seen[label(x.retailer && x.retailer.name) + "|" + x.totalPence]; };
+    var same = sameBuyAs(purchases);
+    return function (x) { return !same(x); };
   }
   function skeleton(host, n) { for (var i = 0; i < n; i++) host.appendChild(el("div", { className: "rl-po rl-skel" })); }
   // The wallet: everything you can still return or swap, newest deadline first, in one list. Everything else is in Receipts.
@@ -11882,7 +12101,7 @@
       var sg = sigOf(both); if (sg === drawn) return; drawn = sg;
       var oldPill = head.querySelector(".pill"); if (oldPill) oldPill.remove();
       foot.textContent = "";
-      var purchases = both[0], receipts = both[1], today = new Date().toISOString().slice(0, 10), items = [];
+      var purchases = both[0], receipts = both[1], today = ukToday(), items = [];
       purchases.forEach(function (o) { (o.items || []).forEach(function (it) {
         // What can still be returned or swapped, and a swap that still has its difference to pay.
         var owes = Boolean(it.exchange && it.exchange.balance && !it.exchange.balance.paid && !it.returnInfo);
@@ -11973,7 +12192,7 @@
   var homeSizes = null;    // watches the feed's size, so the first screen is worked out again when text or pictures change it
   function feedEntries(purchases, receipts, refresh, opts) {
     opts = opts || {};
-    var today = new Date().toISOString().slice(0, 10), fresh = new Date(Date.now() - 30 * 864e5).toISOString().slice(0, 10), out = [];
+    var today = ukToday(), fresh = ukToday(-30), out = [];
     var soon = function (e, dl) { var d = daysLeft(dl); if (d !== null && d >= 0 && d <= 7) { e.rank = 0; e.strip = leftWords(d) + (d === 0 ? " to return it" : ""); e.stripKind = d <= 3 ? "urgent" : "soon"; } else e.rank = 1; };
     purchases.forEach(function (o) {
       // Orders from Relay's test shops never show on Home, even with testing tools (Connor, 15 Nov 2026), except on Orders
@@ -12156,6 +12375,11 @@
       try { all = (window.relayLocalWatches ? window.relayLocalWatches() : []).filter(function (w) { return w && w.sku && w.product && w.real; }).reverse(); } catch (e) {}
       box.textContent = ""; box.className = "";
       if (all.length) { box.appendChild(el("div", { className: "wl-list", "data-round": "plain" }, all.map(function (w) { return watchCard(w, draw); }))); return; }
+      // The shops couldn't be asked, and nothing is kept on this phone: said plainly ("Nothing watched yet" would be false).
+      if (!ready && window.relayCatalogFailed && window.relayCatalogFailed()) {
+        cantLoad(box, "what you're watching", function () { box.textContent = ""; window.addEventListener("relay-catalogue", draw, { once: true }); if (window.relayCatalogRetry) window.relayCatalogRetry(); });
+        return;
+      }
       if (!ready) {
         var bones = el("div", { className: "wl-list" });
         for (var k = 0; k < 2; k++) bones.appendChild(el("div", { className: "wl-card wl-bone" }, [el("span", { className: "wl-pic rl-skel" }), el("span", { className: "wl-mid" }, [el("span", { className: "rl-skel", style: "height:16px;width:90%;border-radius:8px" }), el("span", { className: "rl-skel", style: "height:16px;width:50%;border-radius:8px" })])]));
@@ -12351,7 +12575,7 @@
   var homeEntries = { p: null, r: null, key: "", out: null }, listIds = typeof WeakMap === "function" ? new WeakMap() : null, listN = 0;
   function homeIds(list) { if (!list || typeof list !== "object" || !listIds) return String(list && list.length); if (!listIds.has(list)) listIds.set(list, ++listN); return listIds.get(list); }
   function homeFeedEntries(purchases, receipts) {
-    var key = new Date().toISOString().slice(0, 10) + "|" + (testToolsOn() ? 1 : 0) + "|" + (isReview() ? 1 : 0);
+    var key = ukToday() + "|" + (testToolsOn() ? 1 : 0) + "|" + (isReview() ? 1 : 0);
     if (homeEntries.out && homeEntries.p === purchases && homeEntries.r === receipts && homeEntries.key === key) return homeEntries.out.slice();
     homeEntries = { p: purchases, r: receipts, key: key, out: feedEntries(purchases, receipts, homeRefresh) };
     return homeEntries.out.slice();
@@ -12426,7 +12650,7 @@
       // They stay in Receipts.
       // Something that usually can't go back (Nespresso pods, a food shop) still shows for a week after it's bought, so a new
       // purchase is always there to see (Connor, 15 Nov); apps and subscriptions never do.
-      var weekAgo = new Date(Date.now() - 7 * 864e5).toISOString().slice(0, 10);
+      var weekAgo = ukToday(-7);
       if (homeLook() !== "cards") all = all.filter(function (e) { return e.onWay || e.swaps || (!e.digital && (!e.noReturn || String(e.at || "").slice(0, 10) >= weekAgo)); });
       // "To return": what can still go back, and returns on their way (with where each has got to).
       var sets = { you: all, back: all.filter(function (e) { return e.toReturn || e.returning; }), way: all.filter(function (e) { return e.onWay; }), swaps: all.filter(function (e) { return e.swaps; }), watch: watched };
@@ -12493,6 +12717,10 @@
       var listKey = shown.map(function (w) { return [w.sku, w.nowMinor, w.priceMinor, w.image, w.store, w.dom, w.product, w.variation].join("\u0001"); }).join("\u0002");
       if (shown.length && (!watchList || watchList.key !== listKey)) watchList = { key: listKey, node: el("div", { className: "wl-list", "data-round": "plain" }, shown.map(function (w) { return watchCard(w, function () { if (feed.isConnected) draw(true); }); })) };
       if (shown.length) feed.appendChild(watchList.node);
+      else if (!ready && (state.watchWaiting || watched.length) && window.relayCatalogFailed && window.relayCatalogFailed()) {
+        // The shops couldn't be asked and nothing is kept here to show: said, with Try again (never outlines for ever).
+        cantLoad(feed.appendChild(el("div")), "what you're watching", function () { memo.watchWait = false; if (window.relayCatalogRetry) window.relayCatalogRetry(); if (feed.isConnected) draw(true); });
+      }
       else if (!ready && (state.watchWaiting || watched.length)) {
         // Still waiting for the shops' products, with nothing kept on this phone yet: greyed outlines of the rows (rule 7).
         var bones = el("div", { className: "wl-list" });
@@ -12578,10 +12806,19 @@
       var receipts = state.both[1], byOrder = {};
       if (aiNoteDue) feed.appendChild(aiNoteCard());
       // The shop's own emails about an order (matched as Home already matches them: shop and amount) say where its parcel is.
-      receipts.forEach(function (x) { if (x && x.retailer && x.delivery) byOrder[label(x.retailer.name) + "|" + x.totalPence] = x; });
+      // (Shop, amount and days apart, as sameBuyAs: another order at that shop for the same money has its own parcel.)
+      receipts.forEach(function (x) { if (x && x.retailer && x.delivery) { var bk = label(x.retailer.name) + "|" + x.totalPence; (byOrder[bk] = byOrder[bk] || []).push(x); } });
+      var parcelOf = function (o) {
+        var at = dayMs(o.orderedAt), best = null, gap = Infinity;
+        (byOrder[label(o.store) + "|" + o.amountMinor] || []).forEach(function (x) {
+          var d = dayMs(x.orderDate), g = isNaN(d) || isNaN(at) ? SAME_BUY_MS : Math.abs(d - at);
+          if (g <= SAME_BUY_MS && g < gap) { best = x; gap = g; }
+        });
+        return best;
+      };
       var orders = feedEntries(state.both[0], [], refresh, { withTest: testToolsOn() });
       orders.forEach(function (e) {
-        var o = e.order, x = byOrder[label(o.store) + "|" + o.amountMinor] || null, dv = x && x.delivery;
+        var o = e.order, x = parcelOf(o), dv = x && x.delivery;
         if (dv) e.track = x;
         if (e.owes) e.tag = "Swap to pay for";
         else if (/^Refunded/.test(e.line)) e.tag = "Refunded";
@@ -12810,7 +13047,7 @@
         var shown = opts.limit ? items.slice(0, opts.limit) : items;
         shown.forEach(function (x) { grid.appendChild(confirmedCard(x[0], x[1], refresh)); });
         if (opts.limit && items.length > opts.limit && window.go)
-          host.appendChild(el("button", { className: "rl-po-more", text: "See all " + items.length + " in Receipts →", onclick: function () { window.go("receipts"); } }));
+          host.appendChild(el("button", { className: "rl-po-more", text: "See all " + items.length + " in Receipts", onclick: function () { window.go("receipts"); } }));
       }
       host.appendChild(testHost);
     }).catch(function () {});
@@ -12961,17 +13198,25 @@
     var msg = el("p", { className: "small muted", style: "min-height:18px;margin:10px 0 0" });
     var body = el("div", {}, [el("div", { className: "rl-skel", style: "min-height:48px;border-radius:14px" })]);
     box.appendChild(body); box.appendChild(msg);
+    // A button's request runs once at a time (the button is off meanwhile), and a request that doesn't arrive is said.
+    var run = function (b, start) {
+      if (b.disabled) return; b.disabled = true;
+      Promise.resolve().then(start).then(function () { b.disabled = false; }, function () { b.disabled = false; say(msg, "Couldn't reach Relay. Check your connection and try again.", true); });
+    };
     function draw() {
       Promise.all([thisDevice(), alertStatus()]).then(function (r) {
         var sub = r[0], st = r[1]; body.textContent = "";
+        // Relay couldn't be asked whether alerts are on: said, never shown as "off" (someone with alerts on would be offered Turn on).
+        if (st === null) { cantLoad(body, "your alerts", function () { memoDrop("alerts"); body.textContent = ""; body.appendChild(el("div", { className: "rl-skel", style: "min-height:48px;border-radius:14px" })); draw(); }); return; }
         if (Notification.permission === "denied") { body.appendChild(el("p", { className: "sub", text: "Alerts are blocked for Relay in this browser. Allow notifications for this site in your browser or phone settings, then come back." })); return; }
         var on = Boolean(sub) && st && st.devices > 0;
         if (!on) {
           body.appendChild(el("p", { className: "sub", text: "Get a message on this device when a product you watch (or any product at a shop you choose) drops in price. Nothing is sent unless you turn this on, and you can turn it off any time." }));
-          body.appendChild(el("button", { className: "rl-btn", text: "Turn on alerts", style: "max-width:240px", onclick: function () {
+          var turnOn = el("button", { className: "rl-btn", text: "Turn on alerts", style: "max-width:240px", onclick: function () { run(turnOn, function () {
             say(msg, "Asking your device…");
-            enablePush().then(function (x) { if (x.ok) { say(msg, "Alerts are on. Send yourself a test to make sure they reach you."); draw(); } else say(msg, x.reason === "denied" ? "You said no, so nothing was turned on." : "Couldn't turn alerts on just now. Please try again.", true); });
-          } }));
+            return enablePush().then(function (x) { if (x.ok) { say(msg, "Alerts are on. Send yourself a test to make sure they reach you."); draw(); } else say(msg, x.reason === "denied" ? "You said no, so nothing was turned on." : "Couldn't turn alerts on just now. Please try again.", true); });
+          }); } });
+          body.appendChild(turnOn);
           return;
         }
         body.appendChild(el("p", { className: "sub", text: "✓ Alerts are on for this device. Watching " + st.watches.length + " item" + (st.watches.length === 1 ? "" : "s") + (st.stores.length ? " and every product at: " + st.stores.join(", ") : "") + "." }));
@@ -12979,25 +13224,31 @@
         var modes = el("div", { style: "display:flex;gap:8px;flex-wrap:wrap;margin:4px 0 12px" });
         [["watchlist", "Only my watchlist"], ["all", "Price drops at every shop"]].forEach(function (mode) {
           var on = (mode[0] === "all") === Boolean(st.allShops);
-          modes.appendChild(el("button", { className: "toggle" + (on ? " on" : ""), text: (on ? "✓ " : "") + mode[1], onclick: function () {
-            api("/relay/my/alerts/mode", { method: "POST", body: { mode: mode[0] } }).then(function (x) { if (x.ok) { memoDrop("alerts"); draw(); say(msg, mode[0] === "all" ? "You'll get an alert when anything drops in price at any shop connected to Relay." : "You'll only get alerts for items on your watchlist (and shops you follow)."); } });
-          } }));
+          var mb = el("button", { type: "button", className: "toggle" + (on ? " on" : ""), text: mode[1], ariaPressed: on ? "true" : "false", onclick: function () { run(mb, function () {
+            return api("/relay/my/alerts/mode", { method: "POST", body: { mode: mode[0] } }).then(function (x) {
+              if (!x.ok) return say(msg, "Couldn't change that just now. Please try again.", true);
+              memoDrop("alerts"); draw(); say(msg, mode[0] === "all" ? "You'll get an alert when anything drops in price at any shop connected to Relay." : "You'll only get alerts for items on your watchlist (and shops you follow)."); });
+          }); } });
+          modes.appendChild(mb);
         });
         body.appendChild(modes);
         var row = el("div", { style: "display:flex;gap:8px;flex-wrap:wrap" });
-        row.appendChild(el("button", { className: "rl-btn", text: "Send a test alert", style: "width:auto", onclick: function () {
+        var testBtn = el("button", { className: "rl-btn", text: "Send a test alert", style: "width:auto", onclick: function () { run(testBtn, function () {
           say(msg, "Sending…");
-          api("/relay/my/push/test", { method: "POST" }).then(function (x) { say(msg, x.ok && x.body.sent ? "Sent. It should appear on this device in a few seconds." : x.status === 429 ? "Give it a few seconds, then try again." : "It couldn't be delivered. Try turning alerts off and on again.", !(x.ok && x.body.sent)); });
-        } }));
-        row.appendChild(el("button", { className: "rl-btn ghost", text: "Check prices now", style: "width:auto", onclick: function () {
+          return api("/relay/my/push/test", { method: "POST" }).then(function (x) { var sent = Boolean(x.ok && x.body && x.body.sent); say(msg, sent ? "Sent. It should appear on this device in a few seconds." : x.status === 429 ? "Give it a few seconds, then try again." : "It couldn't be delivered. Try turning alerts off and on again.", !sent); });
+        }); } });
+        row.appendChild(testBtn);
+        var checkBtn = el("button", { className: "rl-btn ghost", text: "Check prices now", style: "width:auto", onclick: function () { run(checkBtn, function () {
           say(msg, "Checking the shops…");
-          api("/relay/my/alerts/check", { method: "POST" }).then(function (x) {
+          return api("/relay/my/alerts/check", { method: "POST" }).then(function (x) {
             if (x.status === 429) return say(msg, "Just checked. Try again in a few seconds.");
-            if (!x.ok) return say(msg, "Couldn't check just now.", true);
+            if (!x.ok || !x.body) return say(msg, "Couldn't check just now.", true);
             say(msg, "Checked " + x.body.checked + " item" + (x.body.checked === 1 ? "" : "s") + ". " + (x.body.drops ? x.body.drops + " price drop" + (x.body.drops === 1 ? "" : "s") + ", " + x.body.sent + " alert" + (x.body.sent === 1 ? "" : "s") + " sent." : "No price drops."));
           });
-        } }));
-        row.appendChild(el("button", { className: "rl-btn ghost", text: "Turn off", style: "width:auto", onclick: function () { disablePush().then(function () { say(msg, "Alerts are off for this device."); draw(); }); } }));
+        }); } });
+        row.appendChild(checkBtn);
+        var offBtn = el("button", { className: "rl-btn ghost", text: "Turn off", style: "width:auto", onclick: function () { run(offBtn, function () { return disablePush().then(function () { say(msg, "Alerts are off for this device."); draw(); }); }); } });
+        row.appendChild(offBtn);
         body.appendChild(row);
         body.appendChild(el("p", { className: "small muted", style: "margin-top:10px", text: "Prices are compared whenever a connected shop updates its catalogue, and every hour. Only shops connected to Relay have prices to watch." }));
       });
@@ -13016,7 +13267,7 @@
     auMineCheck(); mkCheck();
     cachedGet("gmail", "/relay/my/gmail").then(function (g) { if (g.ok) mailFixBadge(g.body); }, function () {});
     var draw = function (rows) {
-      var today = new Date().toISOString().slice(0, 10), n = 0;
+      var today = ukToday(), n = 0;
       (rows || []).forEach(function (x) {
         if (!x || x.kind === "return_instructions" || isCarrier(x) || x.returnProgress) return;
         if (x.returnable === false && !(x.returnableItems || []).length) return;
@@ -13082,4 +13333,6 @@
     window.addEventListener("relay:session", function () { if (load()) unmountWelcome(); else mountWelcome(); });
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start); else start();
+  // The page (index.html) draws Home the moment this file is in, instead of looking for it every tenth of a second.
+  try { window.dispatchEvent(new Event("relay:account-ready")); } catch (e) {}
 })();

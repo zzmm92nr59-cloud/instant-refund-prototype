@@ -36,7 +36,7 @@ export const HELP_QA = [
   ],
   [
     "How do I delete my account?",
-    "Tap your picture at the top of the screen, then Security and privacy, then Delete my account. Your sign-in and everything linked to it are deleted, and it can't be undone."
+    "Tap your picture at the top of the screen, then Security and privacy, then Delete my account. Your sign-in, your receipts and the rest of your account are deleted, and it can't be undone. Records of returns and swaps you made through Relay are kept, because the shops involved rely on them."
   ],
   [
     "Can the help chat look at one of my receipts?",
