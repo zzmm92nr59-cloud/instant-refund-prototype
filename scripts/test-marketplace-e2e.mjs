@@ -366,7 +366,15 @@ const FAKE = "data:image/png;base64," + Buffer.from("<script>alert(1)</script>".
   const blocks = (await call("/relay/my/resale/blocks", { token: sam.token })).body.blocks;
   assert.deepEqual(blocks.map(b => b.about), ["Stoneware Mug"]);
   const beaId = one("SELECT id FROM shoppers WHERE email = ?", bea.email).id;
-  assert.ok(!JSON.stringify(blocks).includes(beaId) && !/bea/i.test(JSON.stringify(blocks)), "Sam never learns who it was");
+  // Each block's own id is random letters and digits (a UUID), so "bea" turns up in one by chance about one run in 150,
+  // which used to fail this check for no reason. So: the id is checked to be the block row's own and nothing of Bea's, and
+  // everything else Sam is sent (every other field, and the field names) is searched for her name, as before.
+  const samId = one("SELECT id FROM shoppers WHERE email = ?", sam.email).id;
+  assert.deepEqual(blocks.map(b => b.id), [one("SELECT id FROM resale_member_blocks WHERE blocker_id = ? AND blocked_id = ?", samId, beaId).id], "the block's own id, nothing else");
+  assert.ok(blocks.every(b => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(b.id)), "a random id, not made from anything of Bea's");
+  const beaHash = (one("SELECT email_hash FROM shoppers WHERE id = ?", beaId) || {}).email_hash;
+  const rest = JSON.stringify(blocks.map(({ id, ...others }) => others));
+  assert.ok(!JSON.stringify(blocks).includes(beaId) && !(beaHash && JSON.stringify(blocks).includes(beaHash)) && !/bea/i.test(rest), "Sam never learns who it was");
   assert.deepEqual((await call("/relay/my/resale/blocks", { token: bea.token })).body.blocks, [], "Bea isn't told she's blocked");
   assert.equal((await call("/relay/my/resale/blocks/" + blocks[0].id + "/remove", { method: "POST", token: bea.token })).status, 404, "only the blocker can unblock");
   assert.deepEqual((await call("/relay/my/export", { token: sam.token })).body.swapAndSell.membersYouBlocked.map(b => b.about), ["Stoneware Mug"], "in Download my data");

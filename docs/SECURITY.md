@@ -212,7 +212,7 @@ once per request by `/relay/my/bank/payments` and `/relay/my/receipts`.
   field they shouldn't, such as a resale listing's title, which always comes from the receipt.
 - **Deny by default:** a route that isn't listed takes no fields at all.
 - Bodies are read only up to the route's size limit (8 KB unless it needs more: pasted emails 1 MB, a profile photo
-  300 KB, a photo of a paper receipt 1.6 MB). Bigger ones get `413` and, when the size is declared, aren't even read.
+  260 KB, a photo of a paper receipt 1.6 MB). Bigger ones get `413` and, when the size is declared, aren't even read.
 - The body must be valid UTF-8 and one JSON object. Keys named `__proto__`, `constructor` or `prototype` are refused
   anywhere (prototype pollution).
 - Text is cleaned: control characters are removed, and in text written for other people (names, notes, messages) so are

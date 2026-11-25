@@ -67,7 +67,9 @@ const ROUTES = new Map(Object.entries({
   // The shopper's account and devices.
   "/relay/my/devices/sign-out-others": NOTHING,
   "/relay/my/delete": NOTHING,
-  "/relay/my/profile": { limit: 300 * KB, tooLarge: "photo_too_big", fields: { name: text(100), photo: str(290 * KB) } },
+  // The size limit is the route's own (profile.js MAX_BODY), and the photo field is allowed all of it, so a photo that's too
+  // big is always answered "photo_too_big" (413), which the app explains, never a plain "invalid_request".
+  "/relay/my/profile": { limit: 260000, tooLarge: "photo_too_big", fields: { name: text(100), photo: str(260000) } },
   // What the shopper shops for: up to 12 ids from the fixed list in interests.js (which checks them again).
   "/relay/my/interests": { fields: { interests: list(12, one(...INTEREST_IDS)) } },
   // Which first-run tips the shopper has seen: ids from the list in tips.js (which checks them again).
