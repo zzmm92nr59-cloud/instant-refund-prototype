@@ -171,6 +171,62 @@ await runPriceAlerts(env, { now: clock, fetchImpl });
 assert.equal(pushes.length, 2, "two drops at the same time give two separate alerts, one per product");
 assert.equal(sqlite.prepare("SELECT COUNT(*) AS n FROM push_subscriptions WHERE shopper_id = ?").get(idOf("alice@example.com")).n, 0, "a device the push service says is gone is removed");
 
+// 8b. "Price drops at every shop" is real shops only: never Relay's own test shops (a Shopify development store, a shop
+// Relay hasn't checked yet, or Square's sandbox shop while Square isn't live). Review P-1.
+{
+  const { shopifyShopsForDisplay } = await import("../worker/shopify-connect.js");
+  await shopifyShopsForDisplay(env);   // makes the shop tables
+  sqlite.exec("ALTER TABLE retailer_catalog_items ADD COLUMN store_label TEXT");   // added by the catalogue reads on the real database
+  const shopItem = (domain, n, title, price) => {
+    const conn = "shopify:" + domain;
+    sqlite.prepare("INSERT INTO retailer_catalog_items (id, provider, external_item_id, title, store_label) VALUES (?,?,?,?,?)").run(conn + ":item:" + n, conn, "p" + n, title, domain.split(".")[0]);
+    sqlite.prepare("INSERT INTO retailer_catalog_variants (id, item_id, external_variant_id, title, sku, price_minor, currency) VALUES (?,?,?,?,?,?,?)").run(conn + ":variant:" + n, conn + ":item:" + n, "pv" + n, "Default Title", null, price, "GBP");
+    return conn + ":variant:" + n;
+  };
+  for (const [domain, plan] of [["real-shop.myshopify.com", 0], ["relay-dev-store.myshopify.com", 1], ["not-checked-yet.myshopify.com", null]]) {
+    sqlite.prepare("INSERT INTO shopify_shops (domain, label, access_iv, access_data, scopes, created_at, updated_at) VALUES (?,?,?,?,?,?,?)").run(domain, domain.split(".")[0], "iv", "data", "read_products", 0, 0);
+    if (plan !== null) sqlite.prepare("INSERT INTO shopify_shop_plan (domain, test_shop, plan, checked_at) VALUES (?,?,?,0)").run(domain, plan, plan ? "partner_test" : "basic");
+  }
+  const real = shopItem("real-shop.myshopify.com", 1, "Real Coat", 9000), dev = shopItem("relay-dev-store.myshopify.com", 2, "Test Coat", 9000), unk = shopItem("not-checked-yet.myshopify.com", 3, "Unchecked Coat", 9000);
+  assert.equal((await post("/relay/my/alerts/mode", bob, { mode: "all" })).status, 200);
+  pushStatus = 201; pushes = []; clock += 60000;
+  await runPriceAlerts(env, { now: clock, fetchImpl });   // the first look only records prices
+  assert.equal(pushes.length, 0);
+  for (const id of [real, dev, unk]) sqlite.prepare("UPDATE retailer_catalog_variants SET price_minor = 7000 WHERE id = ?").run(id);
+  setPrice("DEMO-JACKET", 100);   // Square's sandbox shop, which nobody watches now: Square isn't live, so it's a test shop too
+  sqlite.prepare("DELETE FROM price_watches").run();
+  clock += 60000;
+  await runPriceAlerts(env, { now: clock, fetchImpl });
+  const said = []; for (const x of pushes) said.push(await read(pb, x.body));
+  assert.deepEqual(said.map(x => [x.title, x.body]), [["Price drop at real-shop", "Real Coat is now £70.00 (was £90.00)"]], "only the real shop's drop reaches a shopper");
+  assert.ok(!JSON.stringify(said).match(/Test Coat|Unchecked|Item 1/), "nothing from a test shop, an unchecked shop or Square's sandbox");
+  // Once Square is live, its shops count as real.
+  setPrice("DEMO-JACKET", 5000); env.SQUARE_ENVIRONMENT = "production"; clock += 60000; pushes = [];
+  await runPriceAlerts(env, { now: clock, fetchImpl });
+  setPrice("DEMO-JACKET", 4000); clock += 60000;
+  await runPriceAlerts(env, { now: clock, fetchImpl });
+  assert.equal(pushes.length, 1); delete env.SQUARE_ENVIRONMENT;
+  // Only the shop that changed is looked at when one is named (a shop's webhook), and the work doesn't grow with the
+  // number of watches: 300 watches, one of which dropped, cost a handful of database calls, not hundreds (review M4).
+  const bobId2 = idOf("bob@example.com");
+  for (let n = 100; n < 400; n++) {
+    const id = shopItem("real-shop.myshopify.com", n, "Thing " + n, 2000);
+    sqlite.prepare("INSERT INTO price_watches (shopper_id, sku, product, store, via, baseline_minor, last_seen_minor, created_at) VALUES (?,?,?,?, 'item', 2000, 2000, 0)").run(bobId2, id, "Thing " + n, "real-shop");
+  }
+  clock += 60000; await runPriceAlerts(env, { now: clock, fetchImpl });   // the new things' prices are recorded
+  sqlite.prepare("UPDATE retailer_catalog_variants SET price_minor = 1500 WHERE id = ?").run("shopify:real-shop.myshopify.com:variant:250");
+  sqlite.prepare("UPDATE retailer_catalog_variants SET price_minor = 1 WHERE id = ?").run(dev);
+  let asked = 0; const counting = { ...env, RELAY_DB: { prepare: (sql) => { asked++; return db.prepare(sql); }, batch: (l) => { asked++; return db.batch(l); } } };
+  await post("/relay/my/alerts/mode", bob, { mode: "watchlist" });
+  pushes = []; clock += 60000;
+  const ran = await runPriceAlerts(counting, { now: clock, fetchImpl, provider: "shopify:real-shop.myshopify.com" });
+  assert.equal(ran.drops, 1); assert.equal(pushes.length, 1);
+  assert.equal((await read(pb, pushes[0].body)).body, "Thing 250 is now £15.00 (was £20.00)");
+  assert.ok(asked <= 40, "300 watches cost " + asked + " database calls");
+  assert.equal(sqlite.prepare("SELECT price_minor FROM catalogue_price_seen WHERE variant_id = ?").get(dev), undefined, "a test shop's prices aren't even recorded");
+  console.log("ok - price drops at every shop: real shops only; one changed shop is checked alone, in a handful of database calls");
+}
+
 // 9. Deleting the account removes everything.
 const bobId = idOf("bob@example.com");
 await post("/relay/my/push/subscribe", bob, { endpoint: "https://fcm.googleapis.com/fcm/send/bob2", keys: pb.keys });
