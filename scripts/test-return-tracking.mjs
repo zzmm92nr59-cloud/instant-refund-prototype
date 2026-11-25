@@ -307,10 +307,20 @@ const mail = (from, subject, body, d = TODAY) => `From: ${from}\r\nTo: sam@examp
   assert.deepEqual(returnFacts(a), { receiptId: "a", returnInTransit: true, returnReceived: false, confirmedBy: { by: "carrier", name: "Royal Mail", at: ago(4), via: "tracking", atTime: ago(4) + "T09:14:00" },
     onItsWay: { by: "carrier", name: "Royal Mail", at: ago(4), via: "tracking", atTime: ago(4) + "T09:14:00" }, statement: "On its way: confirmed by Royal Mail's tracking, first scan " + ago(4) + "T09:14:00", trackingNumber: "KO123456789GB", state: "sent" });
   // A parcel looked up before the scan time was kept: on its way, but Relay doesn't put the expected day in its place.
-  a = track({ status: "due", at: ago(-2) });
+  // (Review, 25 Nov 2026: this used to be asserted for a number only the shopper typed. With no first scan there is nothing
+  // to check against the day they said they sent it, so for a typed number it now confirms nothing (below); it still holds
+  // for a number the shop's own return email gave.)
+  const planned = (row) => { const o = order(); o.returnPlan = { kind: "return_instructions", at: ago(6), trackingNumber: "KO123456789GB", carrier: "Royal Mail" };
+    attachReturnTracking([o], { today: TODAY, tracked: [{ tracking_number: "KO123456789GB", ...row }] }); return o; };
+  a = planned({ status: "due", at: ago(-2) });
   assert.deepEqual([a.returnTracking.steps[1].at, a.returnTracking.steps[1].done, a.returnInTransit, a.returnTracking.onItsWay.at, a.returnTracking.onItsWay.atTime], [null, true, true, null, null]);
-  a = track({ status: "in_transit", at: ago(2) });
+  a = planned({ status: "in_transit", at: ago(2) });
   assert.deepEqual([a.returnTracking.steps[1].at, a.returnTracking.onItsWay.at], [ago(2), ago(2)], "the day of the carrier's latest news");
+  for (const row of [{ status: "due", at: ago(-2) }, { status: "in_transit", at: ago(2) }, { status: "delivered", at: ago(1) }]) {
+    a = track(row);
+    assert.deepEqual([a.returnTracking.steps[1].from.by, a.returnTracking.steps[2].done, a.returnInTransit, a.returnReceived, a.returnTracking.onItsWay], ["you", false, false, false, null],
+      "a number only the shopper typed, and no first scan to check it by: nothing confirmed (" + row.status + ")");
+  }
   // Delivered to the shop: both steps, each with its own day.
   a = track({ status: "delivered", at: ago(1), first_scan: ago(4) + "T09:14:00" });
   assert.deepEqual(a.returnTracking.steps.slice(1, 3).map((s) => [s.done, s.at, s.from.via]), [[true, ago(4), "tracking"], [true, ago(1), "tracking"]]);

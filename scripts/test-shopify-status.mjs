@@ -23,7 +23,8 @@ assert.equal(pub.status, 200);
 const body = JSON.parse(pub.text);
 assert.doesNotMatch(pub.text, /myshopify\.com/, "no shop's address");
 assert.doesNotMatch(pub.text, /shpat_|rejected|#1042|Shopify said/, "no error text");
-assert.doesNotMatch(pub.text, /\b137\b|\b41\b/, "no shop's order counts");
+// The last catalogue sync time in the answer (e.g. "2026-11-25 19:41:55") can contain 41 by chance, so they are taken out before looking for the counts.
+assert.doesNotMatch(pub.text.replace(/\d{4}-\d\d-\d\d[ T]\d\d:\d\d:\d\d(\.\d+)?Z?/g, "T"), /\b137\b|\b41\b/, "no shop's order counts");
 assert.equal(body.orderCatchUp, undefined); assert.equal(body.webhooks, undefined);
 for (const s of body.publishedStores) assert.deepEqual(Object.keys(s), ["name"], "published shops by name only");
 // What the app's own status line reads is still there.

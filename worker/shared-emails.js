@@ -32,7 +32,16 @@ export const SHARED_EMAILS_SQL = `CREATE TABLE IF NOT EXISTS shared_emails (
 // ---- Hiding personal details ---------------------------------------------------------------------------------------------
 const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const LINK = /(?:\bhttps?:\/\/|\bwww\.)[^\s<>"'()[\]{}|]+/gi;
-const EMAIL = /[A-Z0-9._%+'-]+@[A-Z0-9-]+(?:\.[A-Z0-9-]+)*\.[A-Z]{2,}/gi;
+// (Each part a bounded length, and only from the start of a run of address characters: an open-ended pattern went over
+// "a.a.a.…" again from every letter, 40,000 characters took over a second. Review, 25 Nov 2026.)
+const EMAIL = /(?<![A-Z0-9._%+'-])[A-Z0-9._%+'-]{1,64}@[A-Z0-9-]{1,63}(?:\.[A-Z0-9-]{1,63}){0,8}\.[A-Z]{2,24}\b/gi;
+// A web address written without "http" or "www.", "kestrel.example/track?t=abc123": a name with a dot, then a path.
+const BARE_LINK = /(?<![\w@.\/-])(?:[a-z0-9][a-z0-9-]{0,62}\.){1,4}[a-z]{2,24}\/[^\s<>"'()[\]{}|]{0,2000}/gi;
+// Numbers outside the UK, "+1 415 555 2671", "+33 1 42 68 53 00": a "+", a country code, then 7 to 13 more digits in groups.
+const INTL_PHONE = /(?<![\w+])\+(?!44)[1-9]\d{0,2}(?:[\s.-]?\(?\d{1,5}\)?){2,6}(?![\d])/g;
+// A name after the words that say whose the order or parcel is, mid-line: "Your order for Jess Smith", "delivered to Sam
+// Taylor". Two words with capitals; an occasion ("a gift for Mother's Day") is hidden too, which is the safe way round.
+const NAME_AFTER = /\b((?:[Oo]rder|[Pp]arcel|[Dd]elivery|[Gg]ift|[Pp]ackage|[Bb]ooking|[Rr]eservation|[Tt]ickets?)\s+for\s+|(?:[Dd]eliver(?:ed|ing)?|[Ss]hip(?:ped|ping)?|[Ss]ent|[Aa]ddressed|[Hh]anded)\s+to\s+)((?:(?:Mr|Mrs|Ms|Miss|Dr|Mx)\.?\s+)?\p{Lu}[\p{L}'’-]{1,30}\s+\p{Lu}[\p{L}'’-]{1,30})(?![\p{L}])/gu;
 // UK numbers: +44 or 0, then 9 or 10 more digits, spaced or not.
 const PHONE = /(?:(?:\+|\b00)44[\s-]?(?:\(0\)[\s-]?)?|\b0)(?:\d[\s-]?){8,9}\d\b/g;
 // Card numbers: 13 to 19 digits in a row, or in groups of four. (An order number such as 202-1234567-1234567 is left.)
@@ -140,10 +149,11 @@ function hideInLine(line, hidden) {
 
 // "Hi Jess,", "Dear Mr Smith", "Thanks Sam!": the name after a greeting. (Spelt out in both cases: a name starts with a
 // capital, and with the "any case" flag a capital would match any letter. "Thank You For Your Order" is not a name.)
-const GREETING = /^(\s*(?:[Hh]i|HI|[Hh]ello|HELLO|[Hh]ey|HEY|[Dd]ear|DEAR|[Tt]hanks|THANKS|[Tt]hank you|THANK YOU|[Gg]ood (?:morning|afternoon|evening))[ ,]+)((?:(?:Mr|Mrs|Ms|Miss|Dr|Mx)\.?\s+)?\p{Lu}[\p{L}'’-]+(?:\s+\p{Lu}[\p{L}'’-]+)?)(?=[\s,!.]|$)/gmu;
+// (Spaces and tabs only after the start of a line: "\s*" ran over every blank line below it, from each one.)
+const GREETING = /^([ \t]*(?:[Hh]i|HI|[Hh]ello|HELLO|[Hh]ey|HEY|[Dd]ear|DEAR|[Tt]hanks|THANKS|[Tt]hank you|THANK YOU|[Gg]ood (?:morning|afternoon|evening))[ ,]+)((?:(?:Mr|Mrs|Ms|Miss|Dr|Mx)\.?\s+)?\p{Lu}[\p{L}'’-]+(?:\s+\p{Lu}[\p{L}'’-]+)?)(?=[\s,!.]|$)/gmu;
 const NOT_NAMES = new Set(["for", "your", "you", "from", "the", "a", "an", "to", "we", "our", "this", "again", "so", "very", "much", "all", "there", "everyone", "and", "in", "on"]);
 // "Name: Jess Smith", "Customer: …", "Recipient: …".
-const NAME_LINE = /^(\s*(?:name|full name|customer(?: name)?|recipient|account holder|card ?holder|billing name|ordered by|placed by)\s*:\s*)(.+)$/gim;
+const NAME_LINE = /^([ \t]*(?:name|full name|customer(?: name)?|recipient|account holder|card ?holder|billing name|ordered by|placed by)[ \t]*:[ \t]*)(\S.*)$/gim;
 
 // The shopper's own names: each word of their profile name as written with a capital ("Will", "WILL", never "will"), and the
 // part before the @ of their email addresses in any case. Whole words only.
@@ -202,9 +212,11 @@ export function hideDetails(input, names = []) {
   const codesAt = [];
   codes(t);
   for (const [at, len] of codesAt.reverse()) t = t.slice(0, at) + "[code]" + t.slice(at + len);
-  for (const step of [swap(LINK, "[link]", "links"), swap(EMAIL, "[email]", "emails"),
-    swap(CARD, "[number]", "numbers"), swap(PHONE, "[phone]", "phones"), swap(LONG_CODE, "[code]", "codes"), swap(POSTCODE, "[postcode]", "postcodes"),
+  for (const step of [swap(LINK, "[link]", "links"), swap(EMAIL, "[email]", "emails"), swap(BARE_LINK, "[link]", "links"),
+    swap(CARD, "[number]", "numbers"), swap(PHONE, "[phone]", "phones"),
+    (x) => x.replace(INTL_PHONE, (m) => { const n = m.replace(/\D/g, "").length; if (n < 8 || n > 15) return m; hidden.phones++; return "[phone]"; }), swap(LONG_CODE, "[code]", "codes"), swap(POSTCODE, "[postcode]", "postcodes"),
     swap(NAME_LINE, "[name]", "names", true)]) t = step(t);
+  t = t.replace(NAME_AFTER, (m, lead) => { hidden.names++; return lead + "[name]"; });
   t = t.replace(GREETING, (m, greet, name) => {
     if (NOT_NAMES.has(name.split(/\s+/)[0].replace(/\.$/, "").toLowerCase())) return m;
     hidden.names++; return greet + "[name]";
@@ -215,7 +227,9 @@ export function hideDetails(input, names = []) {
     const re = new RegExp("(^|[^\\p{L}\\p{N}])" + esc(word.text) + "(?=$|[^\\p{L}\\p{N}])", word.anyCase ? "giu" : "gu");
     t = t.replace(re, (m, before) => { hidden.names++; return before + "[name]"; });
   }
-  return { text: t.replace(/[ \t]+\n/g, "\n").replace(/\n{4,}/g, "\n\n\n"), hidden };
+  // (Spaces at the end of each line taken off line by line: one pattern for it started again at every space of a long run
+  // with no line end after it.)
+  return { text: t.split("\n").map((l) => l.replace(/[ \t]+$/, "")).join("\n").replace(/\n{4,}/g, "\n\n\n"), hidden };
 }
 
 // What Relay read from the email, beside it, so the person reading can see what went wrong.
