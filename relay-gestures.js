@@ -79,22 +79,32 @@
   // Arriving on a step left from an earlier visit (going back across pages, or a reload) makes it an ordinary entry, so
   // Relay never moves through history by itself when it opens.
   if (H.state && H.state.relayBack) { try { H.replaceState(null, "", W.location.href); } catch (e) { /* fine as it is */ } }
-  var armed = false, skipping = 0, timer = 0;
+  // Leaving the step, by back or by Relay removing it, never moves the page: the browser would otherwise put the scroll
+  // back to where it was when the step was added, so closing a sheet and scrolling on straight away (or tapping the next
+  // thing) jumped the page back up a moment later, under the finger. Relay keeps its own scroll places (index.html), so
+  // the browser's own is switched off only while the step is there, and put back as it was once it's gone.
+  var armed = false, skipping = 0, timer = 0, mode = null;
+  function holdScroll() { try { if (mode === null) mode = H.scrollRestoration || "auto"; H.scrollRestoration = "manual"; } catch (e) { mode = null; } }
+  function freeScroll() { if (mode === null || skipping || armed) return; try { H.scrollRestoration = mode; } catch (e) { /* fine as it is */ } mode = null; }
   function sync() {
     timer = 0;
     if (skipping) return; // a step is still being removed: look again once it has
     var can = Boolean(backAction());
-    if (can && !armed) { try { H.pushState({ relayBack: 1 }, "", W.location.href); armed = true; } catch (e) { /* not allowed here */ } }
+    if (can && !armed) { holdScroll(); try { H.pushState({ relayBack: 1 }, "", W.location.href); armed = true; } catch (e) { /* not allowed here */ } freeScroll(); }
     else if (!can && armed) { armed = false; skipping++; H.back(); }
   }
   function soon() { if (!timer) timer = setTimeout(sync, 80); }
   W.addEventListener("popstate", function (e) {
-    if (skipping) { skipping--; soon(); return; }
-    if (!armed) { if (e.state && e.state.relayBack) armed = true; soon(); return; } // forward onto a step, or a link's #
+    // (Put back a moment later, once the browser has finished arriving: some decide on the scroll after this event.)
+    if (skipping) { skipping--; setTimeout(freeScroll, 300); soon(); return; }
+    if (!armed) { if (e.state && e.state.relayBack) armed = true; else setTimeout(freeScroll, 300); soon(); return; } // forward onto a step, or a link's #
     armed = false;
+    setTimeout(freeScroll, 300);
     runBack(backAction());
     soon();
   });
+  // Reloaded or left while the step is there: the browser's own scroll memory is back for that.
+  W.addEventListener("pagehide", function () { if (mode !== null) { try { H.scrollRestoration = mode; } catch (e) { /* fine */ } } });
   function watch() {
     new MutationObserver(soon).observe(D.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["hidden"] });
     D.body.appendChild(live);

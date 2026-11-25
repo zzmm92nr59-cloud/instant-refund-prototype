@@ -9,7 +9,8 @@
 //   - Tapping the tab you're on goes to its top without redrawing; each tab remembers how far down it was.
 //   - Coming back from a Discover product or a Receipts group lands where the list was.
 //   - A long Receipts group brings in its next part before you reach the end.
-//   - Sheets from the bottom have a grabber and close when swiped down; a short swipe snaps back.
+//   - Sheets from the bottom have a grabber and close when swiped down; a short swipe snaps back. Closing one and scrolling
+//     straight away leaves the page where it was scrolled to.
 //   - Links into the app (#open=…, and a tapped notification via the service worker's message) open that exact screen.
 //   - Drafts: a pasted email that wasn't added is still there next time; signing out removes it.
 //   - Watching: shown at once; with no connection it's sent again when the connection is back. Following a shop is instant.
@@ -290,6 +291,26 @@ await page.locator("[data-back]").filter({ visible: true }).first().click(); awa
 
 // ---- Drafts ----
 await page.locator("[data-back]").filter({ visible: true }).first().click(); await settle(); // (back to Home)
+
+// ---- Closing a sheet and scrolling on straight away: the page stays where it was scrolled to ----
+// (Relay removes its extra history step a moment after a sheet closes. The browser used to put the scroll back to where
+// it was when the sheet opened, so a flick, or a tap on the next thing, made just then was undone under the finger.)
+await tab("Receipts").click(); await page.locator("#view .rl-calm-filter").waitFor(); await page.evaluate(() => scrollTo(0, 0)); await settle();
+await page.getByRole("button", { name: "Add a missing receipt" }).click();
+await page.locator(".rl-back .rl-sheet").getByRole("button", { name: "Back", exact: true }).waitFor();
+await page.waitForFunction(() => history.state && history.state.relayBack);
+await page.locator(".rl-back").last().click({ position: { x: 10, y: 10 } });
+// (A scroll that isn't a finger on the screen, such as a mouse wheel or the page bringing something into view: a touch
+// flick happens to stop the browser's own putting back.)
+await page.mouse.move(195, 500); await page.mouse.wheel(0, 450);
+await page.waitForFunction(() => window.scrollY > 100);
+const flickY = await page.evaluate(() => window.scrollY);
+await page.waitForTimeout(700);
+assert.equal(await page.locator(".rl-back").count(), 0, "the sheet closed");
+assert.ok(Math.abs(await page.evaluate(() => window.scrollY) - flickY) < 4, "still where it was scrolled to (" + await page.evaluate(() => window.scrollY) + " vs " + flickY + ")");
+const after = await histState(); assert.deepEqual([after.relayBack, after.can], [false, false], "the sheet's history step was taken away again");
+console.log("ok - closing a sheet and scrolling at once: the page stays where it was scrolled to");
+await tab("Home").click(); await settle();
 await tab("Receipts").click(); await page.locator("#view .rl-calm-filter").waitFor();
 const addRow = page.getByRole("button", { name: "Add a missing receipt" });
 const arBack = page.locator(".rl-back .rl-sheet").getByRole("button", { name: "Back", exact: true });
