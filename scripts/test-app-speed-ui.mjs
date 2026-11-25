@@ -327,7 +327,10 @@ process.on("exit", () => { if (REPORT) console.log(JSON.stringify(results, null,
   // (Connor, 18 Nov 2026: "after I sent the email it went back to Home and was frozen on a blank page for ages"): Home's
   // cards are there at once, and Relay's new answer is drawn when it comes.
   await waitOutDoubleTap(page);
-  await page.locator("#homePage .hl-grid > *, #homePage .hx-live").filter({ hasText: "On its way" }).filter({ hasText: "Kick Lane" }).first().click();
+  // (Home's In progress shows four cards; a big account's parcel on its way is in the line for the rest, a tap away.)
+  const kickCard = page.locator("#homePage .hx-live").filter({ hasText: "On its way" }).filter({ hasText: "Kick Lane" });
+  if (await kickCard.count()) await kickCard.first().click();
+  else { await page.locator("#homePage .hx-note", { hasText: "in progress" }).click(); await page.locator(".rl-back .rl-sheet .hx-note").filter({ hasText: "Kick Lane" }).filter({ hasText: "On its way" }).first().click(); }
   const sheet = page.locator(".rl-back .rl-sheet").last(); await sheet.waitFor();
   await sheet.locator(".rl-rc-ask button", { hasText: "No" }).first().click();
   await page.locator(".rl-sheet[role=alertdialog] button", { hasText: "Some details are wrong" }).click();

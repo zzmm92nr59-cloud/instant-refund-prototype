@@ -12838,7 +12838,8 @@
     var shelf = all.filter(function (e) { return !inLive[e.key]; }).sort(function (a, b) { return a.at < b.at ? 1 : a.at > b.at ? -1 : 0; }).slice(0, 10);
     if (shelf.length) { h("Recent"); box.appendChild(el("div", { className: "hx-shelf" }, shelf.map(nowSquare))); }
     var drops = needs.filter(function (x) { return x.w; });
-    if (drops.length) { h("Price drops"); box.appendChild(el("div", { className: "hx-shelf" }, drops.map(nowDropSquare))); }
+    // (Ten at most, as Recent: the rest are in Watching.)
+    if (drops.length) { h("Price drops"); box.appendChild(el("div", { className: "hx-shelf" }, drops.slice(0, 10).map(nowDropSquare))); }
     var rest = needs.filter(function (x) { return !x.w && !x.top; });
     if (rest.length) box.appendChild(nowStrip(rest, "Also for you"));
     if (!all.length && !first) box.appendChild(el("p", { className: "h2-calm", text: "What you buy shows up here as Relay finds the receipts." }));
