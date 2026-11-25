@@ -199,5 +199,13 @@ jobs:
         run: echo "RELAY_REQUEST_LOG=$RUNNER_TEMP/app-requests.jsonl" >> "$GITHUB_ENV"
       - name: Look at every screen and sheet as a person would (phone, bigger text, desktop) for overlapping text or boxes, anything under the tab bar, sideways scroll, tiny text, small taps and cut-off prices
         run: node --import ./scripts/record-app-requests.mjs scripts/test-screens-ui.mjs
+      - name: Profile - your picture and name, the edit page, sign out
+        run: node --import ./scripts/record-app-requests.mjs scripts/test-profile-ui.mjs
+      - name: Sending single items of an order back
+        run: node --import ./scripts/record-app-requests.mjs scripts/test-item-returns-ui.mjs
+      - name: Wrapped's story - totals, refunds and the reconnect message
+        run: node --import ./scripts/record-app-requests.mjs scripts/test-wrapped-story.mjs
+      - name: Words from outside (shop names, item names, links) are shown as text and never run
+        run: node --import ./scripts/record-app-requests.mjs scripts/test-outside-words-ui.mjs
       - name: Check everything the app sent passes the server's input rules (worker/validate.js)
         run: node scripts/test-validation.mjs

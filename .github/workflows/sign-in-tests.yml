@@ -37,3 +37,5 @@ jobs:
         run: node scripts/test-phone-signin.mjs
       - name: Sign-in for app reviewers
         run: node scripts/test-review-account.mjs
+      - name: Profile - name and photo rules, a photo that is too big is refused plainly
+        run: node scripts/test-profile.mjs
