@@ -3,7 +3,7 @@ import { readCappedBytes } from "./validate.js";
 import { normaliseEmail, emailHash, ensureAuthTables } from "./auth.js";
 import { forgetShopifyShop, removeShopifyItems, shopifyApps, appForShop, appById } from "./shopify-connect.js";
 import { ensureReturnsTables } from "./returns.js";
-import { saveOrderRef, saveOrderAmountNow } from "./order-ref.js";
+import { saveOrderRef, saveOrderAmountNow, ensureOrderPaidColumn } from "./order-ref.js";
 // Shopify webhooks, every one checked against Shopify's signature before anything happens.
 // - orders/paid (shops set up in the server settings only): private order ingestion. Nothing here exposes consumer purchases.
 // - products/create|update|delete, inventory_levels/update: a shop changed its products or stock, so Relay reads that shop again at once (and checks price alerts).
@@ -236,6 +236,20 @@ export async function recordBalancePaid(env, shop, order) {
   } catch { return 0; /* no swaps table yet */ }
 }
 
+// What one of a line's items cost the shopper after its discounts, in pence (order_items.paid_minor; security review M2).
+// Shopify's line price is before discounts; what came off the whole line is in discount_allocations (order codes and
+// automatic discounts are shared out to the lines there). The catch-up read gives Shopify's own figure (paid_unit_price).
+// null when the order doesn't say: a swap then goes by the price, and Shopify is asked again at the swap itself.
+function paidEach(line, price) {
+  try {
+    if (line.paid_unit_price != null && line.paid_unit_price !== "") return Math.min(price, asMoney(line.paid_unit_price));
+    if (!Array.isArray(line.discount_allocations)) return null;
+    const off = line.discount_allocations.reduce((n, d) => n + asMoney(d && d.amount != null ? d.amount : "0"), 0);
+    const qty = Number(line.quantity) > 0 ? Number(line.quantity) : 1;
+    return Math.max(0, price - Math.ceil(off / qty));
+  } catch { return null; }
+}
+
 // Stores one paid Shopify order (webhook or catch-up read). Shape: Shopify's REST order (id, created_at, currency, total_price,
 // email, customer, line_items[]). Only a keyed hash of the order email is kept, never the address, so it can be matched later
 // against a shopper's verified sign-in email. Returns { status, body }.
@@ -271,7 +285,7 @@ export async function ingestShopifyOrder(env, shop, event, sourceId, topic = "or
         throw Error("Invalid order line");
       const price = asMoney(line.price);
       return { id: String(line.id), title: String(line.title).slice(0, 300), quantity: count,
-        price, productId: line.product_id == null ? null : String(line.product_id),
+        price, paid: paidEach(line, price), productId: line.product_id == null ? null : String(line.product_id),
         variantId: line.variant_id == null ? null : String(line.variant_id) };
     });
     statements = [
@@ -285,12 +299,12 @@ export async function ingestShopifyOrder(env, shop, event, sourceId, topic = "or
         .bind(orderId, connection, externalId, event.customer?.id == null ? null : String(event.customer.id),
           String(event.processed_at || event.created_at), amount, "GBP", "shopify", "unverified", "[]", keepAmount ? 1 : 0),
       ...lines.map(line => env.RELAY_DB.prepare(`INSERT INTO order_items
-        (id,order_id,external_line_item_id,product_id,variant_id,title,quantity,price_minor,currency)
-        VALUES (?,?,?,?,?,?,?,?,?)
+        (id,order_id,external_line_item_id,product_id,variant_id,title,quantity,price_minor,currency,paid_minor)
+        VALUES (?,?,?,?,?,?,?,?,?,?)
         ON CONFLICT(order_id,external_line_item_id) DO UPDATE SET
-        title=excluded.title,quantity=excluded.quantity,price_minor=excluded.price_minor`)
+        title=excluded.title,quantity=excluded.quantity,price_minor=excluded.price_minor,paid_minor=excluded.paid_minor`)
         .bind(orderId + ":item:" + line.id, orderId, line.id, line.productId, line.variantId,
-          line.title, line.quantity, line.price, "GBP")),
+          line.title, line.quantity, line.price, "GBP", line.paid)),
       env.RELAY_DB.prepare(`INSERT OR IGNORE INTO audit_events
         (id,actor_type,actor_id,event_type,subject_type,subject_id,metadata_json)
         VALUES (?,?,?,?,?,?,?)`)
@@ -300,6 +314,7 @@ export async function ingestShopifyOrder(env, shop, event, sourceId, topic = "or
   } catch {
     return { status: 400, body: { error: "invalid_amount_or_lines" } };
   }
+  await ensureOrderPaidColumn(env.RELAY_DB);
   try {
     const orderEmail = normaliseEmail(event.email || event.contact_email || (event.customer && event.customer.email));
     let linked = false;
@@ -332,7 +347,7 @@ export async function backfillShopifyOrders(env, shop, token, o = {}) {
   const query = `query RelayOrders($cursor: String, $q: String) { orders(first: 50, after: $cursor, query: $q, sortKey: CREATED_AT, reverse: true) {
     pageInfo { hasNextPage endCursor }
     nodes { legacyResourceId name email createdAt processedAt currencyCode totalPriceSet { shopMoney { amount } } currentTotalPriceSet { shopMoney { amount } } originalTotalPriceSet { shopMoney { amount } }
-      lineItems(first: 100) { nodes { id title quantity currentQuantity originalUnitPriceSet { shopMoney { amount } } product { legacyResourceId } variant { legacyResourceId } } } } } }`;
+      lineItems(first: 100) { nodes { id title quantity currentQuantity originalUnitPriceSet { shopMoney { amount } } discountedUnitPriceAfterAllDiscountsSet { shopMoney { amount } } product { legacyResourceId } variant { legacyResourceId } } } } } }`;
   let cursor = null, pages = 0, orders = 0, linked = 0, skipped = 0, error = null;
   try {
     do {
@@ -348,6 +363,7 @@ export async function backfillShopifyOrders(env, shop, token, o = {}) {
           original_total_price: (n.originalTotalPriceSet && n.originalTotalPriceSet.shopMoney && n.originalTotalPriceSet.shopMoney.amount) ?? null,
           line_items: ((n.lineItems && n.lineItems.nodes) || []).map(l => ({ id: gidNumber(l.id), title: l.title, quantity: l.quantity, current_quantity: l.currentQuantity ?? null,
             price: l.originalUnitPriceSet && l.originalUnitPriceSet.shopMoney && l.originalUnitPriceSet.shopMoney.amount,
+            paid_unit_price: (l.discountedUnitPriceAfterAllDiscountsSet && l.discountedUnitPriceAfterAllDiscountsSet.shopMoney && l.discountedUnitPriceAfterAllDiscountsSet.shopMoney.amount) ?? null,
             product_id: l.product ? l.product.legacyResourceId : null, variant_id: l.variant ? l.variant.legacyResourceId : null })) };
         const res = await ingestShopifyOrder(env, shop, event, "backfill:" + event.id, "orders/backfill");
         if (res.status === 200) { orders++; if (res.body.emailLinked) linked++; } else skipped++;

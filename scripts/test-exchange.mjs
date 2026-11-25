@@ -222,4 +222,21 @@ assert.equal(removedLine, "gid://shopify/CalculatedLineItem/9502");
   console.log("ok - a swap moves Relay's order line to the new item's own line, keeps the right amounts, and the new item can be returned");
 }
 
+// What each item actually cost after its discounts is kept with the order (security review M2): Shopify's notice gives the
+// price before discounts and what came off each line (discount_allocations); a line with no discount cost its price.
+{
+  const { ingestShopifyOrder } = await import("../worker/shopify-webhooks.js");
+  const r = await ingestShopifyOrder(env, SHOP, { id: 777, created_at: new Date(Date.now() - 864e5).toISOString(), currency: "GBP", email: "alice@example.com",
+    total_price: "84.00", line_items: [
+      { id: 7701, title: "Rain Jacket", quantity: 1, price: "100.00", product_id: 3, variant_id: 70, discount_allocations: [{ amount: "40.00" }] },
+      { id: 7702, title: "Wool Socks", quantity: 2, price: "15.00", product_id: 4, variant_id: 71, discount_allocations: [{ amount: "3.00" }, { amount: "3.00" }] },
+      { id: 7703, title: "Beanie", quantity: 1, price: "12.00", product_id: 5, variant_id: 72, discount_allocations: [] },
+      { id: 7704, title: "Laces", quantity: 1, price: "2.00", product_id: 6, variant_id: 73 }] }, "evt-777", "orders/paid");
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  const paid = sqlite.prepare("SELECT external_line_item_id AS line, price_minor AS price, paid_minor AS paid FROM order_items WHERE order_id = ? ORDER BY line").all(conn + ":order:777").map(x => ({ ...x }));
+  assert.deepEqual(paid, [{ line: "7701", price: 10000, paid: 6000 }, { line: "7702", price: 1500, paid: 1200 }, { line: "7703", price: 1200, paid: 1200 }, { line: "7704", price: 200, paid: null }],
+    "40% off the jacket: £60 paid; £6 off two pairs of socks: £12 each; no discount: its price; nothing said: not known");
+  console.log("ok - what each item cost after discounts is kept with the order");
+}
+
 console.log("exchange: all checks passed");

@@ -11,6 +11,7 @@ import { squareHost, squareIsProduction, squareShopName } from "./square-env.js"
 import { ensureOnce } from "./once.js";
 import { ensureReturnsTables, REASON_TEXT, esc, clean } from "./returns.js";
 import { RELAY_RETURN_LIMIT_DAYS } from "./shop-returns.js";
+import { ensureOrderPaidColumn } from "./order-ref.js";
 
 export const SQUARE_ORDER = /^square:sandbox:order:([A-Za-z0-9_-]{4,64})$/;
 export const SQUARE_CONNECTION = /^square:sandbox:([A-Za-z0-9_-]{4,64})$/;
@@ -38,11 +39,14 @@ export function ensureSquareOrderTables(db) {
   return ensureOnce(db, "square-orders", async () => {
     await db.prepare("CREATE TABLE IF NOT EXISTS square_email_checks (order_id TEXT PRIMARY KEY, checked_at INTEGER NOT NULL, found INTEGER NOT NULL)").run();
     await db.prepare("CREATE TABLE IF NOT EXISTS square_test_orders (id TEXT PRIMARY KEY, shopper_id TEXT NOT NULL, order_id TEXT NOT NULL, created_at INTEGER NOT NULL)").run();
-  });
+  }).then(() => ensureOrderPaidColumn(db));
 }
 
 // Which product each size/colour (Square "variation") belongs to, from the catalogue Relay already read.
+// (Always asked just before an order's statements are made, so it also makes sure order_items has the paid_minor column
+// those statements write.)
 export async function squareItemsOfVariations(db) {
+  await ensureSquareOrderTables(db);
   const rows = ((await db.prepare(`SELECT v.external_variant_id AS v, i.external_item_id AS i FROM retailer_catalog_variants v
     JOIN retailer_catalog_items i ON i.id = v.item_id WHERE i.provider = 'square_sandbox'`).all()).results || []);
   return new Map(rows.map(r => [r.v, r.i]));
@@ -65,12 +69,17 @@ export function squareOrderStatements(db, order, location, itemOfVariation) {
     const quantity = Number(line.quantity);
     if (!Number.isSafeInteger(quantity) || quantity <= 0) return;
     const lineId = line.uid || String(index), variation = line.catalog_object_id || null;
-    statements.push(db.prepare(`INSERT INTO order_items (id,order_id,external_line_item_id,product_id,variant_id,title,quantity,price_minor,currency)
-      VALUES (?,?,?,?,?,?,?,?,?) ON CONFLICT(order_id,external_line_item_id) DO UPDATE SET
+    // What one item cost after its discounts (security review M2): Square's gross for the line less its discounts, shared
+    // over its items. null when Square doesn't say.
+    const gross = line.gross_sales_money && Number.isSafeInteger(line.gross_sales_money.amount) ? line.gross_sales_money.amount : null;
+    const off = line.total_discount_money && Number.isSafeInteger(line.total_discount_money.amount) ? line.total_discount_money.amount : 0;
+    const paid = gross == null ? null : Math.max(0, Math.min(minor(line.base_price_money), Math.floor((gross - off) / quantity)));
+    statements.push(db.prepare(`INSERT INTO order_items (id,order_id,external_line_item_id,product_id,variant_id,title,quantity,price_minor,currency,paid_minor)
+      VALUES (?,?,?,?,?,?,?,?,?,?) ON CONFLICT(order_id,external_line_item_id) DO UPDATE SET
       title=excluded.title, quantity=excluded.quantity, price_minor=excluded.price_minor, currency=excluded.currency,
-      product_id=excluded.product_id, variant_id=excluded.variant_id`)
+      product_id=excluded.product_id, variant_id=excluded.variant_id, paid_minor=excluded.paid_minor`)
       .bind(id + ":item:" + lineId, id, lineId, variation ? (itemOfVariation.get(variation) || null) : null, variation,
-        line.name || "Unnamed item", quantity, minor(line.base_price_money), (line.base_price_money && line.base_price_money.currency) || currency));
+        line.name || "Unnamed item", quantity, minor(line.base_price_money), (line.base_price_money && line.base_price_money.currency) || currency, paid));
   });
   return { id, statements };
 }
@@ -395,8 +404,9 @@ async function ownedSquareLine(env, shopper, orderId, lineId) {
   const order = await db.prepare(`SELECT o.id, o.connection_id AS retailer, o.external_order_id AS ext, o.external_customer_id AS customerId, o.ordered_at AS orderedAt, o.status
     FROM retailer_orders o JOIN retailer_order_emails e ON e.order_id = o.id WHERE o.id = ? AND e.email_hash = ?`).bind(String(orderId || ""), shopper.emailHash).first();
   if (!order || !SQUARE_CONNECTION.test(String(order.retailer || ""))) return null;
-  const line = await db.prepare(`SELECT external_line_item_id AS lineId, product_id AS productId, variant_id AS variantId, title, quantity, price_minor AS priceMinor, currency
-    FROM order_items WHERE order_id = ? AND external_line_item_id = ?`).bind(order.id, String(lineId || "")).first();
+  await ensureSquareOrderTables(db);
+  const line = await db.prepare(`SELECT external_line_item_id AS lineId, product_id AS productId, variant_id AS variantId, title, quantity, price_minor AS priceMinor, currency,
+    paid_minor AS paidMinor FROM order_items WHERE order_id = ? AND external_line_item_id = ?`).bind(order.id, String(lineId || "")).first();
   if (!line || !line.productId || !line.variantId) return null;
   return { order, line, location: locationOf(order.retailer) };
 }
@@ -409,7 +419,9 @@ async function swapOptions(env, owned) {
     FROM retailer_catalog_variants v WHERE v.item_id = ? ORDER BY v.title`).bind(swapItemKey(owned.line.productId)).all()).results || []);
   return rows.filter(r => r.variationId !== owned.line.variantId).map(r => {
     const inStock = Number(r.quantity) >= Number(owned.line.quantity || 1);
-    const diff = r.currency === "GBP" && Number.isFinite(r.priceMinor) && Number.isFinite(owned.line.priceMinor) ? r.priceMinor - owned.line.priceMinor : null;
+    // Against what the item actually cost after its discounts, so Relay never refunds more than was paid (security review M2).
+    const paid = Number.isFinite(owned.line.paidMinor) ? owned.line.paidMinor : owned.line.priceMinor;
+    const diff = r.currency === "GBP" && Number.isFinite(r.priceMinor) && Number.isFinite(paid) ? r.priceMinor - paid : null;
     let reason = !inStock ? "Out of stock" : null;
     if (!reason && diff === null) reason = "Different price (not supported yet)";
     else if (!reason && diff !== 0 && Number(owned.line.quantity) !== 1) reason = "Different price (only for a single item)";

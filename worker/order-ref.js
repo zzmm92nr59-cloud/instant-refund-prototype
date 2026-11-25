@@ -63,3 +63,13 @@ export async function saveOrderAmountNow(db, orderId, minor) {
     return false;
   }
 }
+
+// What the shopper actually paid for one of a line's items, after its discounts (order_items.paid_minor; security review M2,
+// 25 Nov 2026). price_minor is Shopify's price before discounts. A swap's difference is worked out from what was paid, so
+// Relay never refunds more than the line cost. null: not known (a line Relay kept before this). Added when first needed.
+export function ensureOrderPaidColumn(db) {
+  return ensureOnce(db, "order-items-paid", async () => {
+    try { await db.prepare("ALTER TABLE order_items ADD COLUMN paid_minor INTEGER").run(); }
+    catch (e) { if (!/duplicate column/i.test(String(e && e.message))) throw e; }
+  });
+}
