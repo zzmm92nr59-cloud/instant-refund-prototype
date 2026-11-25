@@ -1,7 +1,7 @@
 import { getShopifyStores } from "./shopify.js";
 import { readCappedBytes } from "./validate.js";
 import { normaliseEmail, emailHash, ensureAuthTables } from "./auth.js";
-import { forgetShopifyShop, removeShopifyItems, shopifyApps } from "./shopify-connect.js";
+import { forgetShopifyShop, removeShopifyItems, shopifyApps, appForShop, appById } from "./shopify-connect.js";
 import { ensureReturnsTables } from "./returns.js";
 import { saveOrderRef, saveOrderAmountNow } from "./order-ref.js";
 // Shopify webhooks, every one checked against Shopify's signature before anything happens.
@@ -92,6 +92,31 @@ export async function eraseRemovedShops(env, now = Date.now()) {
   return { erased };
 }
 
+// The secrets a notice for this shop may be signed with: only the app the shop is actually connected through (security
+// review M1, 25 Nov 2026). Shopify signs with the secret of the app the shop installed; trying every app's secret let whoever
+// held any one of them (21 apps: the main one and up to 20 pilot apps) sign "app removed", "erase", orders and refunds for
+// every shop. Shopify sign-in already works this way (shopify-connect.js, shopify-embedded.js).
+//  * A shop in Relay's server settings (SHOPIFY_SHOP_DOMAIN and the like): its own webhook secret.
+//  * A connected shop: the app it approved (shopify_shops.client_id); empty means it came through before Relay recorded
+//    that, which was the main app (or, as for renewing its keys, its own pilot app).
+//  * A shop Relay doesn't have (removed, so Shopify's erase requests 48 hours later, or never connected): the apps that shop
+//    could have installed: its own pilot app and the main app. Another shop's pilot app never.
+async function webhookSecrets(env, shop, store) {
+  // (A shop in the server settings is checked with its own secret without asking the database, so a refused notice for
+  // it costs nothing there.)
+  if (store) return store.webhookSecret ? [store.webhookSecret] : [];
+  const out = [];
+  let row = null;
+  try { row = await env.RELAY_DB.prepare("SELECT client_id FROM shopify_shops WHERE domain = ?").bind(shop).first(); } catch { row = null; /* no table yet */ }
+  if (row) {
+    const app = row.client_id ? appById(env, row.client_id) : appForShop(env, shop);
+    if (app) out.push(app.secret);
+  } else {
+    for (const a of shopifyApps(env)) if (!a.shop || a.shop === shop) out.push(a.secret);
+  }
+  return [...new Set(out.filter(Boolean))];
+}
+
 // o.onCatalogueChange(shop): called when a shop's products changed, to read that shop again in the background.
 export async function receiveShopifyWebhook(request, env, o = {}) {
   const shop = String(request.headers.get("x-shopify-shop-domain") || "").toLowerCase().trim();
@@ -99,9 +124,7 @@ export async function receiveShopifyWebhook(request, env, o = {}) {
     return Response.json({ error: "not_configured" }, { status: 503 });
   if (!DOMAIN.test(shop)) return new Response("Unauthorized store", { status: 403 });
   const store = getShopifyStores(env).find(s => s.domain === shop) || null;
-  // Shopify signs with the secret of whichever Relay app the shop installed (main app or that shop's pilot app).
-  const secrets = [...new Set([store && store.webhookSecret, ...shopifyApps(env).map(x => x.secret)].filter(Boolean))];
-  if (!secrets.length)
+  if (!store && !shopifyApps(env).length)
     return new Response("Unauthorized store", { status: 403 });
   const topic = String(request.headers.get("x-shopify-topic") || "").toLowerCase();
   const deliveryId = String(request.headers.get("x-shopify-webhook-id") || "");
@@ -111,6 +134,8 @@ export async function receiveShopifyWebhook(request, env, o = {}) {
   if (!request.headers.get("x-shopify-hmac-sha256")) return new Response("Invalid signature", { status: 401 });
   const body = await readCappedBytes(request, MAX_BYTES);
   if (body === null) return new Response("Payload too large", { status: 413 });
+  const secrets = await webhookSecrets(env, shop, store);
+  if (!secrets.length) return new Response("Invalid signature", { status: 401 });
   let signed = false;
   for (const secret of secrets) if (await validSignature(body, request.headers.get("x-shopify-hmac-sha256"), secret)) { signed = true; break; }
   if (!signed) return new Response("Invalid signature", { status: 401 });
