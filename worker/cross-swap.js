@@ -199,9 +199,12 @@ export async function crossSwapsFor(env, shopper) {
 // could go to (in stock and priced in pounds when Relay last looked).
 async function shopsWithStock(env) {
   const all = await shopifyShopsForDisplay(env, { includeTest: true });
-  const stocked = new Set(((await env.RELAY_DB.prepare(`SELECT DISTINCT i.provider AS p FROM retailer_catalog_items i JOIN retailer_catalog_variants v ON v.item_id = i.id
-      JOIN retailer_inventory_snapshots q ON q.variant_id = v.id WHERE i.provider LIKE 'shopify:%' AND v.price_minor > 0 AND v.currency = 'GBP' AND q.quantity > 0`).all()).results || [])
-    .map(r => String(r.p).slice(8)));
+  // Asked with every load of a shopper's orders, so it stops at the first thing in stock at each connected shop instead of
+  // walking every product, size and stock row of every shop.
+  const stocked = new Set(((await env.RELAY_DB.prepare(`SELECT s.domain AS d FROM shopify_shops s WHERE EXISTS (SELECT 1 FROM retailer_catalog_items i
+      JOIN retailer_catalog_variants v ON v.item_id = i.id JOIN retailer_inventory_snapshots q ON q.variant_id = v.id
+      WHERE i.provider = 'shopify:' || s.domain AND v.price_minor > 0 AND v.currency = 'GBP' AND q.quantity > 0)`).all()).results || [])
+    .map(r => String(r.d)));
   return { kinds: new Map(all.map(s => [s.domain, Boolean(s.test)])), stocked: all.filter(s => s.connected && s.sendsOrders && stocked.has(s.domain)) };
 }
 

@@ -412,7 +412,10 @@ export function journeysOf(c) {
   const out = [];
   const shop = knownShop(c), key = shop && shop.key;
   const words = (c.items || []).map(it => (it && it.name) || "").join(" ");
-  const mode = RAIL.has(key) || /\b(train|rail|railcard)\b/i.test(words) ? "train" : AIR.has(key) || /\b(flight|airport)\b/i.test(words) ? "flight" : COACH.has(key) || /\bcoach\b/i.test(words) ? "coach" : "trip";
+  // The shop decides when Relay knows it (a train, airline or coach company). Only for a shop it doesn't know do the words
+  // decide, and "airport" isn't one of them: a coach, train or taxi to an airport is not a flight.
+  const mode = RAIL.has(key) ? "train" : AIR.has(key) ? "flight" : COACH.has(key) ? "coach"
+    : /\b(train|rail|railcard)\b/i.test(words) ? "train" : /\bcoach\b/i.test(words) ? "coach" : /\bflights?\b/i.test(words) ? "flight" : "trip";
   for (const it of (c.items || [])) {
     const m = JOURNEY.exec(String((it && it.name) || ""));
     if (!m) continue;
