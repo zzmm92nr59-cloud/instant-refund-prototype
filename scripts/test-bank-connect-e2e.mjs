@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 // End-to-end test: connecting a bank, through Relay's real server (scripts/local-worker.mjs: worker.js and a real SQLite
 // database on this computer) and the real app in a browser. TrueLayer and the bank stand in here, with a made-up bank and
 // account; nothing leaves this computer.
@@ -24,7 +25,7 @@ await new Promise(r => app.listen(0, "127.0.0.1", r));
 const APP = "http://127.0.0.1:" + app.address().port;
 const w = await startLocalWorker({ appOrigin: APP });
 // Banks for everyone, through TrueLayer's live addresses (answered here, below).
-Object.assign(w.env, { TRUELAYER_CLIENT_ID: "local-made-up-id", TRUELAYER_CLIENT_SECRET: "local-made-up-secret", TRUELAYER_ENV: "live", BANK_FOR_EVERYONE: "on" });
+Object.assign(w.env, { TRUELAYER_CLIENT_ID: "local-made-up-id", TRUELAYER_CLIENT_SECRET: randomBytes(16).toString("hex"), TRUELAYER_ENV: "live", BANK_FOR_EVERYONE: "on" });
 
 // TrueLayer and a made-up bank, in front of the local worker's "nothing outside is reachable".
 const tl = { tokens: 0 };
