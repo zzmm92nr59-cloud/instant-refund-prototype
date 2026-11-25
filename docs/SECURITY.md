@@ -125,7 +125,12 @@ receipt as "You said" but never makes a fact true. Neither does a label being ma
 bank payment that looks like the refund. `confirmedBy` says who confirmed the latest of them (`carrier` or `shop`, the name,
 the day, `via` tracking or email). Only emails from the shopper's own inboxes are used, a carrier is recognised by its own
 sending domain (never a display name), a step is read only when the email says it has happened, and an email that could
-belong to more than one of their receipts is left out. No route moves money on these facts: an instant-refund route, when
+belong to more than one of their receipts is left out. A tracking number the shopper typed never turns a carrier's ordinary
+parcel email into this return's news: only the carrier's or shop's email about a return with that number, dated on or after
+the day they said they sent it and naming no other shop, or the carrier's tracking with a first scan on or after that day.
+A number on one of their purchases' deliveries is never a return's. A refund email counts only when it says the refund was
+made: declined, refused, pending, requested or "being processed" never does (being processed is kept as `refunding`, which
+makes no fact). A return email joins an order only by its number and its shop together. No route moves money on these facts: an instant-refund route, when
 built, must read them on the server (never from the app) and needs its own row above.
 
 The prototype test routes are switched off by `worker/legacy-routes.js`. They take no sign-in and some place test payments

@@ -125,7 +125,9 @@ for (const f of notPurchases) {
     }
     if (w.kind === "refund") {
       const u = parseReturnUpdateEmail(raw);
-      if (!u.ok || u.stage !== "refunded") notRight.push(`${email.id}: refund not read as a refund`);
+      // (A refund the email says is still being processed is read as "refunding", never "refunded": the fixture says so.
+      // Review, 25 Nov 2026.)
+      if (!u.ok || u.stage !== (w.stage || "refunded")) notRight.push(`${email.id}: refund not read as ${w.stage || "a refund"} (${u.ok ? u.stage : u.reason})`);
       else {
         if (u.amountPence !== w.refundPence) notRight.push(`${email.id}: refund ${u.amountPence} for ${w.refundPence}`);
         if (u.orderRef !== w.orderRef) notRight.push(`${email.id}: refund's order ${u.orderRef} for ${w.orderRef}`);
@@ -134,7 +136,7 @@ for (const f of notPurchases) {
         const sent = parseReturnUpdateEmail(rawEmail(f));
         const orders = [{ id: "a", orderRef: w.orderRef, orderDate: "2026-09-01", retailer: sent.retailer, totalPence: 99999 },
           { id: "b", orderRef: "OTHER-0001", orderDate: "2026-09-01", retailer: sent.retailer, totalPence: 99999 }];
-        const news = [{ stage: "refunded", at: u.at, by: "shop", via: "email", ref: u.orderRef ? String(u.orderRef).toUpperCase() : null,
+        const news = [{ stage: u.stage, at: u.at, by: "shop", via: "email", ref: u.orderRef ? String(u.orderRef).toUpperCase() : null,
           shopKey: u.retailer && (u.retailer.domain || u.retailer.name) ? storeKey(u) : null }];
         const m = matchReturnNews(orders, news, new Map(), new Set());
         if (!(m.get(orders[0]) || []).length) notRight.push(`${email.id}: refund not attached to its order by number`);
@@ -580,11 +582,16 @@ const joinWrong = [];
   // (Round 15e: a despatch email that repeats the order's whole layout, items and total joins the order by its number.)
   { const c2 = mergeOrderEmails([det("holdout16e-bold-number-runon-money"), det("holdout16e-bold-number-despatch")]);
     if (c2.length !== 1 || c2[0].orderRef !== "55120378" || c2[0].totalPence !== 5000 || !(c2[0].fees || []).some((f) => f.pence === 500)) joinWrong.push("a despatch email repeating its order made " + c2.length + " cards (" + JSON.stringify(c2.map((c) => [c.orderRef, c.totalPence, c.fees])) + ")"); }
-  for (const [order, refund, pence] of [["holdout16b-shop-order-one-figure-pence", "holdout16b-shop-refund-initiated", 300], ["holdout16b-rail-change-admin-fee", "holdout16b-rail-refund-by-transaction", 640]]) {
+  for (const [order, refund, pence] of [["holdout16b-shop-order-one-figure-pence", "holdout16b-shop-refund-initiated", 300]]) {
     const m = mergeOrderEmails([det(order)]); attachReturnProgress(m, [], [det(refund)]);
     const p = m[0] && m[0].returnProgress;
     if (!p || p.refundPence !== pence) joinWrong.push(refund + " not joined to its order (" + JSON.stringify(p || null) + ")");
   }
+  // (Review, 25 Nov 2026: this pair used to be asserted as refunded £6.40. The rail email says "Your refund is being credited
+  // back … normally completed within 5 working days": a refund under way, so the order must NOT show it as refunded.)
+  { const m = mergeOrderEmails([det("holdout16b-rail-change-admin-fee")]); attachReturnProgress(m, [], [det("holdout16b-rail-refund-by-transaction")]);
+    const p = m[0] && m[0].returnProgress;
+    if (p && p.refundedAt) joinWrong.push("a refund still being processed was shown as refunded (" + JSON.stringify(p) + ")"); }
 }
 {
   // Round 15c: a grocer's order confirmation ("Order number: | 772104518 |", estimated total), its final receipt and its

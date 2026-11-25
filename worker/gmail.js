@@ -16,7 +16,7 @@
 import { decodePhoto, RECEIPT_PHOTOS_SQL } from "./photos.js";
 import { receiptsToAdd, refundCredits, namesShop } from "./bank.js";
 import { recordReceiptShops } from "./shop-directory.js";
-import { mailText, emailForReading, parseReceiptEmail, parseReturnEmail, parseReturnUpdateEmail, parseReturnParcelEmail, parseDeliveryEmail, parseDispatchEmail, parseCancellationEmail, parseOrderAdjustmentEmail, parseOrderAcceptedEmail, trackingLink, extractProductImageUrls, photoShowsItem } from "./receipt-parser.js";
+import { withReadLimit, mailText, emailForReading, parseReceiptEmail, parseReturnEmail, parseReturnUpdateEmail, parseReturnParcelEmail, parseDeliveryEmail, parseDispatchEmail, parseCancellationEmail, parseOrderAdjustmentEmail, parseOrderAcceptedEmail, trackingLink, extractProductImageUrls, photoShowsItem } from "./receipt-parser.js";
 import { ensureOnce, runAll } from "./once.js";
 import { buildWrapped } from "./wrapped.js";
 import { readShopKinds, learnShopKinds } from "./shop-kind-ai.js";
@@ -202,7 +202,13 @@ async function gmailGet(fetchImpl, url, headers) {
 // email ("once you've dropped it off"), a reminder, "we'll let you know when it's delivered" and a shop's "we'll process
 // your refund" are no longer a drop-off, an arrival or a refund; a shop's own return-label email with the parcel's tracking
 // number and the order's number starts the return on that order.
-export const PARSER_VERSION = 63;
+// 64 (25 Nov 2026, readers' review): a refund declined, refused, pending or still being processed is not a refund (one being
+// processed is kept as "refunding", which ticks nothing); "we'll email you when it's been delivered" is not a delivery; a
+// shop's "your return label has been sent" or "a replacement is on its way" is not the return parcel on its way; a carrier's
+// delivery with a returns footer is a delivery; a carrier is known by its address only; the return deadline comes from the
+// sentence about sending it back; "12.5" is £12.50; a till receipt is marked bought in a shop; a table's label ("ORDER
+// DATE", "ORDER NUMBER") is never an item's name; HTML that never closes its tags is read in time in proportion to it.
+export const PARSER_VERSION = 64;
 // Which full read of every mailbox is due: version 33 of the reader was full read 14, and each reader version since is one
 // more, so a better reader always reaches old receipts too, without anyone having to remember to raise this.
 export const READER_FULL_REV = 14 + Math.max(0, PARSER_VERSION - 33);
@@ -283,6 +289,9 @@ const ROUND_TEXT_CHARS = 12_000_000;
 // (a receipt already read by an older reader keeps what it had), so no email can stop a mailbox being read.
 const ROUND_MS = 15_000;
 const MAX_SUSPECTS = 60;
+// How long after a round wrote down the emails it was reading it can still be running (a scan's hold on a mailbox,
+// JOB_LEASE_MS, is 90 seconds; Cloudflare ends a round long before that).
+const INFLIGHT_STALE_MS = 75_000;
 // Only one year round or background catch-up reads a mailbox at a time (they used to read the same mailbox side by side).
 // The app's year round goes first: the catch-up leaves a mailbox alone while the app has asked for a year round in the
 // last APP_READ_MS, and waits for the app's round to finish. A round that was ended part-way gives the mailbox back after
@@ -542,6 +551,10 @@ export function ensurePushColumns(db) {
     await db.prepare("CREATE INDEX IF NOT EXISTS idx_gmail_connections_push_ref ON gmail_connections(push_ref)").run();
   });
 }
+// An inbox that has to be connected again (Google or Microsoft said Relay's access has ended: mail_problem) is tried once
+// a day, in case access is back, instead of taking a place in every 15-minute check and every catch-up minute while the
+// inboxes that can be read wait. Review, 25 Nov 2026.
+const DEAD_INBOX_RETRY_MS = 24 * 60 * 60 * 1000;
 export async function autoScanGmail(env, now = Date.now(), fetchImpl = (...a) => fetch(...a)) {
   if (!env.RELAY_DB) return { checked: 0 };
   await ensureGmailTables(env.RELAY_DB);
@@ -554,7 +567,8 @@ export async function autoScanGmail(env, now = Date.now(), fetchImpl = (...a) =>
      WHERE EXISTS (SELECT 1 FROM shopper_consents c WHERE c.shopper_id = ${OWNER_SQL("g.shopper_id")} AND c.version = ? AND c.withdrawn_at IS NULL)
        AND NOT EXISTS (SELECT 1 FROM mail_scan_jobs j WHERE j.shopper_id = g.shopper_id AND j.state = 'running')
        AND (g.push_lease IS NULL OR g.push_lease < ?)
-     ORDER BY COALESCE(g.auto_at, 0) LIMIT 3`).bind(CONSENT_VERSION, now).all()).results || []);
+       AND (g.mail_problem IS NULL OR COALESCE(g.auto_at, 0) < ?)
+     ORDER BY COALESCE(g.auto_at, 0) LIMIT 3`).bind(CONSENT_VERSION, now, now - DEAD_INBOX_RETRY_MS).all()).results || []);
   let passes = 0, calls = 0;
   const out = [];
   for (const r of rows) {
@@ -562,14 +576,19 @@ export async function autoScanGmail(env, now = Date.now(), fetchImpl = (...a) =>
     // 1. New mail since this shopper was last checked (a couple of days' overlap; never more than a month).
     const since = Math.max(now - AUTO_MAX_BACK_DAYS * DAY_MS, (r.autoAt || r.lastScanAt || now - AUTO_RECENT_DAYS * DAY_MS) - 2 * DAY_MS);
     let recent;
-    try { recent = await scan(env, r.id, fetchImpl, now, "", false, { recent: true, sinceMs: since, budget: CALL_BUDGET - calls, maxFetch: AUTO_MAX_FETCH }); }
+    // (Moved to the back of the queue before it is read as well as after: a check that Cloudflare ends part-way, on an email
+    // that takes too long, never reaches the line below, and the same few inboxes used to be chosen again every 15 minutes
+    // for good while nobody else's was checked. And each round remembers the emails it is reading (track), so an email
+    // that ends rounds is read on its own next time and then left out. Review, 25 Nov 2026.)
+    await env.RELAY_DB.prepare("UPDATE gmail_connections SET auto_at = ? WHERE shopper_id = ?").bind(now, r.id).run();
+    try { recent = await scan(env, r.id, fetchImpl, now, "", false, { recent: true, sinceMs: since, budget: CALL_BUDGET - calls, maxFetch: AUTO_MAX_FETCH, track: true }); }
     catch (e) { recent = { status: 500, body: { error: String(e && e.message || e).slice(0, 80) } }; }
     passes++; calls += recent.calls || 3;
     let cursor = cursorFor(r.cursor);
     // 2. The first full read (or a full read again, see OUTLOOK_FULL_REV), a little more each run, until it reaches the start of the look-back period.
     if (needsFullRead(r.lastScanAt, r.provider, r.fullRev) && recent.status === 200 && !recent.body.more && passes < AUTO_PASSES_PER_RUN && calls < CALL_BUDGET - 12) {
       let back;
-      try { back = await scan(env, r.id, fetchImpl, now, cursor || ymd(since), false, { budget: CALL_BUDGET - calls, maxFetch: AUTO_MAX_FETCH }); }
+      try { back = await scan(env, r.id, fetchImpl, now, cursor || ymd(since), false, { budget: CALL_BUDGET - calls, maxFetch: AUTO_MAX_FETCH, track: true }); }
       catch (e) { back = { status: 500, body: {} }; }
       passes++; calls += back.calls || 3;
       if (back.status === 200) cursor = back.body.more ? back.body.cursor : null;
@@ -599,6 +618,7 @@ export async function catchUpFullReads(env, now = Date.now(), fetchImpl = (...a)
   await ensureGmailTables(env.RELAY_DB);
   await ensureAutoColumns(env.RELAY_DB);
   await ensureReadColumns(env.RELAY_DB);
+  await ensureHealthColumns(env.RELAY_DB);
   const started = Date.now();
   const staleYear = `SELECT h.year FROM gmail_history_years h WHERE h.shopper_id = g.shopper_id AND h.done_at IS NOT NULL AND COALESCE(h.rev, 0) < ? ORDER BY h.year DESC LIMIT 1`;
   const rows = ((await env.RELAY_DB.prepare(
@@ -607,6 +627,7 @@ export async function catchUpFullReads(env, now = Date.now(), fetchImpl = (...a)
      WHERE (COALESCE(g.full_rev, 0) < ? OR (${staleYear}) IS NOT NULL)
        AND EXISTS (SELECT 1 FROM shopper_consents c WHERE c.shopper_id = ${OWNER_SQL("g.shopper_id")} AND c.version = ? AND c.withdrawn_at IS NULL)
        AND NOT EXISTS (SELECT 1 FROM mail_scan_jobs j WHERE j.shopper_id = g.shopper_id AND j.state = 'running')
+       AND g.mail_problem IS NULL
      ORDER BY COALESCE(g.auto_at, 0) LIMIT ?`).bind(READER_FULL_REV, FULL_REV, READER_FULL_REV, CONSENT_VERSION, CATCH_UP_MAILBOXES).all()).results || []);
   let calls = 0;
   const out = [];
@@ -621,7 +642,7 @@ export async function catchUpFullReads(env, now = Date.now(), fetchImpl = (...a)
     const lease = await takeMailbox(env, r.id, "bg", now);
     if (lease.busyMs) continue;
     let back, year = null;
-    const o = { budget: CATCH_UP_BUDGET - calls, maxFetch: CATCH_UP_FETCH, track: true, deadlineMs: left };
+    const o = { budget: CATCH_UP_BUDGET - calls, maxFetch: CATCH_UP_FETCH, track: "held", deadlineMs: left };
     try {
       if (recent) back = await scan(env, r.id, fetchImpl, now, cursorFor(r.cursor) || "", false, o);
       else {
@@ -828,7 +849,7 @@ export async function accessTokenFor(env, boxId, fetchImpl) {
 // A notice said this inbox has new mail: its newest few days are read at once, by the same reader, with the same rules and
 // the same search as every other read (so nothing beyond receipts, orders, returns and parcel emails is opened).
 export function scanNewMail(env, boxId, fetchImpl, now) {
-  return scan(env, boxId, fetchImpl, now, "", false, { recent: true, sinceMs: now - 2 * DAY_MS, span: 3, budget: 60, maxFetch: 15 });
+  return scan(env, boxId, fetchImpl, now, "", false, { recent: true, sinceMs: now - 2 * DAY_MS, span: 3, budget: 60, maxFetch: 15, track: true });
 }
 
 // Tells Google to cancel Relay's access to the shopper's Gmail. Microsoft has no equivalent call: the shopper removes
@@ -937,6 +958,10 @@ async function disconnect(env, shopperId, fetchImpl, { withdraw }) {
     env.RELAY_DB.prepare("DELETE FROM item_kinds WHERE shopper_id = ?").bind(shopperId),
     env.RELAY_DB.prepare("DELETE FROM parcel_tracks WHERE shopper_id = ?").bind(shopperId),
     env.RELAY_DB.prepare("DELETE FROM return_tracks WHERE shopper_id = ?").bind(shopperId),
+    // (The shopper's own "same order" / "different orders", which hold their emails' ids and the shop's web address, and any
+    // half-finished connection: deleted with the permission, as docs/SECURITY.md promises. Review, 25 Nov 2026.)
+    env.RELAY_DB.prepare("DELETE FROM receipt_joins WHERE shopper_id = ?").bind(shopperId),
+    env.RELAY_DB.prepare("DELETE FROM gmail_oauth_states WHERE shopper_id = ? OR shopper_id LIKE ?").bind(shopperId, shopperId + "~%"),
     env.RELAY_DB.prepare("DELETE FROM gmail_connections WHERE shopper_id = ? OR shopper_id LIKE ?").bind(shopperId, shopperId + "~%"),
     env.RELAY_DB.prepare("DELETE FROM mail_scan_jobs WHERE shopper_id = ? OR shopper_id LIKE ?").bind(shopperId, shopperId + "~%"),
     env.RELAY_DB.prepare("DELETE FROM gmail_history_years WHERE shopper_id LIKE ?").bind(shopperId + "~%")
@@ -1054,13 +1079,32 @@ const HEADER_LINE = /^(from|subject|date|to|cc|received|delivered-to|return-path
 function mailDate(s, now) {
   const t = String(s || "").replace(/\b(?:mon|tues?|wed(?:nes)?|thu(?:rs)?|fri|sat(?:ur)?|sun)(?:day)?\b,?/gi, " ").replace(/\bat\b/gi, " ").replace(/\s+/g, " ").trim();
   if (t.length < 6 || t.length > 60 || !/\d{4}/.test(t)) return null;
+  // (A date in figures is read day first, as the UK writes it: "03/04/2026 10:15" is 3 April. JavaScript's own reading is
+  // month first, 4 March, and gives nothing at all for "25/12/2025". Month first only when it can't be a day, "04/25/2026".
+  // Review, 25 Nov 2026.)
+  const f = /^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})(?:,?\s+(\d{1,2})[:.](\d{2})(?::(\d{2}))?\s*([ap]\.?m\.?)?)?(?:\s*(?:GMT|BST|UTC))?$/i.exec(t);
+  if (f) {
+    let day = +f[1], mo = +f[2];
+    if (mo > 12 && day <= 12) [day, mo] = [mo, day];
+    let h = f[4] == null ? 12 : +f[4];
+    if (f[7] && /^p/i.test(f[7]) && h < 12) h += 12; else if (f[7] && /^a/i.test(f[7]) && h === 12) h = 0;
+    const ms = Date.UTC(+f[3], mo - 1, day, h, +(f[5] || 0), +(f[6] || 0)), made = new Date(ms);
+    if (mo < 1 || mo > 12 || h > 23 || made.getUTCMonth() !== mo - 1 || made.getUTCDate() !== day) return null;
+    return ms > now + 86400000 || made.getUTCFullYear() < 2000 ? null : made;
+  }
   const d = new Date(t);
   return Number.isNaN(d.getTime()) || d.getTime() > now + 86400000 || d.getUTCFullYear() < 2000 ? null : d;
 }
 export function pastedAsEmail(text, now = Date.now()) {
   const t = String(text || "").replace(/\r\n?/g, "\n").replace(/^\s+/, "");
   const lines = t.split("\n"), top = lines.slice(0, 12);
-  if (HEADER_LINE.test(lines[0])) return t;
+  if (HEADER_LINE.test(lines[0])) {
+    // (A copy that starts "From: …" with the day on a "Sent:" line, as Outlook writes it, and no "Date:": the day it was sent.)
+    const headEnd = lines.findIndex((l) => l.trim() === ""), headLines = lines.slice(0, headEnd === -1 ? 12 : Math.min(headEnd, 40));
+    if (headLines.some((l) => /^date\s*:/i.test(l))) return t;
+    const sm = headLines.map((l) => /^sent\s*:\s*(.+?)\s*$/i.exec(l)).find(Boolean), sd = sm && mailDate(sm[1], now);
+    return sd ? "Date: " + sd.toUTCString() + "\n" + t : t;
+  }
   if (top.some(l => /^\s*(from|subject)\s*:/i.test(l))) {
     const m = top.map(l => /^\s*(?:date|sent)\s*:\s*(.+?)\s*$/i.exec(l)).find(Boolean), d = m && mailDate(m[1], now);
     return d ? "Date: " + d.toUTCString() + "\n\n" + t : t;
@@ -1098,7 +1142,12 @@ export function pastedNamesDoubtful(items) { return (items || []).some((i) => i 
 // What one email is to Relay (a receipt, a return or delivery update, an order update, or not a purchase), exactly as a scan
 // decides it. Exported for the coverage tests (scripts/test-receipt-coverage.mjs).
 export function classifyEmail(rawText, ref = {}, lenient = false) { return classify(rawText, ref, lenient); }
-function classify(rawText, ref, lenient = false) {
+// One email gets this long to be read (review, 25 Nov 2026); past it the reader stops with "email_took_too_long" and the
+// scan keeps the email as not read, like one the mailbox couldn't give, and reads the rest. A real receipt takes a few
+// thousandths of a second; the slowest made-up shape in scripts/test-receipt-review-fixes.mjs about half a second.
+export const EMAIL_READ_MS = 10_000;
+function classify(rawText, ref, lenient = false) { return withReadLimit(EMAIL_READ_MS, () => classifyNow(rawText, ref, lenient)); }
+function classifyNow(rawText, ref, lenient = false) {
   let details, status = "pending";
   // Return emails are recognised by specific wording ("Return ID", "your return request"), so they are checked first:
   // otherwise a return email that also mentions the order and an amount could be mistaken for the order itself.
@@ -1152,6 +1201,8 @@ function classify(rawText, ref, lenient = false) {
       // (When the email was sent, to the minute, so a payment service's receipt can find the shop's receipt for the same
       // purchase, and what a gift card paid of an Amazon order. Round 13.)
       ...(receipt.sentAt ? { sentAt: receipt.sentAt } : {}), ...(receipt.giftCardPence ? { giftCardPence: receipt.giftCardPence } : {}),
+      // (Bought in a shop, not online: UK law's 14 days to change your mind are never worked out for it. Review, 25 Nov 2026.)
+      ...(receipt.inStore ? { inStore: true } : {}),
       // (What the rest was paid with, the email's "Visa (£40.75)", beside the gift card's part. Round 24.)
       ...(receipt.giftCardPence && receipt.cardPaid ? { cardPaid: receipt.cardPaid } : {}),
       // (The reference is a payment service's own transaction ID, not the shop's order number. Round 21.)
@@ -1340,6 +1391,13 @@ function outlookMailbox(fetchImpl, token) {
     async read(id) {
       const r = await graphGet(fetchImpl, GRAPH + "/me/messages/" + encodeURIComponent(id) + "/$value", auth);
       if (r.status === 404) return GONE;
+      // (Outlook too busy for this mailbox just now, still after graphGet's own second go: read in a later round, without
+      // counting as a try, the same as Gmail. Review, 25 Nov 2026: three busy rounds used to leave an email out for good.)
+      if (r.status === 429 || r.status === 503 || r.status === 504) {
+        const secs = Number(r.headers && typeof r.headers.get === "function" ? r.headers.get("retry-after") : NaN);
+        this.busyMs = Math.max(this.busyMs || 0, Number.isFinite(secs) && secs > 0 ? Math.min(60000, secs * 1000) : 2000);
+        return BUSY;
+      }
       // (The email's bytes as sent, read the same way as Gmail's: an 8bit windows-1252 part keeps its "£".)
       return r.ok ? outlookEmailText(r) : null;
     },
@@ -1375,24 +1433,51 @@ async function scan(env, boxId, fetchImplIn, now, cursorIn, full, o = {}) {
   // A year round or a background catch-up (each holds the mailbox, see takeMailbox) remembers which emails it is reading
   // until they are saved. If the last such round was ended part-way (Cloudflare ends a request that runs out of memory or
   // processing time, and nothing in this code can catch that), those emails are under suspicion: each is read on its own.
+  // (Review, 25 Nov 2026: the 15-minute check, a read for a new-mail notice and a scan's own rounds remember them too. They
+  // don't hold the mailbox the way a year round does, so two of them can be reading it at once: each round keeps its own
+  // list (read_inflight is { round: { at, held, refs } }), and a list left by a round that doesn't hold the mailbox counts
+  // as ended only once it is INFLIGHT_STALE_MS old, when that round can no longer be running.)
   let track = null, trackStatement = null;
   if (o.track) {
+    await ensureReadColumns(env.RELAY_DB);
     const t = await env.RELAY_DB.prepare("SELECT read_inflight AS inflight, read_suspects AS suspects FROM gmail_connections WHERE shopper_id = ?").bind(boxId).first();
     let suspects = {};
     try { suspects = (t && t.suspects && JSON.parse(t.suspects)) || {}; } catch { suspects = {}; }
-    let inflight = [];
-    try { inflight = (t && t.inflight && JSON.parse(t.inflight)) || []; } catch { inflight = []; }
+    if (!suspects || typeof suspects !== "object" || Array.isArray(suspects)) suspects = {};
+    let inflight = null;
+    try { inflight = (t && t.inflight && JSON.parse(t.inflight)) || null; } catch { inflight = null; }
+    const heldRound = o.track === "held", ended = [], endedKeys = [];
+    // (The list as it was kept before each round had its own: one list, from a round that held the mailbox.)
+    if (Array.isArray(inflight)) ended.push(inflight);
+    else if (inflight && typeof inflight === "object") {
+      for (const [key, e] of Object.entries(inflight)) {
+        const over = !e || typeof e !== "object" || (heldRound && e.held) || !Number.isFinite(e.at) || e.at < now - INFLIGHT_STALE_MS;
+        if (over) { ended.push(e && Array.isArray(e.refs) ? e.refs : []); endedKeys.push(key); }
+      }
+    }
     // (An email that was being read on its own when the round was ended counts twice: it was that email. So an email that
     // ends rounds is left out after two ended rounds, the first with others, the second on its own.)
-    const list = (Array.isArray(inflight) ? inflight : []).filter((ref) => typeof ref === "string");
-    for (const ref of list) suspects[ref] = (suspects[ref] || 0) + (list.length === 1 ? 2 : 1);
+    for (const refsOf of ended) {
+      const list = refsOf.filter((ref) => typeof ref === "string");
+      for (const ref of list) suspects[ref] = (suspects[ref] || 0) + (list.length === 1 ? 2 : 1);
+    }
     // (Kept short: an email that has since gone from the mailbox is forgotten after a while.)
     const keys = Object.keys(suspects);
     for (const k of keys.slice(0, Math.max(0, keys.length - MAX_SUSPECTS))) delete suspects[k];
     track = { suspects };
-    trackStatement = (refs) => env.RELAY_DB.prepare("UPDATE gmail_connections SET read_inflight = ?, read_suspects = ? WHERE shopper_id = ?")
-      .bind(refs && refs.length ? JSON.stringify(refs) : null, Object.keys(track.suspects).length ? JSON.stringify(track.suspects) : null, boxId);
-    if (inflight.length) await trackStatement(null).run();
+    const runKey = "r" + crypto.randomUUID().replace(/-/g, ""), mine = "$." + runKey;
+    const AS_ROUNDS = "CASE WHEN json_valid(read_inflight) AND json_type(read_inflight) = 'object' THEN read_inflight ELSE '{}' END";
+    const suspectsNow = () => (Object.keys(track.suspects).length ? JSON.stringify(track.suspects) : null);
+    trackStatement = (refs) => (refs && refs.length
+      ? env.RELAY_DB.prepare(`UPDATE gmail_connections SET read_inflight = json_set(${AS_ROUNDS}, ?, json(?)), read_suspects = ? WHERE shopper_id = ?`)
+        .bind(mine, JSON.stringify({ at: now, ...(heldRound ? { held: 1 } : {}), refs }), suspectsNow(), boxId)
+      : env.RELAY_DB.prepare(`UPDATE gmail_connections SET read_inflight = NULLIF(json_remove(${AS_ROUNDS}, ?), '{}'), read_suspects = ? WHERE shopper_id = ?`)
+        .bind(mine, suspectsNow(), boxId));
+    if (Array.isArray(inflight)) await env.RELAY_DB.prepare("UPDATE gmail_connections SET read_inflight = NULL, read_suspects = ? WHERE shopper_id = ?").bind(suspectsNow(), boxId).run();
+    else if (endedKeys.length) {
+      await env.RELAY_DB.batch(endedKeys.map((key) => env.RELAY_DB.prepare(`UPDATE gmail_connections SET read_inflight = NULLIF(json_remove(${AS_ROUNDS}, ?), '{}'), read_suspects = ? WHERE shopper_id = ?`)
+        .bind('$."' + String(key).replace(/["\\]/g, "") + '"', suspectsNow(), boxId)));
+    }
   }
   // After one complete scan, later scans only look at recent mail (with a few days of overlap), so opening the app never re-reads the whole mailbox.
   const fullLimit = now - LOOKBACK_DAYS * DAY_MS;
@@ -1456,7 +1541,8 @@ async function scan(env, boxId, fetchImplIn, now, cursorIn, full, o = {}) {
       let cls = null;
       if (typeof rawText === "string") {
         try { cls = classify(rawText, box.ref(listed.entries[i])); }
-        catch (e) { console.error("an email could not be read", String(e && e.message || e).slice(0, 160)); }
+        // (An email that ran out of its reading time would do so again: left out at once, not after three tries.)
+        catch (e) { if (e && e.name === "ReadTooLong") giveUpNow = true; console.error("an email could not be read", String(e && e.message || e).slice(0, 160)); }
       }
       if (!cls) {
         // The mailbox couldn't give this email just now. It used to be skipped for good (that is how Outlook receipts went
@@ -1602,7 +1688,7 @@ async function scan(env, boxId, fetchImplIn, now, cursorIn, full, o = {}) {
 // inbox has (then asking again reads them all again). An inbox that needs connecting again is passed over too, and the
 // answer says so (skipped), so the others are still read.
 async function yearRound(env, shopperId, fetchImpl, now, year, cursorIn, small) {
-  const o = { ...(small ? { maxFetch: 2 } : {}), year, track: true };
+  const o = { ...(small ? { maxFetch: 2 } : {}), year, track: "held" };
   // One round reads one inbox, holding it while it does (see takeMailbox): the background catch-up waits meanwhile.
   const held = async (boxId, cursor) => {
     const lease = await takeMailbox(env, boxId, "app", now);
@@ -1675,7 +1761,7 @@ const releaseLease = (env, job) => env.RELAY_DB.prepare("UPDATE mail_scan_jobs S
 async function runScanJobRound(env, job, fetchImpl, now, o = {}) {
   const db = env.RELAY_DB, same = [job.shopper_id, job.job_id];
   let r;
-  try { r = await scan(env, job.shopper_id, fetchImpl, now, job.cursor || "", Boolean(job.full_read), o.small ? { maxFetch: 2 } : {}); }
+  try { r = await scan(env, job.shopper_id, fetchImpl, now, job.cursor || "", Boolean(job.full_read), { ...(o.small ? { maxFetch: 2 } : {}), track: true }); }
   catch (e) { await releaseLease(env, job).run(); throw e; }
   if (r.status !== 200) {
     // A mailbox that needs connecting again (or was disconnected) ends the job; a busy mailbox is simply tried again later.
@@ -1718,6 +1804,8 @@ async function checkOtherInboxes(env, shopperId, now, full) {
   }
 }
 // The scheduled worker's part: jobs the app isn't driving are carried on, a few rounds a run, until they are done.
+// (A job whose last round never gave the mailbox back, because Cloudflare ended it part-way, goes after the others: it used
+// to stay first in the queue for good, since only a finished round moved it. Review, 25 Nov 2026.)
 export async function runScanJobs(env, now = Date.now(), fetchImpl = (...a) => fetch(...a), o = {}) {
   if (!env.RELAY_DB) return { jobs: 0, rounds: 0 };
   await ensureGmailTables(env.RELAY_DB);
@@ -1727,7 +1815,7 @@ export async function runScanJobs(env, now = Date.now(), fetchImpl = (...a) => f
     `SELECT j.shopper_id AS id FROM mail_scan_jobs j
      WHERE j.state = 'running' AND (j.lease_until IS NULL OR j.lease_until < ?) AND (j.app_at IS NULL OR j.app_at < ?)
        AND EXISTS (SELECT 1 FROM shopper_consents c WHERE c.shopper_id = ${OWNER_SQL("j.shopper_id")} AND c.version = ? AND c.withdrawn_at IS NULL)
-     ORDER BY j.updated_at LIMIT 5`).bind(now, now - JOB_APP_MS, CONSENT_VERSION).all()).results || []);
+     ORDER BY (j.lease_until IS NOT NULL), j.updated_at LIMIT 5`).bind(now, now - JOB_APP_MS, CONSENT_VERSION).all()).results || []);
   let rounds = 0, finished = 0, notified = 0;
   for (const row of rows) {
     if (rounds >= maxRounds || clock() - began > runMs) break;
@@ -2504,6 +2592,17 @@ const siteOf = (d) => String(d || "").toLowerCase().replace(/^(?:[^.]+\.)*?([^.]
 const sameShop = (u, o) => !u.retailer || (!u.retailer.domain && !u.retailer.name) || storeKey(u) === storeKey(o) ||
   (letters(u.retailer.name).length >= 3 && letters(u.retailer.name) === letters(o.retailer && o.retailer.name)) ||
   Boolean(u.retailer.domain && o.retailer && o.retailer.domain && !isVia(u.retailer.domain) && !PERSONAL_MAIL.test(u.retailer.domain) && siteOf(u.retailer.domain) === siteOf(o.retailer.domain));
+// An update that names an order by its number goes on that order when it names the order's shop too. One that names no
+// shop (a carrier's, or one forwarded with no shop to read) goes on it only when no other order has that number: two small
+// shops' orders 1042 are never each other's (second pass of the readers' review, 25 Nov 2026: a cancellation, a parcel or a
+// refund with no shop used to join every order with its number).
+const namesAShop = (u) => Boolean(u && u.retailer && (u.retailer.domain || u.retailer.name));
+function refCounter(orders) {
+  const n = new Map();
+  for (const o of orders) if (o.orderRef && o.kind !== "order_update") { const k = refCore(o.orderRef); n.set(k, (n.get(k) || 0) + 1); }
+  return (ref) => n.get(refCore(ref)) || 0;
+}
+const refShopFits = (u, o, count) => (namesAShop(u) ? sameShop(u, o) : count(u.orderRef || o.orderRef) === 1);
 // The orders sameShop(u, o) could be true for, by their shop's key, name and site (all of them for news that names no shop).
 function shopIndex(orders) {
   const ix = indexBy(orders, (o) => ["k:" + storeKey(o), "n:" + letters(o.retailer && o.retailer.name), o.retailer && o.retailer.domain ? "s:" + siteOf(o.retailer.domain) : null]);
@@ -2522,6 +2621,7 @@ export function attachDeliveries(orders, deliveries) {
   const named = byTime(deliveries.map((d) => (!d.trackingNumber && d.merchant && d.at ? d : null)), "at");
   const refsOf = (o) => (o.orderRef ? [refCore(o.orderRef), ...(String(o.orderRef).length >= 5 ? ["P:" + String(o.orderRef).toUpperCase()] : [])] : []);
   let shopIx = null;
+  const refCount = refCounter(orders);
   const sameStore = (o) => { shopIx = shopIx || indexBy(orders, (p) => [storeKey(p)]); let k; try { k = storeKey(o); } catch { return orders; } return among(shopIx, [k]); };
   for (const o of orders) {
     const mayAt = amongAt(refIx, refsOf(o)), mayName = mayAt.map((i) => deliveries[i]);
@@ -2530,7 +2630,7 @@ export function attachDeliveries(orders, deliveries) {
     const nums = new Set([o.shipment && o.shipment.trackingNumber].filter(Boolean));
     // (Or a parcel of a split order named by the order's number and its parcel's, "DET-7vxlt1dlf1s-1". Round 15e.)
     const parcelOf = (d) => String(o.orderRef).length >= 5 && String(d.orderRef).toUpperCase().replace(/-\d{1,2}$/, "") === String(o.orderRef).toUpperCase();
-    const byRef = (d) => d.orderRef && o.orderRef && (sameOrderRef(d.orderRef, o.orderRef) || parcelOf(d)) && sameShop(d, o);
+    const byRef = (d) => d.orderRef && o.orderRef && (sameOrderRef(d.orderRef, o.orderRef) || parcelOf(d)) && refShopFits(d, o, refCount);
     for (const d of mayName) if (d.trackingNumber && byRef(d)) nums.add(d.trackingNumber);
     const t = (o.shipment && o.shipment.trackingNumber) || [...nums][0] || null;
     let best = o.shipment ? { status: o.shipment.status || "shipped", at: null, carrier: o.shipment.carrier || null, trackingNumber: t || null } : null;
@@ -2649,6 +2749,7 @@ export function attachCancellations(orders, cancels) {
     if (fits.length === 1) byItems.set(fits[0], [...(byItems.get(fits[0]) || []), u]);
   }
   const cancelIx = indexBy(cancels, (u) => (u.orderRef ? [refCore(u.orderRef)] : []));
+  const refCount = refCounter(orders);
   for (const o of orders) {
     const listed = byItems.get(o);
     if (listed) {
@@ -2659,7 +2760,7 @@ export function attachCancellations(orders, cancels) {
       if (!o.orderRef) continue;
     }
     if (!o.orderRef) continue;
-    const mine = among(cancelIx, [refCore(o.orderRef)]).filter(u => u.orderRef && sameOrderRef(u.orderRef, o.orderRef) && sameShop(u, o));
+    const mine = among(cancelIx, [refCore(o.orderRef)]).filter(u => u.orderRef && sameOrderRef(u.orderRef, o.orderRef) && refShopFits(u, o, refCount));
     if (!mine.length) continue;
     const whole = mine.find(u => !u.partial);
     const at = mine.map(u => u.at).filter(Boolean).sort()[0] || null;
@@ -2788,7 +2889,9 @@ export function estimateReturnBy(o, today) {
   const r = (o && o.returns) || {};
   if (!o || o.returnBy || r.deadline || !/^\d{4}-\d{2}-\d{2}$/.test(o.orderDate || "") || o.orderDate > today) return null;
   const windowDays = Number.isInteger(r.windowDays) && r.windowDays > 0 && r.windowDays <= 365 ? r.windowDays : null;
-  const days = windowDays || (o.orderRef && !o.delivery && paidInPounds(o) && lawCovers(o) ? 14 : null);
+  // (Not for a purchase made in a shop, which the reader marks inStore: its receipt number looks like an order number, but
+  // the law's 14 days don't cover it. Review, 25 Nov 2026.)
+  const days = windowDays || (o.orderRef && !o.delivery && !o.inStore && paidInPounds(o) && lawCovers(o) ? 14 : null);
   if (!days) return null;
   const d = new Date(o.orderDate + "T00:00:00Z");
   if (Number.isNaN(d.getTime())) return null;
@@ -2826,6 +2929,56 @@ function refundFits(u, o, orders, byTotal) {
 // A return the shop has accepted that gives no order number, only what it will refund ("we will be crediting you … for the
 // value of £118.00"): it goes on the one order from that shop, bought in the 120 days before, that cost exactly that
 // (in all, or one of its lines). Two such orders, or none, and it goes nowhere: never a guess. Round 15e.
+// ---- Which order an email about "order 1042" belongs to (review, 25 Nov 2026) ----
+// Small shops number their orders 1001, 1002, 1003: two shops a shopper buys from can both have an order 1042. A return
+// email was put on whichever order had its number, with no look at the shop, so shop B's return (its deadline, label and
+// the return parcel's tracking number) showed on shop A's order as "Return started, from shop A's email"; and hiding shop
+// A's order 1042 hid every order numbered 1042, a later real purchase from shop B included. An order number now counts
+// only with its shop.
+// The same shop, as far as two emails can say: the same shop key (an address a shop only sends from, "mail.shop.com", is
+// its shop's), or names that agree ("Kestrel Outdoor Returns" and "Kestrel Outdoor", returns@kestrel-returns.example and
+// "Kestrel"). null when one of them doesn't say which shop it is from (the shopper's own forward).
+const shopLetters = (v) => String(v || "").toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "");
+const domainWord = (d) => { const parts = String(d || "").toLowerCase().replace(SEND_LABEL, "").replace(/\.(?:co\.uk|org\.uk|com|uk|net|org|io|eu|shop|store|example|test)$/, "").split("."); return shopLetters(parts[parts.length - 1]); };
+function shopWords(x) {
+  const r = (x && x.retailer) || {};
+  if (PERSONAL_MAIL.test(String(r.domain || ""))) return [];
+  const generic = /^(?:returns?|orders?|no-?reply|info|hello|customer ?services?|support|team|help|shop|store|sales)$/i;
+  return [...new Set([r.name && !generic.test(String(r.name).trim()) ? shopLetters(r.name) : "", r.via ? "" : domainWord(r.domain)].filter((w) => w.length >= 3))];
+}
+export function sameShopFor(a, b) {
+  const wa = shopWords(a), wb = shopWords(b);
+  if (!wa.length || !wb.length) return null;
+  let ka = "", kb = "";
+  try { ka = joinStore(a); kb = joinStore(b); } catch { /* a shop with no usable key: its words decide */ }
+  if (ka && ka === kb) return true;
+  return wa.some((x) => wb.some((y) => x === y || (Math.min(x.length, y.length) >= 4 && (x.startsWith(y) || y.startsWith(x)))));
+}
+// Each numbered return email on the one order it belongs to: the same number AND the same shop. When the return email
+// doesn't say which shop it is from, only when exactly one order has that number and the return came after it, within 120
+// days. Otherwise it is left off (the receipt simply shows no return details): never on another shop's order.
+export function attachNumberedPlans(orders, plans, hidden = () => false) {
+  const byRef = indexBy(orders, (o) => (o.orderRef ? [String(o.orderRef).toUpperCase()] : []));
+  for (const p of plans) {
+    if (!p.orderRef || hidden(p)) continue;
+    const ref = String(p.orderRef).toUpperCase();
+    const same = among(byRef, [ref]).filter((o) => o.orderRef && String(o.orderRef).toUpperCase() === ref);
+    const inTime = (o) => !o.orderDate || !p.at || (String(o.orderDate).slice(0, 10) <= String(p.at).slice(0, 10) && Date.parse(String(p.at).slice(0, 10)) - Date.parse(String(o.orderDate).slice(0, 10)) <= 120 * 864e5);
+    const sure = same.filter((o) => sameShopFor(p, o) === true);
+    // (Two orders of one shop with one number, a counter's "042" a week apart: the latest placed before the return.)
+    const fits = sure.length ? sure.filter(inTime) : same.every((o) => sameShopFor(p, o) === null) ? same.filter(inTime) : [];
+    const o = sure.length ? fits.sort((x, y) => String(y.orderDate || "").localeCompare(String(x.orderDate || "")))[0] : fits.length === 1 ? fits[0] : null;
+    // Only purchase emails get a card. A return email just adds its return details to the purchase it belongs to.
+    if (o) o.returnPlan = p;
+  }
+}
+// The orders the shopper hid, and whether an email is about one of them: the same number and the same shop (or a hidden
+// email that doesn't say which shop it was from: then the number alone, as before).
+export function hiddenOrders(dismissed) {
+  const byRef = new Map();
+  for (const d of dismissed) { if (!d || !d.orderRef) continue; const k = String(d.orderRef).toUpperCase(); byRef.set(k, (byRef.get(k) || []).concat([d])); }
+  return (x) => Boolean(x && x.orderRef) && (byRef.get(String(x.orderRef).toUpperCase()) || []).some((d) => sameShopFor(d, x) !== false);
+}
 export function attachUnnumberedPlans(orders, plans) {
   let byKey = null;
   for (const p of plans) {
@@ -2851,6 +3004,8 @@ export function attachReturnProgress(orders, deliveries, updates) {
   const paidIx = indexBy(updates, (u) => (!u.orderRef ? [u.paidPence] : []));
   const byTotal = indexBy(orders, (o) => [o.totalPence]);
   const trackIx = indexBy(deliveries, (d) => [d.trackingNumber]);
+  const upperCount = new Map();
+  for (const o of orders) if (o.orderRef && o.kind !== "order_update") { const k = String(o.orderRef).toUpperCase(); upperCount.set(k, (upperCount.get(k) || 0) + 1); }
   // (A refund that names no order and no money, "Your refund has been processed" from a person at the company behind the
   // shop: it goes with the one purchase from that company's address, or the one whose email named that company at its foot,
   // in the six months before it. It says refunded, with no amount: Relay never makes one up. Round 62.)
@@ -2872,7 +3027,9 @@ export function attachReturnProgress(orders, deliveries, updates) {
       if (d.trackingNumber !== t) continue;
       if (!parcel || (STAGE[d.status] || 0) > (STAGE[parcel.status] || 0)) parcel = { status: d.status, at: d.at || null, carrier: d.carrier || (plan && plan.carrier) || null };
     }
-    const mine = (ref ? among(refIx, [ref]).filter(u => u.orderRef && String(u.orderRef).toUpperCase() === ref && (!u.retailer || !u.retailer.domain || storeKey(u) === storeKey(o))) : [])
+    // (By its number and its shop: an update that gives only a shop's name, no address, used to join every order with that
+    // number, another shop's 1042 too. Second pass of the readers' review.)
+    const mine = (ref ? among(refIx, [ref]).filter(u => u.orderRef && String(u.orderRef).toUpperCase() === ref && (u.retailer && u.retailer.domain ? storeKey(u) === storeKey(o) : namesAShop(u) ? sameShop(u, o) : upperCount.get(ref) === 1)) : [])
       .concat(among(paidIx, [o.totalPence]).filter(u => !u.orderRef && refundFits(u, o, orders, byTotal)))
       .concat(o.authorised === true ? updates.filter(u => !u.orderRef && u.paidPence !== o.totalPence && refundFits(u, o, orders, null)) : [])
       .concat(bare.filter(u => bareOrder.get(u) === o));
@@ -3076,7 +3233,6 @@ async function listReceipts(env, shopperId, timing, opts = {}) {
   markJoins(orders, plan, (id) => { const e = emailById.get(id); if (!e) return null; const r = e.retailer || {};
     return { id: /^[0-9a-f-]{36}$/.test(id) ? id : null, shop: r.name || r.domain || null, orderDate: e.orderDate || null, totalPence: Number.isInteger(e.totalPence) ? e.totalPence : null, currency: e.currency || "GBP" }; });
   lap("joinsMs");
-  const byOrder = new Map(orders.filter(o => o.orderRef).map(o => [o.orderRef, o]));
   // The remaining lookups do not depend on each other, so they run together instead of one after another.
   const keys = [...new Set(orders.flatMap(o => [storeKey(o), legacyStoreKey(o)]).filter(Boolean))];
   const lookups = [];
@@ -3107,7 +3263,7 @@ async function listReceipts(env, shopperId, timing, opts = {}) {
     ...lookups
   ]);
   lap("lookupsMs"); if (timing) timing.dismissedCount = (gone.results || []).length;
-  const dismissedRefs = new Set((gone.results || []).map(r => JSON.parse(r.details).orderRef).filter(Boolean));
+  const isHidden = hiddenOrders((gone.results || []).map(r => JSON.parse(r.details)));
   attachDeliveries(orders, deliveries);
   // Each code goes on the receipt of its order (its own email's, or the one order with that number from that shop).
   attachCodes(orders, all, codeRows, sameOrderRef);
@@ -3117,12 +3273,7 @@ async function listReceipts(env, shopperId, timing, opts = {}) {
   attachAccepted(orders, cancels.filter(u => u.stage === "accepted"));
   // What the carrier itself said, where the shopper opened a parcel Relay could track live (parcel-tracking.js).
   applyTracked(orders, tracked);
-  for (const p of plans) {
-    if (p.orderRef && dismissedRefs.has(p.orderRef)) continue;
-    const o = p.orderRef && byOrder.get(p.orderRef);
-    // Only purchase emails get a card. A return email just adds its return details to the purchase it belongs to.
-    if (o) o.returnPlan = p;
-  }
+  attachNumberedPlans(orders, plans, isHidden);
   attachUnnumberedPlans(orders, plans.filter((p) => !p.orderRef));
   attachReturnProgress(orders, deliveries, updates);
   // Where each return has got to, step by step, and who said so (return-tracking.js).
@@ -3135,7 +3286,7 @@ async function listReceipts(env, shopperId, timing, opts = {}) {
   attachShared(orders, sent);
   const remById = new Map((rem.results || []).map(r => [r.id, r]));
   // An order the shopper dismissed stays hidden even when the shop sent other emails about it.
-  const cards = orders.filter(o => !(o.orderRef && dismissedRefs.has(o.orderRef)));
+  const cards = orders.filter(o => !isHidden(o));
   for (const c of cards) { const r = remById.get(c.id); c.reminder = r ? (r.sentAt ? "sent" : "on") : "off"; }
   // What the app has been taught. A shopper's own choice always wins. Otherwise a category is used only when at least two
   // different shoppers chose it for the same store and it clearly leads, so one person's mistake never changes anyone else's list.
@@ -3938,7 +4089,8 @@ async function setReminder(env, shopperId, receiptId, on, now) {
       "SELECT details FROM captured_receipts WHERE shopper_id = ? AND status NOT IN ('dismissed','not_receipt')").bind(shopperId).all();
     for (const o of others.results || []) {
       const od = JSON.parse(o.details);
-      if (od.kind === "return_instructions" && od.orderRef === d.orderRef && od.deadline) deadline = od.deadline;
+      // (The same order: its number and its shop. Another shop's return email with the same number is not this order's.)
+      if (od.kind === "return_instructions" && od.orderRef === d.orderRef && od.deadline && sameShopFor(od, d) !== false) deadline = od.deadline;
     }
   }
   deadline = deadline || (d.returns && d.returns.deadline) || null;

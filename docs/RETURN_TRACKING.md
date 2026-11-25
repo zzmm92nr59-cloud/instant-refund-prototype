@@ -20,12 +20,24 @@ Rules that keep it honest:
 
 - An email counts only for what it says has happened. "Once you've dropped it off", a reminder, "we'll let you know when
   it's delivered" and "we'll process your refund" are not a drop-off, an arrival or a refund.
+- A refund declined, refused, pending, requested, or "being processed" is not a refund. One being processed is kept as
+  `refunding`: it ticks no step and makes no fact; it only lets money in at the bank be matched to the order.
+- A shop's "your return label has been sent", "a replacement is on its way" or "your return is on its way back to you" is
+  not the return parcel on its way. A carrier's email about a parcel coming to the shopper ("We've delivered your ASOS
+  parcel"), even with a "Returning an item?" footer, is a delivery, not a return.
+- A return email joins an order by its number and its shop together: two shops can both have an order 1042. Hiding an
+  order hides only that shop's order with that number.
 - A carrier is recognised by the address its email came from, never by a display name.
 - An email or bank payment that could belong to two receipts is left out. Only the shopper's own inboxes, receipts and
   bank payments are used.
 - A bank payment shows a refund only on a return Relay already knows of, when the bank's text names the shop, the amount
   is the one the shop's refund email gave (or, without one, the order's total, an item's price or a set of its items), and
   it came in on or after the day the return started. It never confirms that the parcel was sent or received.
+- A tracking number only the shopper gave counts for the carrier's news only when that news fits a parcel going back after
+  they sent it: the carrier's or shop's email about a return with that number, dated on or after the day they said they
+  sent it and naming no other shop, or the carrier's tracking with a first scan on or after that day. A carrier's ordinary
+  parcel email (delivered, out for delivery) for that number never counts, and a number on one of their purchases'
+  deliveries is never a return's.
 - The return's tracking number comes from the shop's or carrier's email, or the shopper pastes it in ("I've sent it back").
   It must look like one (8 to 40 letters and digits, at least one digit); the carrier is filled in only for Royal Mail's,
   Yodel's and Evri's own formats, otherwise the app asks.

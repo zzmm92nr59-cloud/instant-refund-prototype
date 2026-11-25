@@ -14,7 +14,9 @@
   "notPurchase": {
    "kind": "refund",
    "refundPence": 640,
-   "orderRef": "730118264590"
+   "orderRef": "730118264590",
+   "stage": "refunding",
+   "why": "Review, 25 Nov 2026: the email says the refund is being processed, not that it has been made, so it is read as a refund under way (stage refunding), never as refunded."
   }
  }
 }

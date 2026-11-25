@@ -86,7 +86,7 @@ const read = (raw) => parseReceiptEmail(raw);
 
 // 4. The reader's version and the search: flight bookings are asked for, and old emails are read again.
 {
-  assert.equal(PARSER_VERSION, 63, "the reader's version went up, so emails read before are read again with it");
+  assert.equal(PARSER_VERSION, 64, "the reader's version went up, so emails read before are read again with it");
   const src = readFileSync(new URL("../worker/gmail.js", import.meta.url), "utf8");
   const terms = /const SEARCH_TERMS =([\s\S]*?);\n/.exec(src)[1];
   for (const w of ['"e-ticket"', "eticket", '"travel confirmation"', '"flight confirmation"', "itinerary", "booking", "category:reservations"]) assert.ok(terms.includes(w), "Gmail is asked for " + w);
