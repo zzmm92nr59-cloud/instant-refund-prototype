@@ -976,6 +976,10 @@ function extractReturns(text, html, orderDate, other = "") {
     let m = sent.match(/within\s+(\d{1,3})(?:\s+|-)(?:calendar\s+|working\s+)?days?(?:\s+(?:starting\s+)?(?:of|from|after)\s+(?:the\s+)?(?:day\s+after\s+(?:the\s+)?(?:date\s+of\s+)?)?(delivery|receiv\w*|dispatch\w*|purchase|order\w*|today))?/i) ||
       sent.match(/(\d{1,3})[-\s]days?\s+(?:free\s+)?returns?/i) || sent.match(/\byou have\s+(\d{1,3})\s+days?\s+to\s+return\b/i);
     if (m && m.index != null && /\brefund(?:ed|s)?(?:\s+(?:to\s+)?(?:you|your\s+(?:card|account|original\s+payment(?:\s+method)?)))?\s*$/i.test(sent.slice(Math.max(0, m.index - 60), m.index))) continue;
+    // (Nor a sentence about the refund itself, "Refunds are processed within 14 days of receiving your return", "Your money
+    // will be back within 5 days": how long the money takes, never how long there is to send something back. Second pass
+    // of the readers' review, 25 Nov 2026: that was a 14-day window from delivery.)
+    if (m && m.index != null && /\b(?:refunds?|money|credit|payment)\b[^.]{0,40}\b(?:processed|issued|made|paid|credited|sent|back|returned|arrive|reach|appear|show)\b[^.]{0,30}$/i.test(sent.slice(0, m.index))) continue;
     if (m) {
       out.windowDays = Number(m[1]);
       const basis = (m[2] || "").toLowerCase();
@@ -1014,8 +1018,14 @@ function extractReturns(text, html, orderDate, other = "") {
   const cant = /\b(?:items?|following)[^.\n]{0,40}\bcan(?:'|’|no)?t be returned\b[\s\S]{0,300}?^[ \t]*[-•*][ \t]*(custom (?:or|and) personali[sz]ed (?:orders|items)|personali[sz]ed (?:orders|items))/im.exec(both);
   if (cant) out.excludes = ["personalised"];
   // Explicit date: "return by 14 November 2026".
-  const byDate = flat.match(/return\w*[^.\n]{0,60}?\bby\s+(\d{1,2}(?:st|nd|rd|th)?\s+[A-Za-z]{3,9}\.?,?\s+\d{4}|\d{4}-\d{2}-\d{2})/i);
-  if (byDate) out.deadline = parseDate(byDate[1]);
+  // (Only a date for sending things back: not "your refund will be returned to your card by 5 December", which is when the
+  // money comes, nor what the shop says it will do by then. Second pass of the readers' review, 25 Nov 2026.)
+  for (const m of flat.matchAll(/return\w*[^.\n]{0,60}?\bby\s+(\d{1,2}(?:st|nd|rd|th)?\s+[A-Za-z]{3,9}\.?,?\s+\d{4}|\d{4}-\d{2}-\d{2})/gi)) {
+    const clause = flat.slice(Math.max(0, m.index - 120), m.index + m[0].length).split(/[.!?]\s|\n/).pop();
+    if (/\b(?:refunds?|money|credit|payment)\b|\b(?:we(?:'|’)ll|we will|will be|you(?:'|’)ll (?:receive|get|have)|we aim|we expect)\b/i.test(clause)) continue;
+    out.deadline = parseDate(m[1]);
+    if (out.deadline) break;
+  }
   if (!out.deadline && out.windowDays && out.windowFrom === "order" && orderDate) {
     const d = new Date(orderDate + "T00:00:00Z");
     if (!Number.isNaN(d.getTime())) { d.setUTCDate(d.getUTCDate() + out.windowDays); out.deadline = isoDate(d); }
@@ -4605,6 +4615,12 @@ export function parseCancellationEmail(rawEmail) {
   if (returnCarrierOf(u.headers.from) || deliveryCarrierOf(u.headers.from)) return no;
   const top = u.text.slice(0, 1500).replace(/\s+/g, " ");
   const said = /\bcancell?(?:ed|ation)\b/i.test(u.subject) || NOT_A_PURCHASE_TOP.test(top);
+  // (A request to cancel, or a shop saying it couldn't, "Your cancellation request for order KO-1001", "we were unable to
+  // cancel it": nothing was cancelled unless the email also says it has been. Second pass of the readers' review, 25 Nov 2026:
+  // a request was read as the whole order cancelled, its return date taken away and its money not counted.)
+  const head2 = u.subject + "\n" + top;
+  if (/\bcancell?ation request\b|\brequest(?:ed)? (?:to|for) (?:a |the )?cancel|\basked (?:us )?to cancel\b|\b(?:unable|not able|could not|couldn(?:'|’)t|can(?:'|’)t|cannot|won(?:'|’)t be able) to (?:be )?cancel|\bcould not be cancell?ed\b|\bcan(?:not|(?:'|’)t) be cancell?ed\b|\btoo late to cancel\b/i.test(head2) &&
+    !saidNow(head2, /\b(?:has|have) been (?:successfully )?cancell?ed\b|\b(?:we(?:'|’)?ve|we have) (?:now |successfully )?cancell?ed\b|\b(?:was|is now) cancell?ed\b/i)) return no;
   // (A subscription that will stop, Google Play's "Your Microsoft Word: … subscription will be cancelled" with "will be
   // cancelled on 13 Aug 2019. No refunds will be issued": nothing bought is undone, it just doesn't renew. Kept as news for
   // the subscription's latest payment (gmail.js attachCancellations): the day it ends and that no money comes back. Round 13.)

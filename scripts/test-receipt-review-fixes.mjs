@@ -10,7 +10,8 @@ import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { parseReturnUpdateEmail, parseDeliveryEmail, parseReturnParcelEmail, parseReturnEmail, parseReceiptEmail, parseDispatchEmail } from "../worker/receipt-parser.js";
-import { classifyEmail, pastedAsEmail, estimateReturnBy } from "../worker/gmail.js";
+import { classifyEmail, pastedAsEmail, estimateReturnBy, attachCancellations, attachReturnProgress } from "../worker/gmail.js";
+import { categorise, shopDisplayName } from "../worker/receipt-category.js";
 import { hideDetails } from "../worker/shared-emails.js";
 import { attachReturnTracking } from "../worker/return-tracking.js";
 
@@ -270,6 +271,60 @@ if (process.argv[2] === "slow") {
   assert.equal(online.inStore, undefined);
   assert.equal((estimateReturnBy(online, "2026-11-25") || {}).basis, "uk_law", "an online order still gets the law's 14 days, marked as an estimate");
   console.log("ok - a purchase made in a shop never gets UK law's 14 days; an online order still does");
+}
+
+// ---- 4. Second pass of the review (code the first pass did not read) ------------------------------------------------
+{
+  // S1. A cancellation or a refund that names no shop joins an order by its number only when no other order has it.
+  const lark = () => ({ id: "a", kind: "receipt", retailer: { name: "Larkspur Candles", domain: "larkspurcandles.example" }, orderRef: "1042", orderDate: "2026-11-02", totalPence: 2400, currency: "GBP", items: [{ name: "Fig Leaf Candle", qty: 1, pricePence: 2400 }] });
+  const fern = () => ({ id: "b", kind: "receipt", retailer: { name: "Fernhill Ceramics", domain: "fernhillceramics.example" }, orderRef: "1042", orderDate: "2026-11-05", totalPence: 3600, currency: "GBP", items: [{ name: "Stoneware Mug", qty: 2, pricePence: 1800 }] });
+  const noShop = { kind: "order_update", stage: "cancelled", partial: false, at: "2026-11-20", orderRef: "1042", amountPence: null, currency: null, retailer: { name: null, domain: null } };
+  let a = lark(), b = fern();
+  attachCancellations([a, b], [noShop]);
+  assert.deepEqual([Boolean(a.cancelled), Boolean(b.cancelled)], [false, false], "a cancellation that names no shop is not put on either shop's order 1042");
+  a = lark(); attachCancellations([a], [noShop]);
+  assert.ok(a.cancelled, "with only one order numbered 1042 it is that order's");
+  a = lark(); b = fern();
+  attachCancellations([a, b], [{ ...noShop, retailer: { name: "Fernhill Ceramics", domain: "fernhillceramics.example" } }]);
+  assert.deepEqual([Boolean(a.cancelled), Boolean(b.cancelled)], [false, true], "one that names its shop goes on that shop's order");
+  a = lark(); b = fern();
+  attachReturnProgress([a, b], [], [{ kind: "return_update", stage: "refunded", at: "2026-11-21", amountPence: 3600, currency: "GBP", orderRef: "1042", retailer: { name: "Fernhill Ceramics", domain: null } }]);
+  assert.deepEqual([Boolean(a.returnProgress && a.returnProgress.refundedAt), Boolean(b.returnProgress && b.returnProgress.refundedAt)], [false, true], "a refund that gives only its shop's name goes on that shop's order 1042, never the other's");
+
+  // S2. A support reply that says a refund was NOT made, or will be, is no money back.
+  const support = (body) => classifyEmail(mail("Kestrel Outdoor Support <support@kestreloutdoor.example>", "Re: your order 77120394", "Hi Sam,\n\n" + body + "\n\nKind regards,\nPriya\n"), {}, false).details;
+  for (const body of ["Sorry about your order 77120394. We have not processed a refund of £11.46 yet, as the parcel has not reached us.", "About order 77120394: once the item is back we will have issued a refund of £11.46 within 5 days."]) {
+    const d = support(body);
+    assert.ok(!(d.kind === "order_update" && d.stage === "adjusted"), `"${body}" is no money back (read as ${d.kind} ${d.stage})`);
+  }
+  let d = support("About order 77120394: I have processed a partial refund of £11.46 back to your card.");
+  assert.deepEqual([d.kind, d.stage, d.amountPence], ["order_update", "adjusted", 1146], "one said as done still counts");
+
+  // S3. A receipt forwarded from another personal mail service is never shown as a shop called "Outlook" or "Gmx".
+  for (const domain of ["outlook.co.uk", "hotmail.fr", "gmx.co.uk", "yahoo.fr", "ntlworld.com"]) assert.equal(shopDisplayName({ name: "Sam Taylor", domain }), "Forwarded receipt", domain);
+
+  // S4. "Apple" in another shop's name is not Apple: a garden centre's pot can be returned.
+  const pot = categorise({ retailer: { name: "Apple Tree Garden Centre", domain: "appletreegardencentre.example" }, items: [{ name: "Terracotta Pot 30cm", qty: 1, pricePence: 1800 }] });
+  assert.deepEqual([pot.category, pot.returnable], ["home", true], "not filed as digital and 'can't be returned'");
+  assert.equal(categorise({ retailer: { name: "Apple", domain: "email.apple.com" }, items: [{ name: "iCloud+ 50GB", qty: 1, pricePence: 99 }] }).category, "digital", "Apple's own still is");
+
+  // S5. How long a refund takes is never the window or the date for sending something back.
+  const order = (extra) => parseReceiptEmail(mail("Kestrel Outdoor <orders@kestreloutdoor.example>", "Your order KO-1001 is confirmed", "Thanks for your order.\n\nOrder number: KO-1001\nOrder date: 23 November 2026\n\nTrail Flask - Qty 1 - £12.50\n\nOrder total: £12.50\n\n" + extra + "\n")).returns || {};
+  let r = order("Refunds are processed within 14 days of receiving your return.");
+  assert.equal(r.windowDays ?? null, null, "'refunds are processed within 14 days of receiving your return' is not 14 days to return");
+  r = order("Once your return arrives, your refund will be returned to your card by 5 December 2026.");
+  assert.equal(r.deadline ?? null, null, "when the money comes back is not a return deadline");
+  r = order("You can return it within 30 days of delivery. Refunds are processed within 5 days of receiving it.");
+  assert.deepEqual([r.windowDays, r.windowFrom], [30, "delivery"], "the real window still reads");
+  assert.equal(order("Please return items by 20 December 2026.").deadline, "2026-12-20");
+
+  // S6. A request to cancel, or a shop saying it couldn't, is not a cancelled order.
+  const cancel = (subject, body) => classifyEmail(mail(SHOP, subject, "Hi Sam,\n\n" + body + "\n\nOrder number: KO-1001\n"), {}, false).details;
+  d = cancel("Your cancellation request for order KO-1001", "We have received your request to cancel order KO-1001. We will let you know once it has been cancelled.");
+  assert.ok(!(d.kind === "order_update" && d.stage === "cancelled"), "a request to cancel is not a cancellation (read as " + d.kind + " " + d.stage + ")");
+  d = cancel("Your cancellation request for order KO-1001", "Good news: your order KO-1001 has been cancelled as you asked.");
+  assert.deepEqual([d.kind, d.stage], ["order_update", "cancelled"], "one that says it has been cancelled is");
+  console.log("ok - second pass: a cancellation or refund with no shop never joins another shop's order 1042; a support reply's refund only when made; personal mail is never a shop; Apple only when it is Apple; refund timing is never a return window; a cancellation request is not a cancellation");
 }
 
 // ---- 2. Emails built to be slow are read quickly (H5) ----------------------------------------------------------------

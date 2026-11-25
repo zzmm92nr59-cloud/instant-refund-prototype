@@ -207,7 +207,9 @@ async function gmailGet(fetchImpl, url, headers) {
 // shop's "your return label has been sent" or "a replacement is on its way" is not the return parcel on its way; a carrier's
 // delivery with a returns footer is a delivery; a carrier is known by its address only; the return deadline comes from the
 // sentence about sending it back; "12.5" is £12.50; a till receipt is marked bought in a shop; a table's label ("ORDER
-// DATE", "ORDER NUMBER") is never an item's name; HTML that never closes its tags is read in time in proportion to it.
+// DATE", "ORDER NUMBER") is never an item's name; HTML that never closes its tags is read in time in proportion to it; a
+// cancellation request is not a cancellation; a support reply's refund counts only when made; how long a refund takes is
+// never a return window or deadline.
 export const PARSER_VERSION = 64;
 // Which full read of every mailbox is due: version 33 of the reader was full read 14, and each reader version since is one
 // more, so a better reader always reaches old receipts too, without anyone having to remember to raise this.
@@ -567,7 +569,7 @@ export async function autoScanGmail(env, now = Date.now(), fetchImpl = (...a) =>
      WHERE EXISTS (SELECT 1 FROM shopper_consents c WHERE c.shopper_id = ${OWNER_SQL("g.shopper_id")} AND c.version = ? AND c.withdrawn_at IS NULL)
        AND NOT EXISTS (SELECT 1 FROM mail_scan_jobs j WHERE j.shopper_id = g.shopper_id AND j.state = 'running')
        AND (g.push_lease IS NULL OR g.push_lease < ?)
-       AND (g.mail_problem IS NULL OR COALESCE(g.auto_at, 0) < ?)
+       AND (g.mail_problem IS NULL OR COALESCE(g.auto_at, 0) <= ?)
      ORDER BY COALESCE(g.auto_at, 0) LIMIT 3`).bind(CONSENT_VERSION, now, now - DEAD_INBOX_RETRY_MS).all()).results || []);
   let passes = 0, calls = 0;
   const out = [];
@@ -958,10 +960,10 @@ async function disconnect(env, shopperId, fetchImpl, { withdraw }) {
     env.RELAY_DB.prepare("DELETE FROM item_kinds WHERE shopper_id = ?").bind(shopperId),
     env.RELAY_DB.prepare("DELETE FROM parcel_tracks WHERE shopper_id = ?").bind(shopperId),
     env.RELAY_DB.prepare("DELETE FROM return_tracks WHERE shopper_id = ?").bind(shopperId),
-    // (The shopper's own "same order" / "different orders", which hold their emails' ids and the shop's web address, and any
-    // half-finished connection: deleted with the permission, as docs/SECURITY.md promises. Review, 25 Nov 2026.)
+    // (The shopper's own "same order" / "different orders", which hold their emails' ids and the shop's web address: deleted
+    // with the permission, as docs/SECURITY.md promises. Review, 25 Nov 2026. A half-finished connection's state is kept for
+    // its 10 minutes, so coming back from Google says plainly that permission is needed.)
     env.RELAY_DB.prepare("DELETE FROM receipt_joins WHERE shopper_id = ?").bind(shopperId),
-    env.RELAY_DB.prepare("DELETE FROM gmail_oauth_states WHERE shopper_id = ? OR shopper_id LIKE ?").bind(shopperId, shopperId + "~%"),
     env.RELAY_DB.prepare("DELETE FROM gmail_connections WHERE shopper_id = ? OR shopper_id LIKE ?").bind(shopperId, shopperId + "~%"),
     env.RELAY_DB.prepare("DELETE FROM mail_scan_jobs WHERE shopper_id = ? OR shopper_id LIKE ?").bind(shopperId, shopperId + "~%"),
     env.RELAY_DB.prepare("DELETE FROM gmail_history_years WHERE shopper_id LIKE ?").bind(shopperId + "~%")
@@ -2966,8 +2968,10 @@ export function attachNumberedPlans(orders, plans, hidden = () => false) {
     const inTime = (o) => !o.orderDate || !p.at || (String(o.orderDate).slice(0, 10) <= String(p.at).slice(0, 10) && Date.parse(String(p.at).slice(0, 10)) - Date.parse(String(o.orderDate).slice(0, 10)) <= 120 * 864e5);
     const sure = same.filter((o) => sameShopFor(p, o) === true);
     // (Two orders of one shop with one number, a counter's "042" a week apart: the latest placed before the return.)
-    const fits = sure.length ? sure.filter(inTime) : same.every((o) => sameShopFor(p, o) === null) ? same.filter(inTime) : [];
-    const o = sure.length ? fits.sort((x, y) => String(y.orderDate || "").localeCompare(String(x.orderDate || "")))[0] : fits.length === 1 ? fits[0] : null;
+    // (One order of that shop with that number: it. Two, a counter's "042" a week apart: the latest placed before the return,
+    // within 120 days. A return email that doesn't say its shop: only the one order with that number, placed before it.)
+    const fits = sure.length > 1 ? sure.filter(inTime) : sure.length ? sure : same.every((o) => sameShopFor(p, o) === null) ? same.filter(inTime) : [];
+    const o = sure.length ? fits.sort((x, y) => String(y.orderDate || "").localeCompare(String(x.orderDate || "")))[0] || null : fits.length === 1 ? fits[0] : null;
     // Only purchase emails get a card. A return email just adds its return details to the purchase it belongs to.
     if (o) o.returnPlan = p;
   }
