@@ -12,14 +12,16 @@
 //  4. A connection started before this rule (no session kept on it) is refused at the callback.
 //  5. Outlook works the same way.
 import assert from "node:assert/strict";
+import { randomBytes } from "node:crypto";
 import { startLocalWorker } from "./local-worker.mjs";
 import { _codeAt } from "../worker/totp.js";
 import { CONSENT_VERSION } from "../worker/gmail.js";
 
 const APP = "http://127.0.0.1:9";
 const w = await startLocalWorker({ appOrigin: APP });
-Object.assign(w.env, { GOOGLE_CLIENT_ID: "local-client", GOOGLE_CLIENT_SECRET: "local-not-a-secret",
-  MICROSOFT_CLIENT_ID: "local-ms-client", MICROSOFT_CLIENT_SECRET: "local-ms-not-a-secret" });
+// (Made up at run time: nothing that looks like a key is written into the code.)
+Object.assign(w.env, { GOOGLE_CLIENT_ID: "local-client", GOOGLE_CLIENT_SECRET: randomBytes(16).toString("hex"),
+  MICROSOFT_CLIENT_ID: "local-ms-client", MICROSOFT_CLIENT_SECRET: randomBytes(16).toString("hex") });
 // Google and Microsoft stand in: the code says whose inbox it is ("code-<address>").
 let whose = null;
 const inner = globalThis.fetch;
