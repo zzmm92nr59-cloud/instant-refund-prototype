@@ -1014,6 +1014,9 @@ const TWO_PART_TLDS = new Set(["co.uk", "org.uk", "ac.uk", "gov.uk", "com.au", "
 export function logoDomain(host) {
   const h = String(host || "").toLowerCase().trim();
   if (h.length > 80 || !/^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(h) || /^[0-9.]+$/.test(h) || /(^|\.)(localhost|local|internal|test|invalid)$/.test(h)) return null;
+  // A public name only (security review L4): its last part is letters (never a number or 0x-number an address could be
+  // read as), and not a name used only inside homes and offices.
+  if (!/\.[a-z]{2,63}$/.test(h) || /(^|\.)0x[0-9a-f]+(\.|$)/.test(h) || /(^|\.)(lan|home|corp|intranet|internal|private|arpa|onion|localdomain)$/.test(h)) return null;
   const parts = h.split(".");
   const n = TWO_PART_TLDS.has(parts.slice(-2).join(".")) ? 3 : 2;
   return parts.slice(-n).join(".");
@@ -1051,13 +1054,28 @@ function logoSources(domain) {
     { url: `https://${domain}/favicon.ico` }, { url: `https://www.${domain}/favicon.ico` },
   ];
 }
+// Security review L4 (25 Nov 2026): redirects are followed by hand, at most three, and only to another https address with
+// a public name (logoDomain); and the body is read only up to a logo's size, never downloaded whole first.
+const LOGO_REDIRECTS = 3;
+async function logoGet(fetchImpl, url) {
+  for (let hop = 0; hop <= LOGO_REDIRECTS; hop++) {
+    const res = await fetchImpl(url, { headers: { Accept: "image/*" }, redirect: "manual", signal: AbortSignal.timeout(LOGO_WAIT_MS) });
+    if (res.status < 300 || res.status >= 400) return res;
+    let next = null;
+    try { next = new URL(res.headers.get("location") || "", url); } catch { return null; }
+    if (next.protocol !== "https:" || next.port || next.username || next.password || !logoDomain(next.hostname)) return null;
+    url = next.href;
+  }
+  return null;
+}
 async function fetchLogo(fetchImpl, domain) {
   for (const src of logoSources(domain)) {
     try {
-      const res = await fetchImpl(src.url, { headers: { Accept: "image/*" }, redirect: "follow", signal: AbortSignal.timeout(LOGO_WAIT_MS) });
-      if (!res.ok || (res.url && !String(res.url).startsWith("https://"))) continue;
-      const bytes = new Uint8Array(await res.arrayBuffer());
-      if (bytes.length < LOGO_MIN_BYTES || bytes.length > LOGO_MAX_BYTES) continue;
+      const res = await logoGet(fetchImpl, src.url);
+      if (!res || !res.ok || (res.url && !String(res.url).startsWith("https://"))) continue;
+      if (Number(res.headers.get("content-length")) > LOGO_MAX_BYTES) { try { await res.body?.cancel(); } catch { /* gone */ } continue; }
+      const got = await bodyUpTo(res, LOGO_MAX_BYTES + 1), bytes = got.bytes;
+      if (got.cut || bytes.length < LOGO_MIN_BYTES || bytes.length > LOGO_MAX_BYTES) continue;
       const type = logoTypeOf(bytes);
       if (!type) continue;
       if (src.minPx) { const px = imagePx(bytes); if (px == null || px < src.minPx) continue; }
@@ -1066,6 +1084,7 @@ async function fetchLogo(fetchImpl, domain) {
   }
   return null;
 }
+export const _fetchLogo = fetchLogo;   // for scripts/test-logo-fetch.mjs
 async function logoFor(env, fetchImpl, domain, now) {
   const row = await env.RELAY_DB.prepare("SELECT type, data, found, fetched_at FROM retailer_logos WHERE domain = ?").bind(domain).first();
   if (row && (row.found || (now - row.fetched_at < LOGO_RETRY_MS && row.fetched_at >= LOGO_SOURCES_SINCE))) return row.found ? row : null;

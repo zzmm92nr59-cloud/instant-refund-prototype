@@ -68,6 +68,8 @@ jobs:
         run: node scripts/test-mail-connect-session.mjs
       - name: Return emails checked for their own sender (a planted carrier or shop email makes no fact; only the carrier's scan is payable)
         run: node scripts/test-return-email-auth.mjs
+      - name: Shop logos are fetched from public https addresses only, without following redirects elsewhere, capped in size
+        run: node scripts/test-logo-fetch.mjs
       - name: Two-step sign-in (sessions from before the second step are ended; the first second step signs other devices out)
         run: node scripts/test-second-step.mjs
       - name: Public Shopify status gives counts only (no shop address, order counts or error text)

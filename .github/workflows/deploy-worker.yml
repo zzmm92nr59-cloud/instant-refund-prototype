@@ -42,6 +42,7 @@ jobs:
           node scripts/test-signin-claim.mjs
           node scripts/test-mail-connect-session.mjs
           node scripts/test-return-email-auth.mjs
+          node scripts/test-logo-fetch.mjs
           node scripts/test-shopify-status.mjs
           node scripts/test-webhook-limits.mjs
           node scripts/test-review-account.mjs
