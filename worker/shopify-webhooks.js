@@ -163,6 +163,17 @@ export async function receiveShopifyWebhook(request, env, o = {}) {
 export async function recordShopRefund(env, shop, refund, now = Date.now()) {
   const db = env.RELAY_DB, orderId = "shopify:" + shop + ":order:" + String(refund && refund.order_id || "");
   if (!/:order:\d{1,20}$/.test(orderId)) return { returns: 0, swaps: 0 };
+  // Shopify delivers a notice at least once, and again when Relay answers slowly. Each refund is counted once, by Shopify's
+  // own id for it: it is noted first, and one already noted changes nothing (a £40 refund must never show as £80).
+  const refundId = refund && refund.id != null && /^\d{1,20}$/.test(String(refund.id)) ? String(refund.id) : null;
+  if (refundId) {
+    let fresh = true;
+    try {
+      fresh = Boolean(await db.prepare(`INSERT OR IGNORE INTO audit_events (id,actor_type,actor_id,event_type,subject_type,subject_id,metadata_json) VALUES (?,?,?,?,?,?,?) RETURNING id`)
+        .bind("shopify:refund:" + shop + ":" + refundId, "system", "shopify_webhook", "shopify_refund_counted", "shopify_store", shop, "{}").first());
+    } catch (e) { console.error("refund_once_failed", String(e && e.message || e).slice(0, 120)); }
+    if (!fresh) return { returns: 0, swaps: 0, duplicate: true };
+  }
   let returns = 0, swaps = 0;
   try { await ensureReturnsTables(db); } catch { /* marking returns is skipped below if the table can't be made */ }
   const byLine = new Map();

@@ -178,7 +178,7 @@
   ["hoodie","hoodie",/hoodie|sweatshirt|\bscuba\b/,/hoodie|sweatshirt/],
   ["jacket","jacket",/jacket|\bcoat\b|raincoat|parka|puffer|gilet|anorak/,null],
   ["jumper","jumper",/jumper|sweater|cardigan|\bknit\b|roll neck/,null],
-  ["shirt","shirt",/\bshirt\b|overshirt|blouse|\bpolo\b/,/(?<!\bt[- ]?)\bshirt\b|overshirt|blouse|\bpolo\b/],
+  ["shirt","shirt",/\bshirt\b|overshirt|blouse|\bpolo\b/,/(?:^|[^\w -]|(?:^|[^t]|\wt)[ -])shirt\b|overshirt|blouse|\bpolo\b/],
   ["top","top",/\btops?\b|bodysuit|\bcami(sole)?\b/,/\btops?\b|bodysuit|\bcami(sole)?\b/],
   ["jumpsuit","jumpsuit",/jumpsuit|playsuit|dungaree|boiler ?suit/,null],
   ["dress","dress",/\bdress\b/,null],
@@ -316,8 +316,10 @@
   if(!kinds.length)return[];
   const stock=(Array.isArray(groups)?groups:[]).filter(g=>g&&g.product&&g.left!==0&&!owned.has(normal(g.store)+"|"+normal(g.product))&&!hiddenKeys.has(normal(g.key)));
   const perKind=kinds.filter(k=>k.mode==="similar").length===1?3:2;
+  // Each colour's test is built once, not again for every product looked at.
+  const colourTest=c=>[c,new RegExp("\\b"+c+"\\b")],lookTests=[...lookColours].map(colourTest);
   const pool=kinds.map(k=>{
-   const shop=[...k.shops.values()][0],many=k.shops.size>1;
+   const shop=[...k.shops.values()][0],many=k.shops.size>1,ownTests=[...k.colours].map(colourTest);
    const lead=k.looked?"Like the "+k.noun+" you've been looking at":k.mode==="similar"?(many?"Like the "+k.noun+" you buy":"Like the "+k.noun+" you bought at "+shop):"Goes with your "+k.noun+(many?"":" from "+shop);
    // A product picked as more of a kind must be that kind itself, as far as the word lists can tell: Boxer Shorts aren't
    // shorts, a Knit Jacket isn't a jumper, a Cap Sleeve T-Shirt isn't a cap.
@@ -327,14 +329,14 @@
     return !o||(o.mode==="similar"&&o.key===k.key)};
    const list=stock.filter(g=>k.want.test(normal(g.product))&&sameKind(g)).map((g,i)=>{
     let s=3;const why=[lead],text=normal(g.product+" "+(g.options||[]).join(" "));
-    const col=[...k.colours].find(c=>new RegExp("\\b"+c+"\\b").test(text));
+    const col=(ownTests.find(c=>c[1].test(text))||[])[0];
     const fit=(g.options||[]).flatMap(o=>String(o).split(/\s*[\/,|]\s*/)).find(o=>sizes.includes(normal(o)));
     if(k.better&&k.better.test(normal(g.product)))s+=1;
     if(col){s+=1;why.push("In "+col+", like yours")}
     if(fit){s+=.5;if(why.length<2)why.push("In your size, "+fit)}
     if(k.shops.has(normal(g.store))){s+=1;if(why.length<2)why.push("From "+possessiveShop(k.shops.get(normal(g.store)))+" range")}
     if(k.paid&&g.min>=k.paid*.5&&g.min<=k.paid*1.6)s+=.5;
-    if(!col&&[...lookColours].some(c=>new RegExp("\\b"+c+"\\b").test(text)))s+=.5;
+    if(!col&&lookTests.some(c=>c[1].test(text)))s+=.5;
     if(lookShops.has(normal(g.store)))s+=.5;
     s-=shopDislike.get(normal(g.store))||0;
     if((Number(seen[normal(g.key)])||Number(seen[g.key])||0)>=4)s-=1.5;

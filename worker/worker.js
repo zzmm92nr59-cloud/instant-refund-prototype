@@ -51,13 +51,16 @@ function syncShopSoon(env, shop) {
   state.done = (async () => {
     try {
       do { state.again = false; await syncAllShopify(env, { only: shop }); } while (state.again);
-      await runPriceAlerts(env);
+      // Only this shop changed: only its watched items and prices are compared.
+      await runPriceAlerts(env, { provider: "shopify:" + shop });
     } catch (e) { console.error("Shopify change sync failed", String(e && e.message || e).slice(0, 120)); }
     finally { shopSyncs.delete(shop); }
   })();
   shopSyncs.set(shop, state);
   return state.done;
 }
+// How many of one shop's variants the public catalogue lists (by name). A shop with more is named in the answer's "more".
+const SHOP_CATALOGUE_MAX = 250;
 const GMAIL_CRON = "7,22,37,52 * * * *";
 // Every minute: scans shoppers started and then left the app for are carried on until they finish.
 const SCAN_JOBS_CRON = "* * * * *";
@@ -88,25 +91,28 @@ const relayWorker = {
       return; }
     // Gmail has its own schedule (every 15 minutes) so it gets the request's limits to itself.
     if (event && event.cron === GMAIL_CRON) { ctx.waitUntil(autoScanGmail(env).then(r => console.log("auto Gmail check", JSON.stringify(r))).catch(e => console.error("auto Gmail check failed", String(e && e.message || e).slice(0, 120)))); return; }
-    ctx.waitUntil(sendReturnReminders(env).catch(() => {}));
-    ctx.waitUntil(tidyTexts(env).catch(() => {}));
+    // Every job's failure is logged by name: a job that breaks must show in the logs, not just stop quietly.
+    const failed = (name) => (e) => console.error(name + " failed", String(e && e.message || e).slice(0, 120));
+    ctx.waitUntil(sendReturnReminders(env).catch(failed("return reminders")));
+    ctx.waitUntil(tidyTexts(env).catch(failed("tidying text-message records")));
     // Emails shoppers sent to Relay are deleted after 30 days.
-    ctx.waitUntil(tidySharedEmails(env).catch(() => {}));
+    ctx.waitUntil(tidySharedEmails(env).catch(failed("deleting old shared emails")));
     // AI help: a few receipts the rules weren't sure about, for shoppers who haven't switched it off (off until the AI key is set).
     ctx.waitUntil(runAiReads(env).then(r => { if (r.read || r.failed || r.stopped) console.log("AI reads", JSON.stringify(r)); })
       .catch(e => console.error("AI reads failed", String(e && e.message || e).slice(0, 120))));
     // Relay health by email: the admins' morning summary (from 8am UK time) and alerts when something breaks.
     ctx.waitUntil(runHealthEmails(env).then(r => { if (r.sent) console.log("health emails", JSON.stringify(r)); }).catch(e => console.error("health emails failed", String(e && e.message || e).slice(0, 120))));
     // Shops that removed Relay over 30 days ago and that Shopify's erase request missed (Shopify API terms 6.2.3).
-    ctx.waitUntil(eraseRemovedShops(env).then(r => { if (r.erased) console.log("removed shops erased", JSON.stringify(r)); }).catch(() => {}));
+    ctx.waitUntil(eraseRemovedShops(env).then(r => { if (r.erased) console.log("removed shops erased", JSON.stringify(r)); }).catch(failed("erasing removed shops")));
     // Catalogues are refreshed first so price alerts compare against the newest prices.
+    const syncNames = ["Square orders and refunds", "Square catalogue", "Shopify catalogues", "Awin feeds"];
     const syncs = Promise.allSettled([
       importHistoricalSquareOrders(env).then(() => syncSquareRefunds(env)).then(r => console.log("Square refunds checked", JSON.stringify(r))),
       syncSquareCatalogue(env),
       syncAllShopify(env),
       syncAwinFeeds(env)
-    ]);
-    ctx.waitUntil(syncs.then(() => runPriceAlerts(env)).catch(() => {}));
+    ]).then(results => results.forEach((r, i) => { if (r.status === "rejected") failed(syncNames[i])(r.reason); }));
+    ctx.waitUntil(syncs.then(() => runPriceAlerts(env)).catch(failed("price alerts")));
   },
   async relayFetch(request, env, ctx) {
     const corsHeaders = {
@@ -331,32 +337,50 @@ const relayWorker = {
       if (!env.RELAY_DB)
         return Response.json({error:"database_unavailable"},{status:503,headers:corsHeaders});
       try {
-        const products = [];
+        // The same answer for everyone, and it changes at most when a shop does: Cloudflare keeps it for a minute, so
+        // opening Browse doesn't rebuild it from the database every time.
+        const edge = typeof caches !== "undefined" && caches.default ? caches.default : null;
+        const cacheKey = new Request(url.origin + url.pathname + (url.searchParams.get("test") === "1" ? "?test=1" : ""));
+        if (edge) { const hit = await edge.match(cacheKey).catch(() => null); if (hit) return hit; }
+        const products = [], more = [];
         await ensureImageTable(env.RELAY_DB);
-        for (const store of stores) {
-          const rows = await env.RELAY_DB.prepare(`SELECT i.title AS product,v.title AS variation,COALESCE(i.image_url,img.image_url) AS imageUrl,
+        // Every shop in one query (one per 90 shops), not one query a shop. Each shop shows its first SHOP_CATALOGUE_MAX
+        // variants by name; a shop with more is named in "more", so nothing is cut without saying.
+        const byProvider = new Map();
+        for (let i = 0; i < stores.length; i += 90) {
+          const part = stores.slice(i, i + 90).map(st => "shopify:" + st.domain);
+          const rows = await env.RELAY_DB.prepare(`SELECT * FROM (SELECT g.*, ROW_NUMBER() OVER (PARTITION BY g.provider ORDER BY g.product, g.variation) AS rn FROM (
+            SELECT i.provider AS provider,i.title AS product,v.title AS variation,COALESCE(i.image_url,img.image_url) AS imageUrl,
             v.id AS catalogueId,v.sku AS retailerSku,v.price_minor AS priceMinor,
             v.currency,MAX(s.quantity) AS quantity,MAX(s.observed_at) AS observedAt
             FROM retailer_catalog_items i
             JOIN retailer_catalog_variants v ON v.item_id=i.id
             LEFT JOIN retailer_item_images img ON img.item_id=i.id
             LEFT JOIN retailer_inventory_snapshots s ON s.variant_id=v.id
-            WHERE i.provider=? AND v.price_minor IS NOT NULL
+            WHERE i.provider IN (${part.map(() => "?").join(",")}) AND v.price_minor IS NOT NULL
               AND v.currency='GBP'
-            GROUP BY i.id,v.id ORDER BY i.title,v.title LIMIT 250`)
-            .bind("shopify:" + store.domain).all();
+            GROUP BY i.id,v.id) g) WHERE rn <= ${SHOP_CATALOGUE_MAX + 1} ORDER BY provider, rn`)
+            .bind(...part).all();
+          for (const row of rows.results || []) { const l = byProvider.get(row.provider) || []; l.push(row); byProvider.set(row.provider, l); }
+        }
+        for (const store of stores) {
+          let rows = byProvider.get("shopify:" + store.domain) || [];
+          if (rows.length > SHOP_CATALOGUE_MAX) { rows = rows.slice(0, SHOP_CATALOGUE_MAX); more.push(store.domain); }
           // The kind of shop it is, as Relay already sorts shops (interests.js shopCategory): Browse puts shops matching a
           // shopper's interests first. null when Relay can't tell; never guessed.
-          const shopCat = shopCategory(store, (rows.results || []).map(r => r.product));
-          for (const row of rows.results || []) {
+          const shopCat = shopCategory(store, rows.map(r => r.product));
+          for (const { provider: _p, rn: _n, ...row } of rows) {
             products.push({...row, sku:row.catalogueId, provider:"shopify",
               storeName:store.label,shopDomain:store.domain,shopCategory:shopCat,inventoryScope:"shop_aggregate",...(store.test ? {testShop:true} : {}),
               ...(store.test && store.canOrder ? {testOrders:true} : {})});
           }
         }
-        return Response.json({products,published:true,publishedStoreCount:stores.length,
-          stockIsSnapshot:true,exchangeOrdersSupported:false},
-          {headers:{...corsHeaders,"Cache-Control":"no-store"}});
+        if (more.length) console.log("Shopify catalogue: more than " + SHOP_CATALOGUE_MAX + " variants at", more.join(", ").slice(0, 300));
+        const answer = Response.json({products,published:true,publishedStoreCount:stores.length,
+          stockIsSnapshot:true,exchangeOrdersSupported:false,...(more.length ? {more} : {})},
+          {headers:{...corsHeaders,"Cache-Control":"public, max-age=60"}});
+        if (edge) { try { ctx.waitUntil(edge.put(cacheKey, answer.clone())); } catch { /* not cached this time */ } }
+        return answer;
       } catch(e) {
         console.error("Shopify public catalogue query failed", String(e.message || e));
         return Response.json({error:"catalogue_unavailable"},

@@ -108,6 +108,14 @@ assert.deepEqual([row.status, row.carrier], ["requested", null]);
 r = await call(alice, "POST", "/relay/my/return", { orderId: recent, lineId: "L1" });
 assert.equal(r.status, 409); assert.equal(r.body.error, "already_returned");
 assert.equal((await call(alice, "GET", "/relay/my/returns")).body.returns.length, 1);
+// Two taps at the same moment (both pass the "no return yet" check before either saves): still one return (review RT-1).
+{
+  const twice = order(190, alice, new Date(Date.now() - 2 * 864e5).toISOString());
+  const both = await Promise.all([call(alice, "POST", "/relay/my/return", { orderId: twice, lineId: "L1" }), call(alice, "POST", "/relay/my/return", { orderId: twice, lineId: "L1" })]);
+  assert.deepEqual(both.map(x => x.status).sort(), [200, 409], "one is taken, the other is told there's already a return");
+  assert.equal(sqlite.prepare("SELECT COUNT(*) AS n FROM relay_returns WHERE order_id = ?").get(twice).n, 1);
+  assert.equal(sqlite.prepare("SELECT COUNT(*) AS n FROM sqlite_master WHERE name = 'idx_relay_returns_one'").get().n, 1, "and the database itself holds it to one");
+}
 assert.equal((await call(bob, "GET", "/relay/my/returns")).body.returns.length, 0);
 
 // Telling the shop. Shopify and the email service are stand-ins; nothing is sent.

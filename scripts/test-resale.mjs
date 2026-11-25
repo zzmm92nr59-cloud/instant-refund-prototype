@@ -126,6 +126,10 @@ assert.equal((await get(`/relay/my/resale/listings/${L2}/image`, bob)).status, 4
   const LP = (await ok.json()).id;
   const lp = (await (await get("/relay/my/resale/feed", bob)).json()).listings.find(l => l.id === LP);
   assert.equal(lp.photos, 2); assert.equal(lp.hasImage, true, "a multi-item order gets a picture from the seller's own photo");
+  // Download my data has the seller's own photos on their listing (review X-1), and nobody else's.
+  const mine = (await (await get("/relay/my/export", alice)).json()).swapAndSell.listings.find(l => l.id === LP);
+  assert.deepEqual(mine.photos, [JPG, JPG], "the listing's own photos, as they were added");
+  assert.ok(!JSON.stringify((await (await get("/relay/my/export", bob)).json()).swapAndSell.listings).includes(JPG.slice(0, 60)), "not in another member's file");
   const first = await get(`/relay/my/resale/listings/${LP}/image`, bob);
   assert.equal(first.status, 200); assert.equal(first.headers.get("content-type"), "image/jpeg", "the seller's photo comes first");
   assert.equal((await get(`/relay/my/resale/listings/${LP}/photos/2`, bob)).status, 200);
@@ -230,5 +234,40 @@ assert.equal(sqlite.prepare("SELECT COUNT(*) n FROM resale_messages WHERE reques
   assert.equal(sqlite.prepare("SELECT status FROM resale_listings WHERE id = ?").get(hat).status, "matched");
   assert.equal((await post("/relay/my/delete", alice)).status, 200);
   assert.equal(sqlite.prepare("SELECT status FROM resale_listings WHERE id = ?").get(hat).status, "active", "back on sale when the buyer it was matched with deletes their account");
+}
+// A member who lost out to another member can ask again once that match falls through and the item is back on sale
+// (review R-2: the old request used to block them for ever with "already asked"). A request the seller declined stays answered.
+{
+  const C2 = "66666666-6666-4666-8666-666666666666";
+  seed("carol@example.com", C2, { kind: "receipt", retailer: { name: "Example Outfitters" }, orderRef: "EO-8", currency: "GBP", items: [{ name: "Wool scarf", qty: 1, pricePence: 3000 }], parserVersion: 5 });
+  const scarf = (await (await post("/relay/my/resale/listings", carol, { receiptId: C2, itemIndex: 0, condition: "good", agree: true })).json()).id;
+  const dan = await signIn("dan@example.com"), eve = await signIn("eve@example.com"), fay = await signIn("fay@example.com");
+  for (const t of [dan, eve, fay]) assert.equal((await ask(t, scarf, { kind: "buy" })).status, 200);
+  const reqOf = (email) => sqlite.prepare("SELECT id, status, outcome FROM resale_requests WHERE listing_id = ? AND asker_id = ?").get(scarf, idOf(email));
+  assert.equal((await post(`/relay/my/resale/requests/${reqOf("fay@example.com").id}/decline`, carol)).status, 200);
+  assert.equal((await post(`/relay/my/resale/requests/${reqOf("dan@example.com").id}/accept`, carol)).status, 200);
+  assert.deepEqual([reqOf("eve@example.com").status, reqOf("eve@example.com").outcome], ["declined", "other"]);
+  assert.equal((await ask(eve, scarf, { kind: "buy" })).status, 404, "while it's matched with someone else it isn't on sale");
+  assert.equal((await post(`/relay/my/resale/requests/${reqOf("dan@example.com").id}/end`, dan, {})).status, 200);
+  assert.equal(sqlite.prepare("SELECT status FROM resale_listings WHERE id = ?").get(scarf).status, "active", "back on sale");
+  assert.equal((await ask(eve, scarf, { kind: "buy", message: "Still keen" })).status, 200, "she can ask again");
+  assert.deepEqual([reqOf("eve@example.com").status, reqOf("eve@example.com").outcome], ["pending", null]);
+  const yours = (await (await get("/relay/my/resale/mine", carol)).json()).listings.find(l => l.id === scarf);
+  assert.ok(yours.requests.some(r => r.status === "pending" && r.message === "Still keen" && r.new), "and the seller sees it as a new request");
+  assert.equal((await ask(fay, scarf, { kind: "buy" })).status, 409, "a request the seller declined stays declined");
+  // Yours comes from a fixed number of database queries, however many listings and requests there are (review R-4).
+  let queries = 0; const prepare = db.prepare; db.prepare = (sql) => { queries++; return prepare(sql); };
+  await get("/relay/my/resale/mine", carol);
+  const forTwo = queries;
+  const C3 = "77777777-7777-4777-8777-777777777777";
+  seed("carol@example.com", C3, { kind: "receipt", retailer: { name: "Example Outfitters" }, orderRef: "EO-9", currency: "GBP", items: [{ name: "Wool gloves", qty: 1, pricePence: 1500 }], parserVersion: 5 });
+  db.prepare = prepare;
+  const gloves = (await (await post("/relay/my/resale/listings", carol, { receiptId: C3, itemIndex: 0, condition: "good", agree: true })).json()).id;
+  for (const t of [dan, eve, fay]) assert.equal((await ask(t, gloves, { kind: "buy" })).status, 200);
+  queries = 0; db.prepare = (sql) => { queries++; return prepare(sql); };
+  await get("/relay/my/resale/mine", carol);
+  db.prepare = prepare;
+  assert.equal(queries, forTwo, "one more listing with three more requests costs no more queries");
+  console.log("ok - a member who lost out can ask again when the item is back on sale; Yours takes the same few queries however much there is");
 }
 console.log("PASS resale v1 + messages: ownership, receipt-sourced titles, privacy of sellers and askers, photos, requests, matching, withdrawal, deletion");

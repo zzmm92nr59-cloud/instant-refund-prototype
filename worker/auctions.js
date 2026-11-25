@@ -77,10 +77,16 @@ export const AUCTION_SQL = [
   "CREATE INDEX IF NOT EXISTS idx_auction_offers_auction ON auction_offers(auction_id, rank)",
   "CREATE INDEX IF NOT EXISTS idx_auction_offers_shopper ON auction_offers(shopper_id)",
   "CREATE TABLE IF NOT EXISTS auction_photos (auction_id TEXT NOT NULL, n INTEGER NOT NULL, type TEXT NOT NULL, data TEXT NOT NULL, PRIMARY KEY (auction_id, n))",
-  "CREATE TABLE IF NOT EXISTS auction_strikes (shopper_id TEXT NOT NULL, auction_id TEXT NOT NULL, at INTEGER NOT NULL, PRIMARY KEY (shopper_id, auction_id))"
+  "CREATE TABLE IF NOT EXISTS auction_strikes (shopper_id TEXT NOT NULL, auction_id TEXT NOT NULL, at INTEGER NOT NULL, PRIMARY KEY (shopper_id, auction_id))",
+  "CREATE INDEX IF NOT EXISTS idx_auctions_outcome ON auctions(status, outcome)"
 ];
+// One offer per place in the queue per auction: two runs at once can never both offer the same auction to someone.
+const OFFER_ONCE_SQL = "CREATE UNIQUE INDEX IF NOT EXISTS idx_auction_offers_once ON auction_offers(auction_id, rank)";
 export function ensureAuctionTables(db) {
-  return ensureOnce(db, "auctions", async () => { for (const sql of AUCTION_SQL) await db.prepare(sql).run(); });
+  return ensureOnce(db, "auctions", async () => {
+    for (const sql of AUCTION_SQL) await db.prepare(sql).run();
+    try { await db.prepare(OFFER_ONCE_SQL).run(); } catch (e) { console.error("auction_offer_index_failed", String(e && e.message || e).slice(0, 120)); }
+  });
 }
 
 // ---- Prices ----
@@ -155,7 +161,12 @@ export async function placeBid(env, shopper, auctionId, max, o = {}) {
   // Two bids at the same moment: each works out the standing from every maximum and saves it only if nothing changed in
   // between (the version), otherwise it reads again. So no bid is ever lost. (The maximum itself is already saved, so even
   // if the auction stays busy, the end of the auction counts it.)
-  let s = null;
+  // If the auction ended while this bid was being saved, the maximum goes back to what it was: a bid that wasn't taken must
+  // never count later, when the item is offered to the next bidder.
+  const undo = () => (mine
+    ? db.prepare("UPDATE auction_bidders SET max_minor = ? WHERE auction_id = ? AND shopper_id = ? AND max_minor = ? AND raised_at = ?").bind(mine.max_minor, auctionId, shopper.id, max, now).run()
+    : db.prepare("DELETE FROM auction_bidders WHERE auction_id = ? AND shopper_id = ? AND max_minor = ? AND raised_at = ?").bind(auctionId, shopper.id, max, now).run()).catch(() => {});
+  let s = null, saved = false;
   for (let tries = 0; tries < 6; tries++) {
     s = standing(await bidders(db, auctionId), a.start_minor);
     // The leader raising their own maximum never moves the price (even out of a tie): only someone else's bid does.
@@ -163,10 +174,12 @@ export async function placeBid(env, shopper, auctionId, max, o = {}) {
     const ends = a.ends_at - now < EXTEND_MS ? now + EXTEND_MS : a.ends_at;
     const done = await db.prepare(`UPDATE auctions SET price_minor = ?, leader_id = ?, bids = bids + 1, ends_at = ?, version = version + 1
       WHERE id = ? AND version = ? AND status = 'live' RETURNING *`).bind(s.price, s.leader, ends, auctionId, a.version).first();
-    if (done) { a = done; break; }
+    if (done) { a = done; saved = true; break; }
     a = await db.prepare("SELECT * FROM auctions WHERE id = ?").bind(auctionId).first();
-    if (!a || a.status !== "live") return [409, { error: "auction_ended" }];
+    if (!a || a.status !== "live") { await undo(); return [409, { error: "auction_ended" }]; }
   }
+  // Too many bids at the same moment to save this one: say so, rather than say it was placed when the price never moved.
+  if (!saved) { await undo(); return [409, { error: "try_again" }]; }
   if (was && was !== s.leader && was !== shopper.id)
     await tell(env, was, { title: "You've been outbid", body: a.title + " is now " + pounds(s.price) + ". Bid again before it ends.", url: "./#open=auction&id=" + a.id }, null, o);
   return [200, { auction: publicAuction({ ...a, price_minor: s.price, leader_id: s.leader }, now), you: { maxMinor: max, leading: s.leader === shopper.id } }];
@@ -198,8 +211,13 @@ const byWhen = (t) => new Date(t).toLocaleString("en-GB", { weekday: "short", da
 
 // ---- The shop's Shopify ----
 async function gql(shop, token, query, variables, f) {
-  const r = await f("https://" + shop + "/admin/api/" + API_VERSION + "/graphql.json", { method: "POST", signal: AbortSignal.timeout(20000),
-    headers: { "X-Shopify-Access-Token": token, "content-type": "application/json" }, body: JSON.stringify({ query, variables }) });
+  // A call that never got an answer (the network, a timeout) is "couldn't ask": Relay doesn't know what Shopify did, so it
+  // is tried again, never treated as the shop saying no.
+  let r;
+  try {
+    r = await f("https://" + shop + "/admin/api/" + API_VERSION + "/graphql.json", { method: "POST", signal: AbortSignal.timeout(20000),
+      headers: { "X-Shopify-Access-Token": token, "content-type": "application/json" }, body: JSON.stringify({ query, variables }) });
+  } catch { throw Object.assign(new Error("shop_unreachable"), { retry: true }); }
   if (r.status === 429 || r.status >= 500) { await r.text().catch(() => ""); throw Object.assign(new Error("shop_busy"), { retry: true }); }
   const j = await r.json().catch(() => ({}));
   if (!r.ok || (j.errors && j.errors.length)) throw Object.assign(new Error("shop_refused"), { retry: false, detail: String((j.errors && j.errors[0] && j.errors[0].message) || r.status).slice(0, 160) });
@@ -209,6 +227,11 @@ const ORDER_CREATE = `mutation RelayAuctionOrder($order: OrderCreateOrderInput!,
   orderCreate(order: $order, options: $options) {
     order { id legacyResourceId name paymentCollectionDetails { additionalPaymentCollectionUrl } }
     userErrors { field message } } }`;
+// The order Relay made for one offer, found by the tag only that offer's order carries (offerTag). Asked before an order is
+// made a second time, so a first try whose answer never arrived can't leave the winner with two orders.
+const ORDER_FIND = `query RelayAuctionFind($q: String!) { orders(first: 1, query: $q) { nodes { id legacyResourceId name cancelledAt
+  paymentCollectionDetails { additionalPaymentCollectionUrl } } } }`;
+export const offerTag = (offerId) => "relay-" + String(offerId).replace(/-/g, ""); // 38 characters: Shopify's tags stop at 40
 const ORDER_STATE = `query RelayAuctionPaid($id: ID!) { order(id: $id) { displayFinancialStatus cancelledAt paymentCollectionDetails { additionalPaymentCollectionUrl } } }`;
 const ORDER_CANCEL = `mutation RelayAuctionCancel($orderId: ID!, $note: String) {
   orderCancel(orderId: $orderId, reason: CUSTOMER, restock: true, notifyCustomer: false, staffNote: $note) { orderCancelUserErrors { field message } } }`;
@@ -224,7 +247,7 @@ export function orderInput(a, offer, email, d) {
     : { title: a.title + (a.size ? ", size " + a.size : ""), quantity: 1, priceSet: money(offer.price_minor), requiresShipping: true, taxable: true };
   return {
     order: {
-      email, currency: "GBP", financialStatus: "PENDING", taxesIncluded: true, tags: ["relay-auction"],
+      email, currency: "GBP", financialStatus: "PENDING", taxesIncluded: true, tags: ["relay-auction", ...(offer.id ? [offerTag(offer.id)] : [])],
       ...(a.test_shop ? { test: true } : {}),
       note: "Won in a Relay auction for " + pounds(offer.price_minor) + (a.delivery_minor ? " plus " + pounds(a.delivery_minor) + " delivery" : " with free delivery") +
         ". Not paid yet: send it once it's paid. Condition: " + (CONDITIONS[a.condition] || a.condition) + ".",
@@ -253,7 +276,18 @@ async function isTestShop(db, domain) {
   return Boolean(plan && Number(plan.test_shop) === 1);
 }
 
+async function planKnown(db, domain) {
+  await ensureShopPlanTable(db);
+  return Boolean(await db.prepare("SELECT 1 AS x FROM shopify_shop_plan WHERE domain = ?").bind(domain).first().catch(() => null));
+}
+
 // ---- After an auction ends ----
+// How long Relay keeps asking a shop it can't reach whether a win was paid, after the time to pay has passed, before it
+// stops and leaves it to Relay's team. Nobody is told they didn't pay, and nothing is cancelled, on a question never answered.
+export const UNKNOWN_GRACE = 6 * HOUR;
+// An order being made is held by one run for this long: a call to Shopify takes 20 seconds at most.
+const CLAIM_FOR = 2 * MINUTE;
+const clock = (o) => o.now || Date.now();
 // Offers the item to the best bidder who hasn't been offered it yet, at what they'd pay against the bidders left. After the
 // winner and two more, an auction nobody paid for ends unsold (by then the price is days old).
 async function offerNext(env, a, now, o) {
@@ -268,14 +302,18 @@ async function offerNext(env, a, now, o) {
   const first = !tried.size && a.leader_id && a.price_minor != null && left.some(b => b.shopperId === a.leader_id);
   const s = first ? { leader: a.leader_id, price: a.price_minor } : standing(left, a.start_minor);
   const offer = { id: crypto.randomUUID(), auction_id: a.id, shopper_id: s.leader, rank: tried.size + 1, price_minor: s.price, status: "pending", offered_at: now, pay_by: now + PAY_HOURS * HOUR };
-  await db.prepare(`INSERT INTO auction_offers (id, auction_id, shopper_id, rank, price_minor, status, offered_at, pay_by) VALUES (?,?,?,?,?,?,?,?)`)
-    .bind(offer.id, a.id, offer.shopper_id, offer.rank, offer.price_minor, "pending", now, offer.pay_by).run();
+  // The offer is saved already held by this run (checked_at), so another run starting meanwhile leaves its order alone; and
+  // only one offer can exist for each place in the queue, so two runs can't both offer the same auction.
+  const put = await db.prepare(`INSERT OR IGNORE INTO auction_offers (id, auction_id, shopper_id, rank, price_minor, status, offered_at, pay_by, checked_at) VALUES (?,?,?,?,?,?,?,?,?)`)
+    .bind(offer.id, a.id, offer.shopper_id, offer.rank, offer.price_minor, "pending", now, offer.pay_by, clock(o)).run();
+  if (put && put.meta && put.meta.changes === 0) return null;
   await db.prepare("UPDATE auctions SET outcome = 'awaiting_payment' WHERE id = ?").bind(a.id).run();
   await makeOrder(env, a, offer, now, o);
   return offer;
 }
-// Makes the winner's order in the shop's Shopify, then tells them. A busy shop is tried again for a while; a refusal
-// (sold out, the shop took away Relay's permission) ends it, and the winner is told there's nothing to pay.
+// Makes the winner's order in the shop's Shopify, then tells them. The caller holds the offer (checked_at) before this
+// runs. A shop that's busy or can't be reached is tried again for a while; a refusal (sold out, the shop took away Relay's
+// permission) ends it, and the winner is told there's nothing to pay.
 async function makeOrder(env, a, offer, now, o) {
   const db = env.RELAY_DB, f = o.fetchImpl || ((...x) => fetch(...x));
   const first = offer.rank === 1;
@@ -291,31 +329,45 @@ async function makeOrder(env, a, offer, now, o) {
   }
   const who = await db.prepare("SELECT email FROM shoppers WHERE id = ?").bind(offer.shopper_id).first();
   const store = a.provider === "shopify" ? await shopStore(env, a.shop_ref, o) : null;
+  // Relay asked for this order before and never learned what happened: the shop may have made it.
+  const triedBefore = offer.detail === "order_tried";
   let fail = null, made = null;
   if (!who) fail = "no_account";
   else if (!store || !store.token) fail = "shop_unavailable";
   else if (!(await canOrder(db, a.shop_ref))) fail = "no_permission";
   else {
     try {
-      const out = (await gql(a.shop_ref, store.token, ORDER_CREATE, orderInput(a, offer, who.email, d), f)).orderCreate;
-      if (!out || (out.userErrors && out.userErrors.length) || !out.order) fail = "shop_refused:" + String((out && out.userErrors && out.userErrors[0] && out.userErrors[0].message) || "").slice(0, 120);
-      else made = out.order;
-    } catch (e) { fail = e.retry ? "busy" : "shop_refused:" + (e.detail || ""); }
+      if (triedBefore) {
+        const found = (((await gql(a.shop_ref, store.token, ORDER_FIND, { q: "tag:" + offerTag(offer.id) }, f)).orders || {}).nodes || [])[0];
+        if (found && found.cancelledAt) fail = "shop_refused:cancelled_by_shop";
+        else if (found) made = found;
+      }
+      if (!made && !fail) {
+        await db.prepare("UPDATE auction_offers SET detail = 'order_tried' WHERE id = ?").bind(offer.id).run();
+        const out = (await gql(a.shop_ref, store.token, ORDER_CREATE, orderInput(a, offer, who.email, d), f)).orderCreate;
+        if (!out || (out.userErrors && out.userErrors.length) || !out.order) fail = "shop_refused:" + String((out && out.userErrors && out.userErrors[0] && out.userErrors[0].message) || "").slice(0, 120);
+        else made = out.order;
+      }
+    } catch (e) { fail = e && e.retry === false ? "shop_refused:" + (e.detail || "") : "busy"; }
   }
   if (fail === "busy" || fail === "shop_unavailable") {
-    if (now - offer.offered_at < RETRY_FOR) { await db.prepare("UPDATE auction_offers SET status = 'pending', checked_at = ? WHERE id = ?").bind(now, offer.id).run(); return; }
+    if (now - offer.offered_at < RETRY_FOR) { await db.prepare("UPDATE auction_offers SET status = 'pending', checked_at = ? WHERE id = ?").bind(clock(o), offer.id).run(); return; }
+    // Given up on a shop that never answered: if an order was asked for, Relay's team is told it may exist at the shop.
+    if (triedBefore || fail === "busy") console.error("auction_order_unknown", a.id, offerTag(offer.id));
   }
   if (fail) {
     console.error("auction_order_failed", a.id, fail.slice(0, 160));
-    await db.prepare("UPDATE auction_offers SET status = 'shop_problem', settled_at = ?, detail = ? WHERE id = ?").bind(now, fail.slice(0, 200), offer.id).run();
+    const ended = await db.prepare("UPDATE auction_offers SET status = 'shop_problem', settled_at = ?, detail = ? WHERE id = ? AND status IN ('pending','needs_address') RETURNING id").bind(now, fail.slice(0, 200), offer.id).first();
+    if (!ended) return;
     await db.prepare("UPDATE auctions SET outcome = 'shop_problem' WHERE id = ?").bind(a.id).run();
     await tell(env, offer.shopper_id, { title: a.store_label + " couldn't take the order", body: "There's nothing to pay for " + a.title + ". The shop couldn't take the order, so the auction has ended without a sale.", url: "./#open=auction&id=" + a.id },
       { id: a.id, subject: "Nothing to pay: " + a.title, text: a.store_label + " couldn't take the order for " + a.title + " (it may have sold out), so there's nothing to pay. The auction has ended without a sale." }, o);
     return;
   }
   const url = payLink(made.paymentCollectionDetails && made.paymentCollectionDetails.additionalPaymentCollectionUrl);
-  await db.prepare("UPDATE auction_offers SET status = 'awaiting_payment', order_gid = ?, order_name = ?, pay_url = ?, checked_at = ? WHERE id = ?")
-    .bind(String(made.id), String(made.name || "").slice(0, 40) || null, url, now, offer.id).run();
+  const set = await db.prepare("UPDATE auction_offers SET status = 'awaiting_payment', order_gid = ?, order_name = ?, pay_url = ?, checked_at = ?, detail = NULL WHERE id = ? AND status IN ('pending','needs_address') RETURNING id")
+    .bind(String(made.id), String(made.name || "").slice(0, 40) || null, url, clock(o), offer.id).first();
+  if (!set) return;
   const total = offer.price_minor + a.delivery_minor;
   const what = first ? "You won " + a.title + " for " + pounds(offer.price_minor) + "." : "The winner didn't pay, so " + a.title + " can be yours for " + pounds(offer.price_minor) + ".";
   await tell(env, offer.shopper_id, { title: first ? "You won!" : "It can be yours", body: what + " Pay " + a.store_label + " " + pounds(total) + " by " + byWhen(offer.pay_by) + ".", url: "./#open=auction&id=" + a.id },
@@ -323,58 +375,95 @@ async function makeOrder(env, a, offer, now, o) {
       " by " + byWhen(offer.pay_by) + " at their own checkout. Open Relay to pay." + (first ? " If it isn't paid by then, it goes to the next bidder." : "") }, o);
 }
 
+let lastTidy = 0;
 // Every minute (worker.js): ends auctions that are due, makes winners' orders, notices payments, and moves an unpaid item on.
+// Two runs can overlap (a slow shop keeps one going past the next minute), so every step takes hold of its row in the
+// database before it asks a shop anything, and one auction failing never stops the others.
 export async function runAuctions(env, o = {}) {
   const db = env.RELAY_DB, now = o.now || Date.now(), f = o.fetchImpl || ((...x) => fetch(...x));
   if (!db) return { ended: 0 };
   await ensureAuctionTables(db);
   const out = { ended: 0, offered: 0, paid: 0, expired: 0 };
+  const each = async (step, rows, fn) => {
+    for (const row of rows) { try { await fn(row); } catch (e) { console.error("auction_step_failed", step, row.id, String(e && e.message || e).slice(0, 120)); } }
+  };
+  const all = async (sql, ...args) => ((await db.prepare(sql).bind(...args).all()).results || []);
   // 1. Due auctions: each is claimed first, so it's only ever ended once.
-  for (const row of ((await db.prepare("SELECT id FROM auctions WHERE status = 'live' AND ends_at <= ? ORDER BY ends_at LIMIT 20").bind(now).all()).results || [])) {
+  await each("end", await all("SELECT id FROM auctions WHERE status = 'live' AND ends_at <= ? ORDER BY ends_at LIMIT 20", now), async (row) => {
     const a = await db.prepare("UPDATE auctions SET status = 'ended', ended_at = ? WHERE id = ? AND status = 'live' AND ends_at <= ? RETURNING *").bind(now, row.id, now).first();
-    if (!a) continue;
+    if (!a) return;
     out.ended++;
     if (await offerNext(env, a, now, o)) out.offered++;
-  }
-  // 2. Orders still to make: the shop was busy, or the winner had no delivery details and has added them since.
-  for (const offer of ((await db.prepare("SELECT * FROM auction_offers WHERE status IN ('pending','needs_address') AND pay_by > ? AND (checked_at IS NULL OR checked_at < ?) LIMIT 10").bind(now, now - 2 * MINUTE).all()).results || [])) {
+  });
+  // 1b. Auctions that ended but were never offered to anyone (the run that ended them was cut short), or whose last offer
+  // lapsed without the next bidder being asked: picked up again here.
+  await each("resume", await all(`SELECT a.* FROM auctions a WHERE a.status = 'ended' AND (a.outcome IS NULL OR a.outcome = 'awaiting_payment') AND a.ended_at < ?
+      AND NOT EXISTS (SELECT 1 FROM auction_offers x WHERE x.auction_id = a.id AND (x.status IN ('pending','needs_address','awaiting_payment') OR x.settled_at > ?)) LIMIT 10`, now - 2 * MINUTE, now - 2 * MINUTE), async (a) => {
+    if (await offerNext(env, a, now, o)) out.offered++;
+  });
+  // 2. Orders still to make: the shop was busy, or the winner had no delivery details and has added them since. Each is
+  // taken hold of first (checked_at), so two runs never ask the shop for the same order.
+  await each("order", await all("SELECT id FROM auction_offers WHERE status IN ('pending','needs_address') AND pay_by > ? AND (checked_at IS NULL OR checked_at < ?) LIMIT 10", now, now - CLAIM_FOR), async (row) => {
+    const at = clock(o);
+    const offer = await db.prepare("UPDATE auction_offers SET checked_at = ? WHERE id = ? AND status IN ('pending','needs_address') AND (checked_at IS NULL OR checked_at < ?) RETURNING *").bind(at, row.id, at - CLAIM_FOR).first();
+    if (!offer) return;
     const a = await db.prepare("SELECT * FROM auctions WHERE id = ?").bind(offer.auction_id).first();
-    if (!a) continue;
-    if (offer.status === "needs_address") await db.prepare("UPDATE auction_offers SET checked_at = ? WHERE id = ?").bind(now, offer.id).run();
-    await makeOrder(env, a, offer, now, o);
-  }
+    if (a) await makeOrder(env, a, offer, now, o);
+  });
   // 3. Waiting for payment: asks Shopify every few minutes whether it's been paid (or the shop cancelled it).
-  for (const offer of ((await db.prepare("SELECT * FROM auction_offers WHERE status = 'awaiting_payment' AND (checked_at IS NULL OR checked_at < ? OR pay_by <= ?) ORDER BY checked_at LIMIT 15").bind(now - 4 * MINUTE, now).all()).results || [])) {
+  await each("paid", await all("SELECT * FROM auction_offers WHERE status = 'awaiting_payment' AND (checked_at IS NULL OR checked_at < ? OR pay_by <= ?) ORDER BY checked_at LIMIT 15", now - 4 * MINUTE, now), async (offer) => {
     const a = await db.prepare("SELECT * FROM auctions WHERE id = ?").bind(offer.auction_id).first();
-    if (!a) continue;
+    if (!a) return;
     const st = await orderState(env, a, offer, o, f);
+    // Each ending is taken once (the status), so a second run at the same moment neither tells the winner again nor undoes it.
+    const settle = (status, detail) => db.prepare("UPDATE auction_offers SET status = ?, settled_at = ?, checked_at = ?, detail = ? WHERE id = ? AND status = 'awaiting_payment' RETURNING id")
+      .bind(status, now, clock(o), detail, offer.id).first();
     if (st && st.paid) {
-      await db.prepare("UPDATE auction_offers SET status = 'paid', settled_at = ?, checked_at = ? WHERE id = ?").bind(now, now, offer.id).run();
+      if (!(await settle("paid", null))) return;
       await db.prepare("UPDATE auctions SET outcome = 'sold' WHERE id = ?").bind(a.id).run();
       out.paid++;
       await tell(env, offer.shopper_id, { title: "Paid", body: a.store_label + " has your payment for " + a.title + " and will send it to you.", url: "./#open=auction&id=" + a.id }, null, o);
-      continue;
+      return;
     }
     if (st && st.cancelled) {
-      await db.prepare("UPDATE auction_offers SET status = 'shop_problem', settled_at = ?, detail = 'cancelled_by_shop' WHERE id = ?").bind(now, offer.id).run();
+      if (!(await settle("shop_problem", "cancelled_by_shop"))) return;
       await db.prepare("UPDATE auctions SET outcome = 'shop_problem' WHERE id = ?").bind(a.id).run();
       await tell(env, offer.shopper_id, { title: a.store_label + " cancelled the order", body: "There's nothing to pay for " + a.title + ".", url: "./#open=auction&id=" + a.id }, null, o);
-      continue;
+      return;
     }
-    const url = st && st.url;
-    await db.prepare("UPDATE auction_offers SET checked_at = ?, pay_url = COALESCE(?, pay_url) WHERE id = ?").bind(now, url || null, offer.id).run();
-    if (offer.pay_by <= now) { await expire(env, a, offer, now, o, f); out.expired++; }
-  }
+    await db.prepare("UPDATE auction_offers SET checked_at = ?, pay_url = COALESCE(?, pay_url) WHERE id = ? AND status = 'awaiting_payment'").bind(clock(o), (st && st.url) || null, offer.id).run();
+    if (offer.pay_by > now) return;
+    if (!st) {
+      // The shop couldn't be asked. That is "don't know", not "didn't pay": the winner may have paid at the shop's checkout.
+      // Nothing is cancelled, nobody gets a strike and nobody else is offered it; Relay asks again on the next run. After a
+      // long wait it stops, says so plainly, and Relay's team sees it in the logs.
+      if (offer.pay_by + UNKNOWN_GRACE > now) return;
+      if (!(await settle("shop_problem", "could_not_check"))) return;
+      console.error("auction_payment_unknown", a.id, offer.order_name || "");
+      await db.prepare("UPDATE auctions SET outcome = 'shop_problem' WHERE id = ?").bind(a.id).run();
+      await tell(env, offer.shopper_id, { title: "Relay couldn't check your order", body: "Relay couldn't reach " + a.store_label + " to see whether " + a.title + " was paid for. If you paid, " + a.store_label + " has your order. If not, there's nothing more to do.", url: "./#open=auction&id=" + a.id },
+        offer.rank === 1 ? { id: a.id, subject: "Relay couldn't check your order: " + a.title, text: "Relay couldn't reach " + a.store_label + " to see whether " + a.title + " was paid for. If you paid, " + a.store_label + " has your order and can tell you about it. If you didn't, there's nothing more to do." } : null, o);
+      return;
+    }
+    if (await expire(env, a, offer, now, o, f)) out.expired++;
+  });
   // 4. Winners who never added delivery details in time: moved on in the same way.
-  for (const offer of ((await db.prepare("SELECT * FROM auction_offers WHERE status IN ('pending','needs_address') AND pay_by <= ? LIMIT 10").bind(now).all()).results || [])) {
+  await each("lapse", await all("SELECT * FROM auction_offers WHERE status IN ('pending','needs_address') AND pay_by <= ? LIMIT 10", now), async (offer) => {
     const a = await db.prepare("SELECT * FROM auctions WHERE id = ?").bind(offer.auction_id).first();
-    if (a) { await expire(env, a, offer, now, o, f); out.expired++; }
+    if (a && await expire(env, a, offer, now, o, f)) out.expired++;
+  });
+  // 5. Tidying, about once an hour: bidders' maximums 90 days after an auction ends, and photos of auctions that ended over 90 days ago.
+  if (Math.abs(now - lastTidy) >= HOUR) {
+    lastTidy = now;
+    try {
+      await db.prepare("DELETE FROM auction_bidders WHERE auction_id IN (SELECT id FROM auctions WHERE status != 'live' AND COALESCE(ended_at, ends_at) < ?)").bind(now - KEEP_BIDS).run();
+      await db.prepare("DELETE FROM auction_photos WHERE auction_id IN (SELECT id FROM auctions WHERE status != 'live' AND COALESCE(ended_at, ends_at) < ?)").bind(now - KEEP_BIDS).run();
+    } catch (e) { console.error("auction_tidy_failed", String(e && e.message || e).slice(0, 120)); }
   }
-  // 5. Tidying: bidders' maximums 90 days after an auction ends, and photos of auctions that ended over 90 days ago.
-  await db.prepare("DELETE FROM auction_bidders WHERE auction_id IN (SELECT id FROM auctions WHERE status != 'live' AND COALESCE(ended_at, ends_at) < ?)").bind(now - KEEP_BIDS).run();
-  await db.prepare("DELETE FROM auction_photos WHERE auction_id IN (SELECT id FROM auctions WHERE status != 'live' AND COALESCE(ended_at, ends_at) < ?)").bind(now - KEEP_BIDS).run();
   return out;
 }
+// Whether the winner's order is paid, as the shop's own Shopify says. null means Relay couldn't ask (no connection, no
+// answer, an error): the caller must treat that as "don't know", never as "not paid".
 async function orderState(env, a, offer, o, f) {
   if (!offer.order_gid) return null;
   const store = await shopStore(env, a.shop_ref, o);
@@ -385,18 +474,22 @@ async function orderState(env, a, offer, o, f) {
     return { paid: PAID.has(String(d.displayFinancialStatus || "")), cancelled: Boolean(d.cancelledAt), url: payLink(d.paymentCollectionDetails && d.paymentCollectionDetails.additionalPaymentCollectionUrl) };
   } catch { return null; }
 }
-// Not paid in time: the order is cancelled at the shop (its stock goes back), the winner is told, and the next bidder gets it.
+// Not paid in time (the shop has just said so): the order is cancelled at the shop (its stock goes back), the winner is told,
+// and the next bidder gets it. If the shop can't be reached to cancel, nothing changes and the next run tries again: the
+// item is never offered on while the first order could still be paid. Answers whether it moved on.
 async function expire(env, a, offer, now, o, f) {
   const db = env.RELAY_DB;
-  const claimed = await db.prepare("UPDATE auction_offers SET status = 'expired', settled_at = ? WHERE id = ? AND status = ? RETURNING id").bind(now, offer.id, offer.status).first();
-  if (!claimed) return;
   if (offer.order_gid) {
     const store = await shopStore(env, a.shop_ref, o);
-    if (store && store.token) {
-      try { await gql(a.shop_ref, store.token, ORDER_CANCEL, { orderId: offer.order_gid, note: "Relay auction: not paid within " + PAY_HOURS + " hours, so it was offered to the next bidder." }, f); }
-      catch (e) { console.error("auction_cancel_failed", a.id, String(e && e.message || e).slice(0, 80)); }
+    if (!store || !store.token) return false;
+    try { await gql(a.shop_ref, store.token, ORDER_CANCEL, { orderId: offer.order_gid, note: "Relay auction: not paid within " + PAY_HOURS + " hours, so it was offered to the next bidder." }, f); }
+    catch (e) {
+      console.error("auction_cancel_failed", a.id, String(e && e.message || e).slice(0, 80));
+      if (!e || e.retry !== false) return false;
     }
   }
+  const claimed = await db.prepare("UPDATE auction_offers SET status = 'expired', settled_at = ? WHERE id = ? AND status = ? RETURNING id").bind(now, offer.id, offer.status).first();
+  if (!claimed) return false;
   // Only the winner's own unpaid win counts against them: an item offered later, which they didn't ask for, doesn't. Nor
   // does a win at one of Relay's own test shops, where the team leaves wins unpaid on purpose ("Trying it out", above).
   const counts = offer.rank === 1 && offer.shopper_id !== "deleted" && !a.test_shop;
@@ -406,17 +499,18 @@ async function expire(env, a, offer, now, o, f) {
     offer.rank === 1 ? { id: a.id, subject: "Time ran out: " + a.title, text: a.title + " wasn't paid for within " + PAY_HOURS + " hours, so the order was cancelled and it's gone to the next bidder." +
       (counts ? " Not paying for two wins in 90 days stops bidding for 30 days." : "") } : null, o);
   await offerNext(env, a, now, o);
+  return true;
 }
 
 // ---- Shops' routes (retailer.js hands these over with the shop already known) ----
 import { decodePhoto } from "./photos.js";
 export { decodePhoto };
-async function shopCatalogue(db, shop) {
+async function shopCatalogue(db, shop, only = null) {
   const conn = "shopify:" + shop.shop_ref;
   const rows = ((await db.prepare(`SELECT v.id AS variantKey, i.title AS product, v.title AS variant, v.price_minor AS priceMinor, i.image_url AS imageUrl, s.quantity AS stock
       FROM retailer_catalog_variants v JOIN retailer_catalog_items i ON i.id = v.item_id
       LEFT JOIN retailer_inventory_snapshots s ON s.variant_id = v.id AND s.connection_id = i.provider
-     WHERE i.provider = ? AND v.currency = 'GBP' ORDER BY i.title, v.title LIMIT 2000`).bind(conn).all().catch(() => ({ results: [] }))).results || []);
+     WHERE i.provider = ? AND v.currency = 'GBP' ${only ? "AND v.id = ?" : ""} ORDER BY i.title, v.title LIMIT 2000`).bind(...(only ? [conn, only] : [conn])).all().catch(() => ({ results: [] }))).results || []);
   return rows.map(r => ({ variantKey: r.variantKey, product: r.product, variant: r.variant && r.variant !== "Default Title" ? r.variant : null, priceMinor: r.priceMinor,
     imageUrl: /^https:\/\//.test(String(r.imageUrl || "")) ? r.imageUrl : null, stock: r.stock == null ? null : Number(r.stock) }));
 }
@@ -489,7 +583,7 @@ async function createAuction(env, shop, b, now) {
   if (kind === "catalogue") {
     const prefix = conn + ":variant:gid://shopify/ProductVariant/";
     if (typeof b.variantKey !== "string" || !b.variantKey.startsWith(prefix) || !/^\d{1,20}$/.test(b.variantKey.slice(prefix.length))) return [404, { error: "not_your_item" }];
-    const item = (await shopCatalogue(db, shop)).find(x => x.variantKey === b.variantKey);
+    const item = (await shopCatalogue(db, shop, b.variantKey))[0];
     if (!item) return [404, { error: "not_your_item" }];
     title = TEXT(item.product, 120); variant = item.variant ? TEXT(item.variant, 80) : null; imageUrl = item.imageUrl; variantKey = item.variantKey;
   } else {
@@ -497,6 +591,10 @@ async function createAuction(env, shop, b, now) {
     if (title.length < 3) return [400, { error: "title_needed" }];
     if (!photos.length) return [400, { error: "photo_needed" }];
   }
+  // Whether this is one of Relay's own test shops is fixed on the auction when it starts, and decides who can see it. So a
+  // shop Relay hasn't checked with Shopify yet (no answer on record: it has just connected) can't start one for a moment:
+  // otherwise a test shop's auction could be shown to every shopper as a real one.
+  if (!(await planKnown(db, shop.shop_ref))) return [409, { error: "shop_not_checked_yet" }];
   const live = await db.prepare("SELECT COUNT(*) AS n FROM auctions WHERE provider = ? AND shop_ref = ? AND status = 'live'").bind(shop.provider, shop.shop_ref).first();
   if (Number(live && live.n) >= MAX_LIVE_PER_SHOP) return [429, { error: "too_many_live", max: MAX_LIVE_PER_SHOP }];
   const today = await db.prepare("SELECT COUNT(*) AS n FROM auctions WHERE provider = ? AND shop_ref = ? AND created_at > ?").bind(shop.provider, shop.shop_ref, now - DAY).first();

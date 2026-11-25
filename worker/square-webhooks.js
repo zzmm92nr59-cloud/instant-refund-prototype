@@ -35,24 +35,28 @@ export async function receiveSquareWebhook(request, env, ctx) {
   // potentially reordered inventory webhook payloads.
   ctx.waitUntil((async()=>{
     try {
+      // Square delivers a notice more than once: it is noted first, and a notice already noted does nothing more (a stock
+      // take sends many at once, and each used to start its own full read and price check).
+      const id = "square:webhook:"+event.event_id;
+      const fresh = await env.RELAY_DB.prepare(`INSERT OR IGNORE INTO audit_events
+        (id,actor_type,actor_id,event_type,subject_type,subject_id,metadata_json)
+        VALUES (?,?,?,?,?,?,?) RETURNING id`)
+        .bind(id,"system","square_webhook","webhook_processed",
+          "retailer_connection","square:sandbox",JSON.stringify({type:event.type})).first();
+      if (!fresh) return;
       const result=await syncSquareCatalogue(env);
-      // A shop changed something: tell anyone watching a product whose price just dropped.
-      await runPriceAlerts(env).catch(()=>{});
+      // A shop changed something: tell anyone watching a product whose price just dropped. Only Square's items are compared.
+      const alerts = () => runPriceAlerts(env, { provider: "square_sandbox" }).catch(e=>console.error("Square price alerts failed",String(e&&e.message||e).slice(0,120)));
+      await alerts();
       // Square's catalogue can lag a few seconds behind its own message, so look once more shortly after.
       if(event.type==="catalog.version.updated"){
         await new Promise(r=>setTimeout(r,20000));
         await syncSquareCatalogue(env).catch(e=>console.error("Square second sync failed",String(e)));
-        await runPriceAlerts(env).catch(()=>{});
+        await alerts();
       }
-      await env.RELAY_DB.prepare(`INSERT INTO audit_events
-        (id,actor_type,actor_id,event_type,subject_type,subject_id,metadata_json)
-        VALUES (?,?,?,?,?,?,?)`)
-        .bind("square:webhook:"+event.event_id,"system","square_webhook","webhook_processed",
-          "retailer_connection","square:sandbox",JSON.stringify({type:event.type,...result})).run();
+      await env.RELAY_DB.prepare("UPDATE audit_events SET metadata_json = ? WHERE id = ?").bind(JSON.stringify({type:event.type,...result}), id).run();
     } catch(error) {
-      // Duplicate event audit IDs are harmless. Other failures must be visible in logs.
-      if(!String(error?.message||"").includes("UNIQUE constraint failed"))
-        console.error("Square webhook sync failed",event.event_id,String(error));
+      console.error("Square webhook sync failed",event.event_id,String(error));
     }
   })());
   return Response.json({received:true});

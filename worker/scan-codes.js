@@ -83,12 +83,26 @@ export function statedDate(text, sentAt) {
   const d = ok(year);
   return d ? d.toISOString().slice(0, 10) : null;
 }
-const BY_DATE = /\b(?:by|before|until|no later than|on or before)\b\s*:?\s*([^.\n]{3,40})/gi;
-function deadlineIn(text, sentAt) {
+// A deadline is only a date the email states as the day to return, drop off, send back or collect by: the doing and the
+// date have to be in the same sentence, the doing first ("send it back no later than Wednesday, December 24", "Drop off
+// by: Sat 6 Sept"). A date that is about something else in a sentence that merely mentions returns is not a deadline:
+// "We'll send your refund by 12 March once it's back with us" (when the refund comes), "Order by 20 December for
+// Christmas, free returns" (an ordering cut-off), "your refund will be returned to your card by 5 March". When unsure,
+// no deadline: Relay never shows a guessed date as the shop's.
+const DOING = String.raw`\b(?:return(?:ed|s|ing)?|drop(?:ped)?(?:\s+\w+){0,3}?\s*-?\s*off|sen[dt](?:\s+[\w']+){0,4}?\s+back|post(?:ed)?(?:\s+[\w']+){0,3}?\s+back|post\s+(?:it|them|your)|collect(?:ed|ion)?|pick(?:ed)?(?:\s+\w+){0,3}?\s*-?\s*up|hand(?:ed)?(?:\s+\w+){0,3}?\s+in|bring(?:\s+[\w']+){0,3}?\s+back)\b`;
+const BY_DATE = new RegExp(DOING + String.raw`[^.;\n]{0,60}?\b(?:by|before|until|no later than|on or before)\b\s*:?\s*([^.\n]{3,40})`, "gi");
+// Before the date, any of these means the sentence is about money coming back, the shop's own doing, a delivery or an order.
+const NOT_A_RETURN_DATE = /\brefund|\bwe(?:'ll|’ll| will| aim| can| are)\b|\byou(?:'ll|’ll| will) (?:receive|get|be|see)\b|\bdeliver|\bdispatch|\barriv|(?:^\s*|\bplease\s+|\bif you\s+|\bwhen you\s+)order(?:ed)?\s+(?:by|before)\b|\bpa(?:y|id|yment)\b/i;
+const CODE_ENDS = /\b(?:valid until|expires?(?: on)?)\s*:?\s*([^.\n]{3,40})/i;
+export function deadlineIn(text, sentAt) {
   for (const s of String(text || "").split(/(?<=[.!?])\s+|\n+/)) {
-    if (!/\breturn|\bdrop|\bsend|\bpost|\bcollect|\bback\b|\bpick|\bvalid\b|\bexpire/i.test(s)) continue;
-    for (const m of s.matchAll(BY_DATE)) { const d = statedDate(m[1], sentAt); if (d) return d; }
-    const e = /\b(?:valid until|expires?(?: on)?)\s*:?\s*([^.\n]{3,40})/i.exec(s); const d = e && statedDate(e[1], sentAt); if (d) return d;
+    for (const m of s.matchAll(BY_DATE)) {
+      if (NOT_A_RETURN_DATE.test(s.slice(0, m.index + m[0].length - m[1].length))) continue;
+      const d = statedDate(m[1], sentAt); if (d) return d;
+    }
+    // "Valid until" and "expires" are about the code itself, unless the sentence is about an offer or a refund.
+    const e = CODE_ENDS.exec(s);
+    if (e && !/\boffer|\bdiscount|\bvoucher|\bpromo|\bsale\b|\brefund|\bgift ?card|\bcredit\b/i.test(s)) { const d = statedDate(e[1], sentAt); if (d) return d; }
   }
   return null;
 }
