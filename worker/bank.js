@@ -90,8 +90,10 @@ export async function ensureBankColumns(db) {
   // card's payments came with nothing saying which card each was on, so the app can say Relay can't tell them apart.
   try { await db.prepare("ALTER TABLE bank_payments ADD COLUMN card_ref TEXT").run(); } catch { /* already there */ }
   try { await db.prepare("ALTER TABLE bank_links ADD COLUMN unsplit INTEGER").run(); } catch { /* already there */ }
-  // bank_cards is read with every payment (visibleSql), including by receiptsToAdd, which doesn't make the tables.
-  try { await db.prepare(BANK_SQL[BANK_SQL.length - 1]).run(); } catch { /* no database binding: nothing to read anyway */ }
+  // bank_cards is read with every payment (visibleSql), including by receiptsToAdd, which doesn't make the tables. Every
+  // bank table is made here first: on a new database a receipts request came before any bank one, the columns below were
+  // tried on tables that didn't exist yet, and (marked ready) were never added, so Bank and cards failed for good.
+  for (const sql of BANK_SQL) { try { await db.prepare(sql).run(); } catch { /* no database binding: nothing to read anyway */ } }
   // 25 Nov 2026. tried_at / problem: when a read was last tried and why it didn't finish ("bank": the bank or TrueLayer
   // didn't answer for some of it; "error": Relay's own), so a read that failed is never shown as a read that happened.
   // session_hash, finish_hash and the sealed tokens on a state: a bank sign-in waits there until the app that started it,
