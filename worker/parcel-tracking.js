@@ -33,7 +33,9 @@ export const trackingAvailable = (env) => Boolean(env && env.SHIP24_API_KEY);
 const API = "https://api.ship24.com/public/v1";
 const AGAIN_AFTER = 2 * 36e5, NO_NEWS_AGAIN = 10 * 60e3,   // no news yet (Ship24 still finding the carrier): sooner
   PER_SHOPPER = 3, DAY = 864e5;
-const FINAL = new Set(["delivered", "problem"]);
+// Only "delivered" is the end. A carrier's "exception" often clears (a delay, a customs hold, an address query), so a
+// parcel with a problem is asked about again like any other, and shows as delivered once it is.
+const FINAL = new Set(["delivered"]);
 // A tracking number as carriers print them: letters and digits, 8 to 40 of them.
 export const TRACKING_NUMBER = /^[A-Z0-9]{8,40}$/;
 // Ship24 can't find Royal Mail parcels on its own: it needs its code for Royal Mail, "gb-post" (help.ship24.com, "How to

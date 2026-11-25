@@ -45,6 +45,10 @@ sqlite.prepare("INSERT INTO shopify_shops VALUES (?, 'Hollow Pine', 'read_produc
 sqlite.prepare("INSERT INTO shopify_shops VALUES (?, 'Old Connection', 'read_products,read_orders')").run(OTHER);
 sqlite.prepare("INSERT INTO shopify_shops VALUES (?, 'Relay Dev', 'read_products,write_orders')").run(TESTSHOP);
 sqlite.prepare("INSERT INTO shopify_shop_plan (domain, test_shop, plan, checked_at) VALUES (?, 1, 'partner_test', 0)").run(TESTSHOP);
+// Hollow Pine is a real shop: Shopify has said it isn't a development store. (A shop Relay hasn't checked yet can't start
+// an auction: tried in section 2.)
+sqlite.prepare("INSERT INTO shopify_shop_plan (domain, test_shop, plan, checked_at) VALUES (?, 0, 'basic', 0)").run(DOMAIN);
+sqlite.prepare("INSERT INTO shopify_shops VALUES ('just-connected.myshopify.com', 'Just Connected', 'read_products,write_orders')").run();
 const item = (domain, n, title, variant, price, cur = "GBP", stock = 4) => {
   const conn = "shopify:" + domain, iid = conn + ":item:gid://shopify/Product/" + n, vid = conn + ":variant:gid://shopify/ProductVariant/" + n;
   sqlite.prepare("INSERT OR IGNORE INTO retailer_catalog_items VALUES (?, ?, ?, ?, NULL, 'Shop', ?)").run(iid, conn, "gid://shopify/Product/" + n, title, "https://cdn.shop.test/" + n + ".jpg");
@@ -61,7 +65,9 @@ const giveAddress = (id) => sqlite.prepare("INSERT OR REPLACE INTO delivery_deta
 const shop = { provider: "shopify", shop_ref: DOMAIN, store_label: "Hollow Pine" };
 let NOW = 1_800_000_000_000;
 // The stand-in Shopify and email service.
-const calls = { orders: [], cancels: [], states: [], emails: [] };
+const calls = { orders: [], cancels: [], states: [], emails: [], finds: [] };
+const atShop = []; // the orders the stand-in shop really made, with their tags
+let stateMode = "ok", cancelMode = "ok";
 let shopMode = "ok", paid = new Set(), cancelledAtShop = new Set(), orderNo = 9000;
 const fetchImpl = async (url, init = {}) => {
   if (String(url).startsWith("https://api.resend.com/")) { calls.emails.push(JSON.parse(init.body)); return new Response("{}", { status: 200 }); }
@@ -73,16 +79,31 @@ const fetchImpl = async (url, init = {}) => {
     calls.orders.push({ shop: m[1], ...q.variables });
     if (shopMode === "busy") return new Response("slow down", { status: 429 });
     if (shopMode === "refuse") return Response.json({ data: { orderCreate: { order: null, userErrors: [{ field: ["lineItems"], message: "Not enough stock" }] } } });
+    if (shopMode === "timeout") throw Object.assign(new Error("The operation was aborted due to timeout"), { name: "TimeoutError" });
     const n = ++orderNo;
+    atShop.push({ id: "gid://shopify/Order/" + n, n, shop: m[1], tags: q.variables.order.tags });
+    // "lost": the shop made the order, but its answer never reached Relay.
+    if (shopMode === "lost") throw Object.assign(new Error("The operation was aborted due to timeout"), { name: "TimeoutError" });
+    if (shopMode === "slow") await new Promise(r => setTimeout(r, 30));
     return Response.json({ data: { orderCreate: { order: { id: "gid://shopify/Order/" + n, legacyResourceId: String(n), name: "#" + n,
       paymentCollectionDetails: { additionalPaymentCollectionUrl: "https://" + m[1] + "/pay/" + n } }, userErrors: [] } } });
   }
+  if (/RelayAuctionFind/.test(q.query)) {
+    calls.finds.push(q.variables.q);
+    if (stateMode === "down") return new Response("bad gateway", { status: 502 });
+    const hit = atShop.find(x => x.shop === m[1] && x.tags.includes(q.variables.q.replace(/^tag:/, "")));
+    return Response.json({ data: { orders: { nodes: hit ? [{ id: hit.id, legacyResourceId: String(hit.n), name: "#" + hit.n, cancelledAt: null,
+      paymentCollectionDetails: { additionalPaymentCollectionUrl: "https://" + m[1] + "/pay/" + hit.n } }] : [] } } });
+  }
   if (/RelayAuctionPaid/.test(q.query)) {
     calls.states.push(q.variables.id);
+    if (stateMode === "down") return new Response("bad gateway", { status: 502 });
+    if (stateMode === "timeout") throw Object.assign(new Error("The operation was aborted due to timeout"), { name: "TimeoutError" });
     return Response.json({ data: { order: { displayFinancialStatus: paid.has(q.variables.id) ? "PAID" : "PENDING", cancelledAt: cancelledAtShop.has(q.variables.id) ? "2027-01-01T00:00:00Z" : null,
       paymentCollectionDetails: { additionalPaymentCollectionUrl: "https://" + m[1] + "/pay/again" } } } });
   }
-  if (/orderCancel/.test(q.query)) { calls.cancels.push(q.variables); return Response.json({ data: { orderCancel: { orderCancelUserErrors: [] } } }); }
+  if (/orderCancel/.test(q.query)) { calls.cancels.push(q.variables);
+    if (cancelMode === "down") return new Response("bad gateway", { status: 502 }); return Response.json({ data: { orderCancel: { orderCancelUserErrors: [] } } }); }
   throw new Error("unexpected Shopify call");
 };
 const listStores = async () => [DOMAIN, OTHER, TESTSHOP].map(domain => ({ domain, token: "shpat_stand_in", label: domain }));
@@ -119,6 +140,8 @@ for (const [change, error] of [[{ agree: false }, "agree_needed"], [{ kind: "lot
   [{ variantKey: WOOL.replace("71", "7x") }, "not_your_item"], [{ photos: [notAPicture] }, "bad_photo"], [{ photos: [tooBig] }, "photo_too_big"],
   [{ kind: "oneoff", title: "Sample coat" }, "photo_needed"], [{ kind: "oneoff", title: "x", photos: [jpeg] }, "title_needed"]])
   assert.equal((await asShop("POST", "/relay/retailer/auctions", { ...base, ...change })).body.error, error, JSON.stringify(change));
+assert.equal((await asShop("POST", "/relay/retailer/auctions", { ...base, kind: "oneoff", title: "Sample coat", photos: [jpeg] }, { provider: "shopify", shop_ref: "just-connected.myshopify.com", store_label: "Just Connected" })).body.error,
+  "shop_not_checked_yet", "a shop Relay hasn't yet checked isn't a test shop can't start an auction (it would be shown to everyone as a real one)");
 const made = await asShop("POST", "/relay/retailer/auctions", { ...base, photos: [jpeg] });
 assert.equal(made.status, 200);
 const A = made.body.auction;
@@ -434,6 +457,119 @@ assert.equal(sqlite.prepare("SELECT COUNT(*) AS n FROM auction_strikes WHERE sho
 assert.equal((await asShopper("d", "GET", "/relay/my/auctions")).body.canBid, true, "two unpaid wins at the test shop don't pause bidding");
 assert.equal(sqlite.prepare("SELECT COUNT(*) AS n FROM auctions WHERE test_shop = 0 AND ends_at - starts_at < 86400000").get().n, 0, "and no real shop's auction has ever run for less than a day");
 console.log("ok - Relay's own test shops can run a 10-minute auction (no other shop is offered it or can ask for it); the time to pay stays 24 hours; unpaid wins there don't count");
+
+// 17b. Closing an auction is safe to run twice at once, and "couldn't ask the shop" is never taken as "no" or "not paid".
+for (const id of ["a", "c", "d"]) giveAddress(id);
+sqlite.exec("DELETE FROM auction_strikes");
+const offerOf = (auctionId, who) => sqlite.prepare("SELECT * FROM auction_offers WHERE auction_id = ? AND shopper_id = ?").get(auctionId, who);
+const newAuction = async (who, max) => {
+  // Whatever is still waiting to be paid from the step before is paid first, so each step starts clean.
+  for (const r of sqlite.prepare("SELECT order_gid FROM auction_offers WHERE status = 'awaiting_payment'").all()) paid.add(r.order_gid);
+  NOW += 5 * 60e3; await runAuctions(env, O());
+  NOW += 3 * 864e5;
+  const x = (await asShop("POST", "/relay/retailer/auctions", { ...base, startMinor: 1000, hours: 24 })).body.auction;
+  NOW = x.endsAt - 3600e3;
+  for (const [w, m] of [].concat(who.map((w, i) => [w, max[i]]))) assert.equal((await bid(w, x.id, m)).status, 200, "bid by " + w);
+  NOW = x.endsAt + 1000;
+  return x;
+};
+// Two of the every-minute runs overlap while the shop is slow: one order, never two.
+shopMode = "slow";
+const R1 = await newAuction(["a"], [1500]);
+let madeBefore = atShop.length;
+const firstRun = runAuctions(env, O());
+while (atShop.length === madeBefore) await new Promise(r => setTimeout(r, 2)); // the first run is now waiting on the shop
+await Promise.all([firstRun, runAuctions(env, O()), runAuctions(env, O())]);
+assert.equal(atShop.length, madeBefore + 1, "one winner, one order at the shop, however many runs overlap");
+assert.equal(offerOf(R1.id, "a").status, "awaiting_payment");
+assert.equal(sqlite.prepare("SELECT COUNT(*) AS n FROM auction_offers WHERE auction_id = ?").get(R1.id).n, 1);
+shopMode = "ok";
+// The shop made the order but its answer never arrived (a timeout): the sale isn't ended, nobody is told "nothing to pay",
+// and the next try finds that order by its tag instead of making a second one.
+shopMode = "lost"; calls.emails.length = 0;
+const R2 = await newAuction(["c"], [1400]);
+madeBefore = atShop.length;
+await runAuctions(env, O());
+assert.equal(atShop.length, madeBefore + 1, "the shop did make it");
+assert.equal(offerOf(R2.id, "c").status, "pending", "a timeout is 'don't know', so it's tried again");
+assert.equal(sqlite.prepare("SELECT outcome FROM auctions WHERE id = ?").get(R2.id).outcome, "awaiting_payment");
+assert.ok(!calls.emails.some(e => /Nothing to pay/.test(e.subject)), "the winner isn't told there's nothing to pay");
+shopMode = "ok"; NOW += 3 * 60e3;
+await runAuctions(env, O());
+assert.equal(atShop.length, madeBefore + 1, "no second order: the first one was found");
+assert.ok(atShop.at(-1).tags.some(t => /^relay-[0-9a-f]{32}$/.test(t)) && atShop.at(-1).tags.every(t => t.length <= 40), "each order carries its own tag, within Shopify's 40 characters");
+assert.equal(offerOf(R2.id, "c").status, "awaiting_payment"); assert.equal(offerOf(R2.id, "c").order_gid, atShop.at(-1).id);
+assert.equal((await asShopper("c", "GET", "/relay/my/auctions")).body.auctions.find(y => y.auction.id === R2.id).you.payUrl, "https://" + DOMAIN + "/pay/" + atShop.at(-1).n);
+// A timeout where the shop made nothing: tried again, and made once.
+shopMode = "timeout";
+const R3 = await newAuction(["d"], [1300]);
+madeBefore = atShop.length;
+await runAuctions(env, O());
+assert.equal(offerOf(R3.id, "d").status, "pending"); assert.equal(atShop.length, madeBefore);
+shopMode = "ok"; NOW += 3 * 60e3;
+await runAuctions(env, O());
+assert.equal(offerOf(R3.id, "d").status, "awaiting_payment"); assert.equal(atShop.length, madeBefore + 1);
+console.log("ok - overlapping runs make one order; a timeout at the shop is tried again and never makes a second order or ends the sale");
+
+// The winner paid, but at the deadline the shop can't be asked: not expired, not cancelled, no strike, not offered on.
+const R4 = await newAuction(["a", "c"], [2000, 1500]);
+await runAuctions(env, O());
+const r4 = offerOf(R4.id, "a");
+assert.equal(r4.status, "awaiting_payment");
+paid.add(r4.order_gid);
+NOW += PAY_HOURS * 3600e3 + 1000; calls.emails.length = 0;
+let cancelsBefore = calls.cancels.length;
+for (const mode of ["down", "timeout"]) {
+  stateMode = mode;
+  ran = await runAuctions(env, O());
+  assert.equal(ran.expired, 0, "couldn't ask (" + mode + ") is not 'didn't pay'");
+  assert.equal(offerOf(R4.id, "a").status, "awaiting_payment");
+  assert.equal(calls.cancels.length, cancelsBefore, "the paid order isn't cancelled");
+  assert.equal(sqlite.prepare("SELECT COUNT(*) AS n FROM auction_strikes WHERE shopper_id = 'a'").get().n, 0, "no strike on a question nobody answered");
+  assert.equal(sqlite.prepare("SELECT COUNT(*) AS n FROM auction_offers WHERE auction_id = ?").get(R4.id).n, 1, "and it isn't offered to the next bidder");
+  assert.ok(!calls.emails.some(e => /Time ran out/.test(e.subject)));
+  NOW += 60e3;
+}
+stateMode = "ok";
+ran = await runAuctions(env, O());
+assert.equal(ran.paid, 1); assert.equal(offerOf(R4.id, "a").status, "paid");
+assert.equal(sqlite.prepare("SELECT outcome FROM auctions WHERE id = ?").get(R4.id).outcome, "sold");
+// A shop that stays unreachable for hours: Relay stops asking, says so plainly, and still nobody is penalised.
+const R5 = await newAuction(["a", "c"], [2000, 1500]);
+await runAuctions(env, O());
+NOW += PAY_HOURS * 3600e3 + 1000; stateMode = "down"; cancelsBefore = calls.cancels.length;
+await runAuctions(env, O());
+assert.equal(offerOf(R5.id, "a").status, "awaiting_payment");
+NOW += 6 * 3600e3 + 60e3; calls.emails.length = 0;
+await runAuctions(env, O());
+assert.equal(offerOf(R5.id, "a").status, "shop_problem"); assert.equal(offerOf(R5.id, "a").detail, "could_not_check");
+assert.equal(sqlite.prepare("SELECT COUNT(*) AS n FROM auction_strikes WHERE shopper_id = 'a'").get().n, 0);
+assert.equal(calls.cancels.length, cancelsBefore); assert.equal(sqlite.prepare("SELECT COUNT(*) AS n FROM auction_offers WHERE auction_id = ?").get(R5.id).n, 1);
+assert.match(calls.emails[0].subject, /^Relay couldn't check your order/); assert.ok(!/wasn't paid/.test(calls.emails[0].text), "never told they didn't pay");
+stateMode = "ok";
+// Not paid, and the shop can't be reached to cancel: the item isn't offered on while the first order could still be paid.
+const R6 = await newAuction(["a", "c"], [2000, 1500]);
+await runAuctions(env, O());
+NOW += PAY_HOURS * 3600e3 + 1000; cancelMode = "down";
+ran = await runAuctions(env, O());
+assert.equal(ran.expired, 0); assert.equal(offerOf(R6.id, "a").status, "awaiting_payment");
+assert.equal(sqlite.prepare("SELECT COUNT(*) AS n FROM auction_offers WHERE auction_id = ?").get(R6.id).n, 1);
+cancelMode = "ok"; NOW += 60e3;
+ran = await runAuctions(env, O());
+assert.equal(ran.expired, 1); assert.equal(offerOf(R6.id, "a").status, "expired"); assert.equal(offerOf(R6.id, "c").status, "awaiting_payment");
+assert.equal(sqlite.prepare("SELECT COUNT(*) AS n FROM auction_strikes WHERE shopper_id = 'a'").get().n, 1, "a win the shop confirmed unpaid still counts");
+console.log("ok - a winner who paid is never expired, struck or replaced because the shop couldn't be asked; an unpaid one only once the shop says so and its order is cancelled");
+
+// An auction that ended but was never offered to anyone (the run was cut short) is picked up on a later run.
+const R7 = await newAuction(["d"], [1700]);
+sqlite.prepare("UPDATE auctions SET status = 'ended', ended_at = ? WHERE id = ?").run(NOW, R7.id);
+await runAuctions(env, O());
+assert.equal(offerOf(R7.id, "d"), undefined, "left alone for a couple of minutes, in case the run that ended it is still going");
+NOW += 3 * 60e3;
+ran = await runAuctions(env, O());
+assert.equal(ran.offered, 1); assert.equal(offerOf(R7.id, "d").status, "awaiting_payment");
+assert.equal((await asShopper("d", "GET", "/relay/my/auctions")).body.auctions.find(y => y.auction.id === R7.id).you.state, "pay");
+console.log("ok - an auction left ended with no winner asked is picked up again");
 
 // 18. A shop that removes Relay: its running auctions end without a sale; Shopify's erase request deletes them all.
 const G = (await asShop("POST", "/relay/retailer/auctions", { ...base, startMinor: 1000, hours: 24 })).body.auction;

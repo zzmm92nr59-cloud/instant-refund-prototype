@@ -159,6 +159,12 @@ const listed = (c) => { const g = categorise(c), k = itemCategories(c); return {
   const eus = t.places.find((p) => p.name === "London Euston"); assert.ok(Math.abs(eus.lat - 51.53) < 0.02 && Math.abs(eus.lon + 0.13) < 0.02);
   assert.equal(buildWrapped(year.filter((c) => c.category !== "travel"), 2026).travel, null, "no travel, no travel chapter");
   assert.deepEqual(journeysOf({ category: "travel", retailer: R("Uber", "uber.com"), items: [{ name: "Trip fare" }, { name: "Pick up to drop off" }] }), [], "only names with capitals both sides count as places");
+  // A coach, a train or a taxi to an airport is not a flight (review WR-1): the shop decides when Relay knows it, and the
+  // word "airport" never does.
+  assert.deepEqual(journeysOf({ category: "travel", retailer: R("National Express", "nationalexpress.com"), items: [{ name: "Leeds to Manchester Airport" }] }).map((j) => j.mode), ["coach"]);
+  assert.deepEqual(journeysOf({ category: "travel", retailer: R("Trainline", "thetrainline.com"), items: [{ name: "London Euston to Birmingham Airport" }] }).map((j) => j.mode), ["train"]);
+  assert.deepEqual(journeysOf({ category: "travel", retailer: R("Made-up Cars", "madeupcars.example"), items: [{ name: "Leeds to Manchester Airport" }] }).map((j) => j.mode), ["trip"], "an unknown shop to an airport: just a trip");
+  assert.deepEqual(journeysOf({ category: "travel", retailer: R("Made-up Travel", "madeuptravel.example"), items: [{ name: "Flight Leeds to Malaga" }] }).map((j) => j.mode), ["flight"], "the word flight still says so");
   assert.equal(placeAt("London Road"), null, "a station named after a road isn't put in that city");
   assert.ok(placeAt("Manchester Oxford Road"), "a station that starts with its city's name is put in that city");
   // Each journey in the order it was made, with where both ends are, for the story to travel along.

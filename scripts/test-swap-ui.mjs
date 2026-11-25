@@ -23,7 +23,7 @@ const STRIPE_STUB = `window.Stripe = function (pk) { window.__stripePk = pk; ret
   elements: function () { return { create: function () { return { mount: function (n) { n.textContent = '[card field]'; } }; } }; },
   confirmCardSetup: function (secret) { window.__confirmedSecret = secret; return Promise.resolve({ setupIntent: { id: 'seti_test000001', status: 'succeeded' } }); } }; };`;
 
-async function run({ card, mode = "card", returnInfo = null, exchange = null, blocked = null, returnable = false }) {
+async function run({ card, mode = "card", returnInfo = null, exchange = null, blocked = null, returnable = false, tools = false }) {
   const context = await browser.newContext({ viewport: { width: 390, height: 820 } }); await skipInterests(context); await bigCards(context);
   const posts = [];
   let saved = card;
@@ -59,6 +59,8 @@ async function run({ card, mode = "card", returnInfo = null, exchange = null, bl
   const errors = []; page.on('pageerror', e => errors.push(String(e)));
   page.on('dialog', () => { throw new Error('a browser pop-up appeared; Relay must ask inside the page'); });
   await page.addInitScript(([k, v]) => localStorage.setItem(k, v), ['relay.session.v1', JSON.stringify({ token: SESSION, email: 'alice@example.com' })]); await skipInterests(context); await bigCards(context); // (after the session, so it knows who's signed in)
+  // tools: this phone has Relay's testing tools switched on (the words about test mode are only for people testing Relay).
+  if (tools) await page.addInitScript(() => { localStorage.setItem('relay-web-preview', '0'); localStorage.setItem('relay-testing-tools', '1'); });
   await page.goto(origin + '/index.html');
   // Returns and swaps already started live on the Returns & swaps page; an order's card on Home opens its page, with Swap.
   if (returnInfo || exchange) await page.evaluate(() => window.go('returns'));
@@ -82,7 +84,9 @@ async function openSwap(page) {
   await page.getByRole('button', { name: /Large\. £5\.00 more/ }).click();
   if (process.env.SHOTS) await page.screenshot({ path: process.env.SHOTS + '/swap-confirm.png' });
   const box = await page.locator('.rl-sheet').last().innerText();
-  assert.match(box, /costs £5\.00 more\. We'll take £5\.00 from your Visa ending 4242 in Apple Pay only once the shop has updated your order\. \(Test mode: no real money\.\)/);
+  // A shopper is never shown test wording (CLAUDE.md rule 15): the sentence ends at "your order."
+  assert.match(box, /costs £5\.00 more\. We'll take £5\.00 from your Visa ending 4242 in Apple Pay only once the shop has updated your order\.(?! \(Test mode)/);
+  assert.doesNotMatch(box, /Test mode/i, 'no test wording without the testing tools');
   await page.getByRole('button', { name: 'Swap and pay £5.00' }).click();
   await page.getByText(/£5\.00 was taken from your card \(test mode, no real money\)/).waitFor();
   assert.deepEqual(posts.find(x => x.p === '/relay/my/exchange').body, { orderId: 'o1', lineId: 'L1', variantKey: 'k14', agreedDiffMinor: 500 });
@@ -95,6 +99,20 @@ async function openSwap(page) {
   console.log('PASS dearer and cheaper swaps show the difference and ask in the page');
 }
 
+// 1b. With Relay's testing tools on, the same screens say it's test mode (so a tester knows no real money moves).
+{
+  const { context, page, errors } = await run({ card: { brand: 'visa', last4: '4242', wallet: 'apple_pay' }, tools: true });
+  await page.getByRole('button', { name: /Large\. £5\.00 more/ }).click();
+  assert.match(await page.locator('.rl-sheet').last().innerText(), /only once the shop has updated your order\. \(Test mode: no real money\.\)/);
+  await context.close();
+  const t = await run({ card: null, tools: true });
+  await t.page.getByRole('button', { name: /Large\. Costs £5\.00 more: add a card/ }).click();
+  await t.page.getByText(/Type a card\. Test mode: use 4242 4242 4242 4242/).waitFor();
+  assert.deepEqual(errors.concat(t.errors), []);
+  await t.context.close();
+  console.log('PASS with testing tools on, the swap and the card form say it is test mode');
+}
+
 // 2. No card yet: the dearer option offers to add one with a £0.00 check, then the swap screen comes back.
 {
   const { context, page, posts, errors } = await run({ card: null });
@@ -102,7 +120,9 @@ async function openSwap(page) {
   await large.waitFor(); assert.equal(await large.isEnabled(), true);
   await large.click();
   await page.getByText('Add a card to pay the £5.00 difference. Saving it charges nothing.').waitFor();
-  await page.getByText(/Test mode: use 4242 4242 4242 4242/).waitFor();
+  // How to pay with a test card is for people testing Relay: a shopper is only asked to type a card.
+  await page.getByText('Type a card.', { exact: true }).waitFor();
+  assert.equal(await page.getByText(/Test mode|4242 4242/).count(), 0, 'no test-card wording without the testing tools');
   if (process.env.SHOTS) await page.screenshot({ path: process.env.SHOTS + '/swap-addcard.png' });
   await page.getByRole('button', { name: 'Save card (£0.00)' }).click();
   await page.getByText('Card saved. Nothing was charged.').waitFor();

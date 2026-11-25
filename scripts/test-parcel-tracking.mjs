@@ -64,6 +64,28 @@ assert.equal(calls[0].init.headers.Authorization, "Bearer ship24-test-key");
 assert.equal((await db.prepare("SELECT n FROM parcel_track_uses WHERE month = '2026-11'").first()).n, 1);
 console.log("ok - off until the key is set; only the tracking number goes to Ship24");
 
+// A parcel the carrier flagged ("exception": a delay, a customs hold) is asked about again like any other, and shows as
+// delivered once it is. It used to stay "a problem" for ever (review PT-1).
+{
+  reply = () => Response.json(body("exception", [ev("exception", "2026-11-13")]));
+  let p = await liveParcel(env, "s9", order("PP000000009GB"), { now: NOW, fetchImpl });
+  assert.equal(p.delivery.status, "problem");
+  const before = calls.length;
+  p = await liveParcel(env, "s9", order("PP000000009GB"), { now: NOW + 36e5, fetchImpl });
+  assert.equal(calls.length, before, "not within 2 hours");
+  reply = () => Response.json(body("delivered", [ev("delivered", "2026-11-15")]));
+  p = await liveParcel(env, "s9", order("PP000000009GB"), { now: NOW + 3 * 36e5, fetchImpl });
+  assert.equal(calls.length, before + 1, "asked again after 2 hours");
+  assert.deepEqual([p.delivery.status, p.delivery.at], ["delivered", "2026-11-15"]);
+  p = await liveParcel(env, "s9", order("PP000000009GB"), { now: NOW + 9 * 36e5, fetchImpl });
+  assert.equal(calls.length, before + 1, "never again once delivered");
+  reply = () => Response.json(body("in_transit", [ev("in_transit", "2026-11-14")], "2026-11-18"));
+  calls = calls.slice(0, 1);
+  await db.prepare("DELETE FROM parcel_tracks WHERE shopper_id = 's9'").run();
+  await db.prepare("UPDATE parcel_track_uses SET n = 1 WHERE month = '2026-11'").run();
+  console.log("ok - a parcel with a problem is checked again and shows as delivered once it is");
+}
+
 // Again within 2 hours: no new question. After 2 hours: the results again, which doesn't count as a new parcel.
 r = await liveParcel(env, "s1", order("AA000000001GB"), { now: NOW + 36e5, fetchImpl });
 assert.equal(calls.length, 1); assert.equal(r.delivery.status, "due");
