@@ -32,8 +32,21 @@ const OPEN_ROUTES = [/^\/relay\/me$/, /^\/relay\/auth\/logout$/, /^\/relay\/my\/
 export const openWithoutSecondStep = (path) => OPEN_ROUTES.some(re => re.test(path));
 
 // This session passed a second step.
-export async function markSessionChecked(env, sessionHash) {
-  if (sessionHash) await env.RELAY_DB.prepare("UPDATE auth_sessions SET second_step = 1 WHERE session_hash = ?").bind(sessionHash).run();
+export async function markSessionChecked(env, sessionHash, now = Date.now()) {
+  if (sessionHash) await env.RELAY_DB.prepare("UPDATE auth_sessions SET second_step = 1, checked_at = ? WHERE session_hash = ?").bind(now, sessionHash).run();
+}
+
+// A new way in needs a recent check (security review M3, 25 Nov 2026). A passkey signs in on its own, so a stolen session
+// that could add one would have a way back in for good, and "Sign out other devices" wouldn't put it out; an authenticator
+// app or a phone for codes is a second step someone else would hold. So once the account has a second step, adding a
+// passkey (or removing one), setting up an authenticator app, adding a phone number or turning on codes by text needs this
+// session to have passed the second step in the last 15 minutes: a passkey sign-in, a code at sign-in, or setting up the
+// account's first second step in it (auth_sessions.checked_at). Older sessions (and sessions approved from a phone, which
+// never passed a step themselves) are asked to sign in again ("recheck_needed"). Setting up the first one is always allowed.
+export const RECHECK_MS = 15 * 60 * 1000;
+export async function needsRecheck(env, shopper, now = Date.now()) {
+  if (Number(shopper && shopper.checkedAt) > now - RECHECK_MS) return false;
+  return hasSecondStep(await secondSteps(env, shopper.id));
 }
 
 // The account's first second step, just set up in this session: the session counts as checked, and every other session of
@@ -41,10 +54,10 @@ export async function markSessionChecked(env, sessionHash) {
 // them may be somebody who got into the inbox: turning two-step on must put them out, not leave them in for 90 days.
 // Given as statements, to run in one step with whatever switches the second step on: there is never a moment when the
 // account has a second step and the session setting it up isn't yet checked (auth.js would end it as one that never passed).
-export function firstSecondStepStatements(env, shopper) {
+export function firstSecondStepStatements(env, shopper, now = Date.now()) {
   if (!shopper.sessionHash) return [];
   return [
-    env.RELAY_DB.prepare("UPDATE auth_sessions SET second_step = 1 WHERE session_hash = ?").bind(shopper.sessionHash),
+    env.RELAY_DB.prepare("UPDATE auth_sessions SET second_step = 1, checked_at = ? WHERE session_hash = ?").bind(now, shopper.sessionHash),
     env.RELAY_DB.prepare("DELETE FROM auth_sessions WHERE shopper_id = ? AND session_hash != ?").bind(shopper.id, shopper.sessionHash)
   ];
 }

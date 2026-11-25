@@ -143,6 +143,9 @@ const other = await emailSignIn("someone.else@example.com");
   assert.equal((await post("/relay/my/devices/approve", phone, { code: s.body.code })).status, 200);
   const got = await check(s.body.pollToken);
   assert.equal(sessionRow(got.body.sessionToken).second_step, 1);
+  // ...but not as a recent check of its own (security review M3, L1): a computer approved from a phone can't add a new way
+  // in (a passkey) until it signs in with the second step itself.
+  assert.equal(sessionRow(got.body.sessionToken).checked_at, null, "approved from a phone: not a recent check");
   ok("a second step passed on the phone carries over");
   const before = sqlite.prepare("SELECT COUNT(*) AS n FROM auth_phone_requests WHERE shopper_id IS NOT NULL").get().n;
   assert.ok(before > 0);

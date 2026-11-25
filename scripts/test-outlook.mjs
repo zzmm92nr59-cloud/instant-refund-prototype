@@ -143,6 +143,14 @@ const call = (path, { method = "GET", body, token, ip = "1.1.1.1", e = env } = {
     body: body ? JSON.stringify(body) : undefined }), e, new URL("https://w.test" + path), {}, { now: clock, fetchImpl });
 const post = (path, token, body) => call(path, { method: "POST", token, body });
 const loc = res => res.headers.get("location");
+// "Connect Outlook" comes back with a single-use code the app hands in with the session that started it (gmail.js
+// finishMailConnect); this does that and says what the app would then be told.
+const finished = async (res, token) => {
+  const m = /#outlook=finish&mailcode=([A-Za-z0-9_-]{43})$/.exec(loc(res) || "");
+  if (!m) return loc(res);
+  const b = await (await post("/relay/my/gmail/finish", token, { code: m[1] })).json();
+  return "#outlook=" + (b.result || b.error);
+};
 const NONCE = "N".repeat(43);
 
 // ---- 1. Which sign-in buttons to show ----
@@ -232,7 +240,7 @@ assert.match(loc(await mscb("code=mail-good&state=" + gstate)), /#outlook=failed
 const cu2 = await connectUrl();
 assert.match(loc(await call("/relay/gmail/callback?code=good-code&state=" + cu2.searchParams.get("state"))), /#gmail=failed$/);
 const cu3 = await connectUrl();
-assert.match(loc(await mscb("code=mail-good&state=" + cu3.searchParams.get("state"))), /#outlook=connected$/);
+assert.match(await finished(await mscb("code=mail-good&state=" + cu3.searchParams.get("state")), jessToken), /#outlook=connected$/);
 assert.match(loc(await mscb("code=mail-good&state=" + cu3.searchParams.get("state"))), /#outlook=failed$/, "single-use");
 let g = await (await call("/relay/my/gmail", { token: jessToken })).json();
 assert.equal(g.connected, true);
@@ -344,7 +352,7 @@ const againMs = new URL((await (await post("/relay/my/gmail/connect", jessToken,
 assert.equal(againMs.origin, "https://login.microsoftonline.com");
 assert.equal(againMs.searchParams.get("login_hint"), "jess.tester@outlook.com", "Microsoft suggests that same inbox");
 msRefreshOk = true;
-assert.match(loc(await mscb("code=mail-good&state=" + againMs.searchParams.get("state"))), /#outlook=reconnected$/);
+assert.match(await finished(await mscb("code=mail-good&state=" + againMs.searchParams.get("state")), jessToken), /#outlook=reconnected$/);
 assert.equal((await olState()).needsReconnect, false);
 assert.equal(sqlite.prepare("SELECT COUNT(*) n FROM captured_receipts WHERE status <> 'not_receipt'").get().n, olKept, "receipts kept");
 console.log("ok - Outlook whose access ended says so, and Connect again brings it back with its receipts");

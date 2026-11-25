@@ -251,6 +251,51 @@ assert.equal((await read("/relay/my/receipts", reviewToken)).status, 200, "the r
 assert.equal((await read("/relay/my/second-step", reviewToken)).body.required, false);
 console.log("ok - the app-reviewer account needs no second step");
 
+// 6b. A new way in (a passkey, an authenticator app, a phone number for codes) needs a recent sign-in once the account has a
+// second step (security review M3, 25 Nov 2026): otherwise a stolen session could add its own passkey, which signs in alone,
+// and keep coming back after "Sign out other devices". Recent: the second step was passed in this session in the last 15
+// minutes. Setting up the account's first second step is always allowed (that is what makes the session checked).
+{
+  const sam = await emailSignIn("sam.fresh@example.com");
+  const samKey = await turnOnApp(sam.sessionToken);
+  assert.equal((await addPasskey(sam.sessionToken, newDevice())).status, 200, "just set up: recent enough to add a passkey");
+  clock += 16 * 60e3;
+  const stale = sam.sessionToken;
+  const keys = () => sqlite.prepare("SELECT COUNT(*) n FROM auth_passkeys p JOIN shoppers s ON s.id = p.shopper_id WHERE s.email = 'sam.fresh@example.com'").get().n;
+  const had = keys();
+  assert.deepEqual(await post("/relay/my/passkeys/options", stale), { status: 403, body: { error: "recheck_needed" } }, "an old session can't start adding a passkey");
+  assert.deepEqual(await post("/relay/my/passkeys/register", stale, { id: "x", name: "Mine", response: { clientDataJSON: "x", attestationObject: "x" } }), { status: 403, body: { error: "recheck_needed" } });
+  const one = sqlite.prepare("SELECT credential_id FROM auth_passkeys p JOIN shoppers s ON s.id = p.shopper_id WHERE s.email = 'sam.fresh@example.com'").get().credential_id;
+  assert.deepEqual(await post("/relay/my/passkeys/remove", stale, { id: one }), { status: 403, body: { error: "recheck_needed" } }, "nor remove one");
+  assert.equal(keys(), had);
+  assert.deepEqual(await post("/relay/my/2fa/text", stale, { on: true, code: "123456" }), { status: 403, body: { error: "recheck_needed" } }, "nor turn on codes by text");
+  assert.deepEqual(await post("/relay/my/phone/start", stale, { phone: "07700 900123" }), { status: 403, body: { error: "recheck_needed" } }, "nor add a phone number");
+  assert.equal((await read("/relay/my/receipts", stale)).status, 200, "everything else carries on as before");
+  // Signing in again (email link and a code from the app) is recent: adding works again.
+  const back = await emailSignIn("sam.fresh@example.com");
+  const fresh = await post("/relay/auth/2fa/verify", undefined, { pendingToken: back.pendingToken, code: hotp(samKey, stepNow() + 1) });
+  assert.equal(fresh.status, 200);
+  assert.equal((await addPasskey(fresh.body.sessionToken, newDevice())).status, 200, "a fresh sign-in can add one");
+  // A passkey sign-in is recent too.
+  const dev = newDevice();
+  assert.equal((await addPasskey(fresh.body.sessionToken, dev)).status, 200);
+  clock += 16 * 60e3;
+  assert.equal((await post("/relay/my/passkeys/options", fresh.body.sessionToken)).status, 403);
+  const viaKey = await passkeySignIn(dev);
+  assert.equal((await post("/relay/my/passkeys/options", viaKey.body.sessionToken)).status, 200);
+  // A passkey-only account: an old session can't set up an authenticator app either (it would hold that second step).
+  const kai = await emailSignIn("kai.fresh@example.com");
+  assert.equal((await addPasskey(kai.sessionToken, newDevice())).status, 200);
+  clock += 16 * 60e3;
+  assert.deepEqual(await post("/relay/my/2fa/setup", kai.sessionToken), { status: 403, body: { error: "recheck_needed" } });
+  assert.deepEqual(await post("/relay/my/2fa/enable", kai.sessionToken, { code: "123456" }), { status: 400, body: { error: "setup_first" } });
+  // A session from before this rule (no time recorded) counts as old.
+  const legacy = await oldSession("sam.fresh@example.com");
+  sqlite.prepare("UPDATE auth_sessions SET second_step = 1 WHERE session_hash = ?").run(createHash("sha256").update(legacy).digest("hex"));
+  assert.deepEqual(await post("/relay/my/passkeys/options", legacy), { status: 403, body: { error: "recheck_needed" } });
+  console.log("ok - adding a passkey, an app or a phone needs a recent sign-in once the account has a second step");
+}
+
 // 7. Switched off again: optional, and anything can be turned off.
 delete env.SECOND_STEP_REQUIRED;
 clock += 60e3;

@@ -253,6 +253,43 @@ assert.deepEqual(await runAiReads(env, clock, fetchImpl), { read: 0, why: "spend
 delete env.AI_MONTHLY_LIMIT_PENCE;
 console.log("ok - over the monthly limit every feature falls back quietly (reader, picks, shops, Read it again, receipt photos, help chat, photo search); next month it's back");
 
+// 7b. A few accounts can't use up everyone's AI (security review L3, 25 Nov 2026). Help chat, search by photo and listing
+// text are counted per shopper per day too (AI_SHOPPER_EVERYDAY_LIMIT_PENCE), separately from receipt reading, and none of
+// those features can take more than its share of the month (AI_FEATURE_MONTH_SHARE, half unless set).
+{
+  const chat = (who, text = "How do I add a receipt?") => handleSupportRoute("/relay/my/help/chat", "POST", chatReq("POST", { messages: [{ role: "user", text }] }), env, {}, who, { now: clock, fetchImpl });
+  const jessShopper = { id: J, email: "jess.private@example.com" };
+  // One question's most-it-could-cost (R) and what it really cost (c): a daily share between R and c + R lets one through, not two.
+  aiCalls = [];
+  { const first = await chat(samShopper); assert.equal(first.status, 200, "Sam's first question is answered"); }
+  const R = mostItCouldCost(env, aiCalls[0]), c = sqlite.prepare("SELECT pence FROM ai_spend_shopper_everyday WHERE shopper_id = ?").get(S).pence;
+  assert.ok(c > 0 && c < R);
+  const oneChat = R;
+  env.AI_SHOPPER_EVERYDAY_LIMIT_PENCE = String(R + c / 2);
+  aiCalls = [];
+  assert.deepEqual([(await chat(samShopper)).status, aiCalls.length], [503, 0], "his second today isn't sent: his own daily share is used");
+  const ps2 = await handlePhotoSearchRoute(new Request("https://w.test/relay/my/photo-search", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ image: "data:image/png;base64,bm90LWEtcmVhbC1waWM=" }) }), env, new URL("https://w.test/relay/my/photo-search"), {}, samShopper, { now: clock, fetchImpl });
+  assert.equal(ps2.status, 503, "search by photo counts against the same daily share");
+  assert.equal((await chat(jessShopper)).status, 200, "Jess still gets an answer");
+  assert.ok((await askForItems(env, section, fetchImpl, { shopperId: S, now: clock })).reading, "Sam's receipt reading has its own limit and carries on");
+  assert.ok(sqlite.prepare("SELECT pence FROM ai_spend_shopper_everyday WHERE shopper_id = ?").get(S).pence > 0, "kept per shopper per day (cost only)");
+  clock += 864e5;
+  assert.equal((await chat(samShopper)).status, 200, "the next day he can ask again");
+  delete env.AI_SHOPPER_EVERYDAY_LIMIT_PENCE;
+  // One feature's share of the month.
+  const spentChat = sqlite.prepare("SELECT pence FROM ai_spend WHERE month = ? AND feature = 'help_chat'").get("2026-12").pence;
+  env.AI_FEATURE_MONTH_SHARE = String((spentChat + oneChat * 0.5) / monthlyLimit(env));   // room for less than one more chat
+  aiCalls = [];
+  assert.equal((await chat(jessShopper)).status, 503, "help chat can't take more than its share of the month");
+  assert.ok((await askForItems(env, section, fetchImpl, { shopperId: J, now: clock })).reading, "receipt reading isn't stopped by it");
+  delete env.AI_FEATURE_MONTH_SHARE;
+  // Deleting the account removes the daily figures.
+  const { spendDeleteStatements } = await import("../worker/ai-spend.js");
+  await db.batch(spendDeleteStatements(db, S));
+  assert.equal(sqlite.prepare("SELECT COUNT(*) AS n FROM ai_spend_shopper_everyday WHERE shopper_id = ?").get(S).n, 0);
+  console.log("ok - help chat and search by photo have a daily share per shopper, and each feature a share of the month");
+}
+
 // 8. The health page: this month's spend against the limit, by feature, and what the reader found; Relay's team only.
 clock = NOV + 2 * 864e5;
 const h = await (await call("/relay/my/admin/health", { token: ops })).json();

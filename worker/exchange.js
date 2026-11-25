@@ -16,7 +16,7 @@ import { paymentsEnabled, cardOf, holdDifference, takeHeld, releaseHold, moneyTe
 import { shopPay } from "./shop-payments.js";
 import { handleSquareExchange } from "./square-orders.js";
 import { shopReturnsMany, returnWindow } from "./shop-returns.js";
-import { saveOrderAmountNow } from "./order-ref.js";
+import { saveOrderAmountNow, ensureOrderPaidColumn } from "./order-ref.js";
 
 const json = (body, status = 200, cors = {}) => Response.json(body, { status, headers: { ...cors, "Cache-Control": "no-store" } });
 const SHOP = /^shopify:([a-z0-9-]+\.myshopify\.com)$/;
@@ -34,7 +34,7 @@ export function ensureExchangeTables(db) {
     // old, removed line. Added later.
     for (const col of ["from_line_id TEXT", "from_price_minor INTEGER"])
       try { await db.prepare("ALTER TABLE relay_exchanges ADD COLUMN " + col).run(); } catch { /* already there */ }
-  }));
+  })).then(() => ensureOrderPaidColumn(db));
 }
 
 const itemKey = (shop, productId) => "shopify:" + shop + ":item:gid://shopify/Product/" + productId;
@@ -164,15 +164,20 @@ async function ownedLine(env, shopper, orderId, lineId) {
   if (!order) return null;
   const m = SHOP.exec(order.retailer);
   if (!m) return null;
-  const line = await db.prepare(`SELECT external_line_item_id AS lineId, product_id AS productId, variant_id AS variantId, title, quantity, price_minor AS priceMinor
-    FROM order_items WHERE order_id = ? AND external_line_item_id = ?`).bind(order.id, String(lineId || "")).first();
+  const line = await db.prepare(`SELECT external_line_item_id AS lineId, product_id AS productId, variant_id AS variantId, title, quantity, price_minor AS priceMinor,
+    paid_minor AS paidMinor FROM order_items WHERE order_id = ? AND external_line_item_id = ?`).bind(order.id, String(lineId || "")).first();
   if (!line || !line.productId || !line.variantId) return null;
   return { order, shop: m[1], line };
 }
+// What one of the line's items actually cost the shopper (after its discounts): Shopify's own answer when the swap asks it
+// (livePaid), else what Relay kept when the order came in, else (a line kept before Relay kept that) its price. A swap's
+// difference is the new item's price less this, which is also what Shopify's order edit comes to (the old line goes with its
+// discount, the new one comes at its price), so Relay never refunds more than the line cost (security review M2).
+const paidFor = (line, livePaid) => Number.isFinite(livePaid) ? livePaid : Number.isFinite(line.paidMinor) ? line.paidMinor : line.priceMinor;
 
 // What the shopper can swap to. Same price: always (if in stock). Dearer: paid through the shop's Shopify checkout, or with a
 // saved card if the shop chose instant card payments. Cheaper: refunded in Shopify. A different price only for a single item.
-async function options(env, owned, card, pay) {
+async function options(env, owned, card, pay, livePaid = null) {
   const db = env.RELAY_DB;
   const rows = ((await db.prepare(`SELECT v.id AS key, v.external_variant_id AS gid, v.title, v.price_minor AS priceMinor, v.currency,
       (SELECT MAX(s.quantity) FROM retailer_inventory_snapshots s WHERE s.variant_id = v.id) AS quantity
@@ -184,7 +189,8 @@ async function options(env, owned, card, pay) {
   const payments = byCard && paymentsEnabled(env);
   return rows.filter(r => r.gid !== current).map(r => {
     const inStock = Number(r.quantity) > 0;
-    const diff = r.currency === "GBP" && Number.isFinite(r.priceMinor) && Number.isFinite(owned.line.priceMinor) ? r.priceMinor - owned.line.priceMinor : null;
+    const paid = paidFor(owned.line, livePaid);
+    const diff = r.currency === "GBP" && Number.isFinite(r.priceMinor) && Number.isFinite(paid) ? r.priceMinor - paid : null;
     let reason = !inStock ? "Out of stock" : null;
     if (!reason && diff === null) reason = "Different price (not supported yet)";
     else if (!reason && diff !== 0 && Number(owned.line.quantity) !== 1) reason = "Different price (only for a single item)";
@@ -274,9 +280,11 @@ async function doExchange(env, shopper, body, o) {
   const choice = (await options(env, owned, card, pay)).find(x => x.key === String(body && body.variantKey || ""));
   if (!choice) return [400, { error: "not_an_option" }];
   if (!choice.available) return [409, { error: choice.reason === "Out of stock" ? "out_of_stock" : choice.needsCard ? "card_needed" : "different_price" }];
-  const diff = choice.priceDiffMinor || 0;
-  // The shopper must have seen and agreed the same difference the server works out now (prices can change meanwhile).
-  if (diff !== 0 && Number(body && body.agreedDiffMinor) !== diff) return [409, { error: "price_changed", priceDiffMinor: diff }];
+  let diff = choice.priceDiffMinor || 0;
+  // The shopper must have seen and agreed the same difference the server works out now (prices can change meanwhile). An
+  // agreed amount that isn't Relay's own is checked again once the shop has said what the line really cost (below).
+  const agreed = body && body.agreedDiffMinor != null && Number.isFinite(Number(body.agreedDiffMinor)) ? Number(body.agreedDiffMinor) : null;
+  if (diff !== 0 && agreed === null) return [409, { error: "price_changed", priceDiffMinor: diff }];
   const stores = await (o.listStores ? o.listStores() : listConnectedShopifyStores(env, o)).catch(() => []);
   const store = stores.find(s => s.domain === owned.shop);
   if (!store) return [409, { error: "shop_not_connected" }];
@@ -293,11 +301,23 @@ async function doExchange(env, shopper, body, o) {
   let hold = null;
   try {
     // Live checks at the shop: the order hasn't been sent, and the new item really is in stock right now.
-    const live = await gql(owned.shop, store.token, `query RelayExchangeCheck($o: ID!, $v: ID!) { order(id: $o) { cancelledAt displayFulfillmentStatus }
+    // Also what the shopper's line cost after its discounts, as the shop's Shopify says now (security review M2).
+    const live = await gql(owned.shop, store.token, `query RelayExchangeCheck($o: ID!, $v: ID!) { order(id: $o) { cancelledAt displayFulfillmentStatus
+      lineItems(first: 100) { nodes { id quantity discountedUnitPriceAfterAllDiscountsSet { shopMoney { amount } } } } }
       productVariant(id: $v) { inventoryQuantity title } }`, { o: "gid://shopify/Order/" + owned.order.ext, v: toGid }, f);
     if (!live.order || live.order.cancelledAt) return [409, { error: "order_cancelled" }];
     if (live.order.displayFulfillmentStatus !== "UNFULFILLED") return [409, { error: sentState(String(live.order.displayFulfillmentStatus || "")) }];
     if (!live.productVariant || !(Number(live.productVariant.inventoryQuantity) >= owned.line.quantity)) return [409, { error: "out_of_stock" }];
+    const liveNode = ((live.order.lineItems && live.order.lineItems.nodes) || []).find(n => n && String(n.id).split("/").pop() === String(owned.line.lineId));
+    const liveAmount = liveNode && liveNode.discountedUnitPriceAfterAllDiscountsSet && liveNode.discountedUnitPriceAfterAllDiscountsSet.shopMoney && liveNode.discountedUnitPriceAfterAllDiscountsSet.shopMoney.amount;
+    const livePaid = liveAmount != null && liveAmount !== "" && Number.isFinite(Number(liveAmount)) ? Math.round(Number(liveAmount) * 100) : null;
+    if (livePaid != null && livePaid !== paidFor(owned.line)) {
+      // Relay's copy was out of date: the difference is worked out from what Shopify says, and agreed before anything changes.
+      const now = (await options(env, owned, card, pay, livePaid)).find(x => x.key === choice.key);
+      if (!now || !now.available) return [409, { error: now && now.reason === "Out of stock" ? "out_of_stock" : now && now.needsCard ? "card_needed" : "different_price" }];
+      diff = now.priceDiffMinor || 0;
+    }
+    if (diff !== 0 && agreed !== diff) return [409, { error: "price_changed", priceDiffMinor: diff }];
     // Dearer: hold the difference on the saved card before touching the order. Nothing is taken until the order is changed.
     const byCard = diff > 0 && pay.method === "card";
     if (byCard) {
@@ -347,7 +367,7 @@ async function doExchange(env, shopper, body, o) {
     // The order as the shop now has it: the new item is a line of its own, and the total may have changed with it. Relay's
     // copy follows, so the new item can be returned later (the shop's refund is matched by this line) and what the order
     // comes to now is right.
-    const moved = await followSwap(db, owned, commit.orderEditCommit.order, toGid, oldLine.id, diff).catch(() => null);
+    const moved = await followSwap(db, owned, commit.orderEditCommit.order, toGid, oldLine.id, choice.priceMinor, byCard ? diff : 0).catch(() => null);
     const orderGid = "gid://shopify/Order/" + owned.order.ext;
     let paid = null, payUrl = null, refunded = null;
     if (hold) paid = await takeHeld(env, hold, o);
@@ -376,20 +396,23 @@ async function doExchange(env, shopper, body, o) {
 // that's what its confirmation email says, order-ref.js). Returns the new line's id, or null when Shopify's answer doesn't
 // show it (then nothing is changed, and the swap is kept the old way, against the line it replaced).
 const tail = (gid) => String(gid == null ? "" : gid).split("/").pop();
-async function followSwap(db, owned, order, toGid, oldLineGid, diff) {
+// newPrice: the new item's price. byCardMinor: what the shopper paid Relay by card for it, which the shop's order shows as a
+// discount on the new line; so what the new line cost on the order is its price less that (paid_minor).
+async function followSwap(db, owned, order, toGid, oldLineGid, newPrice, byCardMinor) {
   const oldId = tail(oldLineGid);
   const fresh = ((order.lineItems && order.lineItems.nodes) || []).filter(n => n && n.variant && n.variant.id === toGid && Number(n.currentQuantity) > 0 && /^\d{1,20}$/.test(tail(n.id)) && tail(n.id) !== oldId)
     .map(n => tail(n.id)).sort((a, b) => (a.length - b.length) || (a < b ? -1 : 1));
   const newId = fresh[fresh.length - 1];
   if (!newId) return null;
   const qty = Number(owned.line.quantity) || 1;
-  const price = Number.isFinite(owned.line.priceMinor) ? owned.line.priceMinor + Math.round((diff || 0) / qty) : null;
+  const price = Number.isFinite(newPrice) ? newPrice : null;
+  const paid = price == null ? null : price - Math.round((byCardMinor || 0) / qty);
   const total = Math.round(Number(order.currentTotalPriceSet && order.currentTotalPriceSet.shopMoney && order.currentTotalPriceSet.shopMoney.amount) * 100);
   const steps = [
     // (Shopify's own notice about the changed order may have added the new line already.)
     db.prepare("DELETE FROM order_items WHERE order_id = ? AND external_line_item_id = ?").bind(owned.order.id, newId),
-    db.prepare("UPDATE order_items SET id = ?, external_line_item_id = ?, variant_id = ?, price_minor = COALESCE(?, price_minor) WHERE order_id = ? AND external_line_item_id = ?")
-      .bind(owned.order.id + ":item:" + newId, newId, tail(toGid), price, owned.order.id, String(owned.line.lineId)),
+    db.prepare("UPDATE order_items SET id = ?, external_line_item_id = ?, variant_id = ?, price_minor = COALESCE(?, price_minor), paid_minor = ? WHERE order_id = ? AND external_line_item_id = ?")
+      .bind(owned.order.id + ":item:" + newId, newId, tail(toGid), price, paid, owned.order.id, String(owned.line.lineId)),
   ];
   await db.batch(steps);
   if (Number.isSafeInteger(total) && total >= 0) await saveOrderAmountNow(db, owned.order.id, total);

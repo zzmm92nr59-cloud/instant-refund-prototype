@@ -31,6 +31,7 @@ import { indexBy, among, amongAt, byTime, nearTime, nearTimeAt } from "./list-in
 import { REREADS_SQL, REREADS_PER_DAY, REREAD_AI_PER_DAY, REREAD_AI_ALL_DAY, orderSection, askForItems, acceptAiItems, namedInEmail, rereadsUsed } from "./receipt-reread.js";
 import { PARCEL_TRACKS_SQL, PARCEL_USES_SQL, applyTracked, readTrackedRows, liveParcel } from "./parcel-tracking.js";
 import { RETURN_TRACKS_SQL, attachReturnTracking, readReturnTracks, saveReturnSent, liveReturnParcel, returnFacts } from "./return-tracking.js";
+import { senderCheckOf } from "./mail-auth.js";
 import { aiTypesFor, learnItemKinds } from "./item-kinds.js";
 import { categorise, itemCategories, itemKinds, returnableItems, storeKey, legacyStoreKey, agreedShopNames, agreedNameFor, logoDomainFor, CATEGORIES, shopDisplayName, PERSONAL_MAIL } from "./receipt-category.js";
 import { cleanItems, isVia, nameFitsDomain } from "./receipt-reader.js";
@@ -473,7 +474,11 @@ async function ensureGmailTablesRun(db) {
   await runAll(db, statements);
   // Which kind of mailbox a connection (or a connection being started) is: NULL for Gmail, 'microsoft' for Outlook.
   // full_rev: which complete read of the look-back period the mailbox has had (see OUTLOOK_FULL_REV).
+  // session_hash: the session that started "Connect" (security review H1, 25 Nov 2026). finish_hash, token_iv, token_data:
+  // the inbox's token, sealed, waiting for that same session to finish the connection (finishMailConnect).
   for (const sql of ["ALTER TABLE gmail_connections ADD COLUMN provider TEXT", "ALTER TABLE gmail_oauth_states ADD COLUMN provider TEXT",
+    "ALTER TABLE gmail_oauth_states ADD COLUMN session_hash TEXT", "ALTER TABLE gmail_oauth_states ADD COLUMN finish_hash TEXT",
+    "ALTER TABLE gmail_oauth_states ADD COLUMN token_iv TEXT", "ALTER TABLE gmail_oauth_states ADD COLUMN token_data TEXT",
     "ALTER TABLE gmail_connections ADD COLUMN full_rev INTEGER",
     // An earlier year's reader (see READER_FULL_REV) and where a background re-read of it has got to.
     "ALTER TABLE gmail_history_years ADD COLUMN rev INTEGER", "ALTER TABLE gmail_history_years ADD COLUMN cursor TEXT"]) {
@@ -1010,6 +1015,9 @@ const TWO_PART_TLDS = new Set(["co.uk", "org.uk", "ac.uk", "gov.uk", "com.au", "
 export function logoDomain(host) {
   const h = String(host || "").toLowerCase().trim();
   if (h.length > 80 || !/^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(h) || /^[0-9.]+$/.test(h) || /(^|\.)(localhost|local|internal|test|invalid)$/.test(h)) return null;
+  // A public name only (security review L4): its last part is letters (never a number or 0x-number an address could be
+  // read as), and not a name used only inside homes and offices.
+  if (!/\.[a-z]{2,63}$/.test(h) || /(^|\.)0x[0-9a-f]+(\.|$)/.test(h) || /(^|\.)(lan|home|corp|intranet|internal|private|arpa|onion|localdomain)$/.test(h)) return null;
   const parts = h.split(".");
   const n = TWO_PART_TLDS.has(parts.slice(-2).join(".")) ? 3 : 2;
   return parts.slice(-n).join(".");
@@ -1047,13 +1055,28 @@ function logoSources(domain) {
     { url: `https://${domain}/favicon.ico` }, { url: `https://www.${domain}/favicon.ico` },
   ];
 }
+// Security review L4 (25 Nov 2026): redirects are followed by hand, at most three, and only to another https address with
+// a public name (logoDomain); and the body is read only up to a logo's size, never downloaded whole first.
+const LOGO_REDIRECTS = 3;
+async function logoGet(fetchImpl, url) {
+  for (let hop = 0; hop <= LOGO_REDIRECTS; hop++) {
+    const res = await fetchImpl(url, { headers: { Accept: "image/*" }, redirect: "manual", signal: AbortSignal.timeout(LOGO_WAIT_MS) });
+    if (res.status < 300 || res.status >= 400) return res;
+    let next = null;
+    try { next = new URL(res.headers.get("location") || "", url); } catch { return null; }
+    if (next.protocol !== "https:" || next.port || next.username || next.password || !logoDomain(next.hostname)) return null;
+    url = next.href;
+  }
+  return null;
+}
 async function fetchLogo(fetchImpl, domain) {
   for (const src of logoSources(domain)) {
     try {
-      const res = await fetchImpl(src.url, { headers: { Accept: "image/*" }, redirect: "follow", signal: AbortSignal.timeout(LOGO_WAIT_MS) });
-      if (!res.ok || (res.url && !String(res.url).startsWith("https://"))) continue;
-      const bytes = new Uint8Array(await res.arrayBuffer());
-      if (bytes.length < LOGO_MIN_BYTES || bytes.length > LOGO_MAX_BYTES) continue;
+      const res = await logoGet(fetchImpl, src.url);
+      if (!res || !res.ok || (res.url && !String(res.url).startsWith("https://"))) continue;
+      if (Number(res.headers.get("content-length")) > LOGO_MAX_BYTES) { try { await res.body?.cancel(); } catch { /* gone */ } continue; }
+      const got = await bodyUpTo(res, LOGO_MAX_BYTES + 1), bytes = got.bytes;
+      if (got.cut || bytes.length < LOGO_MIN_BYTES || bytes.length > LOGO_MAX_BYTES) continue;
       const type = logoTypeOf(bytes);
       if (!type) continue;
       if (src.minPx) { const px = imagePx(bytes); if (px == null || px < src.minPx) continue; }
@@ -1062,6 +1085,7 @@ async function fetchLogo(fetchImpl, domain) {
   }
   return null;
 }
+export const _fetchLogo = fetchLogo;   // for scripts/test-logo-fetch.mjs
 async function logoFor(env, fetchImpl, domain, now) {
   const row = await env.RELAY_DB.prepare("SELECT type, data, found, fetched_at FROM retailer_logos WHERE domain = ?").bind(domain).first();
   if (row && (row.found || (now - row.fetched_at < LOGO_RETRY_MS && row.fetched_at >= LOGO_SOURCES_SINCE))) return row.found ? row : null;
@@ -1160,21 +1184,25 @@ function classifyNow(rawText, ref, lenient = false) {
   const ret = upd.ok || par.ok ? { ok: false } : parseReturnEmail(rawText);
   const del = upd.ok || par.ok || ret.ok ? { ok: false } : parseDeliveryEmail(rawText);
   const receipt = upd.ok || par.ok || ret.ok || del.ok ? { ok: false } : parseReceiptEmail(rawText, { lenient });
+  // Whether a return or parcel email checked out for its own sender, as the receiving mail service wrote down (mail-auth.js;
+  // security review M4). One that fails is never a carrier's or shop's word on a return (return-tracking.js).
+  const check = upd.ok || par.ok || del.ok ? senderCheckOf(rawText) : null;
+  const checked = check ? { senderCheck: check } : {};
   if (upd.ok) {
     details = {
       kind: "return_update", ...ref, stage: upd.stage, at: upd.at, amountPence: upd.amountPence, currency: upd.currency,
       ...(upd.paidPence != null ? { paidPence: upd.paidPence, paidOn: upd.paidOn || null } : {}),
-      orderRef: upd.orderRef, returnId: upd.returnId, retailer: upd.retailer, source: "shopper_email", refundEligible: false, parserVersion: PARSER_VERSION
+      orderRef: upd.orderRef, returnId: upd.returnId, retailer: upd.retailer, source: "shopper_email", refundEligible: false, parserVersion: PARSER_VERSION, ...checked
     };
   } else if (par.ok) {
     details = {
       kind: "return_update", ...ref, stage: par.stage, at: par.at, fromCarrier: par.fromCarrier, carrier: par.carrier, trackingNumber: par.trackingNumber,
-      shopNamed: par.shop, orderRef: par.orderRef, retailer: par.retailer, source: "shopper_email", refundEligible: false, parserVersion: PARSER_VERSION
+      shopNamed: par.shop, orderRef: par.orderRef, retailer: par.retailer, source: "shopper_email", refundEligible: false, parserVersion: PARSER_VERSION, ...checked
     };
   } else if (del.ok) {
     details = {
       kind: "delivery_update", ...ref, status: del.status, at: del.at, carrier: del.carrier, trackingNumber: del.trackingNumber,
-      merchant: del.merchant, retailer: del.retailer, orderRef: del.orderRef, source: "shopper_email", refundEligible: false, parserVersion: PARSER_VERSION
+      merchant: del.merchant, retailer: del.retailer, orderRef: del.orderRef, source: "shopper_email", refundEligible: false, parserVersion: PARSER_VERSION, ...checked
     };
   } else if (ret.ok) {
     details = {
@@ -3419,8 +3447,44 @@ export async function receiptForHelp(env, shopperId, receiptId) {
   };
 }
 
-// Google redirects the browser here. No bearer token is available, so the single-use
-// state (bound to the shopper who began the flow) is the only thing that identifies them.
+// Google (or Microsoft) redirects the browser here. No bearer token is available, and whoever's browser this is hasn't shown
+// they are the shopper who started: the consent link can be sent to someone else, whose inbox would then be connected to
+// the sender's account (security review H1, 25 Nov 2026). So nothing is connected here. The inbox's token waits, sealed,
+// for 10 minutes, and the browser goes back to the app with a single-use code (#gmail=finish&mailcode=…). The app hands it
+// to POST /relay/my/gmail/finish signed in with the very session that started (finishMailConnect); anyone else is refused
+// and the token is deleted. The same pattern as the bank (bank.js finishBank).
+const FINISH_LIFE_MS = 10 * 60 * 1000;
+async function holdForFinish(env, stateHash, provider, address, refreshToken, now) {
+  const sealed = await encrypt(env, JSON.stringify({ r: refreshToken, a: address || null, p: provider || null }));
+  const finish = randomToken();
+  await env.RELAY_DB.prepare("UPDATE gmail_oauth_states SET finish_hash = ?, token_iv = ?, token_data = ?, expires_at = ? WHERE state_hash = ?")
+    .bind(await sha256Hex(finish), sealed.iv, sealed.data, now + FINISH_LIFE_MS, stateHash).run();
+  return "finish&mailcode=" + finish;
+}
+// POST /relay/my/gmail/finish { code }: the app, back from Google's or Microsoft's page, hands in the code the callback gave
+// it. Only the session that started the connection can finish it. The code works once, whoever uses it.
+async function finishMailConnect(env, shopper, code, now, cors) {
+  if (typeof code !== "string" || !/^[A-Za-z0-9_-]{43}$/.test(code)) return json({ error: "invalid_request" }, 400, cors);
+  const row = await env.RELAY_DB.prepare(
+    "UPDATE gmail_oauth_states SET finish_hash = NULL WHERE finish_hash = ? AND expires_at > ? RETURNING state_hash, shopper_id, session_hash, token_iv, token_data, provider")
+    .bind(await sha256Hex(code), now).first();
+  if (!row) return json({ error: "link_failed" }, 409, cors);
+  await env.RELAY_DB.prepare("DELETE FROM gmail_oauth_states WHERE state_hash = ?").bind(row.state_hash).run();
+  if (ownerOf(row.shopper_id) !== shopper.id || !shopper.sessionHash || row.session_hash !== shopper.sessionHash || !row.token_data) {
+    console.log("mail connect: finished by someone other than whoever started it; refused");
+    return json({ error: "not_your_link" }, 403, cors);
+  }
+  if (!(await hasConsent(env.RELAY_DB, shopper.id))) return json({ error: "consent_required" }, 403, cors);
+  let held = null;
+  try { held = JSON.parse(await decrypt(env, row.token_iv, row.token_data)); } catch { held = null; }
+  if (!held || typeof held.r !== "string") return json({ error: "link_failed" }, 409, cors);
+  const provider = row.provider === "microsoft" ? "microsoft" : null, address = typeof held.a === "string" ? held.a : null;
+  const out = (result) => json({ ok: true, result, provider: provider ? "microsoft" : "google" }, 200, cors);
+  if (await inboxTaken(env, row.shopper_id, provider, address)) return out("already_connected");
+  const again = await connectedAgain(env, row.shopper_id, provider, address);
+  await saveConnection(env, row.shopper_id, provider, address, held.r, now);
+  return out(again ? "reconnected" : slotOf(row.shopper_id) ? "added" : "connected");
+}
 export async function handleGmailCallback(request, env, url, opts) {
   const appUrl = String(env.RELAY_APP_URL || opts.appUrl).split("#")[0];
   const back = result => Response.redirect(appUrl + "#gmail=" + result, 302);
@@ -3430,9 +3494,11 @@ export async function handleGmailCallback(request, env, url, opts) {
   const state = url.searchParams.get("state") || "";
   if (!code || !/^[A-Za-z0-9_-]{43}$/.test(state)) return back("failed");
   const claimed = await env.RELAY_DB.prepare(
-    `UPDATE gmail_oauth_states SET used_at = ? WHERE state_hash = ? AND provider IS NULL AND used_at IS NULL AND expires_at > ? RETURNING shopper_id`)
+    `UPDATE gmail_oauth_states SET used_at = ? WHERE state_hash = ? AND provider IS NULL AND used_at IS NULL AND expires_at > ? RETURNING state_hash, shopper_id, session_hash`)
     .bind(opts.now, await sha256Hex(state), opts.now).first();
   if (!claimed) return back("failed");
+  // A try that doesn't say which session started it (made before this rule) can't be finished safely.
+  if (!claimed.session_hash) return back("failed");
   if (!(await hasConsent(env.RELAY_DB, ownerOf(claimed.shopper_id)))) return back("consent_needed");
   const res = await opts.fetchImpl("https://oauth2.googleapis.com/token", {
     method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -3450,10 +3516,7 @@ export async function handleGmailCallback(request, env, url, opts) {
       { headers: { Authorization: "Bearer " + tokens.access_token } });
     if (p.ok) googleEmail = (await p.json()).emailAddress || null;
   } catch { googleEmail = null; }
-  if (await inboxTaken(env, claimed.shopper_id, null, googleEmail)) return back("already_connected");
-  const again = await connectedAgain(env, claimed.shopper_id, null, googleEmail);
-  await saveConnection(env, claimed.shopper_id, null, googleEmail, tokens.refresh_token, opts.now);
-  return back(again ? "reconnected" : slotOf(claimed.shopper_id) ? "added" : "connected");
+  return back(await holdForFinish(env, claimed.state_hash, null, googleEmail, tokens.refresh_token, opts.now));
 }
 // The same inbox was already in this place: it has been connected again (Relay's access had ended), not added.
 async function connectedAgain(env, boxId, provider, address) {
@@ -3519,9 +3582,10 @@ export async function handleOutlookCallback(request, env, url, opts) {
   const state = url.searchParams.get("state") || "";
   if (!code || !/^[A-Za-z0-9_-]{43}$/.test(state)) return back("failed");
   const claimed = await env.RELAY_DB.prepare(
-    `UPDATE gmail_oauth_states SET used_at = ? WHERE state_hash = ? AND provider = 'microsoft' AND used_at IS NULL AND expires_at > ? RETURNING shopper_id`)
+    `UPDATE gmail_oauth_states SET used_at = ? WHERE state_hash = ? AND provider = 'microsoft' AND used_at IS NULL AND expires_at > ? RETURNING state_hash, shopper_id, session_hash`)
     .bind(opts.now, await sha256Hex(state), opts.now).first();
   if (!claimed) return back("failed");
+  if (!claimed.session_hash) return back("failed");
   if (!(await hasConsent(env.RELAY_DB, ownerOf(claimed.shopper_id)))) return back("consent_needed");
   let tokens = null;
   try {
@@ -3542,10 +3606,7 @@ export async function handleOutlookCallback(request, env, url, opts) {
     const p = await opts.fetchImpl(GRAPH + "/me?$select=mail,userPrincipalName", { headers: { Authorization: "Bearer " + tokens.access_token } });
     if (p.ok) { const me = await p.json(); address = (typeof me.mail === "string" && me.mail) || (typeof me.userPrincipalName === "string" && me.userPrincipalName) || null; }
   } catch { address = null; }
-  if (await inboxTaken(env, claimed.shopper_id, "microsoft", address)) return back("already_connected");
-  const again = await connectedAgain(env, claimed.shopper_id, "microsoft", address ? address.slice(0, 254) : null);
-  await saveConnection(env, claimed.shopper_id, "microsoft", address ? address.slice(0, 254) : null, tokens.refresh_token, opts.now);
-  return back(again ? "reconnected" : slotOf(claimed.shopper_id) ? "added" : "connected");
+  return back(await holdForFinish(env, claimed.state_hash, "microsoft", address ? address.slice(0, 254) : null, tokens.refresh_token, opts.now));
 }
 
 // Routes for a signed-in shopper. Returns a Response, or null if the path is not ours.
@@ -3597,8 +3658,8 @@ export async function handleGmailRoute(request, env, url, cors, shopper, opts) {
     const state = randomToken();
     await env.RELAY_DB.prepare("DELETE FROM gmail_oauth_states WHERE expires_at <= ?").bind(opts.now).run();
     await env.RELAY_DB.prepare(
-      "INSERT INTO gmail_oauth_states (state_hash,shopper_id,created_at,expires_at,provider) VALUES (?,?,?,?,?)")
-      .bind(await sha256Hex(state), boxId, opts.now, opts.now + STATE_TTL_MS, outlook ? "microsoft" : null).run();
+      "INSERT INTO gmail_oauth_states (state_hash,shopper_id,created_at,expires_at,provider,session_hash) VALUES (?,?,?,?,?,?)")
+      .bind(await sha256Hex(state), boxId, opts.now, opts.now + STATE_TTL_MS, outlook ? "microsoft" : null, shopper.sessionHash || null).run();
     if (outlook) {
       const ms = new URLSearchParams({
         client_id: env.MICROSOFT_CLIENT_ID, response_type: "code", redirect_uri: microsoftRedirect(env, url), response_mode: "query",
@@ -3611,6 +3672,10 @@ export async function handleGmailRoute(request, env, url, cors, shopper, opts) {
       access_type: "offline", prompt: another ? "consent select_account" : "consent", include_granted_scopes: "false", state, ...(hint ? { login_hint: hint } : {})
     });
     return json({ url: "https://accounts.google.com/o/oauth2/v2/auth?" + params }, 200, cors);
+  }
+  if (path === "/relay/my/gmail/finish" && m === "POST") {
+    const fb = await request.json().catch(() => null);
+    return finishMailConnect(env, shopper, fb && fb.code, opts.now, cors);
   }
   if (path === "/relay/my/gmail" && m === "GET") {
     // instant: Gmail or Outlook tells Relay the moment this inbox gets new mail (mail-push.js), so the app doesn't say "every

@@ -2156,6 +2156,7 @@
     already_enabled: "That's already on.", not_enabled: "That's already off.",
     not_for_review_account: "This account is for reviewing Relay, so that can't be added to it.",
     last_second_step: "Relay needs at least one second step for signing in. Add another way first, then turn this one off.", second_step_needed: "Set up a second step for signing in first.",
+    recheck_needed: "To keep your account safe, this needs a recent sign-in. Sign out, sign in again, then do this within 15 minutes.",
     text_on: "Codes by text are on. Turn them off first to use an authenticator app instead.", app_on: "The authenticator app is on. Turn it off first to use texts instead.", sign_in_expired: "That sign-in timed out or was cancelled. Please start again." };
   function say(node, text, bad) { node.textContent = text; node.className = "rl-msg" + (bad ? " err" : ""); }
   // A list that didn't load says so plainly, with a way to try again: never the "nothing here yet" words (which would be
@@ -3305,7 +3306,7 @@
       });
     });
   }
-  function passkeySaveProblem(x) { return x && x.body && x.body.error === "too_many_passkeys" ? "You've reached the limit of 5 passkeys. Remove one first." : "That passkey couldn't be saved. Try again."; }
+  function passkeySaveProblem(x) { var e = x && x.body && x.body.error; return e === "too_many_passkeys" ? "You've reached the limit of 5 passkeys. Remove one first." : e === "recheck_needed" ? errors.recheck_needed : "That passkey couldn't be saved. Try again."; }
   function passkeySection(box, msg) {
     if (!passkeysSupported()) return;
     var list = el("div"), note = el("div", { className: "rl-msg" });
@@ -3736,7 +3737,7 @@
     function setup() {
       say(note, "");
       api("/relay/my/2fa/setup", { method: "POST", body: {} }).then(function (r) {
-        if (!r.ok) return say(note, "Couldn't start setup. Try again.", true);
+        if (!r.ok) return say(note, errors[r.body && r.body.error] || "Couldn't start setup. Try again.", true);
         body.textContent = "";
         body.appendChild(el("p", { text: "1. In your authenticator app, add a new account and enter this key (or tap the link on your phone):" }));
         body.appendChild(el("div", { className: "rl-codes", text: r.body.secret }));
@@ -8102,7 +8103,9 @@
     var notes = { connected: [name + " connected. Scanning for receipts…", false, true], denied: ["You chose not to connect " + name + ". Relay needs a way to see your receipts, so you can try again or paste one.", true],
       failed: ["Couldn't connect " + name + ". Please try again.", true], consent_needed: ["Please agree to the permission step first, then connect " + name + ".", true], not_configured: [name + " connection isn't switched on yet.", true],
       added: [name + " inbox added. Relay is reading it now, and its receipts appear here in a few minutes.", false], already_connected: ["That inbox is already connected to Relay.", false],
-      reconnected: [name + " is connected again. Relay is catching up on what it missed, and new receipts come in as before.", false] };
+      reconnected: [name + " is connected again. Relay is catching up on what it missed, and new receipts come in as before.", false],
+      not_yours: ["That " + name + " connection was started on another device or in another account, so nothing was connected. Start again here.", true],
+      unreached: ["Couldn't reach Relay to finish connecting " + name + ". Check your connection, then start again.", true] };
     // Adding another inbox that didn't go ahead: the inboxes already connected carry on as they were.
     var adding = false; try { adding = sessionStorage.getItem("relay.addingInbox") === "1"; sessionStorage.removeItem("relay.addingInbox"); } catch (e) {}
     if (adding && result === "denied") return { text: "No inbox was added. Your other inboxes carry on as before.", bad: false };
@@ -8114,11 +8117,26 @@
     // passing: the note only says the first read is under way, so it goes once that read has finished.
     return { text: notes[result][0], bad: notes[result][1], passing: Boolean(notes[result][2]) };
   }
+  // Back from Google's or Microsoft's page after "Connect". The answer comes back as a single-use code
+  // (#gmail=finish&mailcode=…), which this app, signed in with the session that started, hands to Relay to finish it
+  // (worker/gmail.js finishMailConnect): a consent link opened anywhere else can't put someone's inbox in another account.
+  var MAIL_CODE = /^[A-Za-z0-9_-]{43}$/;
   function completeGmail() {
-    var m = /(?:^|[#&])(gmail|outlook)=(connected|added|reconnected|already_connected|denied|failed|consent_needed|not_configured)(?:&|$)/.exec(location.hash || "");
+    var hash = location.hash || "";
+    var m = /(?:^|[#&])(gmail|outlook)=(finish|connected|added|reconnected|already_connected|denied|failed|consent_needed|not_configured)(?:&|$)/.exec(hash);
     if (!m) return;
+    var code = (/(?:^|[#&])mailcode=([^&]*)/.exec(hash) || [])[1] || "";
     try { history.replaceState(null, "", location.pathname + location.search); } catch (e) {}
     var s = load(); if (!s || !s.token) return open(signedOutView);
+    if (m[2] !== "finish") return mailBack(s, m[1], m[2]);
+    if (!MAIL_CODE.test(code)) return mailBack(s, m[1], "failed");
+    api("/relay/my/gmail/finish", { method: "POST", body: { code: code } }).then(function (r) {
+      var b = r.body || {};
+      mailBack(s, m[1], r.ok && b.result ? b.result : b.error === "not_your_link" ? "not_yours" : b.error === "consent_required" ? "consent_needed" : "failed");
+    }, function () { mailBack(s, m[1], "unreached"); });
+  }
+  function mailBack(s, kind, result) {
+    var m = [null, kind, result];
     forgetMail(); staleReceipts();
     if (m[2] === "connected") rememberMailbox({ connected: true, provider: m[1] === "outlook" ? "microsoft" : "google" });
     var note = mailNote(m[2], m[1] === "outlook" ? "Outlook" : "Gmail");

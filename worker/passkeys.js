@@ -230,7 +230,7 @@ export async function handlePasskeyShopperRoute(path, method, request, env, cors
       // The account's first second step, made in this session (with Face ID or the like): in the same step, the session
       // counts as checked and the account's other sessions end (second-step.js).
       await env.RELAY_DB.batch([env.RELAY_DB.prepare("INSERT INTO auth_passkeys (credential_id,shopper_id,public_key,sign_count,name,created_at) VALUES (?,?,?,?,?,?)")
-        .bind(id, shopper.id, b64u(pub), ad.signCount, name, now), ...(!hasSecondStep(before) ? firstSecondStepStatements(env, shopper) : [])]);
+        .bind(id, shopper.id, b64u(pub), ad.signCount, name, now), ...(!hasSecondStep(before) ? firstSecondStepStatements(env, shopper, now) : [])]);
       await tellShopper(env, o, shopper.email, "passkey_added", { name });
       return h.json({ ok: true, name }, 200, cors);
     } catch { return fail(); }

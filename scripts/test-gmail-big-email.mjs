@@ -134,7 +134,7 @@ const sam = (await (await call("/relay/auth/verify", { method: "POST", body: { t
 const post = (path, body) => call(path, { method: "POST", token: sam, body });
 await post("/relay/my/consent", { version: CONSENT_VERSION });
 const state = new URL((await (await post("/relay/my/gmail/connect")).json()).url).searchParams.get("state");
-await call("/relay/gmail/callback?code=good&state=" + state);
+await post("/relay/my/gmail/finish", { code: /mailcode=([A-Za-z0-9_-]{43})/.exec((await call("/relay/gmail/callback?code=good&state=" + state)).headers.get("location"))[1] });
 
 // ---- The year, read the way the app reads it: the cursor it is given, round after round ----
 const started = Date.now();

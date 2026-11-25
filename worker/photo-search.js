@@ -155,7 +155,7 @@ export async function handlePhotoSearchRoute(request, env, url, cors, shopper, o
       // Room for a model that thinks a little before it answers; the answer itself is a few dozen tokens.
       body: JSON.stringify({ model: env.PHOTO_SEARCH_MODEL || aiModel(env), max_tokens: 1024, system: PHOTO_SYSTEM, messages: [{ role: "user", content: [
         { type: "image", source: { type: "base64", media_type: "image/" + pic[1], data: pic[2] } },
-        { type: "text", text: "Items shops on Relay sell:\n" + list } ] }] }) });
+        { type: "text", text: "Items shops on Relay sell:\n" + list } ] }] }) }, { now: o.now, shopperId: shopper && shopper.id });
   } catch (e) { console.error("photo_search_failed", String(e && e.name || "error")); return json({ error: "busy" }, 503, cors); }
   // Relay's AI spending limit for the month is reached: photo search is off until next month, as without the key.
   if (isCapped(r)) return json({ error: "ai_off" }, 503, cors);

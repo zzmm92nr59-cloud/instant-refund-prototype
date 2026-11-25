@@ -83,6 +83,27 @@ On the receipt itself, `returnTracking.items` says which of its items the return
   gave it (its local time unless it carries an offset); it is null when the word came from an email, which gives only a day.
 - `arrived: true` means all Relay was told is that the parcel reached the shop; `at` is then the day it arrived.
 - `statement` says the same in words, for logs and support.
+- `payable` (on `returnFacts`) is true only when `onItsWay` is the carrier's own tracking scan (`via: "tracking"`). **Pay
+  only when `payable` is true.** A fact from an email (`via: "email"`) is always `payable: false`, for the reason below.
+
+## Emails the shopper could have written (security review M4, 25 Nov 2026)
+
+Relay reads the shopper's own inbox, and the shopper is the one person who gains from a fake "your return was delivered to
+the shop". They can put any message in their own mailbox (Gmail's `messages.insert`, IMAP `APPEND`): it skips spam
+filtering and keeps whatever headers they wrote. So:
+
+- When the receiving mail service wrote down how a return or parcel email checked out (`Authentication-Results`, the
+  topmost one only: Gmail and Outlook add theirs above anything the email arrived with), the email must pass DMARC for its
+  From domain, or DKIM or SPF for a domain under the same organisation's domain (`worker/mail-auth.js`). One that fails
+  (`senderCheck: "fail"` on what the reader kept) is nobody's word: it is left off the timeline and makes no
+  `returnInTransit`, `returnReceived` or `onItsWay`.
+- One that passes, or says nothing (no header: an Outlook message read as JSON, or an email read before 25 Nov 2026),
+  counts as before for the timeline and the facts, marked `via: "email"`, and is never `payable`.
+- An email the shopper put in their own inbox can carry a forged "pass". That is why no email alone is ever payable: a
+  payout needs the carrier's own tracking scan (Ship24 or the carrier's API) or the shop's own refund notice from Shopify
+  or Square, which the shopper can't write. Verifying the DKIM signature itself (the carrier's public key from DNS) would
+  let a genuine carrier email count; it isn't built.
+- Tested in `scripts/test-return-email-auth.mjs`.
 
 ## Limits
 

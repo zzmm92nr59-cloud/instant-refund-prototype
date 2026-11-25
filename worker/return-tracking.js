@@ -101,7 +101,7 @@ function fromUpdate(u) {
   return { stage: u.stage, at: day(u.at), by: carrierSaid ? "carrier" : "shop", name: carrierSaid ? (u.carrier || null) : shopName(u), via: "email",
     tn: u.trackingNumber ? String(u.trackingNumber).toUpperCase() : null, carrier: u.carrier || null, ref: u.orderRef ? String(u.orderRef).toUpperCase() : null,
     shopKey: !carrierSaid && u.retailer && (u.retailer.domain || u.retailer.name) ? storeKey(u) : null, shopNamed: carrierSaid ? u.shopNamed || null : null,
-    amountPence: Number.isInteger(u.amountPence) ? u.amountPence : null, currency: u.currency || null };
+    amountPence: Number.isInteger(u.amountPence) ? u.amountPence : null, currency: u.currency || null, ...(u.senderCheck === "fail" ? { failedCheck: true } : {}) };
 }
 // Money back seen in the shopper's bank payments: the refund step only, and the weakest word after the shopper's own.
 // `fits` is asked of each receipt whose return is already known. names(text, shop, domain): bank.js namesShop.
@@ -135,7 +135,8 @@ function creditNews(orders, credits, newsOf, names, goingOf) {
 function fromDelivery(d) {
   if (!d.trackingNumber) return null;
   const stage = d.status === "delivered" ? "received" : ["in_transit", "out_for_delivery", "due"].includes(d.status) ? "sent" : null;
-  return stage ? { stage, at: day(d.at), by: "carrier", name: d.carrier || null, via: "email", tn: String(d.trackingNumber).toUpperCase(), carrier: d.carrier || null, onlyByNumber: true } : null;
+  return stage ? { stage, at: day(d.at), by: "carrier", name: d.carrier || null, via: "email", tn: String(d.trackingNumber).toUpperCase(), carrier: d.carrier || null, onlyByNumber: true,
+    ...(d.senderCheck === "fail" ? { failedCheck: true } : {}) } : null;
 }
 
 // Puts each email's news on the one receipt it belongs to (or on none). orders: this shopper's receipts (merged, so an
@@ -192,7 +193,9 @@ export function matchReturnNews(orders, news, known, opened, since = new Map(), 
 // Who to believe for a step: the carrier's tracking, the carrier's email, the shop's email, the bank, then the shopper's
 // own word; then the earliest (the latest for a refund).
 const trust = (n) => (n.by === "carrier" ? (n.via === "tracking" ? 0 : 1) : n.by === "shop" ? 2 : n.by === "bank" ? 3 : 4);
-const sureWord = (n) => n.by === "carrier" || n.by === "shop";
+// An email that failed its own sender check (mail-auth.js: the receiving mail service said it didn't come from the domain
+// in its From line) is nobody's word: it could have been put in the inbox by the shopper (security review M4).
+const sureWord = (n) => (n.by === "carrier" || n.by === "shop") && !n.failedCheck;
 function best(list, stage) {
   if (!list.length) return null;
   const rank = trust;
@@ -201,6 +204,8 @@ function best(list, stage) {
 
 // One receipt's return: its timeline and the facts a future instant refund can rely on. null when Relay knows of no return.
 export function returnTimeline(o, news, today) {
+  // An email that failed its own sender check isn't shown as anyone's word, and makes no fact (security review M4).
+  news = news.filter((n) => !n.failedCheck);
   const by = Object.fromEntries(STEPS.map((s) => [s, news.filter((n) => n.stage === s)]));
   // The shop received it, or refunded it: that's the shop's own word that it arrived.
   const top = [...STEPS].reverse().find((s) => by[s].length);
@@ -375,8 +380,10 @@ export function returnFacts(card) {
   const who = w ? (w.by === "carrier" ? (w.name || "the carrier") + "'s " + (w.via === "tracking" ? "tracking" : "email") : (w.name || "the shop") + "'s email") : null;
   const statement = !w ? "Not confirmed on its way" : w.arrived ? "Arrived at the shop: confirmed by " + who + (w.at ? " on " + w.at : "")
     : "On its way: confirmed by " + who + (w.atTime ? ", first scan " + w.atTime : w.at ? " on " + w.at : "");
+  // payable: whether onItsWay is a fact a payout could stand on: only the carrier's own tracking scan. A fact from an email
+  // (via "email") never is: the shopper owns the inbox and could have put the email there (security review M4).
   return { receiptId: card ? card.id : null, returnInTransit: Boolean(t && t.returnInTransit), returnReceived: Boolean(t && t.returnReceived),
-    confirmedBy: (t && t.confirmedBy) || null, onItsWay: w, statement, trackingNumber: (t && t.trackingNumber) || null, state: (t && t.state) || null };
+    confirmedBy: (t && t.confirmedBy) || null, onItsWay: w, payable: Boolean(w && w.via === "tracking"), statement, trackingNumber: (t && t.trackingNumber) || null, state: (t && t.state) || null };
 }
 
 export async function readReturnTracks(db, shopperId) {

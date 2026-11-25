@@ -562,7 +562,9 @@ for (const [rid, v] of [[ivyJumper, "Size: M, Colour: Sage green"], [ivyBoots, "
   assert.equal(ivyC.news.messages, 2, "the red number comes with it");
   const jayC = await convs(jay);
   assert.deepEqual(jayC.conversations.map(c => [c.id, c.with, c.selling, c.unread]), [[jB, "Seller", false, 0], [jC, "Seller", false, 1]], "Jay's, as the buyer");
-  assert.ok(!/ivy|jay|example\.com|Lister|Other|FN-|AA-/i.test(JSON.stringify([ivyC, jayC])), "never who either of them is");
+  // (Conversation ids are random letters and can spell "ivy" or "AA-" by chance, so the ids Relay made are taken out first.)
+  const shown = JSON.stringify([ivyC, jayC]).split(jB).join("ID").split(jC).join("ID").replace(/"(id|listingId|requestId)":"[^"]*"/g, '"$1":"ID"');
+  assert.ok(!/ivy|jay|example\.com|Lister|Other|FN-|AA-/i.test(shown), "never who either of them is");
   assert.deepEqual((await convs(bea)).conversations.filter(c => [jB, jC].includes(c.id)), [], "nobody else sees them");
   assert.equal((await call("/relay/my/resale/conversations")).status, 401, "signed in only");
   // Reading one clears its number.

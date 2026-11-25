@@ -68,7 +68,7 @@ const alice = await signIn("alice@example.com", "5.5.5.5");
 const post = (path, token, body) => call(path, { method: "POST", token, body });
 await post("/relay/my/consent", alice, { version: CONSENT_VERSION });
 const state = new URL((await (await post("/relay/my/gmail/connect", alice)).json()).url).searchParams.get("state");
-await call("/relay/gmail/callback?code=good&state=" + state);
+await post("/relay/my/gmail/finish", alice, { code: /mailcode=([A-Za-z0-9_-]{43})/.exec((await call("/relay/gmail/callback?code=good&state=" + state)).headers.get("location"))[1] });
 assert.equal((await (await call("/relay/my/gmail", { token: alice })).json()).connected, true);
 const count = () => sqlite.prepare("SELECT COUNT(*) n FROM captured_receipts").get().n;
 

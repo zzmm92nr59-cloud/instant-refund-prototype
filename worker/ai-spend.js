@@ -12,6 +12,11 @@
 //  * What's kept: per month and feature, the number of calls, tokens in and out and the estimated cost (ai_spend: no
 //    shopper, no email, nothing read); and per shopper per day only the cost and number of calls of their receipt
 //    reading (ai_spend_shopper), for their daily limit, deleted after two days or with the account.
+//  * (Security review L3, 25 Nov 2026.) So a few accounts can't use up the month for everyone: the features a shopper uses
+//    by hand (help chat, search by photo, listing text) have their own daily limit per shopper,
+//    AI_SHOPPER_EVERYDAY_LIMIT_PENCE (default 20p, ai_spend_shopper_everyday, kept like ai_spend_shopper), apart from
+//    receipt reading's; and no feature but receipt reading can take more than AI_FEATURE_MONTH_SHARE of the monthly limit
+//    (default 0.5, half).
 //  * Costs are estimates: Anthropic's list prices in US dollars, turned into pence at AI_USD_TO_GBP (0.80 unless set,
 //    on the high side, so the estimate is more likely over than under). Anthropic's own bill is the real figure.
 
@@ -39,6 +44,10 @@ const DEFAULT_USD_TO_GBP = 0.80;
 // The features, as the health page names them. Receipt reading for one shopper counts against their daily limit.
 export const FEATURES = ["reader", "reread", "receipt_photo", "item_kinds", "shop_kinds", "photo_search", "help_chat", "listing_text"];
 export const SHOPPER_FEATURES = new Set(["reader", "reread", "receipt_photo"]);
+// What a shopper uses by hand, with a daily limit of its own per shopper; and the features that can take only a share of
+// the month (everything but reading receipts).
+export const EVERYDAY_FEATURES = new Set(["help_chat", "photo_search", "listing_text"]);
+export const DEFAULT_SHOPPER_EVERYDAY_LIMIT_PENCE = 20, DEFAULT_FEATURE_MONTH_SHARE = 0.5;
 // What a picture costs as input, at most (Anthropic: about width × height / 750 tokens, pictures are scaled to ~1.15
 // megapixels), with room to spare.
 const IMAGE_TOKENS = 2000;
@@ -47,20 +56,25 @@ export const AI_SPEND_SQL = `CREATE TABLE IF NOT EXISTS ai_spend (month TEXT NOT
   input_tokens INTEGER NOT NULL DEFAULT 0, output_tokens INTEGER NOT NULL DEFAULT 0, pence REAL NOT NULL DEFAULT 0, PRIMARY KEY (month, feature))`;
 export const AI_SPEND_SHOPPER_SQL = `CREATE TABLE IF NOT EXISTS ai_spend_shopper (shopper_id TEXT NOT NULL, day TEXT NOT NULL, calls INTEGER NOT NULL DEFAULT 0,
   pence REAL NOT NULL DEFAULT 0, PRIMARY KEY (shopper_id, day))`;
+export const AI_SPEND_EVERYDAY_SQL = AI_SPEND_SHOPPER_SQL.replace("ai_spend_shopper", "ai_spend_shopper_everyday");
 
 const ready = new WeakSet();
 export async function ensureSpendTables(db) {
   if (!db || ready.has(db)) return;
-  await db.batch([db.prepare(AI_SPEND_SQL), db.prepare(AI_SPEND_SHOPPER_SQL)]);
+  await db.batch([db.prepare(AI_SPEND_SQL), db.prepare(AI_SPEND_SHOPPER_SQL), db.prepare(AI_SPEND_EVERYDAY_SQL)]);
   ready.add(db);
 }
 export function spendDeleteStatements(db, shopperId) {
-  return [db.prepare("DELETE FROM ai_spend_shopper WHERE shopper_id = ?").bind(shopperId)];
+  return [db.prepare("DELETE FROM ai_spend_shopper WHERE shopper_id = ?").bind(shopperId),
+    db.prepare("CREATE TABLE IF NOT EXISTS ai_spend_shopper_everyday (shopper_id TEXT NOT NULL, day TEXT NOT NULL, calls INTEGER NOT NULL DEFAULT 0, pence REAL NOT NULL DEFAULT 0, PRIMARY KEY (shopper_id, day))"),
+    db.prepare("DELETE FROM ai_spend_shopper_everyday WHERE shopper_id = ?").bind(shopperId)];
 }
 
 const num = (v, d) => { const n = Number(v); return v !== undefined && v !== null && String(v).trim() !== "" && Number.isFinite(n) && n >= 0 ? n : d; };
 export const monthlyLimit = (env) => num(env && env.AI_MONTHLY_LIMIT_PENCE, DEFAULT_MONTHLY_LIMIT_PENCE);
 export const shopperDayLimit = (env) => num(env && env.AI_SHOPPER_DAY_LIMIT_PENCE, DEFAULT_SHOPPER_DAY_LIMIT_PENCE);
+export const shopperEverydayLimit = (env) => num(env && env.AI_SHOPPER_EVERYDAY_LIMIT_PENCE, DEFAULT_SHOPPER_EVERYDAY_LIMIT_PENCE);
+export const featureMonthShare = (env) => Math.min(1, num(env && env.AI_FEATURE_MONTH_SHARE, DEFAULT_FEATURE_MONTH_SHARE));
 const usdToGbp = (env) => num(env && env.AI_USD_TO_GBP, DEFAULT_USD_TO_GBP) || DEFAULT_USD_TO_GBP;
 export const monthOf = (now) => new Date(now).toISOString().slice(0, 7);
 export const dayOf = (now) => new Date(now).toISOString().slice(0, 10);
@@ -102,9 +116,13 @@ export async function spentThisMonth(db, now) {
   const r = await db.prepare("SELECT COALESCE(SUM(pence), 0) AS p FROM ai_spend WHERE month = ?").bind(monthOf(now)).first();
   return Number((r && r.p) || 0);
 }
-export async function spentToday(db, shopperId, now) {
+export async function spentToday(db, shopperId, now, table = "ai_spend_shopper") {
   await ensureSpendTables(db);
-  const r = await db.prepare("SELECT pence FROM ai_spend_shopper WHERE shopper_id = ? AND day = ?").bind(shopperId, dayOf(now)).first();
+  const r = await db.prepare("SELECT pence FROM " + table + " WHERE shopper_id = ? AND day = ?").bind(shopperId, dayOf(now)).first();
+  return Number((r && r.pence) || 0);
+}
+async function featureThisMonth(db, feature, now) {
+  const r = await db.prepare("SELECT pence FROM ai_spend WHERE month = ? AND feature = ?").bind(monthOf(now), feature).first();
   return Number((r && r.pence) || 0);
 }
 // Whether a call costing up to `reserve` pence may be made now: null if it may, or why not ("month" or "shopper_day").
@@ -113,6 +131,8 @@ export async function overLimit(env, { feature, shopperId, reserve = 0, now = Da
   if (!db) return null;
   if ((await spentThisMonth(db, now)) + reserve > monthlyLimit(env)) return "month";
   if (shopperId && SHOPPER_FEATURES.has(feature) && (await spentToday(db, shopperId, now)) + reserve > shopperDayLimit(env)) return "shopper_day";
+  if (shopperId && EVERYDAY_FEATURES.has(feature) && (await spentToday(db, shopperId, now, "ai_spend_shopper_everyday")) + reserve > shopperEverydayLimit(env)) return "shopper_day";
+  if (!SHOPPER_FEATURES.has(feature) && (await featureThisMonth(db, FEATURES.includes(feature) ? feature : "other", now)) + reserve > monthlyLimit(env) * featureMonthShare(env)) return "feature_month";
   return null;
 }
 
@@ -130,6 +150,11 @@ export async function recordSpend(env, { feature, shopperId, model, usage, now =
     st.push(db.prepare(`INSERT INTO ai_spend_shopper (shopper_id, day, calls, pence) VALUES (?, ?, 1, ?)
       ON CONFLICT (shopper_id, day) DO UPDATE SET calls = calls + 1, pence = pence + excluded.pence`).bind(shopperId, dayOf(now), pence));
     st.push(db.prepare("DELETE FROM ai_spend_shopper WHERE day < ?").bind(dayOf(now - 864e5)));
+  }
+  if (shopperId && EVERYDAY_FEATURES.has(feature)) {
+    st.push(db.prepare(`INSERT INTO ai_spend_shopper_everyday (shopper_id, day, calls, pence) VALUES (?, ?, 1, ?)
+      ON CONFLICT (shopper_id, day) DO UPDATE SET calls = calls + 1, pence = pence + excluded.pence`).bind(shopperId, dayOf(now), pence));
+    st.push(db.prepare("DELETE FROM ai_spend_shopper_everyday WHERE day < ?").bind(dayOf(now - 864e5)));
   }
   await db.batch(st);
   return pence;
