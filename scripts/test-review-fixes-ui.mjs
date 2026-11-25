@@ -42,6 +42,8 @@ const receipts = [
 ];
 const purchases = [{ id: "o1", store: "Kick Lane", retailer: "shopify:kick-lane.myshopify.com", orderedAt: new Date(Date.now() - 2 * 864e5).toISOString(), amountMinor: 2000, currency: "GBP",
   items: [{ title: "Logo Cap", lineId: "L1", quantity: 1, priceMinor: 2000, currency: "GBP", variant: "Black", exchangeable: false, returnable: false }] }];
+const KICK_TRAINERS = { sku: "shopify-v-9", catalogueId: "shopify-v-9", product: "Jess's Watched Trainers", variation: "UK 5", priceMinor: 8000, currency: "GBP", quantity: 4,
+  storeName: "Kick Lane", shopDomain: "kick-lane.myshopify.com", imageUrl: "https://cdn.kicklane.example/t.jpg" };
 const H = { "access-control-allow-origin": "*", "access-control-allow-headers": "*", "access-control-allow-methods": "*" };
 let st = {};
 const browser = await chromium.launch();
@@ -61,6 +63,10 @@ async function open(email = A) {
     if (p === "/relay/my/purchases") return j({ purchases: who === A ? purchases : [] });
     if (p === "/relay/my/profile") return j({ email: who, name: who === A ? "Jess Tester" : "Sam Other", photo: null });
     if (p === "/relay/my/alerts/status") return j({ devices: 0, watches: [], stores: [] });
+    // Kick Lane still sells the trainers Jess watches. (With a catalogue that lacked them, her card was rightly taken off the
+    // moment the shops answered, a few milliseconds after it showed: the check below raced that, and so proved nothing
+    // about what Sam sees later either.)
+    if (p === "/relay/shopify/catalogue") return j({ published: true, publishedStoreCount: 1, products: [KICK_TRAINERS] });
     if (p.endsWith("/category") && m === "POST") { st.catPosts = (st.catPosts || 0) + 1; return j({ error: "busy" }, 503); }
     if (p === "/relay/my/wrapped") { await new Promise(r => setTimeout(r, 1500)); return j({ year: Number(u.searchParams.get("year")), years: [], receipts: 3, shops: 2, items: 3, spentPence: 6000, currency: "GBP", categories: [], topShops: [], byMonth: [], coverage: { withTotal: 3, noTotal: 0, otherCurrency: 0 } }); }
     return j({});
@@ -164,6 +170,8 @@ async function open(email = A) {
   await page.goto(origin + "/index.html#signin=" + "L".repeat(43));
   await homeShows(page, "S");
   await page.evaluate(() => window.go("radar"));
+  // Once the shops have answered (trainers included), so this isn't passed just because nothing has drawn yet.
+  await page.waitForFunction(() => typeof window.relayNeedCatalog === "function" && window.relayNeedCatalog());
   await page.waitForTimeout(800);
   assert.doesNotMatch(await page.locator("#view").innerText(), /Jess's Watched Trainers/, "Sam never sees what Jess watched");
   // And Jess comes back to her own choice of picks (kept per member, not by her address), with her watches from her account.
