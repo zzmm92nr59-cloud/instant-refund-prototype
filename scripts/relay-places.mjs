@@ -57,6 +57,8 @@ export async function openProfile(page) {
 // The picture that opens Profile, as a person would tap it: top left on Home, top right on the other tabs.
 // (Home's own picture comes after the page's top line in the page, so the last one showing is Home's when on Home.)
 export const profileButton = (page) => page.locator(".topline .avatar, .h2-me").filter({ visible: true }).last();
+// The picture itself (the round one with the initials or the photo), wherever it's showing: for checking what it shows.
+export const picture = (page) => page.locator(".topline .avatar, .h2-me .avatar").filter({ visible: true }).last();
 // Taps the picture to open Profile, as a person would: once the picture is drawn, and again if the tap landed just as the
 // screen was being drawn (a busy machine can do that).
 export async function tapPicture(page) {

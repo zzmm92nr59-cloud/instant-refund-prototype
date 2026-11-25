@@ -1,6 +1,7 @@
 // Browser test: a multi-item email order shows one card per item in the wallet; marking one moves it to Returns,
 // the rest stays; a return Relay can't place asks which items went back. Stubbed server, made-up data.
 import assert from "node:assert/strict";
+import { mkdir } from "node:fs/promises";
 import { createRequire } from "node:module"; import { createServer } from "node:http"; import { readFile } from "node:fs/promises"; import { resolve, extname } from "node:path";
 const require = createRequire(import.meta.url); const { chromium } = require("playwright");
 const server = createServer(async (req, res) => { try { const p = resolve(".", "." + new URL(req.url, "http://x").pathname.replace(/\/$/, "/index.html")); res.setHeader("Content-Type", extname(p) === ".js" ? "text/javascript" : "text/html"); res.end(await readFile(p)); } catch { res.statusCode = 404; res.end(); } });
@@ -11,6 +12,7 @@ const order = { id: "11111111-1111-4111-8111-111111111111", kind: "receipt", ret
 const other = { id: "22222222-2222-4222-8222-222222222222", kind: "receipt", retailer: { name: "Fieldhouse", domain: "fieldhouse.test" }, orderDate: today, totalPence: 9000, currency: "GBP", category: "fashion",
   items: [{ name: "Rain Jacket", pricePence: 6000 }, { name: "Cap", pricePence: 3000 }], returnBy: { date: soon }, returnProgress: { parcel: { status: "in_transit" } }, status: "confirmed" };
 let marks = {}; const posts = [];
+await mkdir("/tmp/shots", { recursive: true });
 const browser = await chromium.launch();
 const ctx = await browser.newContext({ viewport: { width: 1280, height: 1000 } });
 await ctx.route("https://**/*", route => { const u = new URL(route.request().url()), m = route.request().method(); const j = b => route.fulfill({ status: 200, contentType: "application/json", headers: { "access-control-allow-origin": "*", "access-control-allow-headers": "*" }, body: JSON.stringify(b) });
@@ -23,7 +25,13 @@ await ctx.route("https://**/*", route => { const u = new URL(route.request().url
   return j({}); });
 const page = await ctx.newPage(); const errors = []; page.on("pageerror", e => errors.push(String(e)));
 await page.addInitScript(() => localStorage.setItem("relay.session.v1", JSON.stringify({ token: "S".repeat(43), email: "c@example.com" })));
-await page.goto(origin + "/index.html");
+// The Wallet page (one card per thing still returnable) is no longer a shopper's tab: Home shows an order as one card,
+// and index.html sends "wallet" to Home unless testing tools are on ("page===\"wallet\"&&!demo&&!testing"). The page and
+// the item marking behind it are still there for Relay's team, so this test opens it the way they do. Returns & swaps,
+// the second half, is every shopper's (Home's "Swaps and returns").
+await page.goto(origin + "/index.html?testing=1");
+await page.waitForFunction(() => typeof window.go === "function" && window.RelayAccount && window.RelayAccount.mountWallet);
+await page.evaluate(() => window.go("wallet"));
 const wallet = page.locator("#walletPage");
 await wallet.getByText("Flared Pant").waitFor();
 await wallet.getByText("Cropped Tee").waitFor();

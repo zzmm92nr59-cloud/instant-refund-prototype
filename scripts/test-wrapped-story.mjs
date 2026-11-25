@@ -37,7 +37,9 @@ await page.goto(origin + "/index.html"); await page.waitForTimeout(800);
 await page.evaluate(() => window.go("wrapped"));
 await page.getByRole("heading", { name: "Your 2026 in purchases." }).waitFor();
 assert.deepEqual(await page.locator(".rl-wr-years").first().locator("button").allInnerTexts(), ["2026", "2024"], "only years with receipts (plus this year) are offered");
-await page.locator("#rl-wrapped").getByText("£122.00 over 5 receipts.", { exact: true }).waitFor();
+// The cover says what was refunded beside the total (commit b036586, "Round 7: what the shopper sees matches the
+// receipt": totals stay what was paid, and say refunds beside them), and Wrapped is its own page now, with no #rl-wrapped.
+await page.locator(".rl-wr-cover").getByText("£122.00 over 5 receipts. £20.00 of it was refunded.", { exact: true }).waitFor();
 await page.getByRole("button", { name: "Play your 2026 story" }).click();
 const texts = [];
 for (let k = 0; k < 20; k++) {
@@ -75,7 +77,8 @@ assert.equal(await read.isDisabled(), true, "nothing picked, nothing to read");
 await page.locator(".rl-wr-glance .rl-wr-years button", { hasText: /^2025$/ }).click();
 await read.click();
 await page.getByText("Reading 2025 in your Outlook inbox, back to 01/04… 4 receipts found so far. Keep this page open.").waitFor();
-await page.getByText("Done. Relay found 4 receipts in 2025. Your Gmail inbox needs connecting again before Relay can read it: open Profile, then Email connection.").waitFor();
+// (Profile opens from your picture and isn't a tab, CLAUDE.md rule 18; "Email connection" is "Inboxes" now.)
+await page.getByText("Done. Relay found 4 receipts in 2025. Your Gmail inbox needs connecting again before Relay can read it: tap your picture at the top of the screen, then Inboxes.").waitFor();
 assert.deepEqual(scans.map(b => b.cursor || ""), ["", "2025/06/01", "b2|", "b2|2025/04/01", "b3|"], "one year at a time, carrying on from where it got to, inbox by inbox");
 assert.ok(scans.every(b => b.year === 2025));
 await page.waitForFunction(() => document.querySelector(".rl-wr-years button.on") && document.querySelector(".rl-wr-years button.on").textContent === "2025");

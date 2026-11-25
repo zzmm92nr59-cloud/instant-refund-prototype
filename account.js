@@ -1777,11 +1777,12 @@
       img.src = url;
     });
   }
-  function profileView(sheet, onBack, backLabel) {
+  // inBar: on the Profile page, where the screen's own bar already names it and has Back.
+  function profileView(sheet, onBack, backLabel, inBar) {
     var p = profileNow() || { email: "" };
     var photo = p.photo, photoChanged = false;
     var msg = el("div", { className: "rl-msg" });
-    var nameIn = el("input", { type: "text", id: "rl-name", maxLength: 40, autocomplete: "name", placeholder: "Your name", value: p.name || "" });
+    var nameIn = el("input", { type: "text", id: "rl-name", className: "rl-field", maxLength: 40, autocomplete: "name", placeholder: "Your name", value: p.name || "" });
     nameIn.setAttribute("aria-label", "Your name");
     var holder = el("div", { style: "display:flex;justify-content:center;margin:4px 0 12px" });
     var file = el("input", { type: "file", accept: "image/*", style: "display:none" });
@@ -1815,12 +1816,12 @@
           r.body && (r.body.error === "bad_photo" || r.body.error === "photo_too_big") ? "That photo couldn't be used. Try a different one." : "Couldn't save. Try again.", true);
       }).catch(function () { saveBtn.disabled = false; say(msg, "Couldn't reach Relay. Check your connection.", true); });
     };
-    sheet.appendChild(el("h2", { text: "Your profile" }));
+    if (!inBar) sheet.appendChild(el("h2", { text: "Your profile" }));
     sheet.appendChild(el("p", { text: "Add your name and a photo. Only you can see them." }));
     sheet.appendChild(holder); sheet.appendChild(file); sheet.appendChild(pick); sheet.appendChild(drop);
     sheet.appendChild(el("label", { htmlFor: "rl-name", text: "Your name", style: "display:block;font-weight:700;font-size:14px;margin:16px 0 6px" }));
     sheet.appendChild(nameIn); sheet.appendChild(saveBtn); sheet.appendChild(msg);
-    sheet.appendChild(el("button", { type: "button", className: "rl-btn ghost", text: backLabel || "Back", onclick: function () { if (onBack) onBack(); else close(); } }));
+    if (!inBar) sheet.appendChild(el("button", { type: "button", className: "rl-btn ghost", text: backLabel || "Back", onclick: function () { if (onBack) onBack(); else close(); } }));
     draw();
   }
   function editProfile() { open(function (sheet) { profileView(sheet, close, "Cancel"); }); }
@@ -6569,7 +6570,9 @@
     openFind = function () { if (!here()) return open(function (sh) { addReceiptView(sh, function () { close(); }); }); page("Add a receipt", function (b) { addReceiptView(b, null, { inPage: true }); }); };
     openOriginal = function (id) { if (!here()) return open(function (sh) { originalView(sh, id, close); }); screen(function (sh) { originalView(sh, id, home); }); };
     openResale = function (rid) { if (!here()) return open(function (sh) { resaleView(sh, close, rid); }); screen(function (sh) { resaleView(sh, home, rid); }); };
-    function editHere() { screen(function (sh) { profileView(sh, home); }); }
+    // An inner page with its own bar (Back to Profile), like the rest of Profile: not the tab's big title, a second Back
+    // underneath and a bare name box, as it was.
+    function editHere() { page("Your profile", function (b) { profileView(b, home, null, true); }); }
 
     accBar(sheet, "Account");
     var head = el("button", { type: "button", className: "rl-ahead", ariaLabel: "Edit your name and photo", onclick: editHere });
