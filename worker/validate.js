@@ -113,6 +113,8 @@ const ROUTES = new Map(Object.entries({
   "/relay/my/bank/receipt-photo": { limit: 1650 * KB, tooLarge: "photo_too_big", fields: { id: str(200), image: str(1650 * KB) } },
   "/relay/my/bank/connect": { fields: { bank: str(20) } },
   "/relay/my/bank/sync": NOTHING,
+  // Back from the bank's page: the single-use code the callback gave the app (bank.js finishBank).
+  "/relay/my/bank/finish": { fields: { code: str(43) } },
   "/relay/my/help/chat": { limit: 64 * KB, fields: { messages: list(40, obj({ role: one("user", "assistant"), text: text(1000) })), receiptId: id(64) } },
   "/relay/my/help/handoff": { limit: 64 * KB, fields: { messages: list(40, obj({ role: one("user", "assistant"), text: text(1000) })) } },
   "/relay/my/receipts/parse": { limit: 1000 * KB, fields: { email: str(250000) } },

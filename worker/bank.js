@@ -41,6 +41,7 @@ import { readReceiptPhoto } from "./receipt-photo.js";
 import { checkItems } from "./receipt-items.js";
 import { namesCheck } from "./item-names.js";
 import { aiAvailable } from "./ai-reader.js";
+import { ensureOnce } from "./once.js";
 import { seedShops, classificationSays, classificationToKeep, loadShopDirectory, learnedShop, EXCLUDED_KINDS } from "./shop-directory.js";
 
 const DAY = 864e5;
@@ -91,9 +92,23 @@ export async function ensureBankColumns(db) {
   try { await db.prepare("ALTER TABLE bank_links ADD COLUMN unsplit INTEGER").run(); } catch { /* already there */ }
   // bank_cards is read with every payment (visibleSql), including by receiptsToAdd, which doesn't make the tables.
   try { await db.prepare(BANK_SQL[BANK_SQL.length - 1]).run(); } catch { /* no database binding: nothing to read anyway */ }
+  // 25 Nov 2026. tried_at / problem: when a read was last tried and why it didn't finish ("bank": the bank or TrueLayer
+  // didn't answer for some of it; "error": Relay's own), so a read that failed is never shown as a read that happened.
+  // session_hash, finish_hash and the sealed tokens on a state: a bank sign-in waits there until the app that started it,
+  // signed in with the same session, finishes it (handleBankCallback). acct4: the last four digits of an account's
+  // number, as the bank gives it, only to tell two connections of the same bank apart.
+  for (const sql of ["ALTER TABLE bank_links ADD COLUMN tried_at INTEGER", "ALTER TABLE bank_links ADD COLUMN problem TEXT",
+    "ALTER TABLE bank_link_states ADD COLUMN session_hash TEXT", "ALTER TABLE bank_link_states ADD COLUMN finish_hash TEXT",
+    "ALTER TABLE bank_link_states ADD COLUMN token_iv TEXT", "ALTER TABLE bank_link_states ADD COLUMN token_data TEXT",
+    "ALTER TABLE bank_link_states ADD COLUMN bank TEXT", "ALTER TABLE bank_cards ADD COLUMN acct4 TEXT",
+    "CREATE INDEX IF NOT EXISTS idx_bank_links_shopper ON bank_links(shopper_id)",
+    "CREATE INDEX IF NOT EXISTS idx_bank_payments_conn ON bank_payments(shopper_id, connection_id, paid_on)"]) {
+    try { await db.prepare(sql).run(); } catch { /* already there */ }
+  }
   bankColumnsReady = true;
 }
-export async function ensureBankTables(db) { await db.batch(BANK_SQL.map((s) => db.prepare(s))); await ensureBankColumns(db); }
+// Once per copy of the Worker, not on every bank request.
+export function ensureBankTables(db) { return ensureOnce(db, "bank", async () => { await db.batch(BANK_SQL.map((s) => db.prepare(s))); await ensureBankColumns(db); }); }
 // For account deletion (auth.js): everything bank-related for one shopper.
 export function bankDeleteStatements(db, shopperId) {
   return ["bank_payments", "bank_links", "bank_link_states", "bank_not_mine", "bank_cards"].map((t) => db.prepare(`DELETE FROM ${t} WHERE shopper_id = ?`).bind(shopperId));
@@ -150,13 +165,26 @@ async function tokenCall(env, form, f) {
     if (r.ok && b && b.access_token) return b;
     // Why TrueLayer said no, for Relay's logs: its status and short error code only (never the code, token or secret).
     console.log("bank: TrueLayer token refused", form.grant_type, r.status, String((b && b.error) || "").slice(0, 60), String((b && b.error_description) || "").slice(0, 160));
+    // Only a plain "no" (the permission has ended or the code is spent) is a refusal. Busy, down or rate-limited is
+    // "couldn't ask": the caller must not tell anyone to connect again on that.
+    if (r.status === 429 || r.status >= 500) tokenTrouble.add(form);
     return null;
-  } catch (e) { console.log("bank: TrueLayer token call failed", form.grant_type, String(e && e.name || "")); return null; }
+  } catch (e) { console.log("bank: TrueLayer token call failed", form.grant_type, String(e && e.name || "")); tokenTrouble.add(form); return null; }
 }
+// The token requests that got no real answer (see tokenCall): asked about once, straight after the call.
+const tokenTrouble = new WeakSet();
 async function apiGet(env, token, path, f) {
   try {
     const r = await f(hosts(env).api + path, { headers: { Authorization: "Bearer " + token }, signal: AbortSignal.timeout(20000) });
-    if (r.status === 401 || r.status === 403) return { gone: true };
+    if (r.status === 401 || r.status === 403) {
+      // For Relay's logs, TrueLayer's own short reason (never anything about the account): a 403 isn't always a permission
+      // that has ended, and this is how the team can tell.
+      const why = await r.json().catch(() => null);
+      console.log("bank: TrueLayer said no", r.status, path.replace(/\/(accounts|cards)\/[^/?]+/, "/$1/…").split("?")[0], String((why && why.error) || "").slice(0, 60));
+      return { gone: true };
+    }
+    // A bank that has no cards (or no accounts) answers "not supported" for that list: nothing to read, and not a failure.
+    if (r.status === 501 || r.status === 404) { await r.text().catch(() => ""); return { none: true }; }
     const b = r.ok ? await r.json().catch(() => null) : null;
     return b && Array.isArray(b.results) ? { results: b.results } : { failed: true };
   } catch { return { failed: true }; }
@@ -189,20 +217,34 @@ export function isShopping(x) {
 }
 // A shop's name as a person would say it, from the bank's text: "ASDA STOES LTD" is Asda, "PAYPAL *EBAY" is eBay,
 // "AMZNMKTPLACE" is Amazon. The bank's own words stay with the payment too.
-const KNOWN_SHOPS = [[/amzn|amazon/i, "Amazon"], [/\bebay\b/i, "eBay"], [/sainsbury/i, "Sainsbury's"], [/\btesco\b/i, "Tesco"], [/\basda\b/i, "Asda"],
-  [/marks ?(and|&) ?spencer|\bm ?& ?s\b/i, "M&S"], [/john ?lewis/i, "John Lewis"], [/waitrose/i, "Waitrose"], [/morrisons/i, "Morrisons"], [/\baldi\b/i, "Aldi"], [/\blidl\b/i, "Lidl"],
-  [/\bboots\b/i, "Boots"], [/^next(\s+\d|\s*$)|next retail|next plc|next directory/i, "Next"], [/\bnike\b/i, "Nike"], [/jd sports/i, "JD Sports"], [/lululemon/i, "lululemon"], [/\basos\b/i, "ASOS"], [/\bzara\b/i, "Zara"],
-  [/primark/i, "Primark"], [/\bargos\b/i, "Argos"], [/\bcurrys\b/i, "Currys"], [/\bapple\b/i, "Apple"], [/uber ?eats/i, "Uber Eats"], [/deliveroo/i, "Deliveroo"], [/\bjust ?eat\b/i, "Just Eat"],
-  [/pret a manger|\bpret\b/i, "Pret"], [/mcdonald/i, "McDonald's"], [/greggs/i, "Greggs"], [/\bspar\b/i, "Spar"], [/home bargains/i, "Home Bargains"], [/google play/i, "Google Play"], [/starbucks/i, "Starbucks"], [/costa/i, "Costa"], [/nespresso/i, "Nespresso"], [/\bikea\b/i, "IKEA"]];
+// Two kinds of name. A name that is only ever that shop is recognised wherever it stands as a whole word ("W M MORRISONS
+// PLC"). A name that is also an ordinary word or part of other names (Costa, Apple, Boots, Next, Spar, Pret, Nike, Zara) is
+// recognised only when it is the whole of the shop's name on the statement, give or take the shop's own usual endings:
+// "COSTAS BARBERS", "ACOSTA LTD", "APPLE TREE NURSERY" and "WALKING BOOTS CO" keep the bank's own words (Connor's rule:
+// never show a guess as the shop).
+const KNOWN_SHOPS = [[/\b(amzn|amazon)/i, "Amazon"], [/\bebay\b/i, "eBay"], [/\bsainsbury'?s?\b/i, "Sainsbury's"], [/\btesco\b/i, "Tesco"], [/\basda\b/i, "Asda"],
+  [/\bmarks ?(and|&) ?spencer\b|\bm ?& ?s\b/i, "M&S"], [/\bjohn ?lewis\b/i, "John Lewis"], [/\bwaitrose\b/i, "Waitrose"], [/\bmorrisons\b/i, "Morrisons"], [/\baldi\b/i, "Aldi"], [/\blidl\b/i, "Lidl"],
+  [/\bjd sports\b/i, "JD Sports"], [/\blululemon\b/i, "lululemon"], [/\basos\b/i, "ASOS"],
+  [/\bprimark\b/i, "Primark"], [/\bargos\b/i, "Argos"], [/\bcurrys\b/i, "Currys"], [/\buber ?eats\b/i, "Uber Eats"], [/\bdeliveroo\b/i, "Deliveroo"], [/\bjust ?eat\b/i, "Just Eat"],
+  [/\bpret a manger\b/i, "Pret"], [/\bmcdonald'?s\b/i, "McDonald's"], [/\bgreggs\b/i, "Greggs"], [/\bhome bargains\b/i, "Home Bargains"], [/\bgoogle play\b/i, "Google Play"], [/\bstarbucks\b/i, "Starbucks"],
+  [/\bcosta coffee\b/i, "Costa"], [/\bnespresso\b/i, "Nespresso"], [/\bikea\b/i, "IKEA"]];
+const WHOLE_NAME_SHOPS = [[/^boots( the chemists?| pharmacy| opticians| retail)?$/, "Boots"], [/^next( retail| directory| online)?$/, "Next"], [/^nike( retail| store| \.?com)?$|^nike\.com$/, "Nike"],
+  [/^zara( home| retail)?$|^zara\.com$/, "Zara"], [/^apple(\.com(\/bill)?| store| online store| retail)?$/, "Apple"], [/^pret$/, "Pret"], [/^spar$/, "Spar"], [/^costa$/, "Costa"]];
 const TIDY_DROP = /^(card|payment|purchase|pos|contactless|visa|debit|credit|online|to|at|ltd|limited|plc|stores?|stoes|s\/mkts|supermarkets?|uk|gb|gbr|london|www|com)$/i;
+// The statement's words without what isn't the name: who took the payment ("PAYPAL *"), noise words, numbers.
+const tidyWords = (text) => String(text || "").replace(/^(paypal|sq|sumup|zettle|sp|pp)\s*\*\s*/i, "").replace(/[*#]/g, " ").split(/\s+/)
+  .map((w) => w.replace(/[.,]+$/, "")).filter((w) => w && !/^[-–]+$/.test(w) && !TIDY_DROP.test(w) && !/\d/.test(w));
 export function shopName(description, merchant) {
   const said = statementShop(description), text = String(merchant || said || "").trim();
   for (const [re, name] of KNOWN_SHOPS) if (re.test(text) || re.test(said)) return name;
+  for (const t of [text, said]) {
+    const whole = tidyWords(t).join(" ").toLowerCase();
+    for (const [re, name] of WHOLE_NAME_SHOPS) if (re.test(whole)) return name;
+  }
   // A website stays a website, tidied: WWW.TAILS.COM is Tails.com.
   const site = /^(?:www\.)?([a-z0-9-]{2,30})\.(com|co\.uk|uk|net)$/i.exec(text);
   if (site) return site[1].charAt(0).toUpperCase() + site[1].slice(1).toLowerCase() + "." + site[2].toLowerCase();
-  let words = text.replace(/^(paypal|sq|sumup|zettle|sp|pp)\s*\*\s*/i, "").replace(/[*#]/g, " ").split(/\s+/)
-    .map((w) => w.replace(/[.,]+$/, "")).filter((w) => w && !/^[-–]+$/.test(w) && !TIDY_DROP.test(w) && !/\d/.test(w));
+  let words = tidyWords(text);
   // A bank's short codes at the end (LT, CD, LC) and a cut-off last word aren't part of the name.
   // A word after "&" is part of the name ("BRINDLE & FOX" is Brindle & Fox, not "Brindle &").
   while (words.length > 1 && /^[A-Z]{2,3}$/.test(words[words.length - 1]) && !/^(UK|BP|CO)$/.test(words[words.length - 1]) && !/^(&|and)$/i.test(words[words.length - 2])) words.pop();
@@ -274,36 +316,63 @@ function cardsView(rows) {
 export const visibleSql = (t) => `(${t}.card_ref IN (SELECT k.ref FROM bank_cards k WHERE k.shopper_id = ${t}.shopper_id AND k.connection_id = ${t}.connection_id AND k.mine = 1)
   OR (${t}.card_ref IS NULL AND NOT EXISTS (SELECT 1 FROM bank_cards k WHERE k.shopper_id = ${t}.shopper_id AND k.connection_id = ${t}.connection_id)))`;
 
-// Reads a connection's payments for the last 90 days, from the cards and accounts that are the shopper's. Returns { ok }
-// or { gone } (the bank's permission has ended).
+// Reads a connection's payments for the last 90 days, from the cards and accounts that are the shopper's. Returns
+// { ok, read } (everything asked for was read), { partial, read } (the bank or TrueLayer didn't answer for some of it: what
+// was read is kept, nothing else is touched, and the connection is not marked as read) or { gone } (the bank's permission
+// has ended: only when TrueLayer says so, never because it couldn't be asked).
 async function readConnection(env, db, shopperId, row, now, f) {
   let t = await openTokens(env, row); if (!t) return { gone: true };
   if (!t.access || !t.expires || t.expires < now + 60e3) {
-    const fresh = t.refresh ? await tokenCall(env, { grant_type: "refresh_token", refresh_token: t.refresh }, f) : null;
-    if (!fresh) return { gone: true };
-    t = { access: fresh.access_token, refresh: fresh.refresh_token || t.refresh, expires: now + (Number(fresh.expires_in) || 3600) * 1000 };
-    await saveTokens(env, db, row.id, t);
+    const form = { grant_type: "refresh_token", refresh_token: t.refresh };
+    const fresh = t.refresh ? await tokenCall(env, form, f) : null;
+    if (!fresh) {
+      if (tokenTrouble.has(form)) return { partial: true, read: 0 };
+      // Another request (a second phone, another screen) may have renewed it a moment ago: TrueLayer then refuses the old
+      // one. If newer access is saved, that's used; only otherwise has the permission ended.
+      const again = await db.prepare("SELECT token_iv, token_data FROM bank_links WHERE id = ?").bind(row.id).first();
+      const t2 = again && (again.token_data !== row.token_data || again.token_iv !== row.token_iv) ? await openTokens(env, again) : null;
+      if (!t2 || !t2.access || !(t2.expires > now + 60e3)) return { gone: true };
+      t = t2;
+    } else {
+      t = { access: fresh.access_token, refresh: fresh.refresh_token || t.refresh, expires: now + (Number(fresh.expires_in) || 3600) * 1000 };
+      await saveTokens(env, db, row.id, t);
+    }
   }
-  const q = "?from=" + encodeURIComponent(new Date(now - LOOK_BACK_DAYS * DAY).toISOString()) + "&to=" + encodeURIComponent(new Date(now).toISOString());
+  // Five minutes inside the 90 days: banks refuse anything older than 90 days without a fresh sign-in at the bank.
+  const q = "?from=" + encodeURIComponent(new Date(now - LOOK_BACK_DAYS * DAY + 5 * 60e3).toISOString()) + "&to=" + encodeURIComponent(new Date(now).toISOString());
   const rows = [];
   // What was read and why things were left out, for Relay's logs: counts, the bank's category words and the names of the
   // fields it sends (not their values), never a payment, amount, name or account.
   const seen = { accounts: 0, cards: 0, failedLists: 0, failedTx: 0, tx: 0, debits: 0, keptDebits: 0, credits: 0, notChosen: 0, otherCard: 0, marked: 0, leftOutType: {}, leftOutWord: {}, fields: {} };
   // 1. What the connection lists, and which of it is the shopper's (asked when there's more than one).
-  const listed = [];
+  const listed = [], failedKinds = [];
   for (const [list, kind] of [["/data/v1/accounts", "accounts"], ["/data/v1/cards", "cards"]]) {
     const got = await apiGet(env, t.access, list, f);
     if (got.gone) return { gone: true };
-    if (got.failed) { seen.failedLists++; continue; }   // a bank with no cards (or no accounts) answers with an error: skip it
+    if (got.none) continue;                             // a bank with no cards (or no accounts): nothing to read there
+    if (got.failed) { failedKinds.push(kind); continue; }   // couldn't ask: what was read from those before is left alone (below)
     seen[kind] += got.results.length;
     for (const a of got.results.slice(0, 10)) {
       const id = String(a.account_id || "");
       if (!/^[A-Za-z0-9_-]{1,100}$/.test(id)) continue;
-      listed.push({ kind, id, card_key: (kind === "cards" ? "c:" : "a:") + id, provider_id: id, name: clip(a.display_name, 60) || (kind === "cards" ? "Card" : "Account"), last4: clip(a.partial_card_number, 4) });
+      // The last four digits of the account's number, as the bank gives it (accounts only): kept to tell two connections
+      // of the same bank apart, never guessed.
+      const num = kind === "accounts" && a.account_number && typeof a.account_number.number === "string" ? /(\d{4})\s*$/.exec(a.account_number.number) : null;
+      listed.push({ kind, id, card_key: (kind === "cards" ? "c:" : "a:") + id, provider_id: id, name: clip(a.display_name, 60) || (kind === "cards" ? "Card" : "Account"), last4: clip(a.partial_card_number, 4),
+        acct4: num ? num[1] : null });
     }
   }
   const have = new Map((await cardRows(db, shopperId, row.id)).map((r) => [r.card_key, r]));
-  for (const c of listed) await ensureCard(db, shopperId, row, have, c, now, null);
+  // A list that didn't answer only matters when this connection has had cards (or accounts) from it before: then their
+  // payments must be left alone. A list that has never answered for this bank is one the bank doesn't offer.
+  for (const kind of failedKinds) if ([...have.keys()].some((k) => k.startsWith(kind === "cards" ? "c:" : "a:"))) seen.failedLists++;
+  for (const c of listed) {
+    const card = await ensureCard(db, shopperId, row, have, c, now, null);
+    if (c.acct4 && card.acct4 !== c.acct4) {
+      await db.prepare("UPDATE bank_cards SET acct4 = ? WHERE shopper_id = ? AND connection_id = ? AND card_key = ?").bind(c.acct4, shopperId, row.id, c.card_key).run();
+      card.acct4 = c.acct4;
+    }
+  }
   const top = [...have.values()].filter((r) => !r.parent_key);
   // One card or account alone is the shopper's, without asking.
   if (listed.length === 1 && top.length === 1 && top[0].mine == null) {
@@ -312,12 +381,14 @@ async function readConnection(env, db, shopperId, row, now, f) {
   }
   // 2. The payments of each that is theirs. Not theirs, or not answered yet: not read at all.
   let marksSeen = false, amexCardRead = false;
+  const readKeys = new Set();   // the cards and accounts whose payments the bank really answered with, this time
   for (const c of listed) {
     const card = have.get(c.card_key);
     if (card.mine !== 1) { seen.notChosen++; continue; }
     const tx = await apiGet(env, t.access, `/data/v1/${c.kind}/${c.id}/transactions${q}`, f);
     if (tx.gone) return { gone: true };
-    if (tx.failed) { seen.failedTx++; continue; }
+    if (tx.failed || tx.none) { seen.failedTx++; continue; }
+    readKeys.add(c.card_key);
     seen.tx += tx.results.length;
     if (c.kind === "cards" && isAmex(row.bank)) amexCardRead = true;
     // Which card each payment was on, when the card company says (one account, several cards). A payment that names no
@@ -379,16 +450,45 @@ async function readConnection(env, db, shopperId, row, now, f) {
       : db.prepare("UPDATE bank_payments SET card_ref = ? WHERE shopper_id = ? AND connection_id = ? AND card_ref IS NULL AND account = ?").bind(r.ref, ...args));
   }
   if (legacy.length) await db.batch(legacy);
-  // A full read of the last 90 days replaces what was read before for those days (so anything Relay no longer keeps goes).
-  await db.prepare("DELETE FROM bank_payments WHERE shopper_id = ? AND connection_id = ? AND paid_on >= ?").bind(shopperId, row.id, new Date(now - LOOK_BACK_DAYS * DAY).toISOString().slice(0, 10)).run();
-  if (keep.length) await db.batch(keep.map((r) => db.prepare(`INSERT INTO bank_payments (shopper_id, payment_id, connection_id, account, paid_on, amount_minor, currency, description, merchant, classification, card_ref, created_at)
+  // A read replaces what was read before for those days (so anything Relay no longer keeps goes), but only ever with what
+  // the bank actually answered. Everything answered: the connection's whole 90 days. Something not answered (TrueLayer or
+  // the bank busy, down or timing out): only the cards and accounts that were read are replaced, the rest keep what they
+  // had, and the connection isn't marked as read, so it's tried again next time instead of looking up to date.
+  const complete = seen.failedLists === 0 && seen.failedTx === 0;
+  const since = new Date(now - LOOK_BACK_DAYS * DAY).toISOString().slice(0, 10);
+  const readRefs = nowRows.filter((r) => readKeys.has(r.card_key) || (r.parent_key && readKeys.has(r.parent_key))).map((r) => r.ref);
+  const clear = complete ? db.prepare("DELETE FROM bank_payments WHERE shopper_id = ? AND connection_id = ? AND paid_on >= ?").bind(shopperId, row.id, since)
+    : readRefs.length ? db.prepare(`DELETE FROM bank_payments WHERE shopper_id = ? AND connection_id = ? AND paid_on >= ? AND card_ref IN (${readRefs.map(() => "?").join(",")})`).bind(shopperId, row.id, since, ...readRefs.slice(0, 90))
+    : null;
+  // The old rows go and the new ones arrive together or not at all.
+  if (clear || keep.length) await db.batch([...(clear ? [clear] : []), ...keep.map((r) => db.prepare(`INSERT INTO bank_payments (shopper_id, payment_id, connection_id, account, paid_on, amount_minor, currency, description, merchant, classification, card_ref, created_at)
     VALUES (?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(shopper_id, payment_id) DO UPDATE SET account = excluded.account, description = excluded.description, merchant = excluded.merchant,
       classification = excluded.classification, card_ref = excluded.card_ref`)
-    .bind(shopperId, r.payment_id, row.id, r.account, r.paid_on, r.amount_minor, r.currency, r.description, r.merchant, r.classification, r.card_ref, now)));
+    .bind(shopperId, r.payment_id, row.id, r.account, r.paid_on, r.amount_minor, r.currency, r.description, r.merchant, r.classification, r.card_ref, now))]);
+  if (!complete) {
+    await db.prepare("UPDATE bank_links SET tried_at = ?, problem = 'bank', status = 'ok' WHERE id = ?").bind(now, row.id).run();
+    return { partial: true, read: keep.length };
+  }
   // An Amex card whose payments said nothing about which card each was on: the app says Relay can't tell them apart.
-  await db.prepare("UPDATE bank_links SET synced_at = ?, status = 'ok', unsplit = ? WHERE id = ?").bind(now, amexCardRead && !marksSeen ? 1 : 0, row.id).run();
+  await db.prepare("UPDATE bank_links SET synced_at = ?, tried_at = ?, problem = NULL, status = 'ok', unsplit = ? WHERE id = ?").bind(now, now, amexCardRead && !marksSeen ? 1 : 0, row.id).run();
   return { ok: true, read: keep.length };
 }
+// One connection's read, on its own: whatever goes wrong with it is written on that connection (and in Relay's logs by
+// name), and never stops the shopper's other banks being read.
+async function readOne(env, db, shopperId, c, now, f) {
+  try {
+    const r = await readConnection(env, db, shopperId, c, now, f);
+    if (r.gone) await db.prepare("UPDATE bank_links SET status = 'reconnect', tried_at = ?, problem = NULL WHERE id = ?").bind(now, c.id).run();
+    else if (r.partial) await db.prepare("UPDATE bank_links SET tried_at = ?, problem = 'bank' WHERE id = ?").bind(now, c.id).run();
+    return r;
+  } catch (e) {
+    console.error("bank: read failed", String(c.bank || "").slice(0, 40), String(e && e.message || e).slice(0, 160));
+    await db.prepare("UPDATE bank_links SET tried_at = ?, problem = 'error' WHERE id = ?").bind(now, c.id).run().catch(() => {});
+    return { partial: true, read: 0, error: true };
+  }
+}
+// A read that didn't finish is tried again after a minute, not ten.
+export const RETRY_GAP = 60e3;
 
 // Reads every connection of a shopper (at most once every 10 minutes unless forced), then matches payments to receipts.
 export async function syncBank(env, shopperId, now, f, force, matchOnly) {
@@ -396,12 +496,12 @@ export async function syncBank(env, shopperId, now, f, force, matchOnly) {
   now = now || Date.now();
   // matchOnly: no reading from the banks, just matching again (after "Not mine").
   const conns = matchOnly ? [] : (await db.prepare("SELECT * FROM bank_links WHERE shopper_id = ?").bind(shopperId).all()).results || [];
-  let read = 0, gone = 0;
-  for (const c of conns) {
-    if (!force && c.synced_at && now - c.synced_at < SYNC_GAP) continue;
-    const r = await readConnection(env, db, shopperId, c, now, f);
-    if (r.gone) { gone++; await db.prepare("UPDATE bank_links SET status = 'reconnect' WHERE id = ?").bind(c.id).run(); }
-    else read += r.read || 0;
+  let read = 0, gone = 0, failed = 0;
+  // Each bank on its own and all at the same time: a slow or failing one neither holds up nor stops the others.
+  const due = conns.filter((c) => force || !((c.synced_at && now - c.synced_at < SYNC_GAP) || (c.tried_at && now - c.tried_at < RETRY_GAP)));
+  for (const r of await Promise.all(due.map((c) => readOne(env, db, shopperId, c, now, f)))) {
+    if (r.gone) gone++; else read += r.read || 0;
+    if (r.partial) failed++;
   }
   // Payments older than 13 months go.
   await db.prepare("DELETE FROM bank_payments WHERE shopper_id = ? AND paid_on < ?").bind(shopperId, new Date(now - 400 * DAY).toISOString().slice(0, 10)).run();
@@ -415,7 +515,7 @@ export async function syncBank(env, shopperId, now, f, force, matchOnly) {
   for (const p of payments) if (photoLinks.has(p.payment_id)) matches.set(p.payment_id, { receiptId: photoLinks.get(p.payment_id), match: "photo" });
   await db.batch([db.prepare("UPDATE bank_payments SET receipt_id = NULL, match = NULL WHERE shopper_id = ?").bind(shopperId),
     ...[...matches].map(([pid, m]) => db.prepare("UPDATE bank_payments SET receipt_id = ?, match = ? WHERE shopper_id = ? AND payment_id = ?").bind(m.receiptId, m.match, shopperId, pid))]);
-  return { read, gone, matched: matches.size };
+  return { read, gone, matched: matches.size, ...(failed ? { failed } : {}) };
 }
 
 // What the shopper said isn't theirs: { payments: Set, shops: Set }, and which payments weren't a shop purchase (noReceipt).
@@ -498,7 +598,13 @@ export async function refundCredits(env, shopperId) {
   } catch { return []; }   // no bank tables yet: no bank connected
 }
 
-// The bank's page sends the browser back here with a code. The single-use state ties it to the shopper who started.
+// The bank's page sends the browser back here with a code. The single-use state says which shopper, and which of their
+// sessions, started it. Nothing is connected here: whoever's browser this is hasn't shown they are that shopper (a link to
+// the bank's page can be sent to someone else, whose bank would then be read into the sender's account). The bank's tokens
+// wait, encrypted, for 10 minutes, and the browser goes back to the app with a single-use code. The app must hand that
+// code in signed in with the very session that started (finishBank, POST /relay/my/bank/finish); anyone else is refused
+// and the tokens are deleted.
+const FINISH_LIFE = 10 * 60e3;
 export async function handleBankCallback(env, url, o) {
   const appUrl = String(env.RELAY_APP_URL || DEFAULT_APP_URL).split("#")[0];
   const back = (r) => Response.redirect(appUrl + "#bank=" + r, 302);
@@ -508,13 +614,15 @@ export async function handleBankCallback(env, url, o) {
   if (!code || code.length > 2000 || !/^[A-Za-z0-9_-]{43}$/.test(state)) return back("failed");
   const db = env.RELAY_DB; await ensureBankTables(db);
   const hash = await sha256Hex(state);
-  const claimed = await db.prepare("UPDATE bank_link_states SET used_at = ? WHERE state_hash = ? AND used_at IS NULL AND expires_at > ? RETURNING shopper_id")
+  const claimed = await db.prepare("UPDATE bank_link_states SET used_at = ? WHERE state_hash = ? AND used_at IS NULL AND expires_at > ? RETURNING shopper_id, session_hash")
     .bind(o.now, hash, o.now).first();
   if (!claimed) {
     // Say why when it's only that it took too long (each try lasts 15 minutes).
     const was = await db.prepare("SELECT expires_at, used_at FROM bank_link_states WHERE state_hash = ?").bind(hash).first();
     return back(was && !was.used_at && was.expires_at <= o.now ? "expired" : "failed");
   }
+  // A try that doesn't say which session started it (made before this rule) can't be finished safely.
+  if (!claimed.session_hash) return back("failed");
   const t = await tokenCall(env, { grant_type: "authorization_code", code, redirect_uri: redirectUri(env, url) }, o.fetchImpl);
   if (!t) return back("failed");
   let bank = null;
@@ -524,12 +632,31 @@ export async function handleBankCallback(env, url, o) {
     const p = b && Array.isArray(b.results) && b.results[0] && b.results[0].provider;
     bank = bankName(clip(p && p.display_name, 60));
   } catch {}
-  const id = crypto.randomUUID();
   const sealed = await sealToken(env, JSON.stringify({ access: t.access_token, refresh: t.refresh_token || null, expires: o.now + (Number(t.expires_in) || 3600) * 1000 }));
+  const finish = randomToken();
+  await db.prepare("UPDATE bank_link_states SET finish_hash = ?, token_iv = ?, token_data = ?, bank = ?, expires_at = ? WHERE state_hash = ?")
+    .bind(await sha256Hex(finish), sealed.iv, sealed.data, bank, o.now + FINISH_LIFE, hash).run();
+  return back("finish&bankcode=" + finish);
+}
+// POST /relay/my/bank/finish { code }: the app, back from the bank's page, hands in the code the callback gave it. Only the
+// session that started the connection can finish it. The code works once, whoever uses it.
+async function finishBank(env, db, shopper, code, o, cors) {
+  if (typeof code !== "string" || !/^[A-Za-z0-9_-]{43}$/.test(code)) return json({ error: "invalid_request" }, 400, cors);
+  const row = await db.prepare("UPDATE bank_link_states SET finish_hash = NULL WHERE finish_hash = ? AND expires_at > ? RETURNING state_hash, shopper_id, session_hash, token_iv, token_data, bank")
+    .bind(await sha256Hex(code), o.now).first();
+  if (!row) return json({ error: "link_failed" }, 409, cors);
+  await db.prepare("DELETE FROM bank_link_states WHERE state_hash = ?").bind(row.state_hash).run();
+  if (row.shopper_id !== shopper.id || !shopper.sessionHash || row.session_hash !== shopper.sessionHash || !row.token_data) {
+    console.log("bank: a connection was finished by someone other than whoever started it; refused");
+    return json({ error: "not_your_link" }, 403, cors);
+  }
+  const n = await db.prepare("SELECT COUNT(*) AS n FROM bank_links WHERE shopper_id = ?").bind(shopper.id).first();
+  if (n && n.n >= 5) return json({ error: "too_many_banks", max: 5 }, 409, cors);
+  const id = crypto.randomUUID();
   await db.prepare("INSERT INTO bank_links (id, shopper_id, bank, token_iv, token_data, connected_at) VALUES (?,?,?,?,?,?)")
-    .bind(id, claimed.shopper_id, bank, sealed.iv, sealed.data, o.now).run();
-  try { await syncBank(env, claimed.shopper_id, o.now, o.fetchImpl, true); } catch {}
-  return back("connected");
+    .bind(id, shopper.id, row.bank, row.token_iv, row.token_data, o.now).run();
+  try { await syncBank(env, shopper.id, o.now, o.fetchImpl, true); } catch (e) { console.error("bank: first read failed", String(e && e.message || e).slice(0, 160)); }
+  return json({ ok: true, id }, 200, cors);
 }
 
 // The banks offered as one tap in getting started (Connor, 17 Nov 2026), so TrueLayer can skip its own list of banks.
@@ -575,10 +702,34 @@ async function providers(env, now, fetchImpl) {
 }
 
 // One connection as the app sees it: its bank, when it was read, what was found, and which of its cards are the shopper's.
+// readProblem: the last try to read it didn't finish, so syncedAt is older than it looks like it should be: "bank" (the
+// bank didn't answer for some or all of it) or "error" (Relay's own). triedAt: when that was. accounts: what the bank
+// itself calls each card or account on it, with the last four digits the bank gives (see connectionLabels).
 async function connectionView(db, shopperId, c) {
+  const rows = await cardRows(db, shopperId, c.id);
   return { id: c.id, bank: bankName(c.bank), connectedAt: new Date(c.connected_at).toISOString(), syncedAt: c.synced_at ? new Date(c.synced_at).toISOString() : null,
     needsReconnect: c.status === "reconnect", payments: Number(c.payments) || 0, matched: Number(c.matched) || 0,
-    ...cardsView(await cardRows(db, shopperId, c.id)), ...(c.unsplit === 1 ? { unsplit: true } : {}) };
+    ...(c.status !== "reconnect" && c.problem && c.tried_at && (!c.synced_at || c.tried_at > c.synced_at) ? { readProblem: c.problem === "error" ? "error" : "bank", triedAt: new Date(c.tried_at).toISOString() } : {}),
+    accounts: rows.filter((r) => !r.parent_key).map((r) => cardLabel(r.name, r.last4 || r.acct4)),
+    ...cardsView(rows), ...(c.unsplit === 1 ? { unsplit: true } : {}) };
+}
+// Two connections with the same bank name (two "Santander Personal") are told apart by what the bank itself says is on
+// each: the account's or card's own name and the last four digits the bank gives ("Santander Personal, Current Account
+// ending 4321"). Only the bank's own data, never a made-up number or "1" and "2". When that still doesn't tell them apart
+// (or nothing has been read yet), they keep the plain name: the app has the day each was connected. Sets view.label.
+export function connectionLabels(views) {
+  const count = new Map();
+  for (const v of views) count.set(v.bank || "", (count.get(v.bank || "") || 0) + 1);
+  for (const v of views) {
+    v.label = v.bank;
+    if (!v.bank || count.get(v.bank) < 2 || !v.accounts.length) continue;
+    const a = v.accounts;
+    v.label = v.bank + ", " + (a.length === 1 ? a[0] : a.length === 2 ? a[0] + " and " + a[1] : a[0] + " and " + (a.length - 1) + " more");
+  }
+  const seen = new Map();
+  for (const v of views) seen.set(v.label, (seen.get(v.label) || 0) + 1);
+  for (const v of views) if (seen.get(v.label) > 1) v.label = v.bank;
+  return views;
 }
 
 export async function handleBankRoute(path, method, request, env, url, cors, shopper, o) {
@@ -587,12 +738,12 @@ export async function handleBankRoute(path, method, request, env, url, cors, sho
   const ok = await allowed(env, shopper);
   if (path === "/relay/my/bank" && method === "GET") {
     if (!ok) return json({ available: false, connections: [] }, 200, cors);
-    const conns = (await db.prepare(`SELECT c.id, c.bank, c.connected_at, c.synced_at, c.status, c.unsplit, COUNT(p.payment_id) AS payments, SUM(CASE WHEN p.receipt_id IS NOT NULL THEN 1 ELSE 0 END) AS matched
+    const conns = (await db.prepare(`SELECT c.id, c.bank, c.connected_at, c.synced_at, c.status, c.unsplit, c.tried_at, c.problem, COUNT(p.payment_id) AS payments, SUM(CASE WHEN p.receipt_id IS NOT NULL THEN 1 ELSE 0 END) AS matched
       FROM bank_links c LEFT JOIN bank_payments p ON p.connection_id = c.id AND p.shopper_id = c.shopper_id AND ${visibleSql("p")} WHERE c.shopper_id = ? GROUP BY c.id ORDER BY c.connected_at`).bind(shopper.id).all()).results || [];
     const choices = await choicesOffered(env, o.now, o.fetchImpl);
     const views = [];
     for (const c of conns) views.push(await connectionView(db, shopper.id, c));
-    return json({ available: true, testBanks: !bankLive(env), ...(choices ? { choices } : {}), connections: views }, 200, cors);
+    return json({ available: true, testBanks: !bankLive(env), ...(choices ? { choices } : {}), connections: connectionLabels(views) }, 200, cors);
   }
   if (!ok) return json({ error: "not_found" }, 404, cors);
   if (path === "/relay/my/bank/connect" && method === "POST") {
@@ -600,7 +751,9 @@ export async function handleBankRoute(path, method, request, env, url, cors, sho
     if (n && n.n >= 5) return json({ error: "too_many_banks", max: 5 }, 409, cors);
     const state = randomToken();
     await db.prepare("DELETE FROM bank_link_states WHERE expires_at < ?").bind(o.now).run();
-    await db.prepare("INSERT INTO bank_link_states (state_hash, shopper_id, expires_at) VALUES (?,?,?)").bind(await sha256Hex(state), shopper.id, o.now + STATE_LIFE).run();
+    // The state remembers which session started it: only that session can finish the connection (handleBankCallback).
+    if (!shopper.sessionHash) return json({ error: "not_found" }, 404, cors);
+    await db.prepare("INSERT INTO bank_link_states (state_hash, shopper_id, expires_at, session_hash) VALUES (?,?,?,?)").bind(await sha256Hex(state), shopper.id, o.now + STATE_LIFE, shopper.sessionHash).run();
     const b = await request.json().catch(() => null);
     const choice = b && typeof b.bank === "string" ? b.bank : null;
     const q = new URLSearchParams({ response_type: "code", client_id: env.TRUELAYER_CLIENT_ID, redirect_uri: redirectUri(env, url), scope: BANK_SCOPES, state,
@@ -609,7 +762,17 @@ export async function handleBankRoute(path, method, request, env, url, cors, sho
     if (providerId) q.set("provider_id", providerId);
     return json({ url: hosts(env).auth + "/?" + q.toString().replace(/\+/g, "%20") }, 200, cors);
   }
-  if (path === "/relay/my/bank/sync" && method === "POST") return json(await syncBank(env, shopper.id, o.now, o.fetchImpl, false), 200, cors);
+  if (path === "/relay/my/bank/finish" && method === "POST") {
+    const b = await request.json().catch(() => null);
+    return finishBank(env, db, shopper, b && b.code, o, cors);
+  }
+  if (path === "/relay/my/bank/sync" && method === "POST") {
+    // The read carries on to the end even if the phone leaves the screen or the app part-way (o.later), so a slow bank
+    // can't leave every connection unread for days.
+    const work = syncBank(env, shopper.id, o.now, o.fetchImpl, false);
+    if (typeof o.later === "function") o.later(work.catch(() => {}));
+    return json(await work, 200, cors);
+  }
   if (path === "/relay/my/bank/payments" && method === "GET") {
     const rows = (await db.prepare(`SELECT payment_id, account, paid_on, amount_minor, currency, description, merchant, classification, receipt_id, match FROM bank_payments
       WHERE shopper_id = ? AND amount_minor > 0 AND ${visibleSql("bank_payments")} ORDER BY paid_on DESC, payment_id LIMIT 200`).bind(shopper.id).all()).results || [];
@@ -677,20 +840,24 @@ export async function handleBankRoute(path, method, request, env, url, cors, sho
     }
     await db.batch(st);
     if (on.length) {
-      const r = await readConnection(env, db, shopper.id, conn, o.now || Date.now(), o.fetchImpl);
-      if (r.gone) await db.prepare("UPDATE bank_links SET status = 'reconnect' WHERE id = ?").bind(conn.id).run();
+      await readOne(env, db, shopper.id, conn, o.now || Date.now(), o.fetchImpl);
     }
     await syncBank(env, shopper.id, o.now, o.fetchImpl, false, true);
-    const view = await db.prepare(`SELECT c.id, c.bank, c.connected_at, c.synced_at, c.status, c.unsplit, COUNT(p.payment_id) AS payments, SUM(CASE WHEN p.receipt_id IS NOT NULL THEN 1 ELSE 0 END) AS matched
+    const view = await db.prepare(`SELECT c.id, c.bank, c.connected_at, c.synced_at, c.status, c.unsplit, c.tried_at, c.problem, COUNT(p.payment_id) AS payments, SUM(CASE WHEN p.receipt_id IS NOT NULL THEN 1 ELSE 0 END) AS matched
       FROM bank_links c LEFT JOIN bank_payments p ON p.connection_id = c.id AND p.shopper_id = c.shopper_id AND ${visibleSql("p")} WHERE c.id = ? AND c.shopper_id = ? GROUP BY c.id`).bind(conn.id, shopper.id).first();
-    return json({ ok: true, connection: await connectionView(db, shopper.id, view) }, 200, cors);
+    // Its title among the shopper's other connections (two of the same bank are told apart by what the bank says is on each).
+    const others = (await db.prepare("SELECT id, bank, connected_at, synced_at, status, unsplit, tried_at, problem FROM bank_links WHERE shopper_id = ? AND id != ?").bind(shopper.id, conn.id).all()).results || [];
+    const views = [await connectionView(db, shopper.id, view)];
+    for (const x of others) views.push(await connectionView(db, shopper.id, x));
+    return json({ ok: true, connection: connectionLabels(views)[0] }, 200, cors);
   }
   if (path === "/relay/my/bank/disconnect" && method === "POST") {
     const b = await request.json().catch(() => null);
     if (!b || typeof b.id !== "string" || !/^[0-9a-f-]{36}$/.test(b.id)) return json({ error: "invalid_request" }, 400, cors);
     const own = await db.prepare("SELECT 1 AS x FROM bank_links WHERE id = ? AND shopper_id = ?").bind(b.id, shopper.id).first();
     if (!own) return json({ error: "not_found" }, 404, cors);
-    await db.batch([db.prepare("DELETE FROM bank_payments WHERE shopper_id = ? AND connection_id = ?").bind(shopper.id, b.id),
+    await db.batch([db.prepare("DELETE FROM bank_not_mine WHERE shopper_id = ? AND kind IN ('payment', 'no_receipt') AND key IN (SELECT payment_id FROM bank_payments WHERE shopper_id = ? AND connection_id = ?)").bind(shopper.id, shopper.id, b.id),
+      db.prepare("DELETE FROM bank_payments WHERE shopper_id = ? AND connection_id = ?").bind(shopper.id, b.id),
       db.prepare("DELETE FROM bank_cards WHERE shopper_id = ? AND connection_id = ?").bind(shopper.id, b.id),
       db.prepare("DELETE FROM bank_links WHERE id = ? AND shopper_id = ?").bind(b.id, shopper.id)]);
     return json({ ok: true }, 200, cors);
@@ -746,7 +913,8 @@ async function addReceiptPhoto(env, request, cors, shopper, o) {
   const { items: photoItems, itemsCheck } = photoItemsOf(read, got.confidence, photoTotal);
   const details = {
     kind: "receipt", source: "receipt_photo", photoReceipt: true, bankPaymentId: p.payment_id,
-    retailer: { name: (read && read.shop) || shopName(p.description, p.merchant) || "Shop", domain: null },
+    // The shop: what the photo says, else the bank's name for it, else the bank's own words as they are. Never a made-up name.
+    retailer: { name: (read && read.shop) || shopName(p.description, p.merchant) || clip(p.merchant || statementShop(p.description), 60) || "Shop", domain: null },
     orderDate: (read && read.orderDate) || p.paid_on, orderDateFrom: read && read.orderDate ? "photo" : "bank",
     // The total is what the photo says when it says one, otherwise what the bank paid: never one forced to fit the other.
     totalPence: photoTotal != null ? photoTotal : p.amount_minor, currency: photoTotal != null ? photoCurrency : bankCurrency,
