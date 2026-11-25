@@ -52,6 +52,10 @@ import { addressOf } from "./limits.js";
 import { ensureOrderNowColumn } from "./order-ref.js";
 import { REVIEW_TABLE_SQL, REVIEW_MAX_FAILURES_PER_DAY, isReviewAddress, reviewBlocked, reviewCode, handleReviewAdminRoute } from "./review-account.js";
 const LINK_TTL_MS = 15 * 60 * 1000;
+// A Google or Microsoft sign-in, back at Relay: how long it can be finished (or confirmed) by the browser that came back,
+// and, once confirmed, how long the app that started it has to collect it by its secret alone.
+const PROVIDER_TTL_MS = 5 * 60 * 1000;
+const CLAIM_WINDOW_MS = 2 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
 const SESSION_TTL_MS = 90 * DAY_MS;
 // A session in regular use is pushed forward, but at most about once a month.
@@ -136,6 +140,11 @@ async function ensureAuthTablesRun(db) {
   try { await db.prepare("ALTER TABLE auth_login_tokens ADD COLUMN suggested_name TEXT").run(); } catch { /* already there */ }
   // Whether the session passed a second step (second-step.js): 1 after a passkey or a code at sign-in, or once the
   // account's first second step is set up in it. Sessions from before this are 0.
+  // A Google or Microsoft sign-in the app may collect with its secret alone (claimSignIn): 2 once the browser that came back
+  // proved it started it (it holds the secret too), 1 once the person there confirmed it by hand. Empty: not claimable.
+  try { await db.prepare("ALTER TABLE auth_login_tokens ADD COLUMN claim_ok INTEGER").run(); } catch { /* already there */ }
+  // Wrong guesses at a sign-in code, counted on the code itself (verifyCode).
+  try { await db.prepare("ALTER TABLE auth_login_tokens ADD COLUMN attempts INTEGER NOT NULL DEFAULT 0").run(); } catch { /* already there */ }
   try { await db.prepare("ALTER TABLE auth_sessions ADD COLUMN second_step INTEGER NOT NULL DEFAULT 0").run(); } catch { /* already there */ }
   await ensureGmailTables(db);
 }
@@ -146,6 +155,20 @@ function json(body, status = 200, cors = {}) {
 function allowedOrigins(env) {
   const configured = String(env.RELAY_ALLOWED_ORIGINS || "").split(",").map(s => s.trim()).filter(Boolean);
   return new Set(configured.length ? configured : [new URL(env.RELAY_APP_URL || DEFAULT_APP_URL).origin]);
+}
+// Sign-in steps only Relay's own app makes. A browser always says where a request like these comes from (Origin), and
+// Relay's app is a web page wherever it runs (a tab, or installed on the home screen), so one that doesn't say is not the app.
+function fromRelayApp(request, env) {
+  const origin = request.headers.get("origin");
+  return Boolean(origin) && allowedOrigins(env).has(origin);
+}
+// The short code both screens show when a sign-in comes back in a different browser from the one that started it: worked
+// out from the starting browser's secret (its hash), so the two always match and nothing more is stored.
+const MATCH_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // no I, O, 0 or 1
+async function matchCode(env, nonceHash) {
+  const key = await crypto.subtle.importKey("raw", encoder.encode(env.AUTH_SECRET), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const mac = new Uint8Array(await crypto.subtle.sign("HMAC", key, encoder.encode("relay-signin-match:" + nonceHash)));
+  return Array.from(mac.slice(0, 6), b => MATCH_ALPHABET[b % MATCH_ALPHABET.length]).join("");
 }
 function configured(env) {
   return Boolean(env.RELAY_DB && env.AUTH_SECRET && String(env.AUTH_SECRET).length >= 16 && env.RESEND_API_KEY);
@@ -207,9 +230,12 @@ async function requestLink(request, env, cors, opts) {
   // The reviewer's code is the same every time, so its one row is renewed (and made usable again) rather than added twice.
   await env.RELAY_DB.prepare(
     "INSERT INTO auth_login_tokens (token_hash,email,client_hash,created_at,expires_at) VALUES (?,?,?,?,?)" +
-    (review ? " ON CONFLICT(token_hash) DO UPDATE SET client_hash = excluded.client_hash, created_at = excluded.created_at, expires_at = excluded.expires_at, used_at = NULL" : ""))
+    (review ? " ON CONFLICT(token_hash) DO UPDATE SET client_hash = excluded.client_hash, created_at = excluded.created_at, expires_at = excluded.expires_at, used_at = NULL, attempts = 0" : ""))
     .bind(codeHash, "code:" + email, client, now, now + LINK_TTL_MS).run();
-  if (review) return json({ ok: true, review: true }, 200, cors);
+  // Only the newest code works: an earlier one for this address, not yet used, is cancelled once its replacement has gone out.
+  const cancelEarlier = () => env.RELAY_DB.prepare("UPDATE auth_login_tokens SET used_at = ? WHERE email = ? AND token_hash != ? AND used_at IS NULL")
+    .bind(now, "code:" + email, codeHash).run();
+  if (review) { await cancelEarlier(); return json({ ok: true, review: true }, 200, cors); }
   const appUrl = String(env.RELAY_APP_URL || DEFAULT_APP_URL).split("#")[0];
   const link = appUrl + "#signin=" + token; // fragment: never sent to a server or written to logs
   let sent = false;
@@ -231,6 +257,7 @@ async function requestLink(request, env, cors, opts) {
     await env.RELAY_DB.prepare("DELETE FROM auth_login_tokens WHERE token_hash IN (?, ?)").bind(tokenHash, codeHash).run();
     return json({ error: "email_send_failed" }, 502, cors);
   }
+  await cancelEarlier();
   return json({ ok: true }, 200, cors);
 }
 
@@ -250,30 +277,82 @@ async function verifyLink(request, env, cors, opts) {
     `UPDATE auth_login_tokens SET used_at = ?
      WHERE token_hash = ? AND used_at IS NULL AND expires_at > ? AND (client_hash NOT LIKE 'gnonce:%' OR client_hash = ?) RETURNING token_hash, email, client_hash, suggested_name`)
     .bind(now, await sha256Hex(token), now, theirs).first();
-  if (!claimed) return json({ error: "invalid_or_expired_link" }, 400, cors);
-  return finishSignIn(env, claimed, now, cors);
+  if (!claimed) {
+    // A Google or Microsoft sign-in, live, opened in a browser that doesn't hold the secret of the one that started it: it
+    // can't finish here. The page is told so, with the short code to show, and asks the person to confirm (confirmSignIn).
+    const waiting = await env.RELAY_DB.prepare(
+      "SELECT client_hash FROM auth_login_tokens WHERE token_hash = ? AND used_at IS NULL AND expires_at > ? AND client_hash LIKE 'gnonce:%' AND claim_ok IS NULL")
+      .bind(await sha256Hex(token), now).first();
+    if (waiting) return json({ error: "confirm_needed", code: await matchCode(env, String(waiting.client_hash).slice(7)) }, 400, cors);
+    return json({ error: "invalid_or_expired_link" }, 400, cors);
+  }
+  return finishSignIn(env, claimed, now, cors, { proven: true });
 }
 
-// The app that started a Google or Microsoft sign-in, back on screen: finished, if Google or Microsoft has sent the
-// shopper back (somewhere), by the nonce only it holds. Nothing yet: a plain "not yet", so it can ask again.
+// The browser Google or Microsoft sent back, which is not finishing the sign-in itself, says the app that started it may
+// collect it. Always with the one-time token, which only that browser was given. Then either:
+//  * the secret of the browser that started it as well (an installed app's own browser window, which shares its storage):
+//    proof that the person who went through Google's screen is the one who started, so it goes ahead as it would there; or
+//  * the person's own say-so (`agree`), on a page showing the same short code as the app that started it, and telling them
+//    to close it if someone sent them the link. An inbox agreed to on the starting screen is then NOT connected: without
+//    the secret, nothing shows that the person who agreed there is the person who signed in here.
+// `deny` ("This wasn't me") cancels the sign-in. Either way the app has two minutes to collect it.
+async function confirmSignIn(request, env, cors, opts) {
+  const { now } = opts;
+  if (!configured(env)) return json({ error: "sign_in_not_configured" }, 503, cors);
+  if (!fromRelayApp(request, env)) return json({ error: "origin_not_allowed" }, 403, cors);
+  const body = await readJson(request);
+  const token = body && typeof body.token === "string" ? body.token : "";
+  if (!TOKEN_SHAPE.test(token)) return json({ error: "invalid_or_expired_link" }, 400, cors);
+  await ensureAuthTables(env.RELAY_DB);
+  const tokenHash = await sha256Hex(token);
+  const live = "token_hash = ? AND used_at IS NULL AND expires_at > ? AND client_hash LIKE 'gnonce:%' AND claim_ok IS NULL";
+  if (body.deny === true) {
+    const gone = await env.RELAY_DB.prepare(`UPDATE auth_login_tokens SET used_at = ? WHERE ${live} RETURNING token_hash`).bind(now, tokenHash, now).first();
+    if (!gone) return json({ error: "invalid_or_expired_link" }, 400, cors);
+    await env.RELAY_DB.prepare("DELETE FROM auth_pending_mailbox WHERE token_hash = ?").bind(tokenHash).run();
+    return json({ ok: true, cancelled: true }, 200, cors);
+  }
+  const nonce = typeof body.nonce === "string" && TOKEN_SHAPE.test(body.nonce) ? body.nonce : "";
+  if (nonce) {
+    const proven = await env.RELAY_DB.prepare(`UPDATE auth_login_tokens SET claim_ok = 2, expires_at = ? WHERE ${live} AND client_hash = ? RETURNING token_hash`)
+      .bind(now + CLAIM_WINDOW_MS, tokenHash, now, "gnonce:" + (await sha256Hex("gnonce:" + nonce))).first();
+    return proven ? json({ ok: true }, 200, cors) : json({ error: "invalid_or_expired_link" }, 400, cors);
+  }
+  if (body.agree !== true) return json({ error: "invalid_request" }, 400, cors);
+  const agreed = await env.RELAY_DB.prepare(`UPDATE auth_login_tokens SET claim_ok = 1, expires_at = ? WHERE ${live} RETURNING token_hash`)
+    .bind(now + CLAIM_WINDOW_MS, tokenHash, now).first();
+  if (!agreed) return json({ error: "invalid_or_expired_link" }, 400, cors);
+  await env.RELAY_DB.prepare("DELETE FROM auth_pending_mailbox WHERE token_hash = ?").bind(tokenHash).run();
+  return json({ ok: true }, 200, cors);
+}
+
+// The app that started a Google or Microsoft sign-in, back on screen: finished by the secret only it holds, but only once
+// the browser Google or Microsoft sent the person back to has said so (confirmSignIn). The secret alone is never enough:
+// whoever starts a sign-in chooses it, and could have sent Google's link to somebody else. Nothing yet: a plain "not yet".
 async function claimSignIn(request, env, cors, opts) {
   const { now } = opts;
   if (!configured(env)) return json({ error: "sign_in_not_configured" }, 503, cors);
+  if (!fromRelayApp(request, env)) return json({ error: "origin_not_allowed" }, 403, cors);
   const body = await readJson(request);
   const nonce = body && typeof body.nonce === "string" && TOKEN_SHAPE.test(body.nonce) ? body.nonce : "";
   if (!nonce) return json({ error: "invalid_request" }, 400, cors);
   await ensureAuthTables(env.RELAY_DB);
   const claimed = await env.RELAY_DB.prepare(
-    `UPDATE auth_login_tokens SET used_at = ? WHERE token_hash = (SELECT token_hash FROM auth_login_tokens WHERE client_hash = ? AND used_at IS NULL AND expires_at > ? ORDER BY created_at DESC LIMIT 1)
-     AND used_at IS NULL RETURNING token_hash, email, client_hash, suggested_name`)
+    `UPDATE auth_login_tokens SET used_at = ? WHERE token_hash = (SELECT token_hash FROM auth_login_tokens WHERE client_hash = ? AND used_at IS NULL AND expires_at > ? AND claim_ok IN (1, 2) ORDER BY created_at DESC LIMIT 1)
+     AND used_at IS NULL AND claim_ok IN (1, 2) RETURNING token_hash, email, client_hash, suggested_name, claim_ok`)
     .bind(now, "gnonce:" + (await sha256Hex("gnonce:" + nonce)), now).first();
   if (!claimed) return json({ error: "not_yet" }, 404, cors);
-  return finishSignIn(env, claimed, now, cors);
+  return finishSignIn(env, claimed, now, cors, { proven: Number(claimed.claim_ok) === 2 });
 }
 
-async function finishSignIn(env, claimed, now, cors) {
+// proven: the browser Google or Microsoft sent the person back to held the secret of the browser that started the sign-in,
+// so the person who agreed to the wording there is the person who signed in. Only then is an inbox connected.
+async function finishSignIn(env, claimed, now, cors, { proven = false } = {}) {
   const named = claimed.suggested_name ? { suggestedName: claimed.suggested_name } : {};
-  if (String(claimed.client_hash).startsWith("gnonce:")) {
+  if (String(claimed.client_hash).startsWith("gnonce:") && !proven)
+    await env.RELAY_DB.prepare("DELETE FROM auth_pending_mailbox WHERE token_hash = ?").bind(claimed.token_hash).run();
+  if (String(claimed.client_hash).startsWith("gnonce:") && proven) {
     // "Sign in and connect your email": the shopper agreed to the wording on the sign-in screen of this same browser,
     // so the agreement is recorded and Gmail or Outlook connected now, in one step. Connecting starts the first scan.
     const pending = await env.RELAY_DB.prepare(
@@ -343,23 +422,32 @@ async function verifyCode(request, env, cors, opts) {
   const code = body && typeof body.code === "string" ? body.code.replace(/\s/g, "") : "";
   if (!email || !/^\d{6}$/.test(code)) return json({ error: "invalid_or_expired_code" }, 400, cors);
   await ensureAuthTables(env.RELAY_DB);
-  // Only a few wrong guesses are allowed per email, then every outstanding code is cancelled.
-  const fails = await env.RELAY_DB.prepare(
-    "SELECT COUNT(*) AS n FROM auth_code_failures WHERE email = ? AND created_at > ?").bind(email, now - LINK_TTL_MS).first();
-  if ((fails?.n || 0) >= MAX_CODE_FAILURES) {
-    await env.RELAY_DB.prepare("UPDATE auth_login_tokens SET used_at = ? WHERE email = ? AND used_at IS NULL").bind(now, "code:" + email).run();
-    return json({ error: "too_many_requests" }, 429, cors);
-  }
   // The reviewer's code doesn't change, so wrong guesses are also capped per day, not just per 15 minutes.
   if (await isReviewAddress(env, email)) {
     const day = await env.RELAY_DB.prepare(
       "SELECT COUNT(*) AS n FROM auth_code_failures WHERE email = ? AND created_at > ?").bind(email, now - DAY_MS).first();
     if ((day?.n || 0) >= REVIEW_MAX_FAILURES_PER_DAY) return json({ error: "too_many_requests" }, 429, cors);
   }
-  const claimed = await env.RELAY_DB.prepare(
+  // Each code allows a few guesses, counted on the code itself in the same step that lets a guess through: guesses sent
+  // all at once can't each see "none used yet", and a code that has had its guesses can't be used, even by the right one.
+  // Wrong guesses at one code don't hold up the next: asking for a new code gives a fresh one (the hourly limit on those,
+  // and on guesses per network address, still apply), so nobody can keep an address locked out by guessing at it.
+  const codeEmail = "code:" + email;
+  const tried = await env.RELAY_DB.prepare(
+    "UPDATE auth_login_tokens SET attempts = attempts + 1 WHERE email = ? AND used_at IS NULL AND expires_at > ? AND attempts < ? RETURNING token_hash")
+    .bind(codeEmail, now, MAX_CODE_FAILURES).all();
+  const open = new Set((tried.results || []).map(r => r.token_hash));
+  if (!open.size) {
+    // Nothing left to guess at. A code that ran out of guesses is cancelled, and the app says to ask for a new one.
+    const spent = await env.RELAY_DB.prepare("UPDATE auth_login_tokens SET used_at = ? WHERE email = ? AND used_at IS NULL AND expires_at > ? RETURNING token_hash")
+      .bind(now, codeEmail, now).all();
+    return (spent.results || []).length ? json({ error: "too_many_requests" }, 429, cors) : json({ error: "invalid_or_expired_code" }, 400, cors);
+  }
+  const hash = await sha256Hex("code:" + email + ":" + code);
+  const claimed = open.has(hash) ? await env.RELAY_DB.prepare(
     `UPDATE auth_login_tokens SET used_at = ?
      WHERE token_hash = ? AND email = ? AND used_at IS NULL AND expires_at > ? RETURNING email`)
-    .bind(now, await sha256Hex("code:" + email + ":" + code), "code:" + email, now).first();
+    .bind(now, hash, codeEmail, now).first() : null;
   if (!claimed) {
     await env.RELAY_DB.prepare("INSERT INTO auth_code_failures (email, created_at) VALUES (?,?)").bind(email, now).run();
     return json({ error: "invalid_or_expired_code" }, 400, cors);
@@ -381,8 +469,7 @@ function googleConfigured(env) { return Boolean(env.GOOGLE_CLIENT_ID && env.GOOG
 
 async function googleStart(request, env, url, cors, opts) {
   const { now } = opts;
-  const origin = request.headers.get("origin");
-  if (origin && !allowedOrigins(env).has(origin)) return json({ error: "origin_not_allowed" }, 403, cors);
+  if (!fromRelayApp(request, env)) return json({ error: "origin_not_allowed" }, 403, cors);
   if (!googleConfigured(env)) return json({ error: "google_sign_in_not_configured" }, 503, cors);
   const body = await readJson(request);
   const nonce = body && typeof body.nonce === "string" ? body.nonce : "";
@@ -405,7 +492,8 @@ async function googleStart(request, env, url, cors, opts) {
     // Google only hands over a lasting key for Gmail when it shows its own permission screen, so that is asked for too.
     ...(withMail ? { access_type: "offline", prompt: "consent select_account" } : { prompt: "select_account" })
   });
-  return json({ url: "https://accounts.google.com/o/oauth2/v2/auth?" + params }, 200, cors);
+  // code: what this screen shows if the sign-in comes back in another browser, which shows the same (confirmSignIn).
+  return json({ url: "https://accounts.google.com/o/oauth2/v2/auth?" + params, code: await matchCode(env, await sha256Hex("gnonce:" + nonce)) }, 200, cors);
 }
 
 // Called from the shared Google redirect when the state belongs to a sign-in. Returns null if it does not.
@@ -451,11 +539,11 @@ async function googleCallback(request, env, url, opts) {
   if (!email) return back("failed");
   const token = randomToken(), tokenHash = await sha256Hex(token);
   await env.RELAY_DB.prepare("INSERT INTO auth_login_tokens (token_hash,email,client_hash,created_at,expires_at,suggested_name) VALUES (?,?,?,?,?,?)")
-    .bind(tokenHash, email, "gnonce:" + claimed.nonce_hash, now, now + LINK_TTL_MS, name).run();
+    .bind(tokenHash, email, "gnonce:" + claimed.nonce_hash, now, now + PROVIDER_TTL_MS, name).run();
   if (mailbox) {
     const sealed = await sealToken(env, mailbox);
     await env.RELAY_DB.prepare("INSERT INTO auth_pending_mailbox (token_hash,address,token_iv,token_data,created_at,expires_at,provider,consent_version) VALUES (?,?,?,?,?,?,?,?)")
-      .bind(tokenHash, email, sealed.iv, sealed.data, now, now + LINK_TTL_MS, "google", claimed.mail_consent).run();
+      .bind(tokenHash, email, sealed.iv, sealed.data, now, now + PROVIDER_TTL_MS + CLAIM_WINDOW_MS, "google", claimed.mail_consent).run();
   }
   return Response.redirect(appUrl + "#signin=" + token, 302);
 }
@@ -480,8 +568,7 @@ function decodeClaims(idToken) {
 
 async function microsoftStart(request, env, url, cors, opts) {
   const { now } = opts;
-  const origin = request.headers.get("origin");
-  if (origin && !allowedOrigins(env).has(origin)) return json({ error: "origin_not_allowed" }, 403, cors);
+  if (!fromRelayApp(request, env)) return json({ error: "origin_not_allowed" }, 403, cors);
   if (!outlookConfigured(env)) return json({ error: "microsoft_sign_in_not_configured" }, 503, cors);
   const body = await readJson(request);
   const nonce = body && typeof body.nonce === "string" ? body.nonce : "";
@@ -502,7 +589,7 @@ async function microsoftStart(request, env, url, cors, opts) {
     client_id: env.MICROSOFT_CLIENT_ID, response_type: "code", redirect_uri: microsoftRedirect(env, url), response_mode: "query",
     scope: withMail ? MS_SIGNIN_SCOPE + " " + OUTLOOK_SCOPE : MS_SIGNIN_SCOPE, state, prompt: "select_account"
   });
-  return json({ url: MS_AUTH + "/authorize?" + params }, 200, cors);
+  return json({ url: MS_AUTH + "/authorize?" + params, code: await matchCode(env, await sha256Hex("gnonce:" + nonce)) }, 200, cors);
 }
 
 // Called from the shared Microsoft redirect when the state belongs to a sign-in. Returns null if it does not
@@ -546,11 +633,11 @@ async function microsoftCallback(request, env, url, opts) {
   if (!email) return back(otherAddress ? "other_address" : "failed");
   const token = randomToken(), tokenHash = await sha256Hex(token);
   await env.RELAY_DB.prepare("INSERT INTO auth_login_tokens (token_hash,email,client_hash,created_at,expires_at,suggested_name) VALUES (?,?,?,?,?,?)")
-    .bind(tokenHash, email, "gnonce:" + claimed.nonce_hash, now, now + LINK_TTL_MS, name).run();
+    .bind(tokenHash, email, "gnonce:" + claimed.nonce_hash, now, now + PROVIDER_TTL_MS, name).run();
   if (mailbox) {
     const sealed = await sealToken(env, mailbox);
     await env.RELAY_DB.prepare("INSERT INTO auth_pending_mailbox (token_hash,address,token_iv,token_data,created_at,expires_at,provider,consent_version) VALUES (?,?,?,?,?,?,?,?)")
-      .bind(tokenHash, email, sealed.iv, sealed.data, now, now + LINK_TTL_MS, "microsoft", claimed.mail_consent).run();
+      .bind(tokenHash, email, sealed.iv, sealed.data, now, now + PROVIDER_TTL_MS + CLAIM_WINDOW_MS, "microsoft", claimed.mail_consent).run();
   }
   return Response.redirect(appUrl + "#signin=" + token, 302);
 }
@@ -668,6 +755,7 @@ export async function handleAuthRoute(request, env, url, cors = {}, opts = {}) {
     if (path === "/relay/auth/request" && request.method === "POST") return await requestLink(request, env, cors, o);
     if (path === "/relay/auth/verify" && request.method === "POST") return await verifyLink(request, env, cors, o);
     if (path === "/relay/auth/claim" && request.method === "POST") return await claimSignIn(request, env, cors, o);
+    if (path === "/relay/auth/confirm" && request.method === "POST") return await confirmSignIn(request, env, cors, o);
     if (path === "/relay/auth/verify-code" && request.method === "POST") return await verifyCode(request, env, cors, o);
     if (path === "/relay/auth/google/start" && request.method === "POST" && configured(env)) { await ensureAuthTables(env.RELAY_DB); return await googleStart(request, env, url, cors, o); }
     if (path === "/relay/auth/microsoft/start" && request.method === "POST" && configured(env)) { await ensureAuthTables(env.RELAY_DB); return await microsoftStart(request, env, url, cors, o); }
@@ -714,6 +802,19 @@ export async function handleAuthRoute(request, env, url, cors = {}, opts = {}) {
     if (reviewBlocked(path, request.method) && await isReviewAddress(env, shopper.email)) return json({ error: "not_for_review_account" }, 403, cors);
     // Two-step sign-in for everyone (second-step.js): until the account has a second step, only setting one up and the
     // account's basics work. A session that passed a second step skips the check.
+    // Once the account has one, a session that never passed it is over: it was opened with the first step alone, before
+    // the second existed (or before sessions recorded it), and could be anyone who got into the inbox. It's ended here and
+    // the app asks for a fresh sign-in, which asks for the second step. Only signing out still works.
+    if (secondStepRequired(env) && !shopper.secondStep && path !== "/relay/auth/logout") {
+      const steps = await secondSteps(env, shopper.id);
+      if (hasSecondStep(steps)) {
+        await env.RELAY_DB.prepare("DELETE FROM auth_sessions WHERE session_hash = ? AND second_step = 0").bind(shopper.sessionHash).run();
+        // Still there: it was checked a moment ago (this session has just set the second step up, in another request).
+        const now1 = await env.RELAY_DB.prepare("SELECT second_step FROM auth_sessions WHERE session_hash = ?").bind(shopper.sessionHash).first();
+        if (!now1 || Number(now1.second_step) !== 1) return json({ error: "sign_in_again" }, 401, cors);
+        shopper.secondStep = true;
+      }
+    }
     if (secondStepRequired(env) && !shopper.secondStep && (path === "/relay/my/second-step" || !openWithoutSecondStep(path))) {
       const steps = await secondSteps(env, shopper.id), review = !hasSecondStep(steps) && await isReviewAddress(env, shopper.email);
       if (path === "/relay/my/second-step" && request.method === "GET")

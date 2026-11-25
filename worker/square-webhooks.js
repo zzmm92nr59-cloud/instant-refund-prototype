@@ -1,26 +1,34 @@
 import { syncSquareCatalogue } from "./square-catalogue.js";
 import { runPriceAlerts } from "./push.js";
+import { readCappedBytes } from "./validate.js";
 
 const ENDPOINT = "https://relay-square-api2.9pts72cy5j.workers.dev/relay/webhooks/square";
+const MAX_BYTES = 256 * 1024;
 const TYPES = new Set(["inventory.count.updated", "catalog.version.updated"]);
 
 export async function receiveSquareWebhook(request, env, ctx) {
   if (!env.SQUARE_WEBHOOK_SIGNATURE_KEY || !env.RELAY_DB || !env.SQUARE_ACCESS_TOKEN)
     return Response.json({error:"Webhook not configured"},{status:503});
-  const raw = await request.text();
-  if (raw.length > 262144) return new Response("Payload too large",{status:413});
+  // Unsigned: turned away before a byte of the body is read. Signed: read only up to 256 KB (a real notice is a few KB),
+  // refused on its declared size first, and never held in memory beyond that.
   const header = request.headers.get("x-square-hmacsha256-signature") || "";
-  if (!header) return new Response("Forbidden",{status:403});
+  if (!header || header.length > 120) return new Response("Forbidden",{status:403});
+  const bytes = await readCappedBytes(request, MAX_BYTES);
+  if (bytes === null) return new Response("Payload too large",{status:413});
   const key = await crypto.subtle.importKey("raw",new TextEncoder().encode(env.SQUARE_WEBHOOK_SIGNATURE_KEY),
     {name:"HMAC",hash:"SHA-256"},false,["sign"]);
-  const signature = await crypto.subtle.sign("HMAC",key,new TextEncoder().encode(ENDPOINT+raw));
-  const actual = Uint8Array.from(atob(header),c=>c.charCodeAt(0));
+  // Square signs its address followed by the body, exactly as sent: the bytes themselves, not a re-encoded copy.
+  const prefix = new TextEncoder().encode(ENDPOINT), signedBytes = new Uint8Array(prefix.length + bytes.length);
+  signedBytes.set(prefix, 0); signedBytes.set(bytes, prefix.length);
+  const signature = await crypto.subtle.sign("HMAC",key,signedBytes);
+  let actual;
+  try { actual = Uint8Array.from(atob(header),c=>c.charCodeAt(0)); } catch { return new Response("Forbidden",{status:403}); }
   const expected = new Uint8Array(signature);
   let diff=actual.length===expected.length?0:1;
   for(let i=0;i<expected.length;i++)diff |= expected[i] ^ (actual[i]||0);
   if(diff!==0) return new Response("Forbidden",{status:403});
   let event;
-  try { event=JSON.parse(raw); } catch { return new Response("Invalid JSON",{status:400}); }
+  try { event=JSON.parse(new TextDecoder("utf-8",{fatal:true}).decode(bytes)); } catch { return new Response("Invalid JSON",{status:400}); }
   if(!event.event_id || !TYPES.has(event.type))
     return Response.json({received:true,ignored:true});
   // Acknowledge promptly. Re-fetch authoritative current stock rather than trust

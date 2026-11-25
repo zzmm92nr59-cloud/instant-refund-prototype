@@ -162,17 +162,70 @@ assert.equal((await addPasskey(viaPasskey.body.sessionToken, tablet)).status, 20
 assert.equal((await post("/relay/my/passkeys/remove", viaPasskey.body.sessionToken, { id: onlyKey })).status, 200);
 console.log("ok - a passkey-only account finishes email sign-in with its passkey; its last passkey can't be removed");
 
-// 4. A session from before this change, on an account that has a second step: it carries on, but isn't checked. Adding
-// another way from it doesn't check it (only the account's first one does).
+// 4. A session that never passed a second step, on an account that has one (from before sessions recorded it, or opened
+// before the second step was set up): it is ended the first time it's used, and the app is told to sign in again. It can't
+// read anything, add a way in of its own, sign other devices out or delete the account. Only signing out answers.
 const amyOld = await oldSession("amy@example.com");
-assert.equal((await read("/relay/my/receipts", amyOld)).status, 200);
-assert.equal((await read("/relay/my/second-step", amyOld)).body.checked, false);
-assert.equal((await addPasskey(amyOld, newDevice())).status, 200);
-assert.equal((await read("/relay/my/second-step", amyOld)).body.checked, false, "adding a second way doesn't check an old session");
+assert.deepEqual(await read("/relay/my/receipts", amyOld), { status: 401, body: { error: "sign_in_again" } });
+assert.equal((await read("/relay/me", amyOld)).status, 401, "and it's gone: an ordinary 'not signed in' from then on");
+for (const [path, send] of [["/relay/my/second-step"], ["/relay/my/2fa"], ["/relay/my/profile"], ["/relay/my/passkeys"], ["/relay/my/admin/me"], ["/relay/my/2fa/setup", {}], ["/relay/my/devices/sign-out-others", {}], ["/relay/my/delete", {}]]) {
+  const t = await oldSession("amy@example.com");
+  const r = send ? await post(path, t, send) : await read(path, t);
+  assert.deepEqual(r, { status: 401, body: { error: "sign_in_again" } }, path + " is closed to a session that never passed the second step");
+}
+{
+  const t = await oldSession("amy@example.com");
+  const passkeysBefore = sqlite.prepare("SELECT COUNT(*) n FROM auth_passkeys").get().n;
+  assert.equal((await post("/relay/my/passkeys/options", t)).status, 401, "it can't add a passkey of its own to get back in");
+  assert.equal((await post("/relay/my/passkeys/register", t, { id: "x", name: "Mine", response: { clientDataJSON: "x", attestationObject: "x" } })).status, 401);
+  assert.equal(sqlite.prepare("SELECT COUNT(*) n FROM auth_passkeys").get().n, passkeysBefore);
+  const out = await oldSession("amy@example.com");
+  assert.equal((await post("/relay/auth/logout", out, {})).status, 200, "signing out still works");
+}
+assert.equal((await read("/relay/my/receipts", amy.sessionToken)).status, 200, "the session that set the second step up carries on");
+assert.equal(sqlite.prepare("SELECT COUNT(*) n FROM shoppers WHERE email = 'amy@example.com'").get().n, 1, "the account is still there");
 // An old session on an account without one: set one up first.
 const oldOnly = await oldSession("old@example.com");
 assert.deepEqual(await read("/relay/my/receipts", oldOnly), { status: 403, body: { error: "second_step_needed" } });
-console.log("ok - older sessions: carry on if the account has a second step, set one up if not; never checked by adding a second way");
+console.log("ok - a session that never passed the second step is ended once the account has one; without one, set one up first");
+
+// 4b. Setting up the account's first second step ends its other sessions there and then (someone who got into the inbox
+// earlier is put out), for each of the three ways. The session that set it up stays, checked.
+{
+  const sessionsOf = email => sqlite.prepare("SELECT COUNT(*) n FROM auth_sessions a JOIN shoppers s ON s.id = a.shopper_id WHERE s.email = ?").get(email).n;
+  // An authenticator app.
+  const intruder = await emailSignIn("zoe@example.com"), owner = await emailSignIn("zoe@example.com");
+  assert.ok(intruder.sessionToken && owner.sessionToken);
+  assert.equal((await read("/relay/me", intruder.sessionToken)).status, 200);
+  assert.equal(sessionsOf("zoe@example.com"), 2);
+  await turnOnApp(owner.sessionToken);
+  assert.equal(sessionsOf("zoe@example.com"), 1, "the other session is removed when two-step is turned on");
+  assert.equal((await read("/relay/me", intruder.sessionToken)).status, 401);
+  assert.equal((await read("/relay/my/receipts", intruder.sessionToken)).status, 401, "the earlier session reads nothing afterwards");
+  assert.equal((await read("/relay/my/receipts", owner.sessionToken)).status, 200);
+  assert.equal((await read("/relay/my/second-step", owner.sessionToken)).body.checked, true);
+  // A passkey.
+  const intruder2 = await emailSignIn("yan@example.com"), owner2 = await emailSignIn("yan@example.com");
+  assert.equal((await addPasskey(owner2.sessionToken, newDevice())).status, 200);
+  assert.equal(sessionsOf("yan@example.com"), 1);
+  assert.equal((await read("/relay/my/receipts", intruder2.sessionToken)).status, 401);
+  assert.equal((await read("/relay/my/receipts", owner2.sessionToken)).status, 200);
+  // Adding a second way later signs nobody out: the other sessions have all passed a second step by then.
+  const owner3 = await emailSignIn("yan@example.com");
+  assert.equal(owner3.needsSecondStep, true, "a new sign-in is asked for the second step");
+  const before = sessionsOf("yan@example.com");
+  assert.equal((await addPasskey(owner2.sessionToken, newDevice())).status, 200);
+  assert.equal(sessionsOf("yan@example.com"), before, "only the first second step ends other sessions");
+  // Switched off (not required): turning two-step on still ends the other sessions.
+  env.SECOND_STEP_REQUIRED = "off";
+  const a = await emailSignIn("opt@example.com"), b = await emailSignIn("opt@example.com");
+  assert.equal((await read("/relay/my/receipts", a.sessionToken)).status, 200);
+  await turnOnApp(b.sessionToken);
+  assert.equal((await read("/relay/my/receipts", a.sessionToken)).status, 401, "not required: the earlier session is still put out");
+  assert.equal((await read("/relay/my/receipts", b.sessionToken)).status, 200);
+  env.SECOND_STEP_REQUIRED = "on";
+  console.log("ok - setting up the first second step (app or passkey) ends the account's other sessions; adding another later doesn't");
+}
 
 // 5. Relay's team: team tools need a checked session; an unchecked one is told to sign in again, and the tools stay hidden.
 const boss = await emailSignIn("boss@example.com");
@@ -182,8 +235,8 @@ await turnOnApp(boss.sessionToken);
 assert.equal((await read("/relay/my/admin/me", boss.sessionToken)).body.admin, true, "checked: team tools open");
 assert.equal((await read("/relay/my/admin/health", boss.sessionToken)).status, 200);
 const bossOld = await oldSession("boss@example.com");
-assert.deepEqual((await read("/relay/my/admin/me", bossOld)).body, { admin: false, signInAgain: true });
-assert.equal((await read("/relay/my/admin/health", bossOld)).status, 404, "an unchecked session: team tools answer as if they don't exist");
+assert.deepEqual(await read("/relay/my/admin/health", bossOld), { status: 401, body: { error: "sign_in_again" } }, "an unchecked session on a protected account: ended, sign in again");
+assert.equal((await read("/relay/my/admin/me", bossOld)).status, 401);
 assert.deepEqual((await read("/relay/my/admin/me", amy.sessionToken)).body, { admin: false }, "not on the team: nothing to say");
 console.log("ok - team tools need a checked session; an older one is asked to sign in again");
 

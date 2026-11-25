@@ -11,6 +11,9 @@ on:
       - 'worker/security-mail.js'
       - 'worker/review-account.js'
       - 'worker/phone-signin.js'
+      - 'worker/second-step.js'
+      - 'scripts/test-signin-claim.mjs'
+      - 'scripts/test-second-step.mjs'
       - 'scripts/test-phone-signin.mjs'
       - 'worker/migrations/**'
       - 'scripts/test-auth.mjs'
@@ -31,6 +34,10 @@ jobs:
           node-version: "22"
       - name: Sign-in, two-step sign-in, phone numbers and passkeys
         run: node scripts/test-auth.mjs
+      - name: Google and Microsoft sign-in can only be finished by the person who signed in
+        run: node scripts/test-signin-claim.mjs
+      - name: Two-step sign-in for everyone
+        run: node scripts/test-second-step.mjs
       - name: Security emails and signing out other devices
         run: node scripts/test-security-mail.mjs
       - name: Approving a sign-in from a phone
