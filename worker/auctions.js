@@ -276,6 +276,11 @@ async function isTestShop(db, domain) {
   return Boolean(plan && Number(plan.test_shop) === 1);
 }
 
+async function planKnown(db, domain) {
+  await ensureShopPlanTable(db);
+  return Boolean(await db.prepare("SELECT 1 AS x FROM shopify_shop_plan WHERE domain = ?").bind(domain).first().catch(() => null));
+}
+
 // ---- After an auction ends ----
 // How long Relay keeps asking a shop it can't reach whether a win was paid, after the time to pay has passed, before it
 // stops and leaves it to Relay's team. Nobody is told they didn't pay, and nothing is cancelled, on a question never answered.
@@ -586,6 +591,10 @@ async function createAuction(env, shop, b, now) {
     if (title.length < 3) return [400, { error: "title_needed" }];
     if (!photos.length) return [400, { error: "photo_needed" }];
   }
+  // Whether this is one of Relay's own test shops is fixed on the auction when it starts, and decides who can see it. So a
+  // shop Relay hasn't checked with Shopify yet (no answer on record: it has just connected) can't start one for a moment:
+  // otherwise a test shop's auction could be shown to every shopper as a real one.
+  if (!(await planKnown(db, shop.shop_ref))) return [409, { error: "shop_not_checked_yet" }];
   const live = await db.prepare("SELECT COUNT(*) AS n FROM auctions WHERE provider = ? AND shop_ref = ? AND status = 'live'").bind(shop.provider, shop.shop_ref).first();
   if (Number(live && live.n) >= MAX_LIVE_PER_SHOP) return [429, { error: "too_many_live", max: MAX_LIVE_PER_SHOP }];
   const today = await db.prepare("SELECT COUNT(*) AS n FROM auctions WHERE provider = ? AND shop_ref = ? AND created_at > ?").bind(shop.provider, shop.shop_ref, now - DAY).first();

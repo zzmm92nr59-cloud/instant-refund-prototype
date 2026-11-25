@@ -45,6 +45,10 @@ sqlite.prepare("INSERT INTO shopify_shops VALUES (?, 'Hollow Pine', 'read_produc
 sqlite.prepare("INSERT INTO shopify_shops VALUES (?, 'Old Connection', 'read_products,read_orders')").run(OTHER);
 sqlite.prepare("INSERT INTO shopify_shops VALUES (?, 'Relay Dev', 'read_products,write_orders')").run(TESTSHOP);
 sqlite.prepare("INSERT INTO shopify_shop_plan (domain, test_shop, plan, checked_at) VALUES (?, 1, 'partner_test', 0)").run(TESTSHOP);
+// Hollow Pine is a real shop: Shopify has said it isn't a development store. (A shop Relay hasn't checked yet can't start
+// an auction: tried in section 2.)
+sqlite.prepare("INSERT INTO shopify_shop_plan (domain, test_shop, plan, checked_at) VALUES (?, 0, 'basic', 0)").run(DOMAIN);
+sqlite.prepare("INSERT INTO shopify_shops VALUES ('just-connected.myshopify.com', 'Just Connected', 'read_products,write_orders')").run();
 const item = (domain, n, title, variant, price, cur = "GBP", stock = 4) => {
   const conn = "shopify:" + domain, iid = conn + ":item:gid://shopify/Product/" + n, vid = conn + ":variant:gid://shopify/ProductVariant/" + n;
   sqlite.prepare("INSERT OR IGNORE INTO retailer_catalog_items VALUES (?, ?, ?, ?, NULL, 'Shop', ?)").run(iid, conn, "gid://shopify/Product/" + n, title, "https://cdn.shop.test/" + n + ".jpg");
@@ -136,6 +140,8 @@ for (const [change, error] of [[{ agree: false }, "agree_needed"], [{ kind: "lot
   [{ variantKey: WOOL.replace("71", "7x") }, "not_your_item"], [{ photos: [notAPicture] }, "bad_photo"], [{ photos: [tooBig] }, "photo_too_big"],
   [{ kind: "oneoff", title: "Sample coat" }, "photo_needed"], [{ kind: "oneoff", title: "x", photos: [jpeg] }, "title_needed"]])
   assert.equal((await asShop("POST", "/relay/retailer/auctions", { ...base, ...change })).body.error, error, JSON.stringify(change));
+assert.equal((await asShop("POST", "/relay/retailer/auctions", { ...base, kind: "oneoff", title: "Sample coat", photos: [jpeg] }, { provider: "shopify", shop_ref: "just-connected.myshopify.com", store_label: "Just Connected" })).body.error,
+  "shop_not_checked_yet", "a shop Relay hasn't yet checked isn't a test shop can't start an auction (it would be shown to everyone as a real one)");
 const made = await asShop("POST", "/relay/retailer/auctions", { ...base, photos: [jpeg] });
 assert.equal(made.status, 200);
 const A = made.body.auction;

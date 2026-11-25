@@ -54,6 +54,8 @@ jobs:
         run: node scripts/test-scan-codes.mjs
       - name: Auctions (proxy bids, nobody sees who bid, the winner's unpaid order at the shop, 24 hours to pay, then the next bidder)
         run: node scripts/test-auctions.mjs
+      - name: Server review fixes (public catalogue through the real server, made-up shops)
+        run: node scripts/test-server-review.mjs
       - name: Interests (kept with the account, only ids on the list, each account its own, shops' categories never guessed)
         run: node scripts/test-interests.mjs
       - name: First-run tips seen (kept with the account, only ids on the list, each account its own, exported and deleted with it)
