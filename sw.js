@@ -3,7 +3,7 @@
  * It NEVER caches anything from the Relay API, Square, Shopify or Plaid - only
  * Relay's own static pages and icons from this same site. Bump VERSION to force
  * every installed copy to drop its old cache (and, through pwa-register.js, show the new release straight away). */
-const VERSION = "relay-shell-v236";
+const VERSION = "relay-shell-v237";
 // What opening Relay needs, kept on install. The scripts are listed exactly as index.html asks for them (with their ?v=),
 // so none waits on the network when Relay opens (scripts/test-app-speed-ui.mjs checks this list against the page).
 const SHELL = ["./", "index.html", "relay-app-v2.html", "manifest.webmanifest", "pwa-register.js", "account.js", "relay-gestures.js", "relay-corners.js",

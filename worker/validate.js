@@ -107,8 +107,10 @@ const ROUTES = new Map(Object.entries({
   "/relay/my/bank/cards": { fields: { id: str(36), cards: list(40, obj({ ref: str(36), mine: bool })) } },
   "/relay/my/bank/not-mine": { fields: { id: str(200), on: bool, everyFromShop: bool, reason: one("no_receipt") } },
   // A photo of the paper receipt for one of the shopper's own payments, made smaller on the phone first (bank.js checks it
-  // really is a picture of at most 1.1 MB).
-  "/relay/my/bank/receipt-photo": { limit: 1650 * KB, tooLarge: "photo_too_big", fields: { id: str(200), image: str(1600000) } },
+  // really is a picture of at most 1.1 MB). The photo field is allowed all of the body's limit, so a photo that's too big is
+  // always answered "photo_too_big" (413: here when the body is over the limit, by bank.js when the picture is), which the
+  // app explains, never a plain "invalid_request".
+  "/relay/my/bank/receipt-photo": { limit: 1650 * KB, tooLarge: "photo_too_big", fields: { id: str(200), image: str(1650 * KB) } },
   "/relay/my/bank/connect": { fields: { bank: str(20) } },
   "/relay/my/bank/sync": NOTHING,
   "/relay/my/help/chat": { limit: 64 * KB, fields: { messages: list(40, obj({ role: one("user", "assistant"), text: text(1000) })), receiptId: id(64) } },
@@ -188,8 +190,9 @@ const PATTERNS = [
   [new RegExp("^/relay/my/receipts/" + uuidish + "/remind$"), { fields: { on: bool } }],
   // Who a gift was for is a name the shopper types, so it's cleaned like other text people write.
   [new RegExp("^/relay/my/receipts/" + uuidish + "/gift$"), { fields: { gift: bool, for: text(40) } }],
-  // The shopper's own photo of what they bought (made smaller on the phone first: at most 450 KB, as for auctions).
-  [new RegExp("^/relay/my/receipts/" + uuidish + "/photo$"), { limit: 700 * KB, tooLarge: "photo_too_big", fields: { image: str(620000), remove: bool } }],
+  // The shopper's own photo of what they bought (made smaller on the phone first: at most 450 KB, as for auctions). As for
+  // a paper receipt's photo: the field is allowed all of the body's limit, so too big is always said as "photo_too_big".
+  [new RegExp("^/relay/my/receipts/" + uuidish + "/photo$"), { limit: 700 * KB, tooLarge: "photo_too_big", fields: { image: str(700 * KB), remove: bool } }],
   // "Fix this receipt": what the shopper typed in place of what Relay read (worker/gmail.js cleanFix checks it further).
   [new RegExp("^/relay/my/receipts/" + uuidish + "/fix$"), { limit: 16 * KB, fields: { shop: text(80), totalPence: int(0, 100000000), orderDate: str(10),
     items: list(50, obj({ name: text(120), qty: int(1, 999), pricePence: int(0, 100000000) })), undo: bool } }],

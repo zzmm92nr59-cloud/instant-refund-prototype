@@ -255,6 +255,23 @@ const mail = (from, subject, body, d = TODAY) => `From: ${from}\r\nTo: sam@examp
       "a bank payment that looks like the refund never says the shop has the parcel, or that it was sent");
     assert.deepEqual(a.returnTracking.steps.map((s) => [s.done, Boolean(s.missed)]), [[false, true], [true, false], [false, true], [true, false]]);
   }
+  // (25 Nov 2026) The shopper said which items are going back: the timeline is for those items, and money in is this
+  // return's refund only when it is their price (or the whole order's), never the price of something they kept.
+  {
+    const lines = [{ name: "Hat", qty: 1, pricePence: 3000 }, { name: "Coat", qty: 1, pricePence: 5900 }];
+    const hat = { id: "a", i: 0, status: "returning", at: NOW - 9 * DAY };
+    let [a] = run([order("a", "KO-1001", ago(20), 8900, lines)], { marks: [hat], credits: [credit(3000, ago(2))] });
+    assert.deepEqual([a.returnTracking.items, a.returnTracking.itemsFrom, a.returnTracking.state, a.returnTracking.steps[3].amountPence], [[0], "you", "refunded", 3000], "the hat went back and its price came in");
+    [a] = run([order("a", "KO-1001", ago(20), 8900, lines)], { marks: [hat], credits: [credit(5900, ago(2))] });
+    assert.deepEqual([a.returnTracking.items, a.returnTracking.state, a.returnTracking.steps[3].done], [[0], "started", false], "the coat's price came in, but the coat wasn't sent back: not taken as this return's refund");
+    [a] = run([order("a", "KO-1001", ago(20), 8900, lines)], { marks: [hat], credits: [credit(8900, ago(2))] });
+    assert.equal(a.returnTracking.state, "refunded", "the whole order's price still fits");
+    [a] = run([order("a", "KO-1001", ago(20), 8900, lines)], { marks: [hat, { id: "a", i: 1, status: "kept", at: NOW - 9 * DAY }], credits: [credit(3000, ago(2))] });
+    assert.deepEqual(a.returnTracking.items, [0], "an item marked as kept isn't in the return");
+    // Nobody said which items: as before, any set of the order's items, and no items on the timeline.
+    [a] = run([order("a", "KO-1001", ago(20), 8900, lines)], { typed: [{ receipt_id: "a", tracking_number: null, carrier: null, sent_on: ago(8) }], credits: [credit(5900, ago(2))] });
+    assert.deepEqual([a.returnTracking.state, "items" in a.returnTracking], ["refunded", false]);
+  }
   // Left out, each for its own reason.
   const none = (why, orders, o) => { run(orders, o); for (const x of orders) assert.ok(!x.returnTracking || x.returnTracking.steps[3].done === false, "no refund shown: " + why); };
   const started = (id) => ({ id, i: 0, status: "returning", at: NOW - 9 * DAY });

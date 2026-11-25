@@ -30,6 +30,25 @@ Rules that keep it honest:
   It must look like one (8 to 40 letters and digits, at least one digit); the carrier is filled in only for Royal Mail's,
   Yodel's and Evri's own formats, otherwise the app asks.
 
+## Which items a return is for
+
+An order of several things is rarely sent back whole, so a return is for the items the shopper said (`worker/gmail.js`,
+`POST /relay/my/receipts/<id>/items`; in the app, "I'm sending this back" on the order's page asks which).
+
+- The timeline, its tracking number and the fact below are about those items: `returnTracking.items` is their positions
+  on the receipt, with `itemsFrom: "you"`. It is left out when nobody said which. Then the order's page says "Relay
+  wasn't told which items are in this return" and offers "Say which items"; nothing is assumed.
+- The rest of the order keeps its return date and can still be sent back.
+- A refund is said to be for an item (`refundItems` on the receipt) only when the amounts say so: the shop's refund is
+  exactly what the items the shopper marked cost, or it fits exactly one set of the order's items, or it is every
+  item's price together. With no marks, a refund that fits exactly one set also shows those items as returned
+  (`itemsFrom: "refund"`, said in the app as "Relay matched the refund amount to …"). Two sets that fit, an item with no
+  price, or an amount that fits nothing: the refund is shown as an amount on the order and against no item.
+- Money in at the bank counts as this return's refund, when the shopper said which items went back, only if it is the
+  price of those items (one, or a set of them) or the order's total: never the price of something they kept.
+- Taking it back ("Not sending this back", or unticking everything) removes the shopper's own "Return started". A return
+  the shop or a carrier told Relay about stays.
+
 ## The fact for a future instant refund
 
 On the server: `returnFactsFor(env, shopperId, receiptId)` in `worker/gmail.js` (null unless the receipt is that shopper's
@@ -41,6 +60,9 @@ onItsWay: null
 statement: "On its way: confirmed by Royal Mail's tracking, first scan 2026-11-21T09:14:00"
 returnInTransit, returnReceived, confirmedBy, trackingNumber, state
 ```
+
+On the receipt itself, `returnTracking.items` says which of its items the return is for (see above). Before paying on
+`onItsWay` for part of an order, check it: with no `items`, Relay doesn't know what is in the parcel.
 
 - `onItsWay` is null until a carrier or the shop confirmed the parcel left the shopper. Pay on this, never on `state`.
 - It is never set by the shopper's own word (even with a tracking number), a label being made, the carrier's expected
@@ -60,4 +82,4 @@ returnInTransit, returnReceived, confirmedBy, trackingNumber, state
   (or when the carrier's or shop's email arrives).
 - Live tracking is off until `SHIP24_API_KEY` is set as a Cloudflare secret. Only the tracking number goes to Ship24.
 - Tested with a stand-in for Ship24 and made-up emails and bank payments (`scripts/test-return-tracking.mjs`,
-  `scripts/test-return-tracking-ui.mjs`). Real carriers' emails can be worded differently from the made-up ones.
+  `scripts/test-return-tracking-ui.mjs`; items: `scripts/test-item-returns.mjs`, `scripts/test-item-return-pick-ui.mjs`). Real carriers' emails can be worded differently from the made-up ones.

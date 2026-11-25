@@ -1119,6 +1119,15 @@
     ".rl-rt-pick{display:grid;grid-template-columns:repeat(auto-fill,minmax(128px,1fr));gap:8px;margin:0 0 12px}" +
     ".rl-rt-pick button{min-height:44px;padding:8px 12px;border-radius:12px;border:1.5px solid var(--rl-line);background:var(--rl-card);color:var(--rl-text);font:inherit;font-size:15px;font-weight:600;cursor:pointer;transition:transform .12s}" +
     ".rl-rt-pick button:active{transform:scale(.97)}.rl-rt-pick button[aria-pressed=true]{border-color:#101828;background:#101828;color:#fff}" +
+    // Choosing which items of an order are going back: one row an item (its picture, name, size and price), ticked or not.
+    ".rl-pick{display:flex;flex-direction:column;gap:8px;margin:0 0 14px}.rl-pick-row{all:unset;box-sizing:border-box;display:flex;align-items:center;gap:12px;width:100%;min-height:72px;padding:8px 12px 8px 8px;border-radius:16px;border:1.5px solid var(--rl-line);background:var(--rl-card);color:var(--rl-text);cursor:pointer;transition:transform .12s}" +
+    ".rl-pick-row:active{transform:scale(.98)}.rl-pick-row:focus-visible{outline:2px solid var(--rl-text);outline-offset:2px}.rl-pick-row[aria-checked=true]{border-color:var(--rl-text)}.rl-pick-row:disabled{opacity:.6}" +
+    ".rl-pick-row .rl-po-img.rl-pick-pic{width:56px;height:56px;border-radius:12px;flex:none}.rl-pick-row.rl-pick-all{min-height:52px;padding-left:14px}" +
+    ".rl-pick-t{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:2px}.rl-pick-t b{font-size:16px;line-height:21px;font-weight:600;overflow-wrap:anywhere}.rl-pick-t span{font-size:14px;line-height:19px;color:var(--rl-text2);overflow-wrap:anywhere}" +
+    ".rl-pick-p{flex:none;font-size:15px;font-weight:600;white-space:nowrap}.rl-pick-box{flex:none;width:26px;height:26px;border-radius:50%;border:1.5px solid var(--rl-text2);display:grid;place-items:center;color:transparent;box-sizing:border-box}.rl-pick-box .rl-jic{margin:0;color:inherit}" +
+    ".rl-pick-row[aria-checked=true] .rl-pick-box{background:#101828;border-color:#101828;color:#fff}" +
+    // An item on an order's page: its own size or colour under its name, and where its return has got to.
+    ".rl-it-n small,.rl-it-n i{display:block;font-size:14px;line-height:19px;font-style:normal;font-weight:400;color:var(--rl-text2)}.rl-it-n i{color:var(--rl-accent);font-weight:600}" +
     ".rl-pill{all:unset;box-sizing:border-box;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:44px;padding:0 18px;border-radius:999px;background:rgba(120,120,128,.16);color:var(--rl-text);font-size:15px;font-weight:700;text-align:center;text-decoration:none;transition:transform .12s,opacity .12s}" +
     ".rl-pill:active{transform:scale(.96)}.rl-pill:disabled{opacity:.5;cursor:default}.rl-pill:focus-visible{outline:2px solid var(--rl-text);outline-offset:2px}.rl-pill.rl-pill-on{background:var(--lime,#C9D8FF);color:var(--navy,#101828)}" +
     ".rl-rc-ask{display:flex;align-items:center;gap:8px;margin-top:14px;padding-top:12px;border-top:1px solid var(--rl-line)}.rl-rc-ask>span{flex:1;min-width:0;font-size:15px;font-weight:600;line-height:1.35;color:var(--rl-text)}.rl-rc-ask .rl-pill{padding:0 20px}" +
@@ -3694,7 +3703,10 @@
   // One item on its own line: how many ("2 × "), its name and size or colour, and what the line cost (round 7: a receipt's
   // page listed names only, with no quantities or prices).
   // (An item the shop's email says it cancelled says so in place of its price, round 8: only when the email named it.)
-  function itemLine(i, cur) { var q = Number(i.qty) > 1 ? i.qty + " × " : ""; var p = i.cancelled === true ? "Cancelled" : lineMoney(i, cur);
+  // o.own: the size or colour on a line of its own under the name (an order's page); o.state: where its return has got to.
+  function itemLine(i, cur, o) { var q = Number(i.qty) > 1 ? i.qty + " × " : ""; var p = i.cancelled === true ? "Cancelled" : lineMoney(i, cur);
+    if (o && (o.own || o.state)) return el("li", i.cancelled === true ? { className: "rl-item-cancelled" } : {}, [el("span", { className: "rl-it-n" }, [document.createTextNode(q + i.name + (i.variant && !o.own ? ", " + i.variant : ""))]
+      .concat(i.variant && o.own ? [el("small", { text: i.variant })] : [], o.state ? [el("i", { text: o.state })] : [])), p ? el("b", { text: p }) : null].filter(Boolean));
     return el("li", i.cancelled === true ? { className: "rl-item-cancelled" } : {}, [el("span", { text: q + i.name + (i.variant ? ", " + i.variant : "") }), p ? el("b", { text: p }) : null].filter(Boolean)); }
   // Money a shop's email says it refunded on a receipt, in pounds. Shown beside what was spent, never silently taken off it
   // (round 7: Relay's totals are what was paid; refunds are said next to them).
@@ -10307,16 +10319,55 @@
   function retShop(x) { return (x && x.retailer && (x.retailer.name || x.retailer.domain)) || "the shop"; }
   // A return under way: started or sent, or at the shop waiting for the refund.
   function retOpen(x) { var t = retOf(x); return Boolean(t && t.state !== "refunded"); }
-  // One line for a card: where the return has got to.
+  // ---- Which items of an order a return is for (the shopper's own choice, kept by /relay/my/receipts/<id>/items) ----
+  // The order's named items that are going back. Empty when nobody said which (or the order is one thing).
+  function retGoing(x) { return emailItems(x).filter(function (p) { return p.returning; }); }
+  // An item as words: its name and its own size or colour.
+  function itemWords(it) { return it.name + (it.variant ? " (" + it.variant + ")" : ""); }
+  // What a return is for, when it's only part of the order: the item's name, or "2 of 3 items". "" for a whole order, an
+  // order of one thing, or a return whose items Relay wasn't told.
+  function retWhat(x) {
+    var parts = emailItems(x), going = retGoing(x);
+    if (parts.length < 2 || !going.length || going.length === parts.length) return "";
+    return going.length === 1 ? x.items[going[0].index].name : going.length + " of " + parts.length + " items";
+  }
+  // The items a return is for, as a sentence for its page. "" when the order is one thing or Relay wasn't told.
+  function retItemsWords(x) {
+    var parts = emailItems(x), going = retGoing(x);
+    if (parts.length < 2 || !going.length) return "";
+    var names = going.map(function (p) { return itemWords(x.items[p.index]); });
+    var list = names.length > 1 ? names.slice(0, -1).join(", ") + " and " + names[names.length - 1] : names[0];
+    // (Worked out from the refund's amount, not said by the shopper: said as that.)
+    if (x.itemReturnsFrom === "refund") return "Relay matched the refund amount to " + list + ".";
+    return going.length === parts.length ? "In this return: everything in this order." : "In this return: " + list + ".";
+  }
+  // Is the refund's amount the price of exactly the items going back?
+  function refundIsFor(x) {
+    var a = (x.refundItems || []).slice().sort(), b = retGoing(x).map(function (p) { return p.index; }).sort();
+    return a.length > 0 && a.length === b.length && a.every(function (v, k) { return v === b[k]; });
+  }
+  // An order of several items with a return Relay knows of, but not which items are in it.
+  function retItemsUnknown(x) { return Boolean(retOf(x) && emailItems(x).length > 1 && !retGoing(x).length); }
+  // Where one item's return has got to, for the order's page. "" for an item that isn't going back.
+  // "Refunded" only for the items the refund's amount fits (x.refundItems, worker/gmail.js attachItemReturns).
+  function itemRetWord(x, i) {
+    var t = retOf(x), refunded = (x.refundItems || []).indexOf(i) >= 0;
+    if (refunded && t && t.state === "refunded") return "Refunded";
+    if ((x.itemReturns || {})[i] !== "returning") return "";
+    if (!t || t.state === "started") return "Sending back";
+    return t.state === "sent" ? "Sent back" : t.state === "received" ? "At the shop" : "In this return";
+  }
+  // One line for a card: where the return has got to (and for which item, when it's only part of the order).
   function retLine(x) {
-    var t = retOf(x), who = retShop(x);
+    var t = retOf(x), who = retShop(x), what = retWhat(x);
     if (!t) return "";
-    if (t.state === "refunded") { var s = t.steps[3]; return "Refunded" + (s.amountPence != null ? " " + money(s.amountPence, s.currency || "GBP") : ""); }
-    if (t.refundNotSeen) return "Refund not seen yet";
-    if (t.state === "received") return who + " has it, waiting for the refund";
+    // (The refund is said to be for those items only when its amount is theirs: never because they were the ones sent.)
+    if (t.state === "refunded") { var s = t.steps[3]; return "Refunded" + (s.amountPence != null ? " " + money(s.amountPence, s.currency || "GBP") : "") + (what && refundIsFor(x) ? " for " + what : ""); }
+    if (t.refundNotSeen) return "Refund not seen yet" + (what ? " for " + what : "");
+    if (t.state === "received") return who + " has " + (what || "it") + ", waiting for the refund";
     if (t.problem) return "Problem with the return parcel";
-    if (t.state === "sent") return "Sent back, on its way to " + who;
-    return "Return started";
+    if (t.state === "sent") return what ? what + " on " + (retGoing(x).length > 1 ? "their" : "its") + " way back to " + who : "Sent back, on its way to " + who;
+    return what ? "Sending back " + what : "Return started";
   }
   function retFrom(f, who) {
     if (!f) return "";
@@ -10344,8 +10395,12 @@
   // The return on a receipt's page: its timeline, the tracking number, "Refund not seen yet" when it's due, and "I've sent
   // it back". On opening, the carrier is asked where the return parcel is (only with a tracking number, only before the shop
   // has it). changed() runs after the shopper saves something, so the lists behind are drawn again.
-  function returnBox(x, changed) {
+  var retSentNext = null;
+  // pickItems(next): asks which items (an order of several things); given by the order's page, which draws itself again.
+  // next "sent": then carry on to "I've sent it back".
+  function returnBox(x, changed, pickItems) {
     var box = el("div", { className: "rl-rt" }), who = retShop(x), live = el("p", { className: "rl-rt-note", role: "status" });
+    var sent = function () { sentSheet(x, function (body) { if (body && body.returnTracking !== undefined) x.returnTracking = body.returnTracking; draw(); if (changed) changed(); }); };
     function draw() {
       box.textContent = "";
       var t = retOf(x);
@@ -10357,6 +10412,15 @@
       box.classList.toggle("rl-rt-bare", !t);
       if (t) {
         box.appendChild(el("b", { className: "rl-ret-h", text: "Your return" }));
+        // Which items the steps and the tracking number below are about. Not known: said, with a way to say which.
+        var forWhat = retItemsWords(x);
+        if (forWhat) box.appendChild(el("p", { className: "rl-rt-note rl-rt-items", text: forWhat }));
+        else if (retItemsUnknown(x)) box.appendChild(el("p", { className: "rl-rt-note rl-rt-items", text: "Relay wasn't told which items are in this return." }));
+        // A refund whose amount is the price of other items than the ones marked: said as it is, not hidden.
+        if (t.state === "refunded" && (x.refundItems || []).length && x.itemReturnsFrom !== "refund" && retGoing(x).length && !refundIsFor(x)) {
+          var paid = x.refundItems.map(function (i) { return x.items[i]; }).filter(function (i) { return i && i.name; }).map(itemWords);
+          if (paid.length === x.refundItems.length) box.appendChild(el("p", { className: "rl-rt-note", text: "The refund's amount is the price of " + (paid.length > 1 ? paid.slice(0, -1).join(", ") + " and " + paid[paid.length - 1] : paid[0]) + "." }));
+        }
         var list = el("ol", { className: "rl-rt-steps" });
         t.steps.forEach(function (s) {
           var clock = s.atTime ? retClock(s.atTime) : "";
@@ -10383,15 +10447,23 @@
           if (t.trackUrl && /^https:\/\//.test(t.trackUrl)) box.appendChild(el("a", { className: "rl-ret-go", href: t.trackUrl, target: "_blank", rel: "noopener noreferrer" }, [el("span", { text: "Track it on " + possessive(t.carrier) + " website" }), jIc("ext", 18)]));
         }
         box.appendChild(live);
+        if (pickItems && retItemsUnknown(x) && x.id) {
+          var which = el("button", { type: "button", className: "rl-po-secondary", text: "Say which items" });
+          which.onclick = tapOnce(function () { pickItems(null); });
+          box.appendChild(which);
+        }
       }
       if (retCanSend(x) && (!t || ((t.state === "started" || t.state === "sent") && !t.returnInTransit) || (t.typed && !t.returnReceived && t.state !== "refunded"))) {
         var typed = t && t.typed;
         var b = el("button", { type: "button", className: typed || !t ? "rl-po-secondary" : "rl-po-primary" }, [el("span", { text: typed ? "Change what you told Relay" : "I've sent it back" })]);
-        b.onclick = tapOnce(function () { sentSheet(x, function (body) { if (body && body.returnTracking !== undefined) x.returnTracking = body.returnTracking; draw(); if (changed) changed(); }); });
+        // An order of several things with nothing said yet: which items first, then the tracking number and the day.
+        b.onclick = tapOnce(function () { if (pickItems && !t && emailItems(x).length > 1) pickItems("sent"); else sent(); });
         box.appendChild(b);
       }
     }
     draw();
+    // Came here from "I've sent it back" by way of "which items?": the page was drawn again, and now asks the rest.
+    if (retSentNext && retSentNext === x.id) { retSentNext = null; sent(); }
     // Where the return parcel is, from the carrier, now that its page is open (never on a timer).
     var t0 = retOf(x);
     if (t0 && t0.liveTracking && t0.trackingNumber && !memo.returnsLiveOff) {
@@ -10638,7 +10710,8 @@
       el("div", { className: "rl-po-meta", text: under })]);
     var dv = x.delivery, showShip = Boolean(dv && dv.status && (dv.status === "delivered" || freshDelivery(x)));
     // A return under way says where it has got to instead of the parcel that came.
-    if (retOf(x)) info.appendChild(el("div", { className: "rl-po-ship" + (retOf(x).state === "refunded" ? " done" : "") }, [jIc(retOf(x).state === "refunded" ? "check" : "ret", 17), el("span", { text: retLine(x) })]));
+    // (One item's own card: only when that item is in the return, or Relay wasn't told which are.)
+    if (retOf(x) && !(one && retGoing(x).length && (x.itemReturns || {})[opts.item] !== "returning")) info.appendChild(el("div", { className: "rl-po-ship" + (retOf(x).state === "refunded" ? " done" : "") }, [jIc(retOf(x).state === "refunded" ? "check" : "ret", 17), el("span", { text: retLine(x) })]));
     // A code that can still be used (a return barcode, a ticket) says so, once the parcel has come (or there is none).
     else if (codeLine(x) && !(showShip && dv.status !== "delivered")) info.appendChild(codeLine(x));
     else if (showShip) info.appendChild(shipLine(dv));
@@ -10678,10 +10751,20 @@
         // Tell Relay what's going back, so it moves to Returns & swaps and the rest of the order stays in the wallet.
         // (Not once Relay is following the return: its page then says where the return has got to, below.)
         // Not offered for an order that usually can't be returned (food, downloads, tickets), unless it's already marked.
+        // An order of several things asks which ones (its own page only: one item's own card is already about that item).
+        var severalItems = !one && emailItems(x).length > 1 && opts.markable !== "undo";
+        // After choosing: this page again, now saying which items are going back, and the lists behind it drawn again.
+        var pickItems = !one && x.id ? function (next) { itemsSheet(x, function () { retSentNext = next === "sent" && retGoing(x).length ? x.id : null; details(); retSentNext = null; if (opts.changed) opts.changed(); }); } : null;
         if (opts.markable && x.id && !(retOf(x) && retOf(x).state !== "started") && (x.returnable !== false || opts.markable === "undo")) {
           var idxs = opts.item != null ? [opts.item] : (x.items || []).map(function (_, i) { return i; });
           if (!idxs.length) idxs = [0];
-          var undo = opts.markable === "undo", words = el("span", { text: undo ? "Not sending this back" : "I'm sending this back" });
+          if (severalItems) {
+            var change = retGoing(x).length > 0;
+            acts.appendChild(el("button", { type: "button", className: "rl-po-secondary rl-po-mark", onclick: tapOnce(function () { pickItems(null); }) }, [jIc("ret", 18), el("span", { text: change ? "Change what's going back" : "I'm sending this back" })]));
+          } else {
+          // Already told Relay it's going back (and nothing more has happened): the same button takes that back.
+          var mine = x.itemReturns || {}, told = x.itemReturnsFrom !== "refund" && idxs.every(function (i) { return mine[i] === "returning"; });
+          var undo = opts.markable === "undo" || told, words = el("span", { text: undo ? "Not sending this back" : "I'm sending this back" });
           var mark = el("button", { type: "button", className: "rl-po-secondary rl-po-mark" }, [jIc(undo ? "back" : "ret", 18), words]);
           mark.onclick = function () {
             if (mark.disabled) return;
@@ -10690,10 +10773,13 @@
               if (ok) { close(); if (opts.changed) opts.changed(); } else { mark.disabled = false; words.textContent = "Couldn't save. Try again"; } });
           };
           acts.appendChild(mark);
+          }
         }
         if (acts.childNodes.length) sheet.appendChild(acts);
         // Where the return has got to, and "I've sent it back" (return tracking).
-        sheet.appendChild(returnBox(x, function () { if (opts.changed) opts.changed(); }));
+        // (When the return moves on, "I've sent it back", the items below say so too.)
+        var itemsAgain = null;
+        sheet.appendChild(returnBox(x, function () { if (itemsAgain) itemsAgain(); if (opts.changed) opts.changed(); }, pickItems));
         sheet.appendChild(receiptCard(x, function (kind) { if (opts.changed) opts.changed(); if (kind === "dismiss") setTimeout(close, 900); }, true, { noPortal: Boolean(portal && opts.actions !== false), returnShown: true }));
         // The order's details, one to a line.
         var facts = el("div", { className: "rl-dt-facts" });
@@ -10701,10 +10787,15 @@
         if (payLater(x) && !one) fact("To pay at the hotel", Number.isInteger(x.totalPence) ? money(x.totalPence, x.currency) : null); else fact("Price", price);
         // Not in pounds: shown as it was charged, and left out of anything Relay adds up.
         if (price && notPounds(x)) { var cn = moneyName(x.currency); fact("Currency", cn.charAt(0).toUpperCase() + cn.slice(1) + " (not added to your totals in pounds)"); }
-        if (first.variant) fact(x.payAtProperty || /\b\d+\s+nights?\b/i.test(first.variant) ? "Stay" : "Size or colour", first.variant);
-        // Every item on its own line, with how many and what each line cost, as the receipt says (round 7).
+        // One thing's size or colour is its own: on an order of several things each item's is beside that item, below,
+        // never one item's as the order's (25 Nov 2026: a two-item order said "Size or colour: UK 8", the first item's).
+        if (first.variant && (one || named.length <= 1)) fact(x.payAtProperty || /\b\d+\s+nights?\b/i.test(first.variant) ? "Stay" : "Size or colour", first.variant);
+        // Every item on its own line, with how many and what each line cost, as the receipt says (round 7), its own size or
+        // colour under its name, and where its return has got to when it's going back.
         if (!one && (named.length > 1 || (named.length === 1 && Number(named[0].qty) > 1))) {
-          var iul = el("ul", { className: "rl-rr-list" }); named.forEach(function (i) { iul.appendChild(itemLine(i, x.currency)); });
+          var iul = el("ul", { className: "rl-rr-list" });
+          itemsAgain = function () { iul.textContent = ""; named.forEach(function (i) { iul.appendChild(itemLine(i, x.currency, { own: named.length > 1, state: itemRetWord(x, (x.items || []).indexOf(i)) })); }); };
+          itemsAgain();
           facts.appendChild(el("div", { className: "rl-dt-fact rl-dt-items" }, [el("span", { text: "In this order" }), iul]));
         }
         if (one && Number(one.qty) > 1) fact("How many", String(one.qty));
@@ -11953,6 +12044,12 @@
       else if (rt) {
         e.line = retLine(x); e.returning = rt.state !== "refunded"; e.swaps = e.returning; e.rank = e.returning ? 1 : 2; e.nudge = Boolean(rt.refundNotSeen);
         e.tag = rt.refundNotSeen ? "Refund not seen yet" : rt.state === "refunded" ? "Refunded" : rt.state === "received" ? "At the shop" : rt.state === "sent" ? "Sent back" : "Return started";
+        // Only some of the order is going back: the card says how many, never the whole order, and the rest keeps its
+        // return date for the order of "To return".
+        if (retWhat(x) && !rt.refundNotSeen && rt.state !== "refunded") {
+          e.tag = retGoing(x).length + " of " + emailItems(x).length + (rt.state === "received" ? " at the shop" : rt.state === "sent" ? " sent back" : " going back");
+          if (stated && dl && dl >= today && x.returnable !== false) e.when = stated;
+        }
       }
       else if (p) { if (p.refundedAt) e.tag = "Refunded"; e.line = p.refundedAt ? "Refunded" + (p.refundPence != null ? " " + money(p.refundPence, p.currency || "GBP") : "")
           : p.receivedAt || (p.parcel && p.parcel.status === "delivered") ? "Back at the shop, waiting for the refund" : "Sent back, on its way to the shop";
@@ -12573,6 +12670,72 @@
     // A win to pay for: asked only of someone who has bid before, as the tab's red number is.
     var bid = false; try { bid = localStorage.getItem(AU_BID_KEY) === "1"; } catch (e) {}
     if (bid) auctionsMine().then(function (b) { state.wins = ((b && b.auctions) || []).filter(function (r) { return r.you && AU_TODO[r.you.state]; }); draw(); });
+  }
+  // "I'm sending this back" on an order of several things: which ones? Each item with its picture, name, size or colour and
+  // price; tick one or more, or everything. Saved in one request (a second tap while it's on its way does nothing).
+  // With items already marked, they start ticked, and unticking them all is "Not sending anything back".
+  // done(): after saving, with x.itemReturns and x.returnTracking as the server now has them.
+  function itemsSheet(x, done) {
+    var parts = emailItems(x), who = retShop(x), had = retGoing(x).length > 0;
+    var card = el("div", { className: "rl-sheet rl-fix", role: "dialog", ariaModal: "true", ariaLabel: "What are you sending back?" });
+    var layer = el("div", { className: "rl-back", style: "z-index:10000" }, [card]);
+    function shut() { layer.remove(); document.removeEventListener("keydown", onKey); }
+    function onKey(e) { if (e.key === "Escape") shut(); }
+    card.appendChild(el("h2", { text: "What are you sending back?" }));
+    card.appendChild(el("p", { className: "rl-fix-lead", text: "Tick what's going back to " + who + ". Relay keeps following the rest of the order." }));
+    var picks = {}, rows = [], busy = false;
+    parts.forEach(function (p) { picks[p.index] = p.returning; });
+    var list = el("div", { className: "rl-pick", role: "group", ariaLabel: "Items in this order" });
+    var tick = function () { return el("span", { className: "rl-pick-box" }, [jIc("check", 16)]); };
+    var all = el("button", { type: "button", className: "rl-pick-row rl-pick-all", role: "checkbox" }, [el("span", { className: "rl-pick-t" }, [el("b", { text: "Everything in this order" })]), tick()]);
+    all.onclick = function () { if (busy) return; var on = !parts.every(function (p) { return picks[p.index]; }); parts.forEach(function (p) { picks[p.index] = on; }); show(); };
+    list.appendChild(all);
+    parts.forEach(function (p) {
+      var it = x.items[p.index], pic = el("span", { className: "rl-po-img rl-pick-pic" }); pic.setAttribute("aria-hidden", "true");
+      illustrate(pic, { items: [{ name: it.name }], retailer: x.retailer || {}, category: it.category || x.category }, 30);
+      var price = lineMoney(it, x.currency);
+      var row = el("button", { type: "button", className: "rl-pick-row", role: "checkbox" }, [pic,
+        el("span", { className: "rl-pick-t" }, [el("b", { text: (Number(it.qty) > 1 ? it.qty + " × " : "") + it.name })].concat(it.variant ? [el("span", { text: it.variant })] : [])),
+        price ? el("span", { className: "rl-pick-p", text: price }) : null, tick()].filter(Boolean));
+      row.onclick = function () { if (busy) return; picks[p.index] = !picks[p.index]; show(); };
+      rows.push([row, p.index]); list.appendChild(row);
+    });
+    card.appendChild(list);
+    var note = el("p", { className: "rl-msg" }); note.setAttribute("role", "status");
+    var save = el("button", { type: "button", className: "rl-btn", text: "Save" });
+    card.appendChild(note); card.appendChild(save);
+    card.appendChild(el("button", { type: "button", className: "rl-btn ghost rl-plain", text: "Cancel", onclick: shut }));
+    function chosen() { return parts.filter(function (p) { return picks[p.index]; }).map(function (p) { return p.index; }); }
+    function show() {
+      var n = chosen().length;
+      rows.forEach(function (r) { r[0].setAttribute("aria-checked", String(Boolean(picks[r[1]]))); r[0].disabled = busy; });
+      all.setAttribute("aria-checked", String(n === parts.length)); all.disabled = busy;
+      // Nothing ticked: nothing to save, unless that takes back what was marked before.
+      save.disabled = busy || (!n && !had);
+      save.textContent = !n && had ? "Not sending anything back" : "Save";
+    }
+    show();
+    save.onclick = function () {
+      if (busy) return;
+      var on = chosen(), off = parts.filter(function (p) { return p.returning && !picks[p.index]; }).map(function (p) { return p.index; });
+      if (!on.length && !off.length) return;
+      busy = true; show(); say(note, "");
+      api("/relay/my/receipts/" + x.id + "/items", { method: "POST", body: { items: on.map(function (i) { return { index: i, status: "returning" }; }).concat(off.map(function (i) { return { index: i, status: null }; })) } }).then(function (r) {
+        busy = false; show();
+        if (!r.ok) return say(note, r.status === 404 ? "This receipt isn't on your list any more. Pull down to refresh." : "Couldn't save that. Please try again.", true);
+        staleReceipts();
+        // As the server now has it; with an older answer (just "ok"), what was just saved.
+        var b = r.body || {}, marks = Object.assign({}, x.itemReturns || {});
+        on.forEach(function (i) { marks[i] = "returning"; }); off.forEach(function (i) { marks[i] = "kept"; });
+        x.itemReturns = b.itemReturns || marks; delete x.itemReturnsFrom;
+        if (b.returnTracking !== undefined) x.returnTracking = b.returnTracking;
+        shut(); done();
+      }, function () { busy = false; show(); say(note, "Couldn't reach Relay. Check your connection and try again.", true); });
+    };
+    layer.addEventListener("click", function (e) { if (e.target === layer) shut(); });
+    document.addEventListener("keydown", onKey);
+    document.body.appendChild(layer);
+    save.focus();
   }
   function whichItems(x, parts, done) {
     var who = (x.retailer && x.retailer.name) || "this shop";
