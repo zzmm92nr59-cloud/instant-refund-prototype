@@ -44,6 +44,7 @@ await ctx.route("https://**/*", async route => {
     else { st.main = st.others.shift(); }
     return j({ ok: true, deleted: true, ...(b.mailbox ? {} : { nowFirst: st.main ? st.main.email : null }) });
   }
+  if (p === "/relay/my/gmail/finish") { st.finishes = (st.finishes || []).concat([body().code]); return st.finishAnswer ? j(st.finishAnswer.body, st.finishAnswer.status) : j({ ok: true, result: "added", provider: "microsoft" }); }
   if (p === "/relay/my/gmail/find") {
     st.finds.push(body().query);
     return j({ results: [{ id: "a1aaaaaa", subject: "Your Kestrel Outdoor order", from: "Kestrel Outdoor", date: day(-3), added: true, inbox: EMAIL },
@@ -132,6 +133,18 @@ await profile(); await mailPage();
 await page.locator(".rl-ibx-row").nth(1).waitFor();
 assert.equal(await page.locator(".rl-ibx-row").count(), 2, "both inboxes are listed");
 await page.getByRole("button", { name: "Back to Profile" }).click();
+// Back from Microsoft with the single-use code (security review H1): the app hands it in with its own session, then says
+// what Relay answered. The code leaves the address bar at once.
+const MAILCODE = "M".repeat(43);
+await page.goto(origin + "/index.html#outlook=finish&mailcode=" + MAILCODE);
+await page.getByText("Outlook inbox added. Relay is reading it now, and its receipts appear here in a few minutes.").waitFor();
+assert.deepEqual(st.finishes, [MAILCODE], "the code was handed in once");
+assert.equal(await page.evaluate(() => location.hash), "", "the code isn't left in the address");
+// Started on another device or account: refused, said plainly, nothing connected.
+st.finishAnswer = { status: 403, body: { error: "not_your_link" } };
+await page.goto(origin + "/index.html#gmail=finish&mailcode=" + MAILCODE);
+await page.getByText("That Gmail connection was started on another device or in another account, so nothing was connected. Start again here.").waitFor();
+st.finishAnswer = null;
 // Already connected, and not added (cancelled at Google).
 await page.goto(origin + "/index.html#gmail=already_connected");
 await page.getByText("That inbox is already connected to Relay.").waitFor();

@@ -111,4 +111,29 @@ const hook = (secret, id) => {
 assert.equal((await hook(PILOT.secret, "d1")).status, 200);
 assert.equal((await hook("not-ours", "d2")).status, 401);
 
+// 7. A webhook is checked with the secret of the app THAT shop came through, never any app's (security review M1, 25 Nov
+// 2026): whoever holds one pilot app's secret could otherwise sign "app removed", "erase", orders and refunds for every shop.
+const hookFor = (shop, secret, id, topic = "app/uninstalled") => {
+  const body = JSON.stringify({ id: 1, domain: shop });
+  const h = createHmac("sha256", secret).update(body).digest("base64");
+  return receiveShopifyWebhook(new Request("https://w.test/relay/webhooks/shopify", { method: "POST", body,
+    headers: { "x-shopify-shop-domain": shop, "x-shopify-topic": topic, "x-shopify-webhook-id": id, "x-shopify-hmac-sha256": h } }), env);
+};
+const connected = (shop) => sqlite.prepare("SELECT COUNT(*) AS n FROM shopify_shops WHERE domain = ?").get(shop).n;
+const OTHER = "other-shop.myshopify.com";
+assert.equal(connected(OTHER), 1);
+assert.equal((await hookFor(OTHER, PILOT.secret, "m1-1")).status, 401, "the pilot app's secret can't sign for a shop on the main app");
+assert.equal(connected(OTHER), 1, "so the shop is still connected");
+sqlite.prepare("UPDATE shopify_shops SET client_id = ? WHERE domain = ?").run(MAIN.id, OTHER);
+assert.equal((await hookFor(OTHER, PILOT.secret, "m1-2")).status, 401, "nor when the main app is recorded by its id");
+assert.equal((await hookFor(PILOT_SHOP, MAIN.secret, "m1-3", "customers/data_request")).status, 401, "the main app's secret can't sign for a shop on its pilot app");
+assert.equal((await hookFor(PILOT_SHOP, PILOT.secret, "m1-4", "customers/data_request")).status, 200, "the pilot shop's own app still can");
+// A shop Relay doesn't have (gone, or never connected: Shopify's erase requests come after removal) is checked against the
+// apps that shop could have used: its own pilot app, or the main app. Another shop's pilot app never.
+assert.equal((await hookFor("gone-shop.myshopify.com", PILOT.secret, "m1-5", "shop/redact")).status, 401);
+assert.equal((await hookFor("gone-shop.myshopify.com", MAIN.secret, "m1-6", "shop/redact")).status, 200);
+assert.equal((await hookFor(OTHER, MAIN.secret, "m1-7")).status, 200, "the shop's own app removes it");
+assert.equal(connected(OTHER), 0);
+console.log("ok - each shop's webhooks are checked with its own app's secret only");
+
 console.log("shopify pilot apps: all checks passed");

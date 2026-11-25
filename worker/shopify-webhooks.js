@@ -1,9 +1,9 @@
 import { getShopifyStores } from "./shopify.js";
 import { readCappedBytes } from "./validate.js";
 import { normaliseEmail, emailHash, ensureAuthTables } from "./auth.js";
-import { forgetShopifyShop, removeShopifyItems, shopifyApps } from "./shopify-connect.js";
+import { forgetShopifyShop, removeShopifyItems, shopifyApps, appForShop, appById } from "./shopify-connect.js";
 import { ensureReturnsTables } from "./returns.js";
-import { saveOrderRef, saveOrderAmountNow } from "./order-ref.js";
+import { saveOrderRef, saveOrderAmountNow, ensureOrderPaidColumn } from "./order-ref.js";
 // Shopify webhooks, every one checked against Shopify's signature before anything happens.
 // - orders/paid (shops set up in the server settings only): private order ingestion. Nothing here exposes consumer purchases.
 // - products/create|update|delete, inventory_levels/update: a shop changed its products or stock, so Relay reads that shop again at once (and checks price alerts).
@@ -92,6 +92,31 @@ export async function eraseRemovedShops(env, now = Date.now()) {
   return { erased };
 }
 
+// The secrets a notice for this shop may be signed with: only the app the shop is actually connected through (security
+// review M1, 25 Nov 2026). Shopify signs with the secret of the app the shop installed; trying every app's secret let whoever
+// held any one of them (21 apps: the main one and up to 20 pilot apps) sign "app removed", "erase", orders and refunds for
+// every shop. Shopify sign-in already works this way (shopify-connect.js, shopify-embedded.js).
+//  * A shop in Relay's server settings (SHOPIFY_SHOP_DOMAIN and the like): its own webhook secret.
+//  * A connected shop: the app it approved (shopify_shops.client_id); empty means it came through before Relay recorded
+//    that, which was the main app (or, as for renewing its keys, its own pilot app).
+//  * A shop Relay doesn't have (removed, so Shopify's erase requests 48 hours later, or never connected): the apps that shop
+//    could have installed: its own pilot app and the main app. Another shop's pilot app never.
+async function webhookSecrets(env, shop, store) {
+  // (A shop in the server settings is checked with its own secret without asking the database, so a refused notice for
+  // it costs nothing there.)
+  if (store) return store.webhookSecret ? [store.webhookSecret] : [];
+  const out = [];
+  let row = null;
+  try { row = await env.RELAY_DB.prepare("SELECT client_id FROM shopify_shops WHERE domain = ?").bind(shop).first(); } catch { row = null; /* no table yet */ }
+  if (row) {
+    const app = row.client_id ? appById(env, row.client_id) : appForShop(env, shop);
+    if (app) out.push(app.secret);
+  } else {
+    for (const a of shopifyApps(env)) if (!a.shop || a.shop === shop) out.push(a.secret);
+  }
+  return [...new Set(out.filter(Boolean))];
+}
+
 // o.onCatalogueChange(shop): called when a shop's products changed, to read that shop again in the background.
 export async function receiveShopifyWebhook(request, env, o = {}) {
   const shop = String(request.headers.get("x-shopify-shop-domain") || "").toLowerCase().trim();
@@ -99,9 +124,7 @@ export async function receiveShopifyWebhook(request, env, o = {}) {
     return Response.json({ error: "not_configured" }, { status: 503 });
   if (!DOMAIN.test(shop)) return new Response("Unauthorized store", { status: 403 });
   const store = getShopifyStores(env).find(s => s.domain === shop) || null;
-  // Shopify signs with the secret of whichever Relay app the shop installed (main app or that shop's pilot app).
-  const secrets = [...new Set([store && store.webhookSecret, ...shopifyApps(env).map(x => x.secret)].filter(Boolean))];
-  if (!secrets.length)
+  if (!store && !shopifyApps(env).length)
     return new Response("Unauthorized store", { status: 403 });
   const topic = String(request.headers.get("x-shopify-topic") || "").toLowerCase();
   const deliveryId = String(request.headers.get("x-shopify-webhook-id") || "");
@@ -111,6 +134,8 @@ export async function receiveShopifyWebhook(request, env, o = {}) {
   if (!request.headers.get("x-shopify-hmac-sha256")) return new Response("Invalid signature", { status: 401 });
   const body = await readCappedBytes(request, MAX_BYTES);
   if (body === null) return new Response("Payload too large", { status: 413 });
+  const secrets = await webhookSecrets(env, shop, store);
+  if (!secrets.length) return new Response("Invalid signature", { status: 401 });
   let signed = false;
   for (const secret of secrets) if (await validSignature(body, request.headers.get("x-shopify-hmac-sha256"), secret)) { signed = true; break; }
   if (!signed) return new Response("Invalid signature", { status: 401 });
@@ -222,6 +247,20 @@ export async function recordBalancePaid(env, shop, order) {
   } catch { return 0; /* no swaps table yet */ }
 }
 
+// What one of a line's items cost the shopper after its discounts, in pence (order_items.paid_minor; security review M2).
+// Shopify's line price is before discounts; what came off the whole line is in discount_allocations (order codes and
+// automatic discounts are shared out to the lines there). The catch-up read gives Shopify's own figure (paid_unit_price).
+// null when the order doesn't say: a swap then goes by the price, and Shopify is asked again at the swap itself.
+function paidEach(line, price) {
+  try {
+    if (line.paid_unit_price != null && line.paid_unit_price !== "") return Math.min(price, asMoney(line.paid_unit_price));
+    if (!Array.isArray(line.discount_allocations)) return null;
+    const off = line.discount_allocations.reduce((n, d) => n + asMoney(d && d.amount != null ? d.amount : "0"), 0);
+    const qty = Number(line.quantity) > 0 ? Number(line.quantity) : 1;
+    return Math.max(0, price - Math.ceil(off / qty));
+  } catch { return null; }
+}
+
 // Stores one paid Shopify order (webhook or catch-up read). Shape: Shopify's REST order (id, created_at, currency, total_price,
 // email, customer, line_items[]). Only a keyed hash of the order email is kept, never the address, so it can be matched later
 // against a shopper's verified sign-in email. Returns { status, body }.
@@ -257,7 +296,7 @@ export async function ingestShopifyOrder(env, shop, event, sourceId, topic = "or
         throw Error("Invalid order line");
       const price = asMoney(line.price);
       return { id: String(line.id), title: String(line.title).slice(0, 300), quantity: count,
-        price, productId: line.product_id == null ? null : String(line.product_id),
+        price, paid: paidEach(line, price), productId: line.product_id == null ? null : String(line.product_id),
         variantId: line.variant_id == null ? null : String(line.variant_id) };
     });
     statements = [
@@ -271,12 +310,12 @@ export async function ingestShopifyOrder(env, shop, event, sourceId, topic = "or
         .bind(orderId, connection, externalId, event.customer?.id == null ? null : String(event.customer.id),
           String(event.processed_at || event.created_at), amount, "GBP", "shopify", "unverified", "[]", keepAmount ? 1 : 0),
       ...lines.map(line => env.RELAY_DB.prepare(`INSERT INTO order_items
-        (id,order_id,external_line_item_id,product_id,variant_id,title,quantity,price_minor,currency)
-        VALUES (?,?,?,?,?,?,?,?,?)
+        (id,order_id,external_line_item_id,product_id,variant_id,title,quantity,price_minor,currency,paid_minor)
+        VALUES (?,?,?,?,?,?,?,?,?,?)
         ON CONFLICT(order_id,external_line_item_id) DO UPDATE SET
-        title=excluded.title,quantity=excluded.quantity,price_minor=excluded.price_minor`)
+        title=excluded.title,quantity=excluded.quantity,price_minor=excluded.price_minor,paid_minor=excluded.paid_minor`)
         .bind(orderId + ":item:" + line.id, orderId, line.id, line.productId, line.variantId,
-          line.title, line.quantity, line.price, "GBP")),
+          line.title, line.quantity, line.price, "GBP", line.paid)),
       env.RELAY_DB.prepare(`INSERT OR IGNORE INTO audit_events
         (id,actor_type,actor_id,event_type,subject_type,subject_id,metadata_json)
         VALUES (?,?,?,?,?,?,?)`)
@@ -286,6 +325,7 @@ export async function ingestShopifyOrder(env, shop, event, sourceId, topic = "or
   } catch {
     return { status: 400, body: { error: "invalid_amount_or_lines" } };
   }
+  await ensureOrderPaidColumn(env.RELAY_DB);
   try {
     const orderEmail = normaliseEmail(event.email || event.contact_email || (event.customer && event.customer.email));
     let linked = false;
@@ -318,7 +358,7 @@ export async function backfillShopifyOrders(env, shop, token, o = {}) {
   const query = `query RelayOrders($cursor: String, $q: String) { orders(first: 50, after: $cursor, query: $q, sortKey: CREATED_AT, reverse: true) {
     pageInfo { hasNextPage endCursor }
     nodes { legacyResourceId name email createdAt processedAt currencyCode totalPriceSet { shopMoney { amount } } currentTotalPriceSet { shopMoney { amount } } originalTotalPriceSet { shopMoney { amount } }
-      lineItems(first: 100) { nodes { id title quantity currentQuantity originalUnitPriceSet { shopMoney { amount } } product { legacyResourceId } variant { legacyResourceId } } } } } }`;
+      lineItems(first: 100) { nodes { id title quantity currentQuantity originalUnitPriceSet { shopMoney { amount } } discountedUnitPriceAfterAllDiscountsSet { shopMoney { amount } } product { legacyResourceId } variant { legacyResourceId } } } } } }`;
   let cursor = null, pages = 0, orders = 0, linked = 0, skipped = 0, error = null;
   try {
     do {
@@ -334,6 +374,7 @@ export async function backfillShopifyOrders(env, shop, token, o = {}) {
           original_total_price: (n.originalTotalPriceSet && n.originalTotalPriceSet.shopMoney && n.originalTotalPriceSet.shopMoney.amount) ?? null,
           line_items: ((n.lineItems && n.lineItems.nodes) || []).map(l => ({ id: gidNumber(l.id), title: l.title, quantity: l.quantity, current_quantity: l.currentQuantity ?? null,
             price: l.originalUnitPriceSet && l.originalUnitPriceSet.shopMoney && l.originalUnitPriceSet.shopMoney.amount,
+            paid_unit_price: (l.discountedUnitPriceAfterAllDiscountsSet && l.discountedUnitPriceAfterAllDiscountsSet.shopMoney && l.discountedUnitPriceAfterAllDiscountsSet.shopMoney.amount) ?? null,
             product_id: l.product ? l.product.legacyResourceId : null, variant_id: l.variant ? l.variant.legacyResourceId : null })) };
         const res = await ingestShopifyOrder(env, shop, event, "backfill:" + event.id, "orders/backfill");
         if (res.status === 200) { orders++; if (res.body.emailLinked) linked++; } else skipped++;

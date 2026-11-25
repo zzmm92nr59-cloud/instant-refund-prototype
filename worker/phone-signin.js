@@ -82,7 +82,7 @@ export async function handlePhoneSigninStart(path, request, env, cors, o, h) {
     if (done) {
       const shopper = await env.RELAY_DB.prepare("SELECT email FROM shoppers WHERE id = ?").bind(done.shopper_id).first();
       if (!shopper) return h.json({ error: "expired" }, 410, cors);
-      return h.startSession(env, shopper.email, o.now, cors, Number(done.second_step) === 1 ? { skipSecondStep: true } : {});
+      return h.startSession(env, shopper.email, o.now, cors, Number(done.second_step) === 1 ? { skipSecondStep: true, recent: false } : {});
     }
     const row = await env.RELAY_DB.prepare("SELECT expires_at, used_at FROM auth_phone_requests WHERE poll_hash = ?").bind(pollHash).first();
     if (!row || row.used_at || row.expires_at <= o.now) return h.json({ error: "expired" }, 410, cors);

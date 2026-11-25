@@ -388,4 +388,4 @@ export async function shopifyShopsForDisplay(env, opts = {}) {
 }
 
 // Used by shopify-embedded.js (Relay inside Shopify admin).
-export { appForShop, shopInfo, saveTokens, tokenRequest, recordHooks };
+export { appForShop, appById, shopInfo, saveTokens, tokenRequest, recordHooks };

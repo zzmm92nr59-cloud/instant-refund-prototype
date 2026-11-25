@@ -129,12 +129,20 @@ const aliceId = sqlite.prepare("SELECT id FROM shoppers WHERE email = ?").get("a
 const { CONSENT_VERSION } = await import("../worker/gmail.js");
 for (const t of [alice, bob]) assert.equal((await post("/relay/my/consent", t, { version: CONSENT_VERSION })).status, 200);
 const loc = res => res.headers.get("location");
+// "Connect" comes back with a single-use code the app hands in with the session that started it (gmail.js
+// finishMailConnect); this does that and gives back what the app would then be told, as "#gmail=<result>".
+const finishMail = async (res, token) => {
+  const at = res.headers.get("location") || "", m = /#(gmail|outlook)=finish&mailcode=([A-Za-z0-9_-]{43})$/.exec(at);
+  if (!m) return at;
+  const b = await (await post("/relay/my/gmail/finish", token, { code: m[2] })).json();
+  return "#" + m[1] + "=" + (b.result || b.error);
+};
 // Starts a connection and comes back from (fake) Google signed in as the given account.
 const connect = async (token, account, another) => {
   const r = await post("/relay/my/gmail/connect", token, another ? { another: true } : {});
   if (r.status !== 200) return { status: r.status, body: await r.json() };
   const u = new URL((await r.json()).url);
-  return { url: u, back: loc(await call("/relay/gmail/callback?code=code-" + account + "&state=" + u.searchParams.get("state"))) };
+  return { url: u, back: await finishMail(await call("/relay/gmail/callback?code=code-" + account + "&state=" + u.searchParams.get("state")), token) };
 };
 const receiptsOf = async token => (await get("/relay/my/receipts?all=1", token)).receipts;
 const refsOf = rows => rows.map(r => r.orderRef).filter(Boolean).sort();
@@ -206,7 +214,7 @@ console.log("ok - search covers every inbox; Add and the original email use the 
 const ms = await post("/relay/my/gmail/connect", alice, { provider: "microsoft", another: true });
 const msUrl = new URL((await ms.json()).url);
 assert.equal(msUrl.searchParams.get("prompt"), "select_account"); assert.equal(msUrl.searchParams.get("login_hint"), null);
-assert.match(loc(await call("/relay/microsoft/callback?code=code-M&state=" + msUrl.searchParams.get("state"))), /#outlook=added$/);
+assert.match(await finishMail(await call("/relay/microsoft/callback?code=code-M&state=" + msUrl.searchParams.get("state")), alice), /#outlook=added$/);
 st = await get("/relay/my/gmail", alice);
 assert.deepEqual(st.others.map(o => [o.mailbox, o.email, o.provider]), [[2, "alice.work@gmail.com", "google"], [3, "alice.home@outlook.com", "microsoft"]]);
 await runJobs();
@@ -236,7 +244,7 @@ assert.equal(againUrl.searchParams.get("login_hint"), "alice.work@gmail.com", "G
 assert.equal(againUrl.searchParams.get("prompt"), "consent", "so Google gives Relay a new sign-in");
 ended.delete("B");   // Google's new sign-in works
 const keptBefore = refsOf(await receiptsOf(alice));
-assert.match(loc(await call("/relay/gmail/callback?code=code-B&state=" + againUrl.searchParams.get("state"))), /#gmail=reconnected$/);
+assert.match(await finishMail(await call("/relay/gmail/callback?code=code-B&state=" + againUrl.searchParams.get("state")), alice), /#gmail=reconnected$/);
 st = await get("/relay/my/gmail", alice);
 assert.deepEqual(st.others.map(o => [o.mailbox, o.email, o.needsReconnect]), [[2, "alice.work@gmail.com", false]], "same place, fine again, not added twice");
 assert.deepEqual(refsOf(await receiptsOf(alice)), keptBefore, "every receipt kept");
@@ -250,7 +258,7 @@ assert.equal((await get("/relay/my/gmail", alice)).needsReconnect, true);
 const again1 = new URL((await (await post("/relay/my/gmail/connect", alice, { again: 1 })).json()).url);
 assert.equal(again1.searchParams.get("login_hint"), "alice.main@gmail.com");
 ended.delete("A");
-assert.match(loc(await call("/relay/gmail/callback?code=code-A&state=" + again1.searchParams.get("state"))), /#gmail=reconnected$/);
+assert.match(await finishMail(await call("/relay/gmail/callback?code=code-A&state=" + again1.searchParams.get("state")), alice), /#gmail=reconnected$/);
 st = await get("/relay/my/gmail", alice);
 assert.equal(st.needsReconnect, false); assert.equal(st.email, "alice.main@gmail.com"); assert.equal(st.others.length, 1);
 assert.deepEqual(refsOf(await receiptsOf(alice)), keptBefore, "every receipt kept");
@@ -276,7 +284,7 @@ assert.deepEqual(await yearsRead(), [2025]);
 assert.deepEqual((await get("/relay/my/gmail/history", bob)).years, [], "Bob's history is his own");
 // An Outlook inbox added afterwards hasn't read 2025, so it isn't counted as read until it has; then only it is read.
 const ms2 = new URL((await (await post("/relay/my/gmail/connect", alice, { provider: "microsoft", another: true })).json()).url);
-assert.match(loc(await call("/relay/microsoft/callback?code=code-M&state=" + ms2.searchParams.get("state"))), /#outlook=added$/);
+assert.match(await finishMail(await call("/relay/microsoft/callback?code=code-M&state=" + ms2.searchParams.get("state")), alice), /#outlook=added$/);
 await runJobs();
 assert.deepEqual(await yearsRead(), [], "2025 still needs the Outlook inbox");
 oldListed.length = 0;

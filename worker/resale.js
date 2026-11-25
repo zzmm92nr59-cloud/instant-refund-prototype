@@ -230,7 +230,7 @@ async function describeItem(env, shopper, body, now, o = {}) {
       method: "POST",
       headers: { "x-api-key": env.ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json" },
       body: JSON.stringify({ model: env.RESALE_AI_MODEL || DEFAULT_MODEL, max_tokens: 200, ...noThinking(env), system: DESCRIBE_SYSTEM, messages: [{ role: "user", content: facts }] })
-    }, { now });
+    }, { now, shopperId: shopper && shopper.id });
   } catch { return { status: 200, body: { description: null } }; }
   if (isCapped(res) || !res || !res.ok) return { status: 200, body: { description: null } };
   const data = await res.json().catch(() => null);

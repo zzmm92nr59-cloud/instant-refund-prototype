@@ -419,4 +419,19 @@ console.log("22 ok: account deletion removes card memory");
   assert.equal(r.linked, 0);
   console.log("23 ok: 120 orders checked for emails without going over D1's limit of 100 values a query");
 }
+// 24. What each item cost after its discounts is kept (security review M2), so a swap to a cheaper size never refunds more
+// than was paid: a £25 T-shirt with £10 off cost £15; with nothing said, it isn't known.
+{
+  const { squareOrderStatements } = await import("../worker/square-orders.js");
+  const { squareItemsOfVariations } = await import("../worker/square-orders.js");
+  const order = { id: "DISC-1", created_at: "2026-11-20T10:00:00Z", state: "COMPLETED", total_money: { amount: 1500, currency: "GBP" },
+    line_items: [{ uid: "D1", name: "Organic T-shirt", catalog_object_id: "TEE-M", quantity: "1", base_price_money: { amount: 2500, currency: "GBP" },
+      gross_sales_money: { amount: 2500, currency: "GBP" }, total_discount_money: { amount: 1000, currency: "GBP" } },
+      { uid: "D2", name: "Mug", catalog_object_id: "MUG", quantity: "2", base_price_money: { amount: 800, currency: "GBP" } }] };
+  const { id, statements } = squareOrderStatements(db, order, { id: "LOC1", currency: "GBP" }, await squareItemsOfVariations(db));
+  await db.batch(statements);
+  assert.deepEqual(sqlite.prepare("SELECT external_line_item_id AS line, price_minor AS price, paid_minor AS paid FROM order_items WHERE order_id = ? ORDER BY line").all(id).map(r => ({ ...r })),
+    [{ line: "D1", price: 2500, paid: 1500 }, { line: "D2", price: 800, paid: null }]);
+  console.log("24 ok: what each item cost after its discounts is kept");
+}
 console.log("All Square order tests passed");
