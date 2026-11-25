@@ -212,7 +212,7 @@ const browser = await chromium.launch();
   await page.reload();
   await page.locator("#foot button").first().waitFor();
   const openFrom = async (text) => {
-    const hit = page.locator("#homePage .h2-item, #homePage .hl-sq", { hasText: text }).first();
+    const hit = page.locator("#homePage .h2-item, #homePage .hl-sq, #homePage .hx-sq, #homePage .hx-live", { hasText: text }).first();
     await hit.waitFor(); await hit.click();
     const sh = page.locator(".rl-back .rl-sheet").last(); await sh.locator(".rl-rt").waitFor(); await page.waitForTimeout(600); return sh;
   };

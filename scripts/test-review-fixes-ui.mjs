@@ -112,8 +112,10 @@ async function open(email = A) {
 
   // 6. Wrapped from Home, tapped twice while it's still coming; then a press that turns into a drag.
   await page.evaluate(() => window.go("profile")); await homeShows(page, "J");
-  const chip = page.locator("#view .h2-chip-go", { hasText: "Wrapped" });
-  await chip.click(); await page.waitForTimeout(700); await chip.click();
+  // (Wrapped is in Home's More sheet since 25 Nov 2026: its row tapped, then again 700ms later as the chip was.)
+  await page.locator("#view .h2-chip", { hasText: "More" }).click();
+  const chip = page.locator(".rl-back .rl-sheet .rl-arow", { hasText: "Wrapped" });
+  await chip.evaluate(r => { r.click(); setTimeout(() => r.click(), 700); }); await page.waitForTimeout(700);
   await page.locator(".rl-story").first().waitFor();
   await page.waitForTimeout(2200);
   assert.equal(await page.locator(".rl-story").count(), 1, "one story, not two on top of each other");

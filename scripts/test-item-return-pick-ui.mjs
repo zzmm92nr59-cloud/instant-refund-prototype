@@ -7,7 +7,7 @@
 //     "Everything in this order". Nothing ticked can't be saved. One item ticked and Save tapped twice sends one request,
 //     for that item only.
 //  3. Everywhere then says that item and not the order: the page ("In this return: …", "Sending back" beside the item),
-//     Home's "Needs you" and "To return", and Returns & swaps (the item's card only).
+//     Home's "In progress" and "Returns", and Returns & swaps (the item's card only).
 //  4. "Change what's going back": everything; then nothing, which is "Not sending anything back" (undo), and the page and
 //     Home go back to how they were.
 //  5. "I've sent it back" on an order of several things asks which items first, then the tracking number and the day.
@@ -110,7 +110,7 @@ async function shopper() {
   const page = await ctx.newPage(), errors = []; page.on("pageerror", e => errors.push(String(e)));
   await page.goto(origin + "/index.html");
   await homeReady(page);
-  await page.locator("#homePage .h2-sec").first().waitFor();
+  await page.locator("#homePage .h2-sec, #homePage .hx > *").first().waitFor();
   await page.waitForTimeout(700);
   return { ctx, page, errors };
 }
@@ -139,13 +139,9 @@ const clean = { small: [], tiny: [], symbols: [], dots: [], words: [], wide: [] 
 const sheet = page => page.locator(".rl-back .rl-sheet").first();          // the order's page
 const picker = page => page.locator('.rl-sheet[aria-label="What are you sending back?"]');
 const closeTop = async page => { await page.waitForTimeout(400); const back = page.locator(".rl-back").last(); await back.click({ position: { x: 10, y: 10 } }); await back.waitFor({ state: "detached" }); };
-const openOrder = async (page, shop) => { await page.locator("#homePage .hl-sq, #homePage .h2-item", { hasText: shop }).first().click(); const sh = sheet(page); await sh.locator(".rl-dt-head").waitFor(); await page.waitForTimeout(400); return sh; };
-const under = (page, name) => page.evaluate(name => {
-  const kids = [...document.querySelectorAll("#homePage .h2-feed > *")], at = kids.findIndex(k => k.classList.contains("h2-sec") && k.textContent === name), out = [];
-  if (at < 0) return null;
-  for (const k of kids.slice(at + 1)) { if (k.classList.contains("h2-sec")) break; out.push(k.innerText.replace(/\s+/g, " ").trim()); }
-  return out;
-}, name);
+// Home's In progress cards, as each says itself.
+const live = page => page.locator("#homePage .hx-live").evaluateAll(cs => cs.map(c => c.getAttribute("aria-label")));
+const openOrder = async (page, shop) => { await page.locator("#homePage .hl-sq, #homePage .h2-item, #homePage .hx-sq, #homePage .hx-live", { hasText: shop }).first().click(); const sh = sheet(page); await sh.locator(".rl-dt-head").waitFor(); await page.waitForTimeout(400); return sh; };
 // The items on an order's page: each line's words, as a person reads them.
 const lines = sh => sh.locator(".rl-dt-items li").evaluateAll(ls => ls.map(l => l.innerText.replace(/\s+/g, " ").trim()));
 const top = async sh => { await sh.evaluate(s => { s.scrollTop = 0; if (s.parentNode) s.parentNode.scrollTop = 0; }); };
@@ -191,14 +187,15 @@ const allErrors = [];
   await top(sh); await page.screenshot({ path: SHOTS + "/items-page-one-going-back.png" });
   await closeTop(page);
   // Home: the card says the item, never the whole order.
-  await page.waitForFunction(() => /Sending back Cropped Tee/.test(document.querySelector("#homePage").innerText));
-  let needs = await under(page, "Needs you");
-  assert.ok(needs.some(t => /^Sending back Cropped Tee Northwind/.test(t)), "Needs you names the item: " + JSON.stringify(needs));
-  assert.ok(!needs.some(t => /^Return started Northwind/.test(t)), "never the whole order");
+  await page.waitForFunction(() => [...document.querySelectorAll("#homePage .hx-live")].some(c => /^Northwind\. Cropped Tee\. Sending back/.test(c.getAttribute("aria-label"))));
+  let needs = await live(page);
+  assert.ok(needs.some(t => t === "Northwind. Cropped Tee. Sending back. Next: post it back"), "In progress names the item: " + JSON.stringify(needs));
+  assert.ok(!needs.some(t => /^Northwind\. (Flared Pant|3 items)|Return started/.test(t)), "never the whole order");
+  assert.equal((await page.locator("#homePage .h2-feed").innerText()).match(/Northwind/g).length, 1, "the order once on Home");
   await page.screenshot({ path: SHOTS + "/items-home.png" });
-  await page.locator(".h2-chip", { hasText: "To return" }).click(); await page.waitForTimeout(300);
+  await page.locator(".h2-chip", { hasText: "Returns" }).click(); await page.waitForTimeout(300);
   let squares = await page.locator("#homePage .hl-sq").evaluateAll(xs => xs.map(x => x.getAttribute("aria-label")));
-  assert.ok(squares.some(s => /Northwind/.test(s) && /1 of 3 going back/.test(s)), "To return says how many of the order: " + JSON.stringify(squares));
+  assert.ok(squares.some(s => /Northwind/.test(s) && /1 of 3 going back/.test(s)), "Returns says how many of the order: " + JSON.stringify(squares));
   assert.ok(!squares.some(s => /Northwind/.test(s) && /Return started/.test(s)), "never 'Return started' for the whole order");
   assert.deepEqual(await measure(page, "#homePage"), clean, "Home's polish");
   // Returns & swaps: the item's own card, and not the things that were kept.
@@ -209,8 +206,8 @@ const allErrors = [];
   assert.equal(north.length, 1, "one card, for the one item: " + JSON.stringify(north));
   assert.match(north[0], /Cropped Tee, 1 of 3 in this order/); assert.ok(!/Flared Pant|Wool Socks/.test(north[0]), "the kept items aren't in Returns: " + north[0]);
   await page.evaluate(() => window.go("profile")); await homeReady(page);
-  // (Home remembers the chip that was picked: back to "For you", where "Needs you" is.)
-  await page.locator(".h2-chip", { hasText: "For you" }).click(); await page.locator("#homePage .h2-sec").first().waitFor(); await page.waitForTimeout(500);
+  // (Home remembers the chip that was picked: back to "For you", where "In progress" is.)
+  await page.locator(".h2-chip", { hasText: "For you" }).click(); await page.locator("#homePage .hx-h").first().waitFor(); await page.waitForTimeout(500);
   // 4. Change it: everything.
   sh = await openOrder(page, "Northwind");
   await sh.getByRole("button", { name: "Change what's going back" }).click();
@@ -237,7 +234,7 @@ const allErrors = [];
   assert.equal((await lines(sh)).filter(l => /Sending back/.test(l)).length, 0);
   await closeTop(page);
   await page.waitForFunction(() => !/Sending back|going back/.test(document.querySelector("#homePage").innerText));
-  squares = await page.locator("#homePage .hl-sq").evaluateAll(xs => xs.map(x => x.getAttribute("aria-label")));
+  squares = await page.locator("#homePage .hx-sq").evaluateAll(xs => xs.map(x => x.getAttribute("aria-label")));
   assert.ok(squares.some(s => /Northwind/.test(s) && /Return by/.test(s)), "Home shows it as it was: " + JSON.stringify(squares));
   // 9. The server refusing: plain words, nothing changed, and it can be tried again.
   sh = await openOrder(page, "Northwind");
@@ -273,7 +270,7 @@ const allErrors = [];
   assert.equal(await sh.locator(".rl-rt-items").innerText(), "In this return: Canvas Cap (Navy).");
   assert.deepEqual(await lines(sh), ["Rain Jacket L £60.00", "Canvas Cap Navy Sent back £30.00"]);
   await closeTop(page);
-  await page.waitForFunction(() => /Canvas Cap on its way back to Fieldhouse/.test(document.querySelector("#homePage").innerText));
+  await page.waitForFunction(() => [...document.querySelectorAll("#homePage .hx-live")].some(c => c.getAttribute("aria-label") === "Fieldhouse. Canvas Cap. Sent back. Next: Fieldhouse gets it"));
   allErrors.push(...errors); await ctx.close();
 }
 // 6. An order of one thing: no question; one request; the same button takes it back.
@@ -286,22 +283,23 @@ const allErrors = [];
   await page.locator(".rl-back").waitFor({ state: "detached" });
   assert.equal(await picker(page).count(), 0, "no question for one thing");
   assert.deepEqual(st.posts, [[KICK.id, { items: [{ index: 0, status: "returning" }] }]], "one request");
-  await page.waitForFunction(() => /Return started/.test(document.querySelector("#homePage").innerText));
+  const kickBack = () => [...document.querySelectorAll("#homePage .hx-live")].some(c => c.getAttribute("aria-label") === "Kick Lane. Court Classic Trainers. Sending back. Next: post it back");
+  await page.waitForFunction(kickBack);
   sh = await openOrder(page, "Kick Lane");
   assert.equal(await sh.locator(".rl-rt-items").count(), 0, "one thing: nothing to say about which");
   assert.equal(await sh.getByRole("button", { name: "I'm sending this back" }).count(), 0, "it isn't offered twice");
   await sh.getByRole("button", { name: "Not sending this back" }).dblclick();
   await page.locator(".rl-back").waitFor({ state: "detached" });
   assert.deepEqual(st.posts.slice(1), [[KICK.id, { items: [{ index: 0, status: null }] }]], "one request to take it back");
-  await page.waitForFunction(() => !/Return started/.test(document.querySelector("#homePage").innerText));
+  await page.waitForFunction(() => ![...document.querySelectorAll("#homePage .hx-live")].some(c => /^Kick Lane\./.test(c.getAttribute("aria-label"))) && !/Sending back|Return started/.test(document.querySelector("#homePage").innerText));
   allErrors.push(...errors); await ctx.close();
 }
 // 7 and 8. A return Relay wasn't told the items of; and refunds.
 {
   reset();
   const { ctx, page, errors } = await shopper();
-  const needs = await under(page, "Needs you");
-  assert.ok(needs.some(t => /^Sent back, on its way to Harlow & Co/.test(t)), "items not known: nothing is said about which: " + JSON.stringify(needs));
+  const needs = await live(page);
+  assert.ok(needs.some(t => /^Harlow & Co\. 2 items\. Sent back\./.test(t)), "items not known: nothing is said about which: " + JSON.stringify(needs));
   let sh = await openOrder(page, "Harlow & Co");
   assert.equal(await sh.locator(".rl-rt-items").innerText(), "Relay wasn't told which items are in this return.");
   assert.equal((await lines(sh)).filter(l => /Sent back|Sending back/.test(l)).length, 0, "no item is said to be going back");

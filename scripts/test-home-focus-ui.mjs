@@ -1,9 +1,10 @@
 // Browser test: what Home leads with (Settings, Home layout, "What Home shows first"). Stubbed Relay server, a made-up
 // person and invented shops.
 // Checks:
-//  1. Receipts first (the default): "Needs you" at the top with only what really needs the shopper, most urgent first
-//     (a return with 2 days left, one with 6, an inbox to connect again, a bank payment with no receipt), each one small
-//     card that opens its page; then "On the way", then "Recent" (Wallet squares, or Cards). Nothing urgent: one calm line.
+//  1. Receipts first (the default): an inbox to connect again leads; then "In progress", most urgent first (a return with
+//     2 days left in red, one with 6 in amber, then the parcel on its way), each a card that opens its page; then "Recent"
+//     as a shelf, each thing once; the bank payment with no receipt behind one line. In the big Cards layout: "Needs you",
+//     "On the way", "Recent" as before. Nothing urgent: nothing made up.
 //  2. Orders first: "Your orders" from shops on Relay, each with where it has got to (on its way, from the shop's own
 //     email; return started), opening its page with what can be done and Track your parcel; then "Shops on Relay" (the
 //     shops bought from, and All shops); then other receipts, compact. A test shop's order only with testing tools.
@@ -73,11 +74,13 @@ async function shopper({ look = null, focus = null, path = "/index.html" } = {})
   const page = await ctx.newPage(), errors = []; page.on("pageerror", e => errors.push(String(e)));
   await page.goto(origin + path);
   await homeReady(page);
-  await page.locator("#homePage .h2-sec").first().waitFor();
+  await page.locator(DRAWN).first().waitFor();
   await page.waitForTimeout(700);
   return { ctx, page, errors };
 }
-const heads = page => page.locator("#homePage .h2-feed > .h2-sec").allInnerTexts();
+// Home has drawn its parts: a heading of the big Cards layout or Orders first (.h2-sec), or of For you (.hx-h).
+const DRAWN = "#homePage .h2-sec, #homePage .hx-h";
+const heads = page => page.locator("#homePage .h2-feed > .h2-sec, #homePage .hx > .hx-h").allInnerTexts();
 // What's under a heading: the feed's children after it, up to the next heading.
 const under = (page, name) => page.evaluate(name => {
   const kids = [...document.querySelectorAll("#homePage .h2-feed > *")], at = kids.findIndex(k => k.classList.contains("h2-sec") && k.textContent === name), out = [];
@@ -108,7 +111,7 @@ const measure = page => page.evaluate(() => {
     if (ratio < 3) out.faint.push(el.textContent.trim().slice(0, 30) + " " + ratio.toFixed(2));
   }
   if (/ · /.test(document.querySelector("#homePage .h2-feed").innerText)) out.dots.push("·");
-  for (const c of document.querySelectorAll("#homePage .h2-item, #homePage .hl-sq, #homePage .hl-row")) if (c.querySelector("button, a")) out.cardButtons.push(c.innerText.slice(0, 30));
+  for (const c of document.querySelectorAll("#homePage .h2-item, #homePage .hl-sq, #homePage .hl-row, #homePage .hx-live, #homePage .hx-sq")) if (c.querySelector("button, a")) out.cardButtons.push(c.innerText.slice(0, 30));
   if (document.documentElement.scrollWidth > innerWidth + 1) out.wide.push(document.documentElement.scrollWidth);
   return out;
 });
@@ -131,26 +134,28 @@ const allErrors = [];
 {
   const { ctx, page, errors } = await shopper();
   assert.equal(await page.evaluate(() => localStorage.getItem("relay-home-focus")), null, "nothing chosen yet");
-  assert.deepEqual(await heads(page), ["Needs you", "On the way", "Recent"]);
-  const needs = await under(page, "Needs you");
-  assert.equal(needs.length, 4, "only what really needs the shopper: " + JSON.stringify(needs));
-  assert.match(needs[0], /^Vitamin C Serum\. 2 days left$/, "the return closing soonest first");
-  assert.match(needs[1], /^Wool Coat\. 6 days left$/);
-  assert.equal(needs[2], "Connect Outlook again");
-  assert.match(needs[3], /^H&M, £34\.99 on /, "the bank payment with no receipt");
-  const serum = page.locator("#homePage .h2-feed > .h2-item.small", { hasText: "Vitamin C Serum" });
-  assert.equal(await serum.locator(".h2-line-t span").innerText(), "Return to Glow Lab by " + shortDay(day(2)));
-  assert.equal(await serum.locator(".h2-strip").getAttribute("class"), "h2-strip urgent", "red in the last three days");
-  assert.equal(await page.locator("#homePage .h2-feed > .h2-item.small", { hasText: "Wool Coat" }).locator(".h2-strip").getAttribute("class"), "h2-strip soon", "amber in the last week");
-  assert.deepEqual(await under(page, "On the way"), ["Northfold. Flow Flared Pant. £69.00. On its way"], "the parcel on its way");
-  const recent = await under(page, "Recent");
+  assert.deepEqual(await heads(page), ["In progress", "Recent"]);
+  // The inbox to connect again leads, a row of its own.
+  assert.match(await page.locator("#homePage .hx > .hx-note").first().innerText(), /^Connect Outlook again/);
+  const live = await page.locator("#homePage .hx-live").evaluateAll(cs => cs.map(c => c.getAttribute("aria-label")));
+  assert.equal(live.length, 4, "only what's moving: " + JSON.stringify(live));
+  assert.match(live[0], /^Glow Lab\. Vitamin C Serum\. 2 days to return\. Return by /, "the return closing soonest first");
+  assert.equal(live[0], "Glow Lab. Vitamin C Serum. 2 days to return. Return by " + shortDay(day(2)));
+  assert.match(live[1], /^Harlow & Co\. Wool Coat\. 6 days to return\./);
+  assert.equal(live[2], "Kiln Road. Stoneware Mug. Return started", "the return under way, as the shop knows it (nothing said about posting)");
+  assert.match(live[3], /^Northfold\. Flow Flared Pant\. On its way/, "the parcel on its way");
+  const stClass = name => page.locator("#homePage .hx-live", { hasText: name }).locator(".hx-st").getAttribute("class");
+  assert.equal(await stClass("Vitamin C Serum"), "hx-st urgent", "red in the last three days");
+  assert.equal(await stClass("Wool Coat"), "hx-st soon", "amber in the last week");
+  const recent = await page.locator("#homePage .hx-shelf .hx-sq").evaluateAll(cs => cs.map(c => c.getAttribute("aria-label")));
   assert.ok(recent.some(t => /Court Classic Trainers/.test(t)) && recent.some(t => /Vertuo Pods/.test(t)) && recent.some(t => /Linen Overshirt/.test(t)), "the latest: " + JSON.stringify(recent));
-  assert.ok(!recent.some(t => /Vitamin C Serum|Wool Coat|Flow Flared Pant/.test(t)), "each thing once: what's above isn't repeated");
+  assert.ok(!recent.some(t => /Vitamin C Serum|Wool Coat|Flow Flared Pant|Stoneware Mug/.test(t)), "each thing once: what's above isn't repeated");
+  // The bank payment with no receipt: behind the one line at the end.
+  assert.match(await page.locator("#homePage .hx-needs").innerText(), /^H&M, £34\.99 on /, "the bank payment with no receipt");
   assert.ok(!(await page.locator("#homePage .h2-feed").innerText()).includes("Sample Tote"), "no test shop order without testing tools");
-  assert.ok(await page.locator("#homePage .h2-feed > .hl-grid").count() >= 2, "Wallet squares (the default look)");
-  // A small card is one tap: it opens the thing's own page, with what can be done.
+  // A card is one tap: it opens the thing's own page, with what can be done.
   await waitOutDoubleTap(page);
-  await page.locator("#homePage .h2-feed > .h2-item.small", { hasText: "Wool Coat" }).click();
+  await page.locator("#homePage .hx-live", { hasText: "Wool Coat" }).click();
   const sheet = page.locator(".rl-back .rl-sheet").last(); await sheet.waitFor();
   assert.deepEqual(await sheet.locator(".rl-dt-acts button").allInnerTexts(), ["Start return", "I'm sending this back"]);
   await close(page);
@@ -159,24 +164,31 @@ const allErrors = [];
   // The same in Cards.
   await page.evaluate(() => { localStorage.setItem("relay-home-look", "cards"); window.go("receipts"); }); await page.evaluate(() => window.go("profile"));
   await page.locator("#homePage .h2-feed > .h2-item:not(.small)").first().waitFor();
-  assert.deepEqual(await heads(page), ["Needs you", "On the way", "Recent"], "the same parts in Cards");
+  assert.deepEqual(await heads(page), ["Needs you", "On the way", "Recent"], "the big Cards layout keeps its parts");
+  const needs = await under(page, "Needs you");
+  assert.equal(needs.length, 4, "only what really needs the shopper: " + JSON.stringify(needs));
+  assert.match(needs[0], /^Vitamin C Serum\. 2 days left$/, "the return closing soonest first");
+  assert.match(needs[1], /^Wool Coat\. 6 days left$/);
+  assert.equal(needs[2], "Connect Outlook again");
+  assert.match(needs[3], /^H&M, £34\.99 on /, "the bank payment with no receipt");
+  assert.deepEqual(await under(page, "On the way"), ["Northfold. Flow Flared Pant. On its way"], "the parcel on its way");
   assert.equal(await page.locator("#homePage .h2-feed > .hl-grid").count(), 0);
   await polished(page, "receipts first, cards");
   await shot(page, "receipts-first-cards");
   allErrors.push(...errors); await ctx.close();
 }
-// Nothing urgent: one calm line, never something made up.
+// Nothing urgent: never something made up (no In progress, nothing behind the one line), just what was bought.
 {
   reset({ receipts: [SHOES, PODS], needReceipt: [], reconnect: false, orders: [] });
   const { ctx, page, errors } = await shopper();
-  assert.deepEqual(await heads(page), ["Needs you", "Recent"]);
-  assert.equal(await page.locator("#homePage .h2-feed > .h2-sec + .h2-calm").innerText(), "Nothing needs you right now.");
-  assert.equal(await page.locator("#homePage .h2-feed > .h2-item.small:not(:last-child)").count(), 0, "no urgent cards (only All receipts at the end)");
+  assert.deepEqual(await heads(page), ["Recent"]);
+  assert.equal(await page.locator("#homePage .hx-live, #homePage .hx-needs, #homePage .hx > .hx-note:not(.hx-all)").count(), 0, "no urgent cards (only All receipts at the end)");
+  assert.equal(await page.locator("#homePage .hx-shelf .hx-sq").count(), 2, "the two purchases");
   await polished(page, "receipts first, nothing urgent");
   await shot(page, "receipts-first-calm");
   allErrors.push(...errors); await ctx.close();
 }
-console.log("ok - Receipts first (the default): Needs you, most urgent first, one small card each that opens its page; then On the way and Recent, each thing once; a calm line when nothing needs you; polished in Wallet and Cards");
+console.log("ok - Receipts first (the default): an inbox to connect again, then In progress most urgent first, each a card that opens its page, then Recent, each thing once; Cards keeps Needs you, On the way and Recent; nothing made up when nothing is urgent; polished");
 
 // 2. Orders first, chosen in Settings: orders from shops on Relay with where they've got to, the shops, then the rest.
 reset();
@@ -229,8 +241,8 @@ reset();
   await page.locator("#homePage .rl-ys-shop", { hasText: "All shops" }).click();
   await page.waitForFunction(() => window.page === "discover");
   // ?focus=receipts tries the other one without changing what was chosen.
-  await page.goto(origin + "/index.html?focus=receipts"); await homeReady(page); await page.locator("#homePage .h2-sec").first().waitFor();
-  assert.equal((await heads(page))[0], "Needs you", "?focus=receipts shows Receipts first");
+  await page.goto(origin + "/index.html?focus=receipts"); await homeReady(page); await page.locator(DRAWN).first().waitFor();
+  assert.equal((await heads(page))[0], "Needs you", "?focus=receipts shows Receipts first (in Cards, chosen above)");
   assert.equal(await page.evaluate(() => localStorage.getItem("relay-home-focus")), "orders", "and keeps what was chosen");
   // And back to Receipts first in Settings, at any time.
   await openAccountRow(page, "Home layout");
@@ -282,10 +294,10 @@ reset();
     await page.waitForTimeout(1500);
     opened[focus] = st.log.map(x => x.split("?")[0]).sort(); st.log = [];
     await page.evaluate(f => { localStorage.setItem("relay-home-focus", f); window.go("receipts"); }, focus === "orders" ? "receipts" : "orders");
-    await page.evaluate(() => window.go("profile")); await page.locator("#homePage .h2-sec").first().waitFor(); await page.waitForTimeout(1200);
+    await page.evaluate(() => window.go("profile")); await page.locator(DRAWN).first().waitFor(); await page.waitForTimeout(1200);
     const afterReceipts = st.log.slice(); st.log = [];
     await page.evaluate(() => window.go("receipts")); await page.waitForTimeout(800); st.log = [];
-    await page.evaluate(() => window.go("profile")); await page.locator("#homePage .h2-sec").first().waitFor(); await page.waitForTimeout(1200);
+    await page.evaluate(() => window.go("profile")); await page.locator(DRAWN).first().waitFor(); await page.waitForTimeout(1200);
     assert.deepEqual(st.log, [], "Home drawn again (" + focus + " switched) asks for nothing it didn't just load: " + JSON.stringify(st.log) + " / " + JSON.stringify(afterReceipts));
     allErrors.push(...errors); await ctx.close();
   }

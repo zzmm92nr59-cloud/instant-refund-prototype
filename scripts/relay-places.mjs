@@ -25,7 +25,8 @@ export async function homeShows(page, initial, opts) {
 // Wallet and Today have their own checks in test-home-look-ui.mjs.
 export async function bigCards(ctx) { await ctx.addInitScript(() => { try { localStorage.setItem("relay-home-look", "cards"); } catch (e) {} }); }
 // A card on Home, by any text on it. Tapping it opens what the old wallet card showed (its page, a sheet).
-export const homeCard = (page, text) => page.locator("#homePage .h2-feed > .h2-item", { hasText: text });
+// (For you's cards since 25 Nov 2026: In progress cards, shelf squares and its rows, such as All receipts.)
+export const homeCard = (page, text) => page.locator("#homePage .h2-feed > .h2-item, #homePage .hx-live, #homePage .hx-sq, #homePage .hx > .hx-note, #homePage .h2-feed > .hx-note", { hasText: text });
 export async function openHomeCard(page, text) {
   await homeCard(page, text).first().click();
   await page.locator(".rl-back .rl-sheet").last().waitFor();

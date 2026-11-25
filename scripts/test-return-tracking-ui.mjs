@@ -1,8 +1,9 @@
 // Browser test: return tracking in the app (worker/return-tracking.js). Stubbed Relay server, a made-up person, invented
 // shops, orders and tracking numbers.
 // Checks:
-//  1. Home (Receipts first): "Needs you" shows a refund not seen 14 days after the shop had the return near the top, and a
-//     return on its way with where it has got to; "To return" shows returns in progress beside what can still go back.
+//  1. Home (Receipts first): "In progress" shows a refund not seen 14 days after the shop had the return first, and a
+//     return on its way with where it has got to, each with a bar lit only for the steps Relay has seen; "Returns" shows
+//     returns in progress beside what can still go back.
 //  2. The receipt's page: the four steps in order, each done one with its day and who said so ("From Royal Mail", "From
 //     Glow Lab's email", "You said"), steps still to come greyed, the tracking number with the carrier's own link, and
 //     "Refund not seen yet" with what to do. Opening it asks the carrier once (never on Home, never on a timer); when
@@ -105,7 +106,7 @@ async function shopper() {
   const page = await ctx.newPage(), errors = []; page.on("pageerror", e => errors.push(String(e)));
   await page.goto(origin + "/index.html");
   await homeReady(page);
-  await page.locator("#homePage .h2-sec").first().waitFor();
+  await page.locator("#homePage .h2-sec, #homePage .hx > *").first().waitFor();
   await page.waitForTimeout(700);
   return { ctx, page, errors };
 }
@@ -133,27 +134,23 @@ const measure = (page, scope) => page.evaluate((scope) => {
 const clean = { small: [], tiny: [], symbols: [], dots: [], words: [], wide: [] };
 const sheet = page => page.locator(".rl-back .rl-sheet").last();
 const closeTop = async page => { await page.waitForTimeout(400); const back = page.locator(".rl-back").last(); await back.click({ position: { x: 10, y: 10 } }); await back.waitFor({ state: "detached" }); };
-const under = (page, name) => page.evaluate(name => {
-  const kids = [...document.querySelectorAll("#homePage .h2-feed > *")], at = kids.findIndex(k => k.classList.contains("h2-sec") && k.textContent === name), out = [];
-  if (at < 0) return null;
-  for (const k of kids.slice(at + 1)) { if (k.classList.contains("h2-sec")) break; out.push(k.innerText.replace(/\s+/g, " ").trim()); }
-  return out;
-}, name);
 const allErrors = [];
 
 // 1. Home.
 {
   const { ctx, page, errors } = await shopper();
-  const needs = await under(page, "Needs you");
-  assert.ok(needs && needs.length >= 2, "Needs you is there: " + JSON.stringify(needs));
-  assert.match(needs[0], /^Refund not seen yet Glow Lab, Vitamin C Serum/, "the refund not seen comes first: " + needs[0]);
-  assert.ok(needs.some(t => /^Sent back, on its way to Harlow & Co Harlow & Co, Wool Coat/.test(t)), "the return on its way, with where it has got to: " + JSON.stringify(needs));
+  const needs = await page.locator("#homePage .hx-live").evaluateAll(cs => cs.map(c => [c.getAttribute("aria-label"), [...c.querySelectorAll(".hx-bar i")].map(i => i.classList.contains("on") ? 1 : 0).join("")]));
+  assert.ok(needs.length >= 2, "In progress is there: " + JSON.stringify(needs));
+  assert.deepEqual(needs[0], ["Glow Lab. Vitamin C Serum. Refund not seen yet", "0110"], "the refund not seen comes first, its missed start unlit: " + JSON.stringify(needs[0]));
+  assert.ok(needs.some(([t, bar]) => t === "Harlow & Co. Wool Coat. Sent back. Next: Harlow & Co gets it" && bar === "1100"), "the return on its way, with where it has got to: " + JSON.stringify(needs));
+  assert.equal(await page.locator("#homePage .hx-live", { hasText: "Wool Coat" }).locator(".hx-bar").getAttribute("aria-label"), "Return started, Sent back");
+  assert.equal((await page.locator("#homePage .h2-feed").innerText()).match(/Wool Coat/g).length, 1, "each return once");
   assert.equal(st.log.filter(l => /return-parcel/.test(l)).length, 0, "Home never asks the carrier");
   assert.deepEqual(await measure(page, "#homePage"), clean, "Home's polish");
   await page.evaluate(() => window.scrollTo(0, 0)); await page.waitForTimeout(250);
   await page.screenshot({ path: SHOTS + "/home-return-in-progress.png" });
-  // "To return": returns on their way beside what can still go back, each with its state.
-  await page.locator(".h2-chip", { hasText: "To return" }).click();
+  // "Returns": returns on their way beside what can still go back, each with its state.
+  await page.locator(".h2-chip", { hasText: "Returns" }).click();
   await page.waitForTimeout(300);
   const squares = await page.locator("#homePage .hl-sq").evaluateAll(xs => xs.map(x => x.getAttribute("aria-label")));
   assert.ok(squares.some(s => /Kick Lane/.test(s) && /Return by/.test(s)), "still returnable: " + JSON.stringify(squares));
@@ -161,13 +158,13 @@ const allErrors = [];
   assert.ok(squares.some(s => /Glow Lab/.test(s) && /Refund not seen yet/.test(s)), "refund not seen: " + JSON.stringify(squares));
   await page.screenshot({ path: SHOTS + "/home-to-return.png" });
   allErrors.push(...errors); await ctx.close();
-  console.log("ok - Home: Needs you leads with the refund not seen yet, then the return on its way with its state; To return shows returns in progress beside what can still go back; nothing asked of the carrier");
+  console.log("ok - Home: In progress leads with the refund not seen yet, then the return on its way with its state and the steps seen; Returns shows returns in progress beside what can still go back; nothing asked of the carrier");
 }
 
 // 2. The receipt's page: the timeline.
 {
   const { ctx, page, errors } = await shopper();
-  await page.locator("#homePage .h2-item", { hasText: "Sent back, on its way to Harlow & Co" }).first().click();
+  await page.locator("#homePage .hx-live", { hasText: "Wool Coat" }).first().click();
   const sh = sheet(page); await sh.locator(".rl-rt").waitFor();
   await page.waitForTimeout(500);
   const steps = await sh.locator(".rl-rt-step").evaluateAll(xs => xs.map(x => [x.classList.contains("done"), x.innerText.replace(/\s+/g, " ").trim()]));
@@ -184,7 +181,7 @@ const allErrors = [];
   assert.equal(st.log.filter(l => /return-parcel/.test(l)).length, 1, "and not again while it stays open (nothing on a timer)");
   await closeTop(page);
   // A refund not seen: what to do.
-  await page.locator("#homePage .h2-item", { hasText: "Refund not seen yet" }).first().click();
+  await page.locator("#homePage .hx-live", { hasText: "Refund not seen yet" }).first().click();
   const s2 = sheet(page); await s2.locator(".rl-rt-nudge").waitFor();
   assert.match(await s2.locator(".rl-rt-nudge").innerText(), new RegExp("Refund not seen yet\\s+Glow Lab had your return on " + shortDay(day(-16)) + ", and Relay hasn't seen a refund email since\\. Contact Glow Lab with your order number, R-1111, and ask when they'll refund you\\."));
   assert.equal(await s2.locator(".rl-rt-nudge a").getAttribute("href"), "https://returns.glowlab.example/help");
@@ -202,7 +199,7 @@ const allErrors = [];
 {
   reset();
   const { ctx, page, errors } = await shopper();
-  const open = async (shop) => { await page.locator("#homePage .hl-sq", { hasText: shop }).first().click(); const sh = sheet(page); await sh.locator(".rl-rt").waitFor(); await page.waitForTimeout(400); return sh; };
+  const open = async (shop) => { await page.locator("#homePage .hx-sq, #homePage .hx-live", { hasText: shop }).first().click(); const sh = sheet(page); await sh.locator(".rl-rt").waitFor(); await page.waitForTimeout(400); return sh; };
   const read = (sh) => sh.locator(".rl-rt-step").evaluateAll(xs => xs.map(x => [x.classList.contains("done"), x.innerText.replace(/\s+/g, " ").trim()]));
   let sh = await open("Fern & Finch");
   assert.deepEqual(await read(sh), [[true, "Return started From Fern & Finch's email, " + shortDay(day(-14))], [true, "Sent back From Royal Mail's email, " + shortDay(day(-12))],
@@ -227,13 +224,13 @@ const allErrors = [];
 {
   reset({ parcel: { available: false } });
   const { ctx, page, errors } = await shopper();
-  await page.locator("#homePage .h2-item", { hasText: "Sent back, on its way to Harlow & Co" }).first().click();
+  await page.locator("#homePage .hx-live", { hasText: "Wool Coat" }).first().click();
   const sh = sheet(page); await sh.locator(".rl-rt").waitFor();
   await sh.locator(".rl-rt-note", { hasText: "Relay can't follow the parcel with Royal Mail just now, so this shows what the emails and you said." }).waitFor();
   allErrors.push(...errors); await ctx.close();
   reset({ parcel: { available: true, reason: "limit" } });
   const b = await shopper();
-  await b.page.locator("#homePage .h2-item", { hasText: "Sent back, on its way to Harlow & Co" }).first().click();
+  await b.page.locator("#homePage .hx-live", { hasText: "Wool Coat" }).first().click();
   await sheet(b.page).locator(".rl-rt-note", { hasText: "Relay can't check with Royal Mail again this month. You can still track it on Royal Mail's website." }).waitFor();
   allErrors.push(...b.errors); await b.ctx.close();
   console.log("ok - when live tracking is off or this month's checks are used up, the page says so plainly");
@@ -243,7 +240,7 @@ const allErrors = [];
 {
   reset();
   const { ctx, page, errors } = await shopper();
-  await page.locator(".h2-chip", { hasText: "To return" }).click(); await page.waitForTimeout(300);
+  await page.locator(".h2-chip", { hasText: "Returns" }).click(); await page.waitForTimeout(300);
   await page.locator("#homePage .hl-sq", { hasText: "Kick Lane" }).click();
   const sh = sheet(page); await sh.locator(".rl-rt").waitFor();
   await sh.locator("button", { hasText: "I've sent it back" }).click();
@@ -279,4 +276,4 @@ const allErrors = [];
 }
 assert.deepEqual(allErrors, [], "no page errors");
 await browser.close(); server.close();
-console.log("PASS return tracking in the app: Home's Needs you and To return, the receipt's timeline with who said so, Refund not seen yet, I've sent it back, live tracking only on opening (stubbed server)");
+console.log("PASS return tracking in the app: Home's In progress and Returns, the receipt's timeline with who said so, Refund not seen yet, I've sent it back, live tracking only on opening (stubbed server)");

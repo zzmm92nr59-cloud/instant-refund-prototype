@@ -66,12 +66,12 @@ async function shopper(email = EMAIL) {
   const page = await ctx.newPage(), errors = []; page.on("pageerror", (e) => errors.push(String(e)));
   await page.goto(origin + "/index.html");
   await homeReady(page);
-  await page.locator("#homePage .h2-sec").first().waitFor();
+  await page.locator("#homePage .h2-sec, #homePage .hx > *").first().waitFor();
   await page.waitForTimeout(600);
   return { ctx, page, errors };
 }
 const sheetText = (page) => page.locator(".rl-sheet").last().innerText();
-const squares = (page, shop) => page.locator("#homePage .hl-sq", { hasText: shop });
+const squares = (page, shop) => page.locator("#homePage .hl-sq, #homePage .hx-sq, #homePage .hx-live", { hasText: shop });
 const openFromHome = async (page, shop) => { await squares(page, shop).first().click(); await page.locator(".rl-sheet").last().waitFor(); await page.waitForTimeout(300); };
 const tall = async (loc, what) => { for (const b of await loc.all()) { if (!(await b.isVisible())) continue; const h = await b.evaluate((e) => e.getBoundingClientRect().height); assert.ok(h >= 44, what + " at least 44px: " + h); } };
 const shot = (page, name) => page.screenshot({ path: SHOTS + "/" + name + ".png" });
