@@ -203,6 +203,8 @@ jobs:
         run: node --import ./scripts/record-app-requests.mjs scripts/test-profile-ui.mjs
       - name: Sending single items of an order back
         run: node --import ./scripts/record-app-requests.mjs scripts/test-item-returns-ui.mjs
+      - name: Sending one item back from an order's page - which items, each item's size, undo
+        run: node --import ./scripts/record-app-requests.mjs scripts/test-item-return-pick-ui.mjs
       - name: Wrapped's story - totals, refunds and the reconnect message
         run: node --import ./scripts/record-app-requests.mjs scripts/test-wrapped-story.mjs
       - name: Words from outside (shop names, item names, links) are shown as text and never run

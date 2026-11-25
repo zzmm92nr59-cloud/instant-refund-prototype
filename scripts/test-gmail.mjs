@@ -278,10 +278,20 @@ assert.ok(JSON.stringify(sqlite.prepare("SELECT details FROM captured_receipts")
   assert.equal((await post(url, alice, { items: [{ index: 9, status: "returning" }] })).status, 400, "no such item");
   assert.equal((await post(url, alice, { items: [{ index: 0, status: "lost" }] })).status, 400, "unknown status");
   assert.equal((await post(url, alice, { items: "x" })).status, 400);
-  assert.equal((await post(url, alice, { items: [{ index: 0, status: "returning" }] })).status, 200);
+  // (25 Nov 2026) The answer carries the receipt as it now stands, so its page can say at once which items are in the
+  // return: the shopper's marks, and the return they started ("You said"), for those items.
+  const marked = await post(url, alice, { items: [{ index: 0, status: "returning" }] });
+  assert.equal(marked.status, 200);
+  { const b = await marked.json();
+    assert.deepEqual([b.ok, b.itemReturns], [true, { 0: "returning" }]);
+    // (This order's return was started by the shop's own email: the shopper's mark says which item it is for.)
+    assert.deepEqual([b.returnTracking.state, b.returnTracking.items, b.returnTracking.itemsFrom], ["started", [0], "you"]); }
   let again = (await (await call("/relay/my/receipts", { token: alice })).json()).receipts.find(x => x.id === card.id);
   assert.deepEqual(again.itemReturns, { 0: "returning" });
-  assert.equal((await post(url, alice, { items: [{ index: 0, status: null }] })).status, 200, "undo");
+  const undone = await post(url, alice, { items: [{ index: 0, status: null }] });
+  assert.equal(undone.status, 200, "undo");
+  { const b = await undone.json();
+    assert.deepEqual([b.ok, b.itemReturns, "items" in b.returnTracking], [true, { 0: "kept" }, false], "taken back: the shop's return is still there, with no item said to be in it"); }
   again = (await (await call("/relay/my/receipts", { token: alice })).json()).receipts.find(x => x.id === card.id);
   assert.deepEqual(again.itemReturns, { 0: "kept" }, "undoing is remembered as the shopper's choice");
   sqlite.prepare("DELETE FROM receipt_item_marks").run();
@@ -455,6 +465,16 @@ assert.equal((await call(`/relay/my/receipts/${noPhoto.id}/image`, { token: alic
   const JPG = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(300, 7)]), url = "data:image/jpeg;base64," + JPG.toString("base64");
   assert.equal((await post(`/relay/my/receipts/${noPhoto.id}/photo`, bob, { image: url })).status, 404, "not someone else's receipt");
   assert.equal((await post(`/relay/my/receipts/${noPhoto.id}/photo`, alice, { image: "data:image/jpeg;base64,AAAA" })).status, 400, "not really a picture");
+  // (25 Nov 2026) Too big is always said as "photo_too_big", which the app explains ("That picture is too big. Try another."):
+  // over 450 KB; between the old cap on the photo field (620,000 characters) and the body's limit (700 KB), which used to
+  // be a plain "invalid_request"; and over the body's limit, which isn't read.
+  { const big = (n) => "data:image/jpeg;base64," + Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(n, 7)]).toString("base64");
+    for (const [kb, why] of [[455, "over 450 KB"], [490, "between the two limits"], [700, "over the body's limit"]]) {
+      const res = await post(`/relay/my/receipts/${noPhoto.id}/photo`, alice, { image: big(kb * 1024) });
+      assert.equal((await res.json()).error, "photo_too_big", why);
+    }
+    assert.ok(big(490 * 1024).length > 620000 && big(490 * 1024).length < 700 * 1024 - 20);
+    assert.equal(JSON.parse(sqlite.prepare("SELECT details FROM captured_receipts WHERE id = ?").get(noPhoto.id).details).ownPhoto, undefined, "nothing kept from a photo that's too big"); }
   assert.equal((await post(`/relay/my/receipts/${noPhoto.id}/photo`, alice, { image: url })).status, 200);
   let d = JSON.parse(sqlite.prepare("SELECT details FROM captured_receipts WHERE id = ?").get(noPhoto.id).details);
   assert.deepEqual([d.ownPhoto, d.hasImage, d.photoIsItem], [true, true, true]);

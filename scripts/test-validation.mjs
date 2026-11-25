@@ -111,6 +111,15 @@ async function signIn(email) {
   assert.equal(r1.response.headers.get("access-control-allow-origin"), "*");
   const r2 = await checkBody(req("/relay/my/profile", { body: JSON.stringify({ photo: "data:image/png;base64," + "A".repeat(320 * 1024) }) }), "/relay/my/profile", cors);
   assert.equal(r2.response.status, 413); assert.deepEqual(await r2.response.json(), { error: "photo_too_big" }, "the profile keeps its own message for a big photo");
+  // Photos of a paper receipt and of what was bought: the photo may fill the whole body the route reads, so a photo that is
+  // too big is never refused here as a plain "invalid_request" (the route says "photo_too_big"); over the body's limit, 413.
+  const RID = "/relay/my/receipts/11111111-1111-4111-8111-111111111111/photo", pic = (n) => "data:image/jpeg;base64," + "A".repeat(n);
+  for (const [path, body, over] of [[RID, { image: pic(690 * 1024) }, { image: pic(720 * 1024) }], ["/relay/my/bank/receipt-photo", { id: "p1", image: pic(1640 * 1024) }, { id: "p1", image: pic(1700 * 1024) }]]) {
+    const ok = await checkBody(req(path, { body: JSON.stringify(body) }), path, cors);
+    assert.ok(ok.request && !ok.response, path + ": a photo just under the body's limit reaches the route");
+    const big = await checkBody(req(path, { body: JSON.stringify(over) }), path, cors);
+    assert.equal(big.response.status, 413); assert.deepEqual(await big.response.json(), { error: "photo_too_big" }, path + ": over the limit is too big, in those words");
+  }
   for (const body of ["[1,2]", "\"text\"", "42", "{not json", "null"]) {
     const r = await checkBody(req("/relay/my/gmail/find", { body }), "/relay/my/gmail/find", cors);
     assert.equal(r.response.status, 400, body); assert.equal((await r.response.json()).error, "invalid_request");

@@ -2908,14 +2908,42 @@ export function itemsForRefund(items, refundPence) {
   // The whole order isn't a per-item answer; the paid items of an order with a free gift are (the gift cost nothing back).
   return found && found.length < priced.length ? found : null;
 }
+// What a set of an order's lines cost together (each line's price times how many); null when any has no price.
+function linesTotal(items, idxs) {
+  let sum = 0;
+  for (const i of idxs) {
+    const it = (items || [])[i];
+    if (!it || !Number.isInteger(it.pricePence)) return null;
+    sum += it.pricePence * (Number(it.qty) > 0 && !it.lineTotal ? Number(it.qty) : 1);
+  }
+  return sum;
+}
+// o.itemReturns: each line the shopper marked ("returning" or "kept"), or, with no marks, the lines a refund's amount
+// fits in exactly one way (itemReturnsFrom "refund").
+// o.refundItems: the lines the shop's refund was for, only when the amounts say so: it equals what the lines the shopper
+// said went back cost, or it fits exactly one set of the order's lines, or it is every line's price together. Otherwise
+// it is left out, and the refund is shown as an amount on the order, not against any item.
 export function attachItemReturns(orders, marks) {
   const byId = new Map();
   for (const m of marks) { const e = byId.get(m.id) || {}; e[m.i] = m.status; byId.set(m.id, e); }
   for (const o of orders) {
     const mine = byId.get(o.id);
-    if (mine) { o.itemReturns = mine; continue; }
-    const rp = o.returnProgress, guess = rp && rp.refundPence != null ? itemsForRefund(o.items, rp.refundPence) : null;
-    if (guess) { o.itemReturns = Object.fromEntries(guess.map(i => [i, "returning"])); o.itemReturnsFrom = "refund"; }
+    const rp = o.returnProgress, pence = rp && Number.isInteger(rp.refundPence) && rp.refundPence > 0 ? rp.refundPence : null;
+    const count = (o.items || []).length, every = Array.from({ length: count }, (_, i) => i);
+    const guess = pence != null ? itemsForRefund(o.items, pence) : null;
+    if (mine) {
+      o.itemReturns = mine;
+      if (pence == null) continue;
+      const going = Object.keys(mine).filter((k) => mine[k] === "returning").map(Number).filter((i) => i < count).sort((a, b) => a - b);
+      if (going.length && linesTotal(o.items, going) === pence) o.refundItems = going;
+      else if (guess) o.refundItems = guess;
+      else if (count > 1 && linesTotal(o.items, every) === pence) o.refundItems = every;
+      continue;
+    }
+    if (guess) {
+      o.itemReturns = Object.fromEntries(guess.map(i => [i, "returning"])); o.itemReturnsFrom = "refund"; o.refundItems = guess;
+      if (o.returnTracking) { o.returnTracking.items = guess.slice(); o.returnTracking.itemsFrom = "refund"; }
+    } else if (pence != null && count > 1 && linesTotal(o.items, every) === pence) o.refundItems = every;
   }
 }
 
@@ -3770,7 +3798,9 @@ export async function handleGmailRoute(request, env, url, cors, shopper, opts) {
     await env.RELAY_DB.batch(list.map(x => x.status
       ? env.RELAY_DB.prepare("INSERT INTO receipt_item_marks (shopper_id, receipt_id, item_index, status, updated_at) VALUES (?,?,?,?,?) ON CONFLICT (shopper_id, receipt_id, item_index) DO UPDATE SET status = excluded.status, updated_at = excluded.updated_at").bind(shopper.id, itm[1], x.index, x.status, now)
       : env.RELAY_DB.prepare("INSERT INTO receipt_item_marks (shopper_id, receipt_id, item_index, status, updated_at) VALUES (?,?,?,'kept',?) ON CONFLICT (shopper_id, receipt_id, item_index) DO UPDATE SET status = 'kept', updated_at = excluded.updated_at").bind(shopper.id, itm[1], x.index, now)));
-    return json({ ok: true }, 200, cors);
+    // The receipt as it now stands, so its page can show at once which items are in the return and where it has got to.
+    const after = (await listReceipts(env, shopper.id, null, { ...ALL, now: opts.now || now })).find((r) => r.id === itm[1] || (r.emailIds || []).includes(itm[1]));
+    return json({ ok: true, itemReturns: (after && after.itemReturns) || null, returnTracking: (after && after.returnTracking) || null }, 200, cors);
   }
   // The shopper says a receipt was a present for someone else (and, if they like, who for), or that it wasn't after all.
   // "Not a gift" is kept as a choice, with no name, so it wins over an earlier choice made on another email of the order.

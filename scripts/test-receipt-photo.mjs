@@ -112,6 +112,13 @@ assert.deepEqual(await (await up(jess, { id: HM, image: "hello" })).json(), { er
 assert.deepEqual(await (await up(jess, { id: HM, image: "data:image/png;base64," + Buffer.alloc(300, 65).toString("base64") })).json(), { error: "bad_photo" }, "says PNG, isn't a picture");
 let r = await up(jess, { id: HM, image: "data:image/jpeg;base64," + jpeg(1150 * 1024).toString("base64") });
 assert.deepEqual([r.status, await r.json()], [413, { error: "photo_too_big" }], "over 1.1 MB once decoded");
+// (25 Nov 2026) A photo between the old cap on the photo field (1,600,000 characters) and the body's limit (1650 KB) was
+// refused as a plain "invalid_request", which the app can only answer with "Couldn't add the photo just now". It's too big,
+// and says so.
+{ const mid = "data:image/jpeg;base64," + jpeg(1210 * 1024).toString("base64");
+  assert.ok(mid.length > 1600000 && JSON.stringify({ id: HM, image: mid }).length < 1650 * 1024, "between the two limits");
+  r = await up(jess, { id: HM, image: mid });
+  assert.deepEqual([r.status, await r.json()], [413, { error: "photo_too_big" }], "between the photo's old cap and the body's limit: still too big, said plainly"); }
 r = await call("/relay/my/bank/receipt-photo", { method: "POST", token: jess, raw: JSON.stringify({ id: HM, image: "data:image/jpeg;base64," + "A".repeat(1700 * 1024) }) });
 assert.deepEqual([r.status, await r.json()], [413, { error: "photo_too_big" }], "a body over the limit isn't read");
 assert.equal(sqlite.prepare("SELECT COUNT(*) AS n FROM captured_receipts").get().n, 0, "nothing made from any of those");

@@ -72,10 +72,13 @@ export function guessCarrier(tn) {
 }
 
 // Does an amount the shop refunded fit this order: its total, one line's price, or one set of its lines?
-function amountFits(pence, o) {
+// going: the lines the shopper said are going back, when they said (their positions in o.items). Then only the order's
+// total or a set of those lines fits: money the size of a line they kept isn't taken to be this return's refund.
+function amountFits(pence, o, going) {
   if (!Number.isInteger(pence) || pence <= 0) return false;
   if (Number.isInteger(o.totalPence) && pence === o.totalPence) return true;
-  const prices = (o.items || []).map((it) => (it && Number.isInteger(it.pricePence) ? it.pricePence * (Number(it.qty) > 0 && !it.lineTotal ? Number(it.qty) : 1) : null)).filter((p) => p != null);
+  const told = going && going.length ? new Set(going) : null;
+  const prices = (o.items || []).map((it, i) => (it && Number.isInteger(it.pricePence) && (!told || told.has(i)) ? it.pricePence * (Number(it.qty) > 0 && !it.lineTotal ? Number(it.qty) : 1) : null)).filter((p) => p != null);
   if (prices.length > 12) return prices.includes(pence);
   for (let mask = 1; mask < (1 << prices.length); mask++) {
     let sum = 0;
@@ -102,7 +105,7 @@ function fromUpdate(u) {
 }
 // Money back seen in the shopper's bank payments: the refund step only, and the weakest word after the shopper's own.
 // `fits` is asked of each receipt whose return is already known. names(text, shop, domain): bank.js namesShop.
-function creditNews(orders, credits, newsOf, names) {
+function creditNews(orders, credits, newsOf, names, goingOf) {
   const out = new Map(), taken = new Map();
   if (!names) return out;
   for (const c of credits || []) {
@@ -115,7 +118,7 @@ function creditNews(orders, credits, newsOf, names) {
       if (c.on < first || c.on < day(o.orderDate) || daysBetween(day(o.orderDate), c.on) > MATCH_DAYS) return false;
       // The shop's own refund email gave an amount: only that amount. Otherwise what the order could refund.
       const said = news.filter((n) => n.stage === "refunded" && n.by !== "bank" && n.amountPence != null);
-      return said.length ? said.some((n) => n.amountPence === c.pence) : amountFits(c.pence, o);
+      return said.length ? said.some((n) => n.amountPence === c.pence) : amountFits(c.pence, o, goingOf ? goingOf(o) : null);
     });
     if (fit.length !== 1) continue;
     taken.set(fit[0], (taken.get(fit[0]) || []).concat([c]));
@@ -233,7 +236,7 @@ export function returnTimeline(o, news, today) {
 // Puts the return timeline on each receipt (o.returnTracking), with returnInTransit and returnReceived beside it.
 // plans: the shops' return emails already on their receipts (o.returnPlan). updates: return_update emails. deliveries:
 // carriers' parcel emails. typed: this shopper's return_tracks rows. tracked: their parcel_tracks rows (Ship24). marks:
-// receipt_item_marks rows ("I'm sending this back").
+// receipt_item_marks rows ("I'm sending this back": { id, i, status, at }, i the line's position on the receipt).
 // credits: money in from the shopper's bank payments (bank.js refundCredits), with names (bank.js namesShop).
 export function attachReturnTracking(orders, { updates = [], deliveries = [], typed = [], tracked = [], marks = [], credits = [], names = null, today }) {
   const idsOf = (o) => o.emailIds || [o.id];
@@ -249,9 +252,12 @@ export function attachReturnTracking(orders, { updates = [], deliveries = [], ty
       if (p.trackingNumber) known.set(String(p.trackingNumber).toUpperCase(), o);
     }
   }
+  // Which lines of each receipt the shopper said are going back (their positions in its items).
+  const going = new Map();
   for (const m of marks) {
     const o = m.status === "returning" && byId.get(m.id);
     if (!o) continue;
+    if (Number.isInteger(m.i) && m.i >= 0) going.set(o, (going.get(o) || []).concat([m.i]));
     if (!own.get(o).some((n) => n.marked)) own.get(o).push({ stage: "started", at: m.at ? new Date(Number(m.at)).toISOString().slice(0, 10) : null, by: "you", via: "app", marked: true });
     opened.add(o);
   }
@@ -291,12 +297,15 @@ export function attachReturnTracking(orders, { updates = [], deliveries = [], ty
     }
   }
   // Money back seen in the bank: only on a receipt whose return is already known.
-  const fromBank = creditNews(orders, credits, (o) => allOf.get(o).filter((n) => n.stage), names);
+  const fromBank = creditNews(orders, credits, (o) => allOf.get(o).filter((n) => n.stage), names, (o) => going.get(o) || null);
   for (const o of orders) {
     const all = allOf.get(o);
     if (fromBank.has(o)) all.push(fromBank.get(o));
     const t = returnTimeline(o, all, today);
     if (!t) continue;
+    // The lines this return is for, when the shopper said: the timeline and its tracking number are about those, not the
+    // rest of the order. Left out when nobody said which (gmail.js attachItemReturns adds a refund's one clear answer).
+    if (going.has(o)) { t.items = [...new Set(going.get(o))].sort((a, b) => a - b); t.itemsFrom = "you"; }
     o.returnTracking = t;
     o.returnInTransit = t.returnInTransit;
     o.returnReceived = t.returnReceived;
