@@ -73,7 +73,7 @@ const words = async (page, sel) => (await page.locator(sel).innerText()).replace
   assert.ok((await words(page, "#view")).includes(bad("shop") + "Northwind"), "Home shows the shop's name exactly as it was written");
   await safe(page, "Home");
   // The order's page: the things, sizes, order number, return wording, and the shop's own return link.
-  await page.locator("#view .h2-feed .hl-grid > *", { hasText: "Northwind" }).first().click();
+  await page.locator("#view .h2-feed .hl-grid > *, #view .h2-feed .hx-sq, #view .h2-feed .hx-live", { hasText: "Northwind" }).first().click();
   const sheet = page.locator(".rl-back .rl-sheet").last(); await sheet.waitFor();
   await sheet.getByText("Cropped Tee").first().waitFor();
   const onSheet = (await sheet.innerText()).replace(/\s+/g, " ");

@@ -52,22 +52,22 @@ async function shopper() {
   const page = await ctx.newPage(), errors = []; page.on("pageerror", (e) => errors.push(String(e)));
   await page.goto(origin + "/index.html");
   await homeReady(page);
-  await page.locator("#homePage .h2-sec").first().waitFor();
+  await page.locator("#homePage .h2-sec, #homePage .hx > *").first().waitFor();
   await page.waitForTimeout(600);
   return { ctx, page, errors };
 }
 const sheetText = (page) => page.locator(".rl-sheet").last().innerText();
-const openFromHome = async (page, shop) => { await page.locator("#homePage .hl-sq", { hasText: shop }).first().click(); await page.locator(".rl-sheet").last().waitFor(); await page.waitForTimeout(300); };
+const openFromHome = async (page, shop) => { await page.locator("#homePage .hl-sq, #homePage .hx-sq, #homePage .hx-live", { hasText: shop }).first().click(); await page.locator(".rl-sheet").last().waitFor(); await page.waitForTimeout(300); };
 
 // 1. Home's names.
 st = { receipts: [TAKEAWAY, PODS, SHORT, PASTED], log: [], reread: (id, j) => j({ error: "x" }, 500) };
 let { ctx, page, errors } = await shopper();
 const home = await page.locator("#homePage").innerText();
 // A multi-item order: how many things and what the whole order came to, never the first item's own price (Connor, 19 Nov 2026).
-const take = await page.locator("#homePage .hl-sq", { hasText: "Just Eat" }).first().innerText();
+const take = await page.locator("#homePage .hl-sq, #homePage .hx-sq, #homePage .hx-live", { hasText: "Just Eat" }).first().innerText();
 assert.match(take, /6 items/, "a six-item order says how many\n" + take); assert.match(take, /£42\.57/, "and the order's total\n" + take);
 assert.ok(!/£6\.99/.test(take), "not the first item's price\n" + take);
-const pods = await page.locator("#homePage .hl-sq", { hasText: "Nespresso" }).first().innerText();
+const pods = await page.locator("#homePage .hl-sq, #homePage .hx-sq, #homePage .hx-live", { hasText: "Nespresso" }).first().innerText();
 assert.match(pods, /3 items/, "no item list: how many the email says\n" + pods); assert.match(pods, /£63\.00/, "and its total");
 console.log("ok - Home: '6 items' and the total for a multi-item order; '3 items' and the total when the email lists none");
 
@@ -140,12 +140,12 @@ const NOLIST = base("66666666-6666-4666-8666-666666666666", "Uber Eats", { merch
 const PAYDAY = base("77777777-7777-4777-8777-777777777777", "Fresh Basket", { totalPence: 9940, items: [], orderDate: day(-2), itemsCheck: { complete: false, itemsPence: 0, expectedPence: null, missingPence: null, orderUpdate: true } });
 st = { receipts: [NOLIST, PAYDAY], log: [], reread: (id, j) => j({ error: "x" }, 500) };
 ({ ctx, page, errors } = await shopper());
-const lotus = await page.locator("#homePage .hl-sq", { hasText: "Lotus Grill" }).first().innerText();
+const lotus = await page.locator("#homePage .hl-sq, #homePage .hx-sq, #homePage .hx-live", { hasText: "Lotus Grill" }).first().innerText();
 assert.match(lotus, /£8\.64/, "Home shows what it comes to after the refund\n" + lotus);
 // Named after the restaurant; the app it came through is the line under it (as the Receipts list says it), never the name.
-const lotusSq = page.locator("#homePage .hl-sq", { hasText: "Lotus Grill" }).first();
-assert.equal(await lotusSq.locator(".hl-sqs").innerText(), "Lotus Grill", "named after the restaurant\n" + lotus);
-assert.equal(await lotusSq.locator(".hl-sqn").innerText(), "Uber Eats", "the app under the restaurant\n" + lotus);
+const lotusSq = page.locator("#homePage .hl-sq, #homePage .hx-sq, #homePage .hx-live", { hasText: "Lotus Grill" }).first();
+assert.equal(await lotusSq.locator(".hx-sq-s").innerText(), "Lotus Grill", "named after the restaurant\n" + lotus);
+assert.match(await lotusSq.locator(".hx-sq-n").innerText(), /^(Ordered on|\d+ items on) Uber Eats$/, "the app under the restaurant (Home, 25 Nov 2026: \"5 items on Uber Eats\")\n" + lotus);
 assert.equal((lotus.match(/Uber Eats/g) || []).length, 1, "the app said once\n" + lotus);
 await openFromHome(page, "Lotus Grill");
 txt = await sheetText(page);

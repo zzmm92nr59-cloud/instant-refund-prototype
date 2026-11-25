@@ -236,7 +236,8 @@ screen("new-bag", "new", async (page, cfg) => { await tabTo(page, "bag"); await 
 screen("new-inboxes", "new", async (page, cfg) => { await tabTo(page, "profile"); await tapPicture(page); await page.locator("#mePage .rl-arow:visible", { hasText: "Inboxes" }).first().click(); await settle(page, 700); await look(page, cfg, "new-inboxes"); });
 
 // The full account.
-const CHIPS = ["For you", "Watching", "To return", "On the way", "Swaps and returns"];
+// (Home's chips since 25 Nov 2026: For you, Watching, Returns and More, which opens a sheet; parcels are in For you.)
+const CHIPS = ["For you", "Watching", "Returns", "More"];
 for (const c of CHIPS) screen("home-" + c.toLowerCase().replace(/\W+/g, "-"), "full", async (page, cfg) => {
   await homeReady(page); const chip = page.locator("#view .h2-chip", { hasText: c }).first();
   if (!(await chip.waitFor({ timeout: 15000 }).then(() => true, () => false))) { problems.push(cfg.name + " home chip missing: " + c); return; }
@@ -274,7 +275,7 @@ for (const [n, t] of RECEIPT_PAGES) screen("receipt-" + n, "full", async (page, 
   await look(page, cfg, "receipt-" + n, { bar: false });
   // From Home (or Receipts' search when Home doesn't show it), its own page.
   await tabTo(page, "profile"); await homeReady(page);
-  const sq = page.locator("#homePage .hl-sq, #homePage .h2-item").filter({ hasText: new RegExp(t) }).first();
+  const sq = page.locator("#homePage .hl-sq, #homePage .h2-item, #homePage .hx-sq, #homePage .hx-live").filter({ hasText: new RegExp(t) }).first();
   if (await sq.count()) { await sq.scrollIntoViewIfNeeded(); await waitOutDoubleTap(page); await sq.click(); await sheet(page).waitFor(); await settle(page, 600); await look(page, cfg, "receipt-" + n + "-page");
     await page.evaluate(() => { const s = [...document.querySelectorAll(".rl-back .rl-sheet")].pop(); if (s) s.scrollTop = s.scrollHeight; }); await settle(page, 300); await look(page, cfg, "receipt-" + n + "-page-end"); }
 });

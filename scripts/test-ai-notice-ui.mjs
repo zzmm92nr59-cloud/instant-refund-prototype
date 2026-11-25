@@ -1,7 +1,7 @@
 // Browser test: the one-time "AI help is now on" notice (worker/ai-choice.js; Connor, 24 Nov 2026: AI on for everyone).
 // Stubbed Relay server, made-up people and shops. Checks:
-//  1. Relay says it's due with the profile (no request of its own on opening the app); Home shows one small card in
-//     "Needs you", nothing floating over the page.
+//  1. Relay says it's due with the profile (no request of its own on opening the app); Home shows it as one line at the
+//     end of For you (the line for what needs you that isn't a purchase), nothing floating over the page.
 //  2. Tapping it (twice, quickly) opens one sheet that says plainly it's on, what's sent, that Anthropic can't train on it
 //     and where to switch it off; Relay is told it's been seen once.
 //  3. Got it closes the sheet and the card is gone; opening Relay again doesn't show it, even if Relay hadn't recorded it
@@ -66,19 +66,19 @@ const measure = (page, scope) => page.evaluate(scope => {
   if (document.documentElement.scrollWidth > innerWidth + 1) out.wide.push(document.documentElement.scrollWidth);
   return out;
 }, scope);
-const card = (page) => page.locator("#homePage .h2-feed .h2-item", { hasText: "AI help is now on" });
+const card = (page) => page.locator("#homePage .h2-feed .hx-needs", { hasText: "AI help is now on" });
 
-// 1. Due: one small card in Needs you.
+// 1. Due: one line on Home, after the purchases.
 let { ctx, page, errors } = await phone();
 await page.reload(); await homeShows(page, "JT");
 await card(page).waitFor();
 assert.equal(await card(page).count(), 1, "one card");
 assert.match(await card(page).innerText(), /What it does, and how to switch it off/);
-assert.equal(await page.locator("#homePage .h2-feed h2", { hasText: "Needs you" }).count(), 1, "in Needs you");
+assert.equal(await page.evaluate(() => { const n = document.querySelector("#homePage .hx-needs"), last = [...document.querySelectorAll("#homePage .hx-sq, #homePage .hx-live")].pop(); return Boolean(last && (last.compareDocumentPosition(n) & Node.DOCUMENT_POSITION_FOLLOWING)); }), true, "after the purchases");
 assert.ok(!st.log.some(x => /ai-notice|ai-reading|item-kinds/.test(x)), "opening the app asks nothing extra for it: " + st.log.filter(x => /ai/.test(x)).join(", "));
 assert.equal(await page.evaluate(() => [...document.querySelectorAll("body > *")].filter(e => /ai help is now on/i.test(e.textContent || "") && getComputedStyle(e).position === "fixed").length), 0, "nothing floating");
 await page.screenshot({ path: SHOTS + "/notice-home-after.png" });
-console.log("ok - due with the profile: one small card in Needs you, nothing extra asked, nothing floating");
+console.log("ok - due with the profile: one line on Home after the purchases, nothing extra asked, nothing floating");
 
 // 2. Tapped twice quickly: one sheet, Relay told once.
 // Two taps in a row on the card itself (a quick second tap would otherwise land on the sheet's backdrop).

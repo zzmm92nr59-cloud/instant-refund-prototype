@@ -12736,7 +12736,8 @@
     }
     if (rt) return { t: "Refunded", k: "good" };
     // A return of an order from a shop on Relay, or one Relay learned of from the shop's emails without the steps.
-    if (/^Return started/.test(l) || /^Sent back/.test(l) || /^Back at the shop/.test(l)) return { t: /^Sent back/.test(l) ? "Sent back" : /^Back at/.test(l) ? "At the shop" : "Sending back", k: "info", rank: 2, next: /waiting for the refund/.test(l) ? "Next: your refund" : "" };
+    // (Said as the shop or Relay knows it: "Return started" when nothing says it has been posted yet.)
+    if (/^Return started/.test(l) || /^Sent back/.test(l) || /^Back at the shop/.test(l)) return { t: /^Sent back/.test(l) ? "Sent back" : /^Back at/.test(l) ? "At the shop" : "Return started", k: "info", rank: 2, next: /^Back at/.test(l) ? "Next: your refund" : "" };
     if (t === "Refunded" || /^Refunded/.test(l)) return { t: "Refunded", k: "good" };
     if (e.onWay) {
       // A parcel: the order (seen: it's what this is), sent (any word from the shop or carrier but an expected day), with you.
@@ -12748,9 +12749,15 @@
     if (e.toReturn && e.when) return { t: "Return by " + dayWords(e.when), k: "" };
     return null;
   }
-  // What it is, under the shop's name: never the shop again; for a takeaway the app it was ordered on, said as that; for a
+  // What it is, under the shop's name: never the shop again; for a takeaway how many things and the app it was ordered on
+  // ("5 items on Just Eat", never "Just Eat, 5 items"); for a
   // return of part of an order, the part going back.
-  function nowWhat(e, live) { return live && e.going ? e.going : e.via ? "Ordered on " + e.via : cleanName(e.title, e.shop) || (e.count > 1 ? e.count + " items" : ""); }
+  // (Several things: how many, as everywhere on Home, never the first one's name: Connor, 19 Nov 2026.)
+  function nowWhat(e, live) {
+    if (live && e.going) return e.going;
+    if (e.via) return (e.count > 1 ? e.count + " items on " : "Ordered on ") + e.via;
+    return e.count > 1 ? e.count + " items" : cleanName(e.title, e.shop);
+  }
   function nowPic(e) {
     var box = el("span", { className: "hx-pic" }), art = el("span", { className: "h2-art" }); art.setAttribute("aria-hidden", "true"); box.appendChild(art);
     if (e.via) illustrate(art, { items: [{ name: (e.tiles && e.tiles[0] && e.tiles[0].name) || e.title || "" }], retailer: { name: e.shop }, category: e.cat }, 96);

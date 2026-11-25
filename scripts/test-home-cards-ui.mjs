@@ -1,8 +1,9 @@
 // Browser test: what a Home card says, and "View receipt" after Profile was opened. Stubbed Relay server, made-up person,
 // invented shops and restaurants. Nothing here proves a real phone.
 // Checks: a takeaway of several dishes ordered through an app shows the restaurant, how many things and what the whole
-// order came to (never the first dish and its own price: Connor, 19 Nov 2026), with the app first ("Just Eat, 5 items");
-// one with no dishes listed shows the app under the restaurant, never "Order from" it again; a single thing keeps its name and price;
+// order came to (never the first dish and its own price: Connor, 19 Nov 2026), and the app it came through ("5 items on
+// Just Eat": Home's For you, 25 Nov 2026); one with no dishes listed shows the app under the restaurant ("Ordered on Uber
+// Eats"), never "Order from" it again; a single thing keeps its name and price;
 // after Profile has been opened and left, a receipt opened from Home still opens its email with "View receipt".
 import assert from "node:assert/strict";
 import { createRequire } from "node:module"; import { createServer } from "node:http"; import { readFile, mkdir } from "node:fs/promises"; import { resolve, extname } from "node:path";
@@ -53,24 +54,24 @@ await page.reload();
 await homeReady(page);
 
 // 1. The takeaway: the restaurant, how many dishes, the whole order's total.
-const take = page.locator("#homePage .hl-sq", { hasText: "Golden Lantern" });
+const take = page.locator("#homePage .hx-sq", { hasText: "Golden Lantern" });
 await take.waitFor();
-assert.equal(await take.locator(".hl-sqn").innerText(), "Just Eat, 5 items");
-assert.equal(await take.locator(".hl-sqp").innerText(), "£26.45");
+assert.equal(await take.locator(".hx-sq-n").innerText(), "5 items on Just Eat");
+assert.equal(await take.locator(".hx-sq-p").innerText(), "£26.45");
 assert.ok(!/Crispy Chilli Beef|£7\.90/.test(await take.innerText()), "not the first dish and its own price");
 // One thing: its own name and price.
-const one = page.locator("#homePage .hl-sq", { hasText: "Fern & Finch" });
-assert.equal(await one.locator(".hl-sqn").innerText(), "Ribbed Knit Scarf");
-assert.equal(await one.locator(".hl-sqp").innerText(), "£42.00");
+const one = page.locator("#homePage .hx-sq", { hasText: "Fern & Finch" });
+assert.equal(await one.locator(".hx-sq-n").innerText(), "Ribbed Knit Scarf");
+assert.equal(await one.locator(".hx-sq-p").innerText(), "£42.00");
 // A takeaway with no dishes listed: the restaurant, then the app it came through, never the restaurant again.
-const bare = page.locator("#homePage .hl-sq", { hasText: "Saffron Corner (Bow)" });
-assert.equal(await bare.locator(".hl-sqs").innerText(), "Saffron Corner (Bow)");
-assert.equal(await bare.locator(".hl-sqn").innerText(), "Uber Eats");
+const bare = page.locator("#homePage .hx-sq", { hasText: "Saffron Corner (Bow)" });
+assert.equal(await bare.locator(".hx-sq-s").innerText(), "Saffron Corner (Bow)");
+assert.equal(await bare.locator(".hx-sq-n").innerText(), "Ordered on Uber Eats");
 assert.ok(!/Order from/i.test(await bare.innerText()), "no 'Order from' line under the restaurant");
 // And no card's second line is only its title again.
-for (const sq of await page.locator("#homePage .hl-sq").all()) {
+for (const sq of await page.locator("#homePage .hx-sq").all()) {
   const key = (t) => t.toLowerCase().replace(/^(?:your\s+)?order\s+from\s+/, "").replace(/[^a-z0-9]+/g, "");
-  const t = await sq.locator(".hl-sqs").innerText(), n = await sq.locator(".hl-sqn").count() ? await sq.locator(".hl-sqn").innerText() : "";
+  const t = await sq.locator(".hx-sq-s").innerText(), n = await sq.locator(".hx-sq-n").count() ? await sq.locator(".hx-sq-n").innerText() : "";
   assert.ok(!n || !key(t).startsWith(key(n)), "second line repeats the title: " + t + " / " + n);
 }
 await page.screenshot({ path: "/tmp/shots/home-cards.png" });

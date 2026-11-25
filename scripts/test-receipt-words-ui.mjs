@@ -210,7 +210,7 @@ console.log("ok - Receipts: each row's title (the business), 'and N more', total
 await page.evaluate(() => window.go("profile"));
 await homeReady(page); await page.waitForTimeout(400);
 for (const r of NEWEST.receipts.filter((x) => (x.kind || "receipt") === "receipt")) {
-  const sq = page.locator("#homePage .hl-sq", { hasText: bizOf(r) }).first();
+  const sq = page.locator("#homePage .hl-sq, #homePage .hx-sq, #homePage .hx-live", { hasText: bizOf(r) }).first();
   if (!(await sq.count())) continue;
   await sq.scrollIntoViewIfNeeded(); await sq.click();
   const sheet = page.locator(".rl-back .rl-sheet").last(); await sheet.waitFor(); await page.waitForTimeout(300);

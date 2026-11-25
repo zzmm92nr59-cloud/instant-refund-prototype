@@ -201,38 +201,41 @@ console.log("ok - Home's cards show the return date, the last week's days left (
 // With nothing chosen, Home is Wallet (Connor's pick, 15 Nov).
 await page.evaluate(() => { localStorage.removeItem("relay-home-look"); window.go("receipts"); });
 await page.evaluate(() => window.go("profile"));
-await page.locator("#homePage .hl-sq").first().waitFor();
+await page.locator("#homePage .hx-sq").first().waitFor();
 assert.equal(await page.locator("#homePage .h2-feed > .h2-item:not(.small)").count(), 0, "no big cards by default");
 // Today was taken away (Connor, 17 Nov 2026): a phone that had it shows Wallet.
 for (const look of ["today", "wallet"]) {
   await page.evaluate(l => { localStorage.setItem("relay-home-look", l); window.go("receipts"); }, look);
   await page.evaluate(() => window.go("profile"));
   if (look === "today") {
-    await page.locator(".hl-sq").first().waitFor();
+    await page.locator(".hx-sq").first().waitFor();
     assert.equal(await page.locator(".hl-row").count(), 0, "no Today rows: a phone that had Today shows Wallet");
     continue;
   } else {
-    await page.locator(".hl-sq").first().waitFor();
-    // (Each part of Home has its own grid, so the two squares are looked for in one with two or more.)
-    const g = await page.evaluate(() => { const grid = [...document.querySelectorAll(".hl-grid")].find(x => x.querySelectorAll(".hl-sqpic").length >= 2); const a = [...grid.querySelectorAll(".hl-sqpic")].map(x => x.getBoundingClientRect()); return { w: a[0].width, h: a[0].height, row: Math.abs(a[0].top - a[1].top) < 1 }; });
-    assert.ok(g.w > 150 && Math.abs(g.w - g.h) < 1 && g.row, "two big squares a row: " + JSON.stringify(g));
-    assert.ok(await page.locator(".hl-tag").count() >= 1, "a label on what needs something");
+    await page.locator(".hx-sq").first().waitFor();
+    // Home's For you (Connor, 25 Nov 2026): In progress, then a shelf of 140px squares (rule 16), a label on what has a date.
+    assert.deepEqual(await page.locator("#homePage .hx > .hx-h").allInnerTexts(), ["In progress", "Recent"]);
+    const g = await page.locator("#homePage .hx-shelf .hx-pic").evaluateAll(ps => ps.map(p => { const r = p.getBoundingClientRect(); return [Math.round(r.width), Math.round(r.height), Math.round(r.top)]; }));
+    assert.ok(g.length >= 2 && g.every(x => x[0] === 140 && x[1] === 140 && x[2] === g[0][2]), "140px squares side by side: " + JSON.stringify(g));
+    assert.ok(await page.locator(".hx-sq .hx-tag").count() >= 1, "a label on what has a return date");
     // Under each square, the product as a person would say it, never the shop's name twice (Connor, 17 Nov 2026).
-    const caps = await page.locator(".hl-sq").evaluateAll(b => b.map(x => [x.querySelector(".hl-sqs")?.textContent, x.querySelector(".hl-sqn")?.textContent || null]));
+    const caps = await page.locator(".hx-sq").evaluateAll(b => b.map(x => [x.querySelector(".hx-sq-s")?.textContent, x.querySelector(".hx-sq-n")?.textContent || null]));
     assert.ok(caps.every(([shop, name]) => !name || name.toLowerCase() !== String(shop).toLowerCase()), "no shop name twice: " + JSON.stringify(caps));
     assert.deepEqual(await page.evaluate(() => [window.relayCleanName("lululemon Align™ High-Rise Pant", "lululemon"), window.relayCleanName("Nespresso", "Nespresso"),
       window.relayCleanName("W Restfeel Slide TOPK/TOPK/SODA", "lululemon"), window.relayCleanName("iPhone 15 Case", "Apple")]), ["Align High-Rise Pant", "", "W Restfeel Slide", "iPhone 15 Case"]);
-    // The top row: what's on Home, then the rest of Relay, scrolled sideways.
-    const chipNames = await page.locator("#view .h2-chip").allInnerTexts();
-    assert.deepEqual(chipNames.slice(0, 2), ["For you", "Watching"]);
-    for (const c of ["Swap & resell", "Auctions", "Shops on Relay", "Wrapped"]) assert.ok(chipNames.includes(c), c + " is on the top row");
-    assert.equal(await page.locator("#view .h2-chips").evaluate(n => getComputedStyle(n).overflowX), "auto", "scrolls sideways");
+    // The top row: what's on Home, then More with the rest of Relay; every chip whole on the phone (never cut mid-word).
+    assert.deepEqual(await page.locator("#view .h2-chip").allInnerTexts(), ["For you", "Watching", "Returns", "More"]);
+    assert.deepEqual(await page.evaluate(() => [...document.querySelectorAll("#view .h2-chip")].filter(c => c.getBoundingClientRect().right > innerWidth).map(c => c.innerText)), [], "no chip off the edge");
+    await page.locator("#view .h2-chip", { hasText: "More" }).click();
+    for (const c of ["Swap & resell", "Auctions", "Shops on Relay", "Wrapped"]) await page.locator(".rl-back .rl-sheet .rl-arow", { hasText: c }).waitFor();
+    await page.locator(".rl-back").last().click({ position: { x: 20, y: 20 } }); await page.locator(".rl-back").waitFor({ state: "detached" }); await page.waitForTimeout(450);
     await page.locator("#view .h2-chip", { hasText: "Watching" }).click();
     await page.getByText("Nothing watched yet.", { exact: false }).waitFor();
-    await page.locator("#view .h2-chip", { hasText: "For you" }).click(); await page.locator(".hl-sq").first().waitFor();
-    // Wrapped on Home plays this year's story straight away, not a page first (Connor, 18 Nov 2026).
+    await page.locator("#view .h2-chip", { hasText: "For you" }).click(); await page.locator(".hx-sq").first().waitFor();
+    // Wrapped on Home (More) plays this year's story straight away, not a page first (Connor, 18 Nov 2026).
     await page.waitForTimeout(450);
-    await page.locator("#view .h2-chip", { hasText: "Wrapped" }).click();
+    await page.locator("#view .h2-chip", { hasText: "More" }).click();
+    await page.locator(".rl-back .rl-sheet .rl-arow", { hasText: "Wrapped" }).click();
     await page.locator(".rl-story[role=dialog]").waitFor();
     assert.notEqual(await page.evaluate(() => window.page), "wrapped", "no page in between");
     await page.locator(".rl-story-x").click(); await page.locator(".rl-story").waitFor({ state: "detached" });
@@ -242,11 +245,11 @@ for (const look of ["today", "wallet"]) {
   assert.equal(await page.locator("#homePage .h2-feed", { hasText: "Original Pods" }).count(), 0, look + ": not when it's older than a week");
   await page.evaluate(() => window.scrollTo(0, 0)); await page.waitForTimeout(300);
   await polished("home " + look, "#view");
-  await page.locator(look === "today" ? ".hl-row" : ".hl-sq").first().click();
+  await page.locator(".hx-sq").first().click();
   await page.locator(".rl-sheet").last().waitFor(); await page.waitForTimeout(450); await page.locator(".rl-back").last().click({ position: { x: 20, y: 20 } }); await page.locator(".rl-back").waitFor({ state: "detached" });
 }
 await page.evaluate(() => localStorage.setItem("relay-home-look", "cards"));
-console.log("ok - Home's other layouts: Today is gone (it shows Wallet) and Wallet (two big squares a row, labels), polished, each opens its page");
+console.log("ok - Home's other layouts: Today is gone (it shows For you), and For you (In progress, then a shelf of 140px squares with labels), four whole chips with More, polished, each opens its page");
 
 // 3. From Home: All receipts, the bell (how many things are watched) and, through Receipts and Browse, Returns & swaps and
 //    Wrapped, each open their page. (The four tiles under the old wallet are gone; these are where each now lives.)

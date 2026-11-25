@@ -239,10 +239,13 @@ process.on("exit", () => { if (REPORT) console.log(JSON.stringify(results, null,
   assert.equal(await page.evaluate(() => document.body.style.overflow), "", "a receipt's page leaves the page scrollable");
   await page.evaluate(() => window.tabTap("profile")); await homeDrawn(page, "Home after a receipt's page");
   // Wrapped, from Home's chip.
+  // (Wrapped is in Home's More sheet, 25 Nov 2026: timed from its tap there, as it was from its chip.)
   await waitOutDoubleTap(page);
+  await page.locator("#view .h2-chip", { hasText: "More" }).first().click();
+  const wrappedRow = page.locator(".rl-back .rl-sheet .rl-arow", { hasText: "Wrapped" }); await wrappedRow.waitFor();
   mark = Date.now();
   const w0 = await page.evaluate(() => performance.now());
-  await page.locator("#view .h2-chip-go", { hasText: "Wrapped" }).first().click();
+  await wrappedRow.click();
   await page.locator(".rl-story").first().waitFor({ timeout: 20000 });
   await page.locator(".rl-story .rl-story-slide").first().waitFor({ timeout: 20000 });
   const w1 = await nextFrame(page);
@@ -254,7 +257,8 @@ process.on("exit", () => { if (REPORT) console.log(JSON.stringify(results, null,
   await homeDrawn(page, "Home after Wrapped");
   // Wrapped left by the phone's back (the swipe from the edge) instead of its cross.
   await waitOutDoubleTap(page);
-  await page.locator("#view .h2-chip-go", { hasText: "Wrapped" }).first().click();
+  await page.locator("#view .h2-chip", { hasText: "More" }).first().click();
+  await page.locator(".rl-back .rl-sheet .rl-arow", { hasText: "Wrapped" }).click();
   await page.locator(".rl-story .rl-story-slide").first().waitFor({ timeout: 20000 });
   await page.waitForTimeout(600); // as long as a person takes to decide to go back
   await page.goBack().catch(() => {}); await page.waitForTimeout(500);
@@ -312,7 +316,7 @@ process.on("exit", () => { if (REPORT) console.log(JSON.stringify(results, null,
   await homeDrawn(page, "Home after forwarding a receipt to Relay");
   // Every sheet Home opens, then closed: Home is still there, and scrolls.
   await waitOutDoubleTap(page);
-  await page.locator("#homePage .h2-feed .h2-item, #homePage .hl-grid > *").first().click();
+  await page.locator("#homePage .h2-feed .h2-item, #homePage .hl-grid > *, #homePage .hx-live, #homePage .hx-sq").first().click();
   await page.locator(".rl-back .rl-sheet").last().waitFor();
   await page.locator(".rl-back").last().click({ position: { x: 10, y: 10 } }); await page.waitForTimeout(400);
   await homeDrawn(page, "Home after closing a card's sheet");
@@ -323,7 +327,7 @@ process.on("exit", () => { if (REPORT) console.log(JSON.stringify(results, null,
   // (Connor, 18 Nov 2026: "after I sent the email it went back to Home and was frozen on a blank page for ages"): Home's
   // cards are there at once, and Relay's new answer is drawn when it comes.
   await waitOutDoubleTap(page);
-  await page.locator("#homePage .hl-grid > *").filter({ hasText: "On its way" }).filter({ hasText: "Kick Lane" }).first().click();
+  await page.locator("#homePage .hl-grid > *, #homePage .hx-live").filter({ hasText: "On its way" }).filter({ hasText: "Kick Lane" }).first().click();
   const sheet = page.locator(".rl-back .rl-sheet").last(); await sheet.waitFor();
   await sheet.locator(".rl-rc-ask button", { hasText: "No" }).first().click();
   await page.locator(".rl-sheet[role=alertdialog] button", { hasText: "Some details are wrong" }).click();

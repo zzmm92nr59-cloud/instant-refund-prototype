@@ -135,14 +135,14 @@ assert.match(squares[0], /^East Ocean/, "Recent: newest first");
 assert.ok(squares.some(s => /^Harlow & Co\. Wool Coat\. £120\.00\. Refunded$/.test(s)), "a finished return is a purchase with its outcome");
 // The takeaway: the restaurant, the app it came through said plainly, a drawing (not the app's logo).
 const eo = page.locator("#homePage .hx-sq", { hasText: "East Ocean" });
-assert.equal(await eo.locator(".hx-sq-n").innerText(), "Ordered on Just Eat");
+assert.equal(await eo.locator(".hx-sq-n").innerText(), "7 items on Just Eat");
 assert.equal(await eo.locator("img.rl-logo-img").count(), 0, "never the delivery app's logo over the restaurant");
 // Rule 16: 140px squares; a photo fills its square; a logo sits whole on white.
 const sizes = await page.locator("#homePage .hx-pic").evaluateAll(ps => [...new Set(ps.map(p => Math.round(p.getBoundingClientRect().width) + "x" + Math.round(p.getBoundingClientRect().height)))]);
 assert.deepEqual(sizes, ["140x140"]);
 const photo = await page.locator("#homePage .hx-live", { hasText: "Align" }).locator(".h2-art img").evaluate(i => { const a = i.getBoundingClientRect(), b = i.closest(".hx-pic").getBoundingClientRect(); return [Math.round(a.width - b.width), Math.round(a.height - b.height), getComputedStyle(i).objectFit]; });
 assert.deepEqual(photo, [0, 0, "cover"], "the photo fills its square");
-const logo = page.locator("#homePage .hx-sq", { hasText: "Define Jacket" }).locator("img.rl-logo-img");
+const logo = page.locator("#homePage .hx-sq", { hasText: "£176.00" }).locator("img.rl-logo-img");
 await logo.waitFor();
 const lg = await logo.evaluate(i => { const a = i.getBoundingClientRect(), b = i.closest(".hx-pic").getBoundingClientRect(); return { inside: a.left >= b.left && a.right <= b.right && a.top >= b.top && a.bottom <= b.bottom, fit: getComputedStyle(i).objectFit, back: getComputedStyle(i.parentElement).backgroundColor }; });
 assert.deepEqual(lg, { inside: true, fit: "contain", back: "rgb(255, 255, 255)" }, "the logo whole, on white");

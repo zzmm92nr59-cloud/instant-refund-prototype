@@ -320,8 +320,8 @@ console.log("ok - an offered question is sent once; the heading opens Receipts; 
   await page.locator("#foot button").first().waitFor();
   await page.locator(".h2-feed .h2-pic").first().waitFor();
   assert.equal(await page.evaluate(() => [...document.querySelectorAll(".h2-feed img")].filter(i => i.complete && i.naturalWidth).length), 0, "the page is drawn before any picture has arrived");
-  // "To return" lists every one of them (For you stops at eight cards).
-  await page.locator(".h2-chip", { hasText: "To return" }).click();
+  // "Returns" lists every one of them (For you stops at eight cards).
+  await page.locator(".h2-chip", { hasText: "Returns" }).click();
   await page.waitForFunction(() => { const all = [...document.querySelectorAll(".h2-feed .h2-pic img")]; return all.length >= 11 && all.every(i => i.complete && i.naturalWidth) && document.querySelectorAll(".h2-feed .h2-logo.rl-has-logo").length >= 7; }, null, { timeout: 30000 });
   await page.waitForTimeout(700); // the shop with no logo has had its answer too, and has its drawing
   // The pinned top row and the tab bar are put aside for this part, so nothing lies over a tile's middle.
@@ -378,7 +378,7 @@ console.log("ok - an offered question is sent once; the heading opens Receipts; 
   // receipt's own page do (Connor, 24 Nov 2026: On's three-item receipt showed a grey bag though Relay has On's logo).
   // Each square's picture: the item's photo, else the shop's logo, else a drawing only when there's no logo.
   { await page.goto(origin + "/index.html?home=wallet");
-    await page.locator(".h2-chip", { hasText: "To return" }).click();
+    await page.locator(".h2-chip", { hasText: "Returns" }).click();
     await page.locator(".h2-feed .hl-sq").first().waitFor();
     await page.waitForFunction(() => [...document.querySelectorAll(".h2-feed .hl-sqpic img")].length >= 7 && [...document.querySelectorAll(".h2-feed .hl-sqpic img")].every(i => i.complete && i.naturalWidth), null, { timeout: 30000 });
     await page.waitForTimeout(700);

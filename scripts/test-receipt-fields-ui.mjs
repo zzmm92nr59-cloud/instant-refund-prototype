@@ -86,13 +86,13 @@ await ctx.route("https://**/*", async (route) => {
 const page = await ctx.newPage(), errors = []; page.on("pageerror", (e) => errors.push(String(e)));
 await page.goto(origin + "/index.html");
 await homeReady(page);
-await page.locator("#homePage .h2-sec").first().waitFor();
+await page.locator("#homePage .h2-sec, #homePage .hx > *").first().waitFor();
 await page.waitForTimeout(600);
 if (SHOTS) await page.screenshot({ path: join(SHOTS, "0-home.png") });
 
 const sheet = () => page.locator(".rl-sheet").last();
 async function openFromHome(shop, shot) {
-  await page.locator("#homePage .hl-sq", { hasText: shop }).first().click(); await sheet().waitFor(); await page.waitForTimeout(400);
+  await page.locator("#homePage .hl-sq, #homePage .hx-sq, #homePage .hx-live", { hasText: shop }).first().click(); await sheet().waitFor(); await page.waitForTimeout(400);
   const t = await sheet().innerText();
   if (SHOTS && shot) {
     // The part of the page that says it, in view.
@@ -105,7 +105,7 @@ async function shut() { const b = page.locator(".rl-back").last(); await b.click
 const noDots = (t, what) => assert.ok(!/ · /.test(t), what + ": no facts glued with dots\n" + t);
 
 // 1. Paid at the hotel.
-const hotelSq = await page.locator("#homePage .hl-sq", { hasText: "Harbour View Hotel" }).first().innerText();
+const hotelSq = await page.locator("#homePage .hl-sq, #homePage .hx-sq, #homePage .hx-live", { hasText: "Harbour View Hotel" }).first().innerText();
 assert.match(hotelSq, /£240\.00 to pay/, "Home doesn't show the stay as paid\n" + hotelSq);
 let t = await openFromHome("Harbour View Hotel", "1-pay-at-hotel.png");
 assert.match(t, /Nothing has been paid yet\. You pay £240\.00 at the hotel, as the booking email says\./, t);
@@ -136,7 +136,7 @@ console.log("ok - the shop's own total beside what PayPal took");
 // 4. A free gift.
 t = await openFromHome("Glow Lab", "4-free-gift.png");
 assert.match(t, /Mini Cleanser Trial Set\s+Free gift/, t); assert.ok(!t.includes("£0.00"), "never £0.00\n" + t);
-const giftSq = await page.locator("#homePage .hl-sq", { hasText: "Glow Lab" }).first().innerText();
+const giftSq = await page.locator("#homePage .hl-sq, #homePage .hx-sq, #homePage .hx-live", { hasText: "Glow Lab" }).first().innerText();
 assert.ok(!giftSq.includes("£0.00"), "Home: never £0.00\n" + giftSq);
 await shut();
 console.log("ok - a free gift says 'Free gift', never £0.00");

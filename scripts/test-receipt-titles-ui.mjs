@@ -67,11 +67,11 @@ await ctx.route("https://**/*", async (route) => {
 const page = await ctx.newPage(), errors = []; page.on("pageerror", (e) => errors.push(String(e)));
 await page.goto(origin + "/index.html");
 await homeReady(page);
-await page.locator("#homePage .h2-sec").first().waitFor();
+await page.locator("#homePage .h2-sec, #homePage .hx > *").first().waitFor();
 await page.waitForTimeout(600);
 
 // 5 (first, as the app opens on Home). The same business on Home, and no return line for the digital ones.
-const homeSq = page.locator("#homePage .hl-sq");
+const homeSq = page.locator("#homePage .hl-sq, #homePage .hx-sq, #homePage .hx-live");
 for (const name of ["Golden Lantern", "Harbour Grill"]) assert.ok(await homeSq.filter({ hasText: name }).count(), "Home names the restaurant " + name);
 const homeText = await page.locator("#homePage").innerText();
 assert.ok(!/Return to (Apple|Puzzle Pals)|Puzzle Pals[^\n]*Return by|Return today/.test(homeText), "no return line for game coins on Home\n" + homeText);
@@ -149,7 +149,7 @@ await page.evaluate(() => { const a = document.activeElement; if (a && a.blur) a
 console.log("ok - search finds receipts by item, restaurant and game");
 
 // The receipt's page from Home names the same business.
-await goTab(page, "Home"); await page.locator("#homePage .hl-sq").first().waitFor();
+await goTab(page, "Home"); await page.locator("#homePage .hl-sq, #homePage .hx-sq, #homePage .hx-live").first().waitFor();
 await homeSq.filter({ hasText: "Golden Lantern" }).first().click();
 const sheet = page.locator(".rl-sheet").last(); await sheet.waitFor(); await page.waitForTimeout(300);
 assert.equal(await sheet.locator(".rl-dt-name h2").innerText(), "Golden Lantern");
