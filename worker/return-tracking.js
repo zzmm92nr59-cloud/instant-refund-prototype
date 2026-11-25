@@ -117,7 +117,7 @@ function creditNews(orders, credits, newsOf, names, goingOf) {
       const first = news.map((n) => n.at).filter(Boolean).sort()[0] || day(o.orderDate);
       if (c.on < first || c.on < day(o.orderDate) || daysBetween(day(o.orderDate), c.on) > MATCH_DAYS) return false;
       // The shop's own refund email gave an amount: only that amount. Otherwise what the order could refund.
-      const said = news.filter((n) => n.stage === "refunded" && n.by !== "bank" && n.amountPence != null);
+      const said = news.filter((n) => (n.stage === "refunded" || n.stage === "refunding") && n.by !== "bank" && n.amountPence != null);
       return said.length ? said.some((n) => n.amountPence === c.pence) : amountFits(c.pence, o, goingOf ? goingOf(o) : null);
     });
     if (fit.length !== 1) continue;
@@ -140,9 +140,18 @@ function fromDelivery(d) {
 
 // Puts each email's news on the one receipt it belongs to (or on none). orders: this shopper's receipts (merged, so an
 // order's emails share one card). Returns Map(order → [news]).
-export function matchReturnNews(orders, news, known, opened) {
+// since: for each known number, the day that return started (the shop's return email, or the day the shopper said they
+// sent it). typedOnly: the numbers only the shopper gave (review, 25 Nov 2026). A number the shopper typed used to make any
+// carrier news about that number "the carrier's word" on this return: the number of a parcel that was delivered TO them
+// showed "Received by the shop". Now, for a number only the shopper gave:
+//  * a carrier's ordinary parcel email (delivered, out for delivery) is never this return's: it doesn't say where the
+//    parcel was going;
+//  * a carrier's or shop's email about a RETURN with that number counts when it is dated on or after the day the shopper
+//    said they sent it and names no other shop or order; from then on the number is the return's, for later news too.
+// And for every known number, news dated before the return started is not about the return.
+export function matchReturnNews(orders, news, known, opened, since = new Map(), typedOnly = new Set()) {
   const out = new Map(orders.map((o) => [o, []]));
-  const add = (o, n) => { out.get(o).push(n); if (n.tn && !known.has(n.tn)) known.set(n.tn, o); };
+  const add = (o, n) => { out.get(o).push(n); if (n.tn && !known.has(n.tn)) known.set(n.tn, o); if (n.tn && !n.onlyByNumber) typedOnly.delete(n.tn); };
   const within = (n, o) => n.at && o.orderDate && n.at >= o.orderDate && daysBetween(o.orderDate, n.at) <= MATCH_DAYS;
   const shopFits = (n, o) => (n.shopKey ? n.shopKey === storeKey(o) : n.shopNamed ? nameFits(n.shopNamed, o) : false);
   // (Only the receipts that could fit are checked, by the same rules: those with the number the news names, or of the shop
@@ -151,7 +160,15 @@ export function matchReturnNews(orders, news, known, opened) {
   const withRef = (ref) => { byRef = byRef || indexBy(orders, (o) => (o.orderRef ? [String(o.orderRef).toUpperCase()] : [])); return among(byRef, [ref]); };
   const ofShop = (n) => { if (!n.shopKey) return orders; byShop = byShop || indexBy(orders, (o) => [storeKey(o)]); return among(byShop, [n.shopKey]); };
   const pick = (n) => {
-    if (n.tn && known.has(n.tn)) return known.get(n.tn);
+    if (n.tn && known.has(n.tn)) {
+      const o = known.get(n.tn), from = since.get(n.tn);
+      if (from && (!n.at || n.at < from)) return null;
+      if (!typedOnly.has(n.tn)) return o;
+      if (n.onlyByNumber) return undefined;     // wait: a later pass may learn the number is the return's
+      if (n.shopKey ? n.shopKey !== storeKey(o) : n.shopNamed ? !nameFits(n.shopNamed, o) : false) return null;
+      if (n.ref && o.orderRef && String(o.orderRef).toUpperCase() !== n.ref) return null;
+      return o;
+    }
     if (n.onlyByNumber) return undefined;     // wait: a later pass may learn the number
     if (n.ref) {
       const same = withRef(n.ref).filter((o) => o.orderRef && String(o.orderRef).toUpperCase() === n.ref && (n.shopKey || n.shopNamed ? shopFits(n, o) : true));
@@ -243,13 +260,20 @@ export function attachReturnTracking(orders, { updates = [], deliveries = [], ty
   const byId = new Map();
   for (const o of orders) for (const id of idsOf(o)) byId.set(id, o);
   const own = new Map(orders.map((o) => [o, []]));
-  const known = new Map(), opened = new Set();
+  const known = new Map(), opened = new Set(), since = new Map(), typedOnly = new Set();
+  // A parcel that came TO the shopper is never a return: the number on a purchase, in a shop's dispatch email, or in a
+  // carrier's email that says which shop the parcel is from.
+  const purchaseNumbers = new Set(orders.map((o) => o.delivery && o.delivery.trackingNumber && String(o.delivery.trackingNumber).toUpperCase()).filter(Boolean));
+  for (const d of deliveries) {
+    if (d && d.trackingNumber && (d.merchant || d.status === "shipped" || (d.retailer && (d.retailer.domain || d.retailer.name)))) purchaseNumbers.add(String(d.trackingNumber).toUpperCase());
+  }
   for (const o of orders) {
     const p = o.returnPlan;
     if (p) {
-      own.get(o).push({ stage: "started", at: day(p.at), by: "shop", name: shopName(o), via: "email", tn: p.trackingNumber ? String(p.trackingNumber).toUpperCase() : null, carrier: p.carrier || null });
+      const tn = p.trackingNumber && !purchaseNumbers.has(String(p.trackingNumber).toUpperCase()) ? String(p.trackingNumber).toUpperCase() : null;
+      own.get(o).push({ stage: "started", at: day(p.at), by: "shop", name: shopName(o), via: "email", tn, carrier: p.carrier || null });
       opened.add(o);
-      if (p.trackingNumber) known.set(String(p.trackingNumber).toUpperCase(), o);
+      if (tn) { known.set(tn, o); if (day(p.at)) since.set(tn, day(p.at)); }
     }
   }
   // Which lines of each receipt the shopper said are going back (their positions in its items).
@@ -267,11 +291,13 @@ export function attachReturnTracking(orders, { updates = [], deliveries = [], ty
     const tn = r.tracking_number ? String(r.tracking_number).toUpperCase() : null;
     own.get(o).push({ stage: "sent", at: day(r.sent_on), by: "you", via: "app", tn, carrier: r.carrier || null, typed: true });
     opened.add(o);
-    if (tn) known.set(tn, o);
+    // (A number the shop's own return email already gave for this receipt is the shop's word, not only the shopper's. One
+    // that is a parcel sent TO the shopper is shown as what they typed and matched to nothing.)
+    if (tn && !purchaseNumbers.has(tn) && !known.has(tn)) { known.set(tn, o); typedOnly.add(tn); if (day(r.sent_on)) since.set(tn, day(r.sent_on)); }
   }
-  const purchaseNumbers = new Set(orders.map((o) => o.delivery && o.delivery.trackingNumber && String(o.delivery.trackingNumber).toUpperCase()).filter(Boolean));
-  const news = updates.map(fromUpdate).concat(deliveries.map(fromDelivery).filter((n) => n && !purchaseNumbers.has(n.tn)));
-  const matched = matchReturnNews(orders, news, known, opened);
+  const news = updates.map(fromUpdate).map((n) => (n.tn && purchaseNumbers.has(n.tn) ? (n.by === "carrier" ? null : { ...n, tn: null }) : n)).filter(Boolean)
+    .concat(deliveries.map(fromDelivery).filter((n) => n && !purchaseNumbers.has(n.tn)));
+  const matched = matchReturnNews(orders, news, known, opened, since, typedOnly);
   // Ship24's word on the return parcel, once its number is known.
   const live = new Map((tracked || []).filter((r) => r && r.status).map((r) => [String(r.tracking_number).toUpperCase(), r]));
   const numbersOf = new Map();
@@ -286,7 +312,18 @@ export function attachReturnTracking(orders, { updates = [], deliveries = [], ty
       // The carrier's first scan: the day and time it first had the parcel (parcel-tracking.js firstScan). Without one
       // (a parcel looked up before Relay kept it), the day of the carrier's latest news; never its expected delivery day.
       const scan = r.first_scan && day(r.first_scan) ? { at: day(r.first_scan), atTime: String(r.first_scan) } : null;
+      // (Review, 25 Nov 2026. The carrier's tracking is this return's only when it fits a parcel going back: its first scan
+      // is not before the return started, and for a number only the shopper gave there must be a first scan to check, on or
+      // after the day they said they sent it. A parcel already moving before then was coming to them, or is someone
+      // else's: nothing is ticked and no fact is made.)
+      const from = since.get(tn) || null;
+      if (scan && from && scan.at < from) continue;
       const said = { by: "carrier", name: carrier, via: "tracking", tn };
+      if (typedOnly.has(tn) && !(scan && from)) {
+        // (Only that the carrier reports a problem with the parcel they named: a warning, never a step or a fact.)
+        if (r.status === "problem") all.push({ ...said, stage: null, at: day(r.at), problem: true });
+        continue;
+      }
       if (r.status === "delivered") {
         all.push({ ...said, stage: "received", at: day(r.at) });
         if (scan) all.push({ ...said, stage: "sent", ...scan });

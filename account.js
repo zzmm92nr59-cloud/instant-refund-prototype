@@ -242,6 +242,8 @@
     // A change, once done: reads that started while it was on its way may be from before it, so none is reused.
     if (method !== "GET") answer.then(function () { reads = {}; }, function () { reads = {}; });
     answer.then(function (r) { if (r.status === 403 && /"second_step_needed"/.test(r.text || "")) needSecondStep(); }, function () {});
+    // Signed in before the account had its second step: Relay has ended that sign-in (worker/second-step.js).
+    answer.then(function (r) { if (r.status === 401 && /"sign_in_again"/.test(r.text || "") && s && s.token) signInAgain(s.token); }, function () {});
     if (key) {
       var entry = { answer: answer, waiting: true, at: 0 };
       reads[key] = entry;
@@ -2717,12 +2719,16 @@
       if (navigator.standalone) localStorage.setItem("relay_gstandalone", "1"); else localStorage.removeItem("relay_gstandalone");
     } catch (e) { free(); return say(note, "Your browser is blocking storage, so " + who + " sign-in can't work here. Continue with email instead.", true); }
     // Back from Google or Microsoft without signing in (the phone's back, or Done): the buttons work again.
-    providerFree = function () { free(); say(note, ""); };
+    providerFree = function () { free(); say(note, matchNote()); };
     claiming = false;
     var body2 = { nonce: nonce }; if (consent) body2.consentVersion = consent.version;
     var host = g ? /^https:\/\/accounts\.google\.com\// : /^https:\/\/login\.microsoftonline\.com\//;
     api("/relay/auth/" + (g ? "google" : "microsoft") + "/start", { method: "POST", body: body2 }).then(function (r) {
-      if (r.ok && r.body && host.test(r.body.url || "")) { location.href = r.body.url; return; }
+      if (r.ok && r.body && host.test(r.body.url || "")) {
+        // The short code this screen shows if the sign-in comes back in another browser, which shows the same (matchNote).
+        try { if (/^[A-Z2-9]{6}$/.test(r.body.code || "")) localStorage.setItem("relay_gcode", r.body.code); else localStorage.removeItem("relay_gcode"); } catch (e) {}
+        location.href = r.body.url; return;
+      }
       free();
       if (r.body && r.body.error === "consent_version_mismatch") providersAsked = null;
       say(note, r.status === 503 ? who + " sign-in isn't switched on yet. Continue with email instead." : r.body && r.body.error === "consent_version_mismatch" ? "Relay's wording has just changed. Please try again." : "Couldn't open " + who + ". Please try again.", true);
@@ -2809,6 +2815,9 @@
       codeGo.disabled = true; say(msg, "Checking…");
       api("/relay/auth/verify-code", { method: "POST", body: { email: email, code: codeIn.value } }).then(function (r) {
         codeGo.disabled = false;
+        // A code allows 5 tries (worker/auth.js); after that it's cancelled and a new one is needed. (With retryAfterMs it's
+        // Relay's general limit on sign-in attempts instead, which passes by itself.)
+        if (!r.ok && r.status === 429 && !(r.body && r.body.retryAfterMs)) { codeIn.value = ""; return say(msg, "That code has stopped working after too many wrong tries. Go back and ask for a new one.", true); }
         if (!r.ok) { codeIn.value = ""; return say(msg, errors[r.body.error] || "Something went wrong. Please try again.", true); }
         if (r.body.needsSecondStep) return secondStepView(sheet, r.body);
         signedIn(r.body);
@@ -3143,6 +3152,14 @@
     if (!providersAsked) providersAsked = api("/relay/auth/providers").then(function (r) { if (!r.ok) providersAsked = null; if (r.ok) providersKnown = r.body; return r.ok ? r.body : null; }, function () { providersAsked = null; return null; });
     return providersAsked;
   }
+  // From the installed app, Google or Microsoft can come back in a separate browser, which asks the person to confirm and
+  // shows a short code. The app shows the same one, so they can tell that page belongs to the sign-in they started here.
+  function spacedCode(c) { return c.slice(0, 3) + " " + c.slice(3); }
+  function matchNote() {
+    var c = "";
+    try { if (navigator.standalone && localStorage.getItem("relay_gnonce")) c = localStorage.getItem("relay_gcode") || ""; } catch (e) {}
+    return /^[A-Z2-9]{6}$/.test(c) ? "If the other window asks, your code is " + spacedCode(c) + "." : "";
+  }
   function newNonce() {
     var bytes = new Uint8Array(32); (window.crypto || window.msCrypto).getRandomValues(bytes);
     return btoa(String.fromCharCode.apply(null, bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
@@ -3409,6 +3426,23 @@
   // one up (Face ID or the phone's screen lock, codes by text, or an authenticator app), or signs out.
   var protectTimer = null;
   function protectOpen() { return Boolean(document.querySelector('.rl-sheet[aria-label="Protect your account"]')); }
+  // Relay ended this sign-in because the account now has a second step that this sign-in never passed (set up since, on
+  // another device). Signed out here, with the sign-in page saying why. Once, however many requests were told.
+  var againTimer = null;
+  function signInAgain(token) {
+    if (againTimer) return;
+    againTimer = setTimeout(function () {
+      againTimer = null;
+      var now = load();
+      if (!now || now.token !== token) return;
+      save(null);
+      open(function (sheet) {
+        signedOutView(sheet, { returning: true });
+        var n = sheet.querySelector(".rl-msg");
+        if (n) say(n, "Two-step sign-in is now on for your account, so please sign in again.");
+      });
+    }, 0);
+  }
   function needSecondStep() {
     if (protectTimer || protectOpen() || !load()) return;
     // A moment's wait: the sign-up journey may be opening it itself.
@@ -7964,12 +7998,19 @@
     try { gn = localStorage.getItem("relay_gnonce") || ""; fromApp = localStorage.getItem("relay_gstandalone") === "1"; } catch (e) {}
     // Started in the iPhone home-screen app, which hands Google to a separate browser: this is that browser. The app
     // finishes signing in when it's back on screen (claimSignIn), so this page only says to go back.
-    if (fromApp && !navigator.standalone) return backToApp();
-    try { localStorage.removeItem("relay_gnonce"); localStorage.removeItem("relay_gnonce_at"); localStorage.removeItem("relay_gstandalone"); } catch (e) {}
+    // It holds the app's secret too (it shares the app's storage), which shows Relay that the person who just signed in
+    // with Google or Microsoft is the one who started: it says so, and the app may then finish.
+    var offline = function () { open(function (sheet) { sheet.appendChild(el("h2", { text: "Couldn't reach Relay" })); sheet.appendChild(el("button", { className: "rl-btn ghost", text: "Close", onclick: close })); }); };
+    if (fromApp && !navigator.standalone && gn) {
+      return api("/relay/auth/confirm", { method: "POST", body: { token: m[1], nonce: gn } }).then(function (r) { if (r.ok) backToApp(); else ranOut(); }, offline);
+    }
+    try { localStorage.removeItem("relay_gnonce"); localStorage.removeItem("relay_gnonce_at"); localStorage.removeItem("relay_gcode"); localStorage.removeItem("relay_gstandalone"); } catch (e) {}
     api("/relay/auth/verify", { method: "POST", body: gn ? { token: m[1], nonce: gn } : { token: m[1] } }).then(function (r) {
       if (!r.ok) {
-        // No secret here (a different browser from the one that started): the one that started can still finish.
-        if (!gn) return backToApp();
+        // A different browser from the one that started (no secret here, or another sign-in's): it can't finish. The app
+        // that started can, but only once the person here has confirmed it's theirs.
+        if (r.body && r.body.error === "confirm_needed" && /^[A-Z2-9]{6}$/.test(r.body.code || "")) return confirmElsewhere(m[1], r.body.code);
+        if (!gn) return ranOut();
         return open(function (sheet) { sheet.appendChild(el("h2", { text: "Sign-in failed" }));
           sheet.appendChild(el("p", { text: errors[r.body.error] || "Something went wrong." }));
           sheet.appendChild(el("button", { className: "rl-btn", text: "Try again", onclick: show })); });
@@ -7981,6 +8022,43 @@
   function afterSignIn(body) {
     if (body.needsSecondStep) { signInExtra = { mailConnected: body.mailConnected, outlookConnected: body.outlookConnected, suggestedName: body.suggestedName }; return open(function (sheet) { secondStepView(sheet, body); }); }
     signedIn(body);
+  }
+  // A sign-in that came back to a browser which can't finish it, and is no longer waiting (used, cancelled or timed out).
+  function ranOut() {
+    open(function (sheet) {
+      sheet.classList.add("rl-full", "rl-jr");
+      jFrame(sheet, { noClose: true, title: "That sign-in has run out", sub: "Close this window, go back to Relay and sign in again." });
+    });
+  }
+  // Google or Microsoft sent the person back to a browser that didn't start the sign-in. Normally that's the installed app's
+  // separate browser window. It could also be someone who was sent a sign-in link by somebody else, who must not be let in
+  // by it: so nothing happens until the person here says it's theirs, on a page showing the code the app shows too.
+  function confirmElsewhere(token, code) {
+    open(function (sheet) {
+      sheet.classList.add("rl-full", "rl-jr");
+      var body = jFrame(sheet, { noClose: true, title: "Finish signing in to Relay?",
+        sub: "Only continue if the Relay app on your phone shows this same code. If someone sent you this link, close this page." });
+      var box = el("div", { className: "rl-pcode", role: "status", text: spacedCode(code) });
+      box.setAttribute("aria-label", "Your code: " + code.split("").join(" "));
+      var msg = el("div", { className: "rl-msg" });
+      var busy = false;
+      var send = function (what, then) {
+        if (busy) return;
+        busy = true; yes.disabled = no.disabled = true;
+        api("/relay/auth/confirm", { method: "POST", body: what }).then(function (r) {
+          if (r.ok) return then();
+          if (r.status === 429) { busy = false; yes.disabled = no.disabled = false; return say(msg, "Too many attempts. Please try again in a minute.", true); }
+          ranOut();
+        }, function () { busy = false; yes.disabled = no.disabled = false; say(msg, "Couldn't reach Relay. Check your connection.", true); });
+      };
+      var yes = el("button", { type: "button", className: "rl-btn", text: "Continue", onclick: function () { send({ token: token, agree: true }, backToApp); } });
+      var no = el("button", { type: "button", className: "rl-textbtn", text: "This wasn't me", onclick: function () {
+        send({ token: token, deny: true }, function () {
+          open(function (sh) { sh.classList.add("rl-full", "rl-jr"); jFrame(sh, { noClose: true, title: "Sign-in cancelled", sub: "Nobody was signed in. You can close this page." }); });
+        });
+      } });
+      [box, msg, yes, no].forEach(function (n) { body.appendChild(n); });
+    });
   }
   function backToApp() {
     open(function (sheet) {
@@ -8001,18 +8079,18 @@
     var gn = "", at = 0;
     try { gn = localStorage.getItem("relay_gnonce") || ""; at = Number(localStorage.getItem("relay_gnonce_at")) || 0; } catch (e) {}
     if (!gn || /(?:^|[#&])signin=/.test(location.hash || "")) return;
-    if (Date.now() - at > 15 * 60000) { try { localStorage.removeItem("relay_gnonce"); localStorage.removeItem("relay_gnonce_at"); } catch (e) {} if (providerFree) providerFree(); return; }
+    if (Date.now() - at > 15 * 60000) { try { localStorage.removeItem("relay_gnonce"); localStorage.removeItem("relay_gnonce_at"); localStorage.removeItem("relay_gcode"); } catch (e) {} if (providerFree) providerFree(); return; }
     claiming = true;
     var tries = 0;
     (function ask() {
       api("/relay/auth/claim", { method: "POST", body: { nonce: gn } }).then(function (r) {
         if (r.ok && r.body && (r.body.sessionToken || r.body.needsSecondStep)) {
           claiming = false;
-          try { localStorage.removeItem("relay_gnonce"); localStorage.removeItem("relay_gnonce_at"); localStorage.removeItem("relay_gstandalone"); } catch (e) {}
+          try { localStorage.removeItem("relay_gnonce"); localStorage.removeItem("relay_gnonce_at"); localStorage.removeItem("relay_gcode"); localStorage.removeItem("relay_gstandalone"); } catch (e) {}
           return afterSignIn(r.body);
         }
         // Not signed in (yet): back where they were, on the sign-in page, if the page started again without it.
-        if (tries === 0 && !document.querySelector(".rl-back .rl-sheet")) open(function (sheet) { signedOutView(sheet, {}); });
+        if (tries === 0 && !document.querySelector(".rl-back .rl-sheet")) open(function (sheet) { signedOutView(sheet, {}); var n = sheet.querySelector(".rl-msg"); if (n && matchNote()) say(n, matchNote()); });
         if (++tries < 4 && document.visibilityState === "visible") return setTimeout(ask, 2500);
         claiming = false;
       }, function () { claiming = false; });
@@ -8085,7 +8163,7 @@
   function completeGoogleNote() {
     var m = /(?:^|[#&])(gsignin|msignin)=(denied|failed|other_address)(?:&|$)/.exec(location.hash || "");
     if (!m) return;
-    try { history.replaceState(null, "", location.pathname + location.search); localStorage.removeItem("relay_gnonce"); } catch (e) {}
+    try { history.replaceState(null, "", location.pathname + location.search); localStorage.removeItem("relay_gnonce"); localStorage.removeItem("relay_gcode"); } catch (e) {}
     var who = m[1] === "msignin" ? "Microsoft" : "Google";
     open(function (sheet) {
       sheet.appendChild(el("h2", { text: m[2] === "denied" ? who + " sign-in cancelled" : who + " sign-in didn't work" }));

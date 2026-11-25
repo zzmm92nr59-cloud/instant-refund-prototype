@@ -42,6 +42,9 @@ box.push(mail(102, clock - 21 * DAY, "Your Monday evening trip with Uber", { bod
 box.push(mail(103, clock - 22 * DAY, "Your order is ready to collect", { body: receipt(103) }));
 box.push(mail(201, clock - 23 * DAY, "Your RAINS order confirmation #RA-201"));         // Outlook refuses it twice, then gives it
 box.push(mail(202, clock - 24 * DAY, "Your RAINS order confirmation #RA-202"));         // never readable: must not stop the scan
+// (Review, 25 Nov 2026) Outlook too busy for this one through four rounds of reading (eight refusals, each round asks twice):
+// busy is not a try, so it is read once Outlook gives it. It used to be left out for good after three busy rounds.
+box.push(mail(203, clock - 25 * DAY, "Your RAINS order confirmation #RA-203"));
 const mime = m => `From: ${m.fromName} <${m.from}>\r\nSubject: ${m.subject}\r\nMessage-ID: ${m.mid}\r\nDate: ${new Date(m.at).toUTCString()}\r\nContent-Type: text/plain; charset=utf-8\r\n\r\n${m.body}`;
 
 let inFlight = 0, maxInFlight = 0, refused = 0;
@@ -78,6 +81,7 @@ const fetchImpl = async (url, init = {}) => {
         const n = (tries.get(m.id) || 0) + 1; tries.set(m.id, n);
         if (m.id.endsWith("0201") && n <= 4) return new Response("busy", { status: 503, headers: { "retry-after": "0" } });
         if (m.id.endsWith("0202")) return new Response("server error", { status: 500 });
+        if (m.id.endsWith("0203") && n <= 8) return new Response('{"error":{"code":"ApplicationThrottled"}}', { status: 429, headers: { "retry-after": "0" } });
         reads.push(m.id);
         return new Response(mime(m), { status: 200 });
       } finally { inFlight--; }
@@ -88,7 +92,7 @@ const fetchImpl = async (url, init = {}) => {
 };
 const call = (path, { method = "GET", body, token } = {}) =>
   handleAuthRoute(new Request("https://w.test" + path, { method,
-    headers: { "content-type": "application/json", "cf-connecting-ip": "1.1.1.1", ...(token ? { authorization: "Bearer " + token } : {}) },
+    headers: { "content-type": "application/json", "cf-connecting-ip": "1.1.1.1", origin: "https://zzmm92nr59-cloud.github.io", ...(token ? { authorization: "Bearer " + token } : {}) },
     body: body ? JSON.stringify(body) : undefined }), env, new URL("https://w.test" + path), {}, { now: clock, fetchImpl });
 const NONCE = "N".repeat(43);
 
@@ -122,6 +126,7 @@ assert.equal(refused, 0, "so Outlook never had to refuse one");
 const refs = receiptRefs();
 for (let i = 1; i <= 30; i++) assert.ok(refs.has("RA-" + i), "order RA-" + i + " captured");
 assert.ok(refs.has("RA-201"), "an email Outlook was too busy to give is read in a later round, not skipped");
+assert.ok(refs.has("RA-203"), "one Outlook is too busy for through four rounds is still read once it gives it: busy is never a try");
 for (const id of ["0101", "0102", "0103"]) assert.ok(reads.some(x => x.endsWith(id)), "payment, trip and ready-to-collect emails are read: " + id);
 const stuck = captured().find(d => d.unread);
 assert.ok(stuck && stuck.readTries === 3, "an email that never reads is tried 3 times, then left out");

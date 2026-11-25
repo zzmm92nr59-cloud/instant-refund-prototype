@@ -66,5 +66,7 @@ export function realInbox({ now = Date.UTC(2026, 10, 19, 12) } = {}) {
     // Every email Relay kept, with what it made of it (round 20).
     stored: () => sqlite.prepare("SELECT id, status, details FROM captured_receipts").all().map((r) => ({ id: r.id, status: r.status, details: JSON.parse(r.details) })),
     call,
+    // (A look straight into the database, for tests that check what was deleted.)
+    sql: (q, ...a) => sqlite.prepare(q).all(...a),
   };
 }

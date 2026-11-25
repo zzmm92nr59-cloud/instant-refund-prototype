@@ -139,7 +139,7 @@ const hiddenBox = [
 
 const call = (path, { method = "GET", body, token, ip = "1.1.1.1", e = env } = {}) =>
   handleAuthRoute(new Request("https://w.test" + path, { method,
-    headers: { "content-type": "application/json", "cf-connecting-ip": ip, ...(token ? { authorization: "Bearer " + token } : {}) },
+    headers: { "content-type": "application/json", "cf-connecting-ip": ip, origin: "https://zzmm92nr59-cloud.github.io", ...(token ? { authorization: "Bearer " + token } : {}) },
     body: body ? JSON.stringify(body) : undefined }), e, new URL("https://w.test" + path), {}, { now: clock, fetchImpl });
 const post = (path, token, body) => call(path, { method: "POST", token, body });
 const loc = res => res.headers.get("location");

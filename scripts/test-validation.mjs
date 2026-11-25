@@ -352,8 +352,16 @@ function probeRequest(path, token) {
   assert.equal(addressOf(r("/", { "cf-connecting-ip": "2001:0db8:0001:0002:0000:0000:0000:0001" })), "2001:db8:1:2::/64");
   assert.equal(addressOf(r("/", { "cf-connecting-ip": "203.0.113.9" })), "203.0.113.9");
   assert.equal(addressOf(r("/", { "cf-connecting-ip": "::ffff:203.0.113.9" })), "203.0.113.9", "IPv4 written the IPv6 way counts as itself");
-  // Webhooks and the browser's preflight aren't counted.
-  for (let i = 0; i < 5; i++) assert.equal(await checkRateLimits(r("/relay/webhooks/shopify", { "cf-connecting-ip": "2001:db8:1:2::9" }), {}, u("/relay/webhooks/shopify"), now), null);
+  // Shopify's and Square's webhooks count against the sending address like any request (the body has to be read before the
+  // signature can be checked, so a flood of fakes is stopped here): that address is over its allowance, so they're refused.
+  for (const hook of ["/relay/webhooks/shopify", "/relay/webhooks/square"])
+    assert.equal((await checkRateLimits(r(hook, { "cf-connecting-ip": "2001:db8:1:2::9" }), {}, u(hook), now)).scope, "address", hook + " is counted per address");
+  // From another address they go through, and never count against the sign-in or account allowances, however many come.
+  for (let i = 0; i < LIMITS.user.limit + 50; i++) assert.equal(await checkRateLimits(r("/relay/webhooks/shopify", { "cf-connecting-ip": "198.51.100.77", authorization: "Bearer " + "w".repeat(43) }), {}, u("/relay/webhooks/shopify"), now), null);
+  for (let i = 0; i < 5; i++) assert.equal(await checkRateLimits(r("/relay/webhooks/square", { "cf-connecting-ip": "198.51.100.78" }), {}, u("/relay/webhooks/square"), now), null);
+  // Gmail's and Outlook's notices (checked before anything is read) and the browser's preflight aren't counted.
+  for (const hook of ["/relay/webhooks/gmail", "/relay/webhooks/outlook", "/relay/webhooks/outlook/lifecycle"])
+    for (let i = 0; i < 5; i++) assert.equal(await checkRateLimits(r(hook, { "cf-connecting-ip": "2001:db8:1:2::9" }), {}, u(hook), now), null);
   assert.equal(await checkRateLimits(r("/relay/auth/request", { "cf-connecting-ip": "2001:db8:1:2::9" }, "OPTIONS"), {}, u("/relay/auth/request"), now), null);
   // Cloudflare's binding, when it's there, is used instead of memory; if it fails, the request goes ahead.
   const seen = [];
@@ -366,7 +374,7 @@ function probeRequest(path, token) {
   assert.equal(await checkRateLimits(r("/relay/auth/request"), { RL_IP: broken, RL_SIGNIN: broken }, u("/relay/auth/request"), now), null, "a broken counter never locks people out");
   console.error = quiet;
   assert.ok(seen.every(k => !k.includes("a".repeat(20))), "credentials are never used as counter names");
-  console.log("ok - rate limits: per address, per sign-in address, per shopper, per mailbox search; IPv6 by /64; webhooks exempt; Cloudflare's binding used when there; fails open");
+  console.log("ok - rate limits: per address, per sign-in address, per shopper, per mailbox search; IPv6 by /64; Shopify's and Square's webhooks per address, mail notices exempt; Cloudflare's binding used when there; fails open");
 }
 {
   resetMemoryLimits();

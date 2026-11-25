@@ -341,7 +341,9 @@ function categoriseBy(card, learned) {
   // A booking the reader found flights in (flight-booking.js) is travel, whoever it was booked with.
   if (Array.isArray(card.flights) && card.flights.length) return finish("travel", items, noReturn);
   // Apple sells both phones and App Store credit: the items decide.
-  if (/(^|\b|\.)apple(\b|\.)/i.test(store) && !/applebee/i.test(store) && !isVia(r.domain)) return finish(HARDWARE.test(items) ? "electronics" : "digital", items, noReturn);
+  // (Apple itself: its own address, or a name that is only Apple's. "Apple Tree Garden Centre" is not Apple: its pots were
+  // filed as digital and "can't be returned". Second pass of the readers' review, 25 Nov 2026.)
+  if ((/(^|\.)apple\.com$/i.test(String(r.domain || "")) || /^(?:apple(?: (?:store|retail|uk|services|distribution international(?: ltd)?|media services|online store))?|app store|itunes(?: store)?)$/i.test(String(r.name || "").trim())) && !isVia(r.domain)) return finish(HARDWARE.test(items) ? "electronics" : "digital", items, noReturn);
   // (Amazon's digital orders, numbered "D01-…" (Prime Video films and rentals, Kindle books, apps), are digital whatever their
   // lines say, so nothing is ever offered back for a film watched. A café, restaurant, pub or takeaway's bill is food and
   // drink, whatever a dish is called ("BBQ" is not a barbecue for the garden). Round 15.)
@@ -494,7 +496,9 @@ const KNOWN_NAMES = { appcharge: "Appcharge", lycamobile: "Lycamobile", shopifye
   hm: "H&M" };
 const MAIL_SUBDOMAIN = /^(e|em|email|emails|mail|mailer|news|newsletter|info|hello|noreply|no-reply|orders?|shop|store|click|links?|g|t|m|r|reply|notify|notifications?|updates?|service|customerservice|support|accounts?)$/i;
 // Personal email services: a receipt "from" one of these is one the shopper (or a friend) forwarded, not a shop.
-export const PERSONAL_MAIL = /(^|\.)(gmail\.com|googlemail\.com|outlook\.com|hotmail\.(com|co\.uk)|live\.(com|co\.uk)|msn\.com|icloud\.com|me\.com|mac\.com|yahoo\.(com|co\.uk)|ymail\.com|aol\.com|proton\.me|protonmail\.com|pm\.me|btinternet\.com|sky\.com|virginmedia\.com)$/i;
+// (Second pass of the readers' review, 25 Nov 2026: a receipt forwarded from outlook.co.uk, hotmail.fr or gmx.co.uk showed
+// the shop as "Outlook", "Hotmail", "Gmx". The common UK and European personal mail services are listed too.)
+export const PERSONAL_MAIL = /(^|\.)(gmail\.com|googlemail\.com|outlook\.(com|co\.uk|fr|de|es|it|ie)|hotmail\.(com|co\.uk|fr|de|es|it)|live\.(com|co\.uk|fr|de|ie)|msn\.com|icloud\.com|me\.com|mac\.com|yahoo\.(com|co\.uk|fr|de|es|it|ie)|ymail\.com|rocketmail\.com|aol\.(com|co\.uk)|proton\.me|protonmail\.(com|ch)|pm\.me|btinternet\.com|btopenworld\.com|sky\.com|virginmedia\.com|ntlworld\.com|blueyonder\.co\.uk|talktalk\.net|tiscali\.co\.uk|gmx\.(com|co\.uk|de|net)|web\.de|mail\.com|zoho\.com|fastmail\.(com|fm)|tutanota\.com|tuta\.io|hey\.com|yandex\.(com|ru))$/i;
 // (Kept for each shop's address and name, as storeKey is: the receipts list names the same shops thousands of times.)
 const SHOWN_NAMES = new Map();
 export function shopDisplayName(retailer) {

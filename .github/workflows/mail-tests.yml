@@ -9,6 +9,7 @@ on:
       - 'scripts/test-gmail*.mjs'
       - 'scripts/test-outlook*.mjs'
       - 'scripts/test-receipt-*.mjs'
+      - 'scripts/real-receipts.mjs'
       - 'scripts/test-wrapped.mjs'
       - 'scripts/test-wrapped-better.mjs'
       - 'scripts/test-wrapped-journeys.mjs'
@@ -41,6 +42,7 @@ on:
       - 'scripts/test-gmail*.mjs'
       - 'scripts/test-outlook*.mjs'
       - 'scripts/test-receipt-*.mjs'
+      - 'scripts/real-receipts.mjs'
       - 'scripts/test-wrapped.mjs'
       - 'scripts/test-wrapped-better.mjs'
       - 'scripts/test-wrapped-journeys.mjs'
@@ -134,3 +136,7 @@ jobs:
         run: node scripts/test-scan-codes.mjs
       - name: Fix this receipt (shop, total, date, items; own receipts only; counted for Relay health)
         run: node scripts/test-receipt-fixes.mjs
+      - name: Readers' review (nothing refused, promised or under way read as done; slow emails; two shops with one order number; one email can't stall everyone's mail)
+        run: |
+          node scripts/test-receipt-review-fixes.mjs
+          node scripts/test-receipt-review-mailbox.mjs

@@ -39,6 +39,9 @@ jobs:
           node scripts/test-shopify-multi-store.mjs
           node scripts/test-shopify-token-exchange.mjs
           node scripts/test-auth.mjs
+          node scripts/test-signin-claim.mjs
+          node scripts/test-shopify-status.mjs
+          node scripts/test-webhook-limits.mjs
           node scripts/test-review-account.mjs
           node scripts/test-security-mail.mjs
           node scripts/test-phone-signin.mjs

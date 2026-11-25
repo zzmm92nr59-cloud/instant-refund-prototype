@@ -105,7 +105,15 @@ const eats = (e) => mk(e.from, e.subject, e.date, rowsHtml(e.lines), true);
     const ids = new Set(cards.map((c) => c.id));
     const shown = (c) => (c.adjusted && c.adjusted.refundPence > 0) || (c.returnProgress && c.returnProgress.refundPence > 0) || (c.returnTracking && c.returnTracking.state === "refunded");
     const money = box.stored().filter((r) => r.status !== "not_receipt" && r.status !== "dismissed" && ((r.details.kind === "order_update" && r.details.stage === "adjusted") || (r.details.kind === "return_update" && r.details.stage === "refunded")));
-    assert.ok(money.length >= 1);
+    // (Review, 25 Nov 2026: the railway's "Your refund is being credited back … normally completed within 5 working days" is now
+    // a refund under way ("refunding"), not one made, so inbox2 has no money-back email that says it was paid; it must still
+    // never be a card of its own, and its order must not show it as refunded.)
+    const underWay = box.stored().filter((r) => r.details.kind === "return_update" && r.details.stage === "refunding");
+    for (const r of underWay) {
+      assert.ok(!ids.has(r.id), "a refund under way is never a card of its own");
+      assert.ok(!cards.some((c) => c.orderRef && String(c.orderRef).toUpperCase() === String(r.details.orderRef || "").toUpperCase() && shown(c)), "and its order does not show it as refunded");
+    }
+    assert.ok(money.length >= 1 || (box === inbox2 && underWay.length === 1));
     for (const r of money) {
       assert.ok(!ids.has(r.id), "money back is never a card of its own: " + JSON.stringify(r.details).slice(0, 160));
       // (The order it is for shows it.)
@@ -126,7 +134,10 @@ const eats = (e) => mk(e.from, e.subject, e.date, rowsHtml(e.lines), true);
   const groc = cards.find((c) => c.orderRef === "1234-5678-90");
   assert.equal(groc.adjusted.refundPence, 270, "the supermarket order shows the items refunded");
   const rail = (await inbox2.receipts()).receipts.find((c) => c.orderRef === "730118264590");
-  assert.ok(rail && rail.returnProgress && rail.returnProgress.refundPence === 640, "the train booking shows its refund");
+  // (Review, 25 Nov 2026: this used to assert the train booking shows a £6.40 refund. The railway's email says the refund
+  // "is being credited back … normally completed within 5 working days": under way, not made, so the booking must not show
+  // it as refunded. Money in at the bank for it can still be matched to the booking.)
+  assert.ok(rail && !(rail.returnProgress && rail.returnProgress.refundedAt) && !(rail.returnTracking && rail.returnTracking.state === "refunded"), "the train booking does not show a refund still being credited as refunded");
   console.log("ok - every refund Relay keeps shows on its order in the receipts list, never as a purchase, and two same-total orders each get their own refund");
 }
 

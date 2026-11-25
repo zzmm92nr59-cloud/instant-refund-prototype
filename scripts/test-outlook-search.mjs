@@ -125,7 +125,7 @@ const fetchImpl = async (url, init = {}) => {
 let emails = [];
 const call = (path, { method = "GET", body, token } = {}) =>
   handleAuthRoute(new Request("https://w.test" + path, { method,
-    headers: { "content-type": "application/json", "cf-connecting-ip": "1.1.1.1", ...(token ? { authorization: "Bearer " + token } : {}) },
+    headers: { "content-type": "application/json", "cf-connecting-ip": "1.1.1.1", origin: "https://zzmm92nr59-cloud.github.io", ...(token ? { authorization: "Bearer " + token } : {}) },
     body: body ? JSON.stringify(body) : undefined }), env, new URL("https://w.test" + path), {}, { now: clock, fetchImpl });
 
 // Signed in with Microsoft, Outlook connected in the same step.
@@ -183,7 +183,18 @@ const resetUses = () => { try { sqlite.exec("DELETE FROM outlook_search_uses"); 
   const cols = sqlite.prepare("PRAGMA table_info(auth_passkeys)").all();
   sqlite.prepare(`INSERT INTO auth_passkeys (${cols.map(c => c.name).join(",")}) VALUES (${cols.map(() => "?").join(",")})`)
     .run(...cols.map(c => c.name === "shopper_id" ? TESS : /INT|REAL/i.test(c.type) ? 1 : "made-up-" + c.name));
-  for (const path of [S, M + encodeURIComponent(boxes.tess[0].id)]) assert.deepEqual(await get(path, tess).then(r => [r.status, r.body]), [404, { error: "not_found" }], "second step set up but not passed in this session");
+  // That session is ended on its next use (worker/second-step.js) and the app asks for a fresh sign-in: nothing is searched.
+  const tessRow = sqlite.prepare("SELECT * FROM auth_sessions WHERE shopper_id = ?").get(TESS);
+  const callsBefore = graphCalls.length;
+  for (const path of [S, M + encodeURIComponent(boxes.tess[0].id)]) {
+    const r = await get(path, tess);
+    assert.equal(r.status, 401, "second step set up but not passed in this session: refused");
+    assert.notEqual(r.status, 200);
+  }
+  assert.equal(graphCalls.length, callsBefore, "and Outlook was asked nothing");
+  assert.equal(sqlite.prepare("SELECT COUNT(*) n FROM auth_sessions WHERE shopper_id = ?").get(TESS).n, 0, "the session is gone");
+  // Signed in again, this time passing the second step (the same token, so the rest of this test carries on with it).
+  sqlite.prepare("INSERT INTO auth_sessions (session_hash, shopper_id, created_at, expires_at, second_step) VALUES (?,?,?,?,1)").run(tessRow.session_hash, tessRow.shopper_id, tessRow.created_at, tessRow.expires_at);
   sqlite.prepare("UPDATE auth_sessions SET second_step = 1").run();
   assert.equal((await get(S, tess)).status, 200, "the same team member, with a session that passed the second step, gets in");
   delete env.SECOND_STEP_REQUIRED;

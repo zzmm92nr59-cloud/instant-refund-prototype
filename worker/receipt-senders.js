@@ -213,7 +213,12 @@ export function orderAmended(subject, text) {
 const AMT = "£\\s?(\\d{1,3}(?:,\\d{3})+|\\d+)\\.(\\d{2})";
 export function supportRefund(subject, text) {
   const t = String(text || "").slice(0, 8000).replace(/\*\*/g, "").replace(/\s+/g, " ");
-  const one = (res) => { for (const re of res) { const m = new RegExp(re, "i").exec(t); if (m) return Number(m[1].replace(/,/g, "")) * 100 + Number(m[2]); } return null; };
+  // (Only a refund the reply says was made: not one in a sentence that says it wasn't, or will be once something happens,
+  // "We have not processed a refund of £11.46", "once it's back we will have issued a refund of £11.46". Second pass of the
+  // readers' review, 25 Nov 2026: those were read as money back.)
+  const NOT_DONE = /\b(?:not|never|no|unable|cannot|can(?:'|’)t|couldn(?:'|’)t|won(?:'|’)t|wouldn(?:'|’)t|haven(?:'|’)t|hasn(?:'|’)t|didn(?:'|’)t|once|when|if|unless|until|after|will|would|should|could|may|might|shall|we(?:'|’)ll|pending|declined|rejected|refused)\b|n(?:'|’)t\b/i;
+  const done = (m) => { const before = t.slice(Math.max(0, m.index - 200), m.index).split(/[.!?]\s/).pop(); const after = t.slice(m.index + m[0].length, m.index + m[0].length + 80).split(/[.!?](?:\s|$)/)[0]; return !NOT_DONE.test(before + " " + m[0]) && !/\b(?:declined|rejected|refused|cancelled|reversed|pending)\b/i.test(after); };
+  const one = (res) => { for (const re of res) for (const m of t.matchAll(new RegExp(re, "gi"))) if (done(m)) return Number(m[1].replace(/,/g, "")) * 100 + Number(m[2]); return null; };
   const refundPence = one([
     "\\b(?:processed|issued|sent|given you|arranged|approved) (?:you )?an? (?:partial |full |further )?refund of " + AMT,
     "\\bwe(?:'|’)?(?:ve| have)? refunded (?:you |your (?:card|account|original payment method) )?(?:with )?" + AMT,

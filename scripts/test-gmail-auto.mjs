@@ -237,12 +237,15 @@ assert.equal(failing.autoAt, lastGood, "copies of the app from before show the l
 const inBox = n => sqlite.prepare("SELECT COUNT(*) n FROM captured_receipts WHERE json_extract(details, '$.orderRef') = ?").get("EO-" + n).n;
 assert.equal(inBox(600), 0);
 // Google down for a while: tried again, nothing marked either way.
-tokenAnswer = "busy"; clock += 60 * 60 * 1000;
+// (Review, 25 Nov 2026: an inbox that has to be connected again is now tried once a day rather than in every 15-minute
+// check, so it doesn't hold the others' places. These two steps used to be an hour and 15 minutes after the last try; they
+// are now a day after it, when it is tried again. What is asserted at each step is unchanged.)
+tokenAnswer = "busy"; clock += DAY;
 assert.equal((await autoScanGmail(env, clock, fetchImpl)).results[0].status, 502);
 assert.equal(row().problem, "reconnect", "a busy Google changes nothing");
 // Access works again (connected again, or Google gave it back): the next check reads what came in meanwhile.
 tokenAnswer = "ok"; box.m601 = { raw: mail(601), day: ymd(clock) };
-clock += 15 * 60 * 1000;
+clock += DAY;
 assert.equal((await autoScanGmail(env, clock, fetchImpl)).results[0].status, 200);
 assert.equal(inBox(600), 1, "mail from six days ago, while checks were failing, is read");
 assert.equal(inBox(601), 1);

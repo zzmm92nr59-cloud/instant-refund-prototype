@@ -160,6 +160,7 @@ export function unwrapSafeLinks(text) {
 //    into the HTML itself (data: addresses) left out first: they can be far longer than the rest of the email.
 function collectParts(headers, body, out, depth = 0) {
   if (depth > 6) return;
+  inTime();
   const type = headers["content-type"] || "text/plain";
   const boundary = type.match(/boundary="?([^";]+)"?/i);
   if (/multipart\//i.test(type) && boundary) {
@@ -204,7 +205,7 @@ function collectParts(headers, body, out, depth = 0) {
   // emptied: it says nothing about the order and would push the order out of what is read.)
   if (/text\/html/i.test(type)) decoded = decoded.replace(/\bdata:[a-z]+\/[a-z0-9.+-]+;base64,[A-Za-z0-9+/=\s]{200,}/gi, "data:,").replace(/(\s[a-z][a-z0-9:-]*\s*=\s*)(["'])[^"'<>]{4000,}?\2/gi, '$1""');
   decoded = withoutMojibake(withoutInvisible(unwrapSafeLinks(decoded.slice(0, MAX_INPUT)))).replace(/\r\n?/g, "\n");
-  if (/text\/html/i.test(type)) out.html.push(decoded);
+  if (/text\/html/i.test(type)) out.html.push(tameHtml(decoded));
   // (A "text" part that is really a web page, Ryanair's itinerary sends its HTML as text/plain: read as the page shows it,
   // never as tags. Round 15.)
   else if (/text\/plain/i.test(type)) out.text.push(PLAIN_IS_HTML.test(decoded.slice(0, 3000)) || (decoded.slice(0, 20000).match(/<\/?(?:td|tr|table|div|span|br|p)\b/gi) || []).length >= 30 ? htmlToText(decoded) : decoded);
@@ -248,12 +249,88 @@ function walkShownParts(headers, body, out, depth) {
 const ENTITIES = { nbsp: " ", amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", pound: "£", euro: "€", rsquo: "’", lsquo: "‘", rdquo: "”", ldquo: "“",
   ndash: "–", mdash: "—", hellip: "…", middot: "·", bull: "•", times: "×", copy: "©", reg: "®", trade: "™", deg: "°", frac12: "½", eacute: "é",
   egrave: "è", ecirc: "ê", aacute: "á", agrave: "à", acirc: "â", iacute: "í", oacute: "ó", ouml: "ö", uuml: "ü", auml: "ä", ccedil: "ç", ntilde: "ñ", szlig: "ß", shy: "", zwnj: "", zwj: "", rarr: "→", larr: "←" };
+// ---- An email's HTML is made safe to read before anything reads it (review, 25 Nov 2026) ----
+// One made-up email of 540 KB of "<style x>" (never closed) took a quarter of a minute in each reader, and "<!-- a " or a
+// run of "<" far longer: a pattern such as <style…</style>, <!--…--> or <[^>]+> starts again at every opening and runs to
+// the end of the email looking for a close that never comes, so the time grows with the square of the email's size.
+// Cloudflare ends a round that takes that long, and nothing in the code can catch it. tameHtml goes through the HTML once
+// (time in proportion to its length) and leaves only shapes those patterns read quickly:
+//  * a comment, a <script> or a <style> that closes is kept exactly as it is;
+//  * one that never closes is no longer an opening: a comment's "<" becomes "&lt;" (its words are read as text), a
+//    <script> or <style> becomes <x-script> or <x-style> (an unknown tag, taken out like any other; what follows it is
+//    read as text, as it always was);
+//  * a "<" with another "<" before its ">" (or with no ">" at all) is not a tag: it becomes "&lt;", the character itself.
+// An email written as HTML normally reads exactly as before.
+let lastTame = null, lastTameOf = null;
+export function tameHtml(html) {
+  const s = String(html == null ? "" : html);
+  if (s === lastTame || s.indexOf("<") === -1) return s;
+  if (s === lastTameOf) return lastTame;
+  const OPENER = /<(script|style)/iy, CLOSE = { script: /<\/script>/gi, style: /<\/style>/gi }, noClose = { script: false, style: false };
+  let out = "", from = 0, i = 0, gt = -2, noCommentEnd = false;
+  for (;;) {
+    i = s.indexOf("<", i);
+    if (i === -1) break;
+    if (s.startsWith("<!--", i)) {
+      const end = noCommentEnd ? -1 : s.indexOf("-->", i + 4);
+      if (end !== -1) { i = end + 3; continue; }
+      noCommentEnd = true;
+      out += s.slice(from, i) + "&lt;"; from = ++i;
+      continue;
+    }
+    OPENER.lastIndex = i;
+    const m = OPENER.exec(s);
+    let rename = false;
+    if (m) {
+      const name = m[1].toLowerCase();
+      let end = -1;
+      if (!noClose[name]) { const re = CLOSE[name]; re.lastIndex = i + m[0].length; const c = re.exec(s); if (c) end = c.index + c[0].length; else noClose[name] = true; }
+      if (end !== -1) { i = end; continue; }
+      rename = true;
+    }
+    if (gt !== -1 && gt <= i) gt = s.indexOf(">", i + 1);
+    // (No ">" anywhere after this: nothing from here on is a tag.)
+    if (gt === -1) { out += s.slice(from, i) + s.slice(i).replace(/</g, "&lt;"); from = s.length; break; }
+    const nextLt = s.indexOf("<", i + 1);
+    if (nextLt !== -1 && nextLt < gt) { out += s.slice(from, i) + "&lt;"; from = ++i; continue; }
+    if (rename) { out += s.slice(from, i) + "<x-"; from = i + 1; }
+    i = gt + 1;
+  }
+  const done = from === 0 ? s : out + s.slice(from);
+  lastTame = done; lastTameOf = s;
+  return done;
+}
+// The HTML up to its last closing tag of one kind ("</a>", "</table>"). A pattern that reads a whole element, <a …>…</a>,
+// finds each one's end at once when every opening has a closing after it; without one it ran from each opening to the end
+// of the email (540 KB of <a href="x"> with no </a> took seconds).
+export function upToLastClose(html, name) {
+  const s = String(html || ""), re = new RegExp("</" + name + ">", "gi");
+  let last = -1;
+  for (let m; (m = re.exec(s)); ) last = m.index + m[0].length;
+  return last === -1 ? "" : s.slice(0, last);
+}
+// How long one email may take to read. A reader checks the clock as it starts each part of its work (reading the email's
+// parts, turning its HTML into text) and stops with this error once the time is up; the scan keeps the email as not read
+// (gmail.js) and reads the rest. (Cloudflare's clock stands still while code runs and only moves on when the Worker waits
+// for something, so there this stops an email only where a wait came first; the scan's own record of the emails it was in
+// the middle of, read_inflight in gmail.js, is what catches an email that takes a Worker's whole allowance.)
+export class ReadTooLong extends Error { constructor() { super("email_took_too_long"); this.name = "ReadTooLong"; } }
+let readUntil = 0;
+export function withReadLimit(ms, fn) {
+  const before = readUntil;
+  readUntil = Date.now() + ms;
+  try { return fn(); } finally { readUntil = before; }
+}
+function inTime() { if (readUntil && Date.now() > readUntil) throw new ReadTooLong(); }
+
 // A plain-text part that a shop's system filled with bits of its HTML: the item table left in as tags, the pound sign written
 // "&#163;" ("Total (inc. VAT): &#163;15.00", a pub chain's order-at-table email). Each table is read as a table and the
 // entities as the characters they stand for; the rest of the lines stay as they are (coverage round).
 function plainAsWritten(t) {
   if (!/<(?:table|tr|td)\b[^>]*>|&(?:#163|#x[aA]3|pound|amp|nbsp);/.test(t)) return t;
-  return decodeEntities(t.replace(/<table\b[\s\S]*?<\/table>/gi, (tbl) => "\n" + htmlToTextAll(tbl) + "\n"));
+  // (Only as far as the last "</table>": see upToLastClose.)
+  const head = upToLastClose(t, "table");
+  return decodeEntities(head.replace(/<table\b[\s\S]*?<\/table>/gi, (tbl) => "\n" + htmlToTextAll(tbl) + "\n") + t.slice(head.length));
 }
 // Pay-later companies, and what their emails about an instalment (not the purchase itself) say.
 const PAY_LATER_SENDER = /(^|\.)(klarna\.(?:com|co\.uk)|clearpay\.co\.uk|afterpay\.com|laybuy\.com|payzilch\.com|zilch\.com)$/i;
@@ -287,33 +364,88 @@ function decodeEntities(text) {
 // When leaving the hidden parts out would leave no price at all, they are kept (an email that shows its items only once
 // its style sheet's @media rules apply).
 const HIDDEN_STYLE = /\bstyle\s*=\s*(["'])[^"']*?\bdisplay\s*:\s*none\b[^"']*\1/i;
+// The style sheets of an email, each <style>…</style>'s own text, found in one pass (the email is tame: tameHtml).
+function styleSheets(html) {
+  const out = [], OPEN = /<style\b[^>]*>/gi, CLOSE = /<\/style>/gi;
+  for (let m; (m = OPEN.exec(html)); ) {
+    CLOSE.lastIndex = OPEN.lastIndex;
+    const c = CLOSE.exec(html);
+    if (!c) break;
+    out.push(html.slice(OPEN.lastIndex, c.index));
+    OPEN.lastIndex = c.index + c[0].length;
+  }
+  return out;
+}
+// The most of an email's style sheets that is gone through for hidden classes (a real email's are a few thousand characters).
+const MAX_CSS = 200_000;
 function hiddenClasses(html) {
   const out = new Set();
-  for (const [, css] of html.matchAll(/<style\b[^>]*>([\s\S]*?)<\/style>/gi)) {
-    let flat = css.replace(/\/\*[\s\S]*?\*\//g, "");
-    // (Rules inside @media apply only on some screens: they are left out, with their braces.)
-    for (let k = 0; k < 3; k++) flat = flat.replace(/@media[^{]*\{(?:[^{}]*\{[^{}]*\})*[^{}]*\}/gi, "");
-    for (const [, sel, body] of flat.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
-      if (!/\bdisplay\s*:\s*none\b/i.test(body)) continue;
-      for (const one of sel.split(",")) { const m = /^\s*(?:[a-z0-9]+)?\.([a-z0-9_-]+)\s*$/i.exec(one); if (m) out.add(m[1].toLowerCase()); }
+  let left = MAX_CSS;
+  for (const sheet of styleSheets(html)) {
+    if (left <= 0) break;
+    const css = sheet.slice(0, left);
+    left -= css.length;
+    // Comments out, in one pass (a "/*" that never closes stays as it is).
+    let flat = "", at = 0;
+    for (;;) { const a = css.indexOf("/*", at); const b = a === -1 ? -1 : css.indexOf("*/", a + 2); if (b === -1) { flat += css.slice(at); break; } flat += css.slice(at, a); at = b + 2; }
+    // Each innermost rule, "selectors { declarations }", read in one pass. (Rules inside @media apply only on some
+    // screens: they are left out, with their braces.)
+    const stack = [];
+    let start = 0, open = -1, selStart = 0, inMedia = 0;
+    for (let k = 0; k < flat.length; k++) {
+      const ch = flat.charCodeAt(k);
+      if (ch === 123) { const media = /@media/i.test(flat.slice(start, Math.min(k, start + 400))); stack.push(media); if (media) inMedia++; open = k; selStart = start; start = k + 1; }
+      else if (ch === 125) {
+        if (open !== -1 && stack.length && !inMedia && k - open < 20000 && /\bdisplay\s*:\s*none\b/i.test(flat.slice(open + 1, k))) {
+          for (const one of flat.slice(selStart, open).slice(-2000).split(",")) { const m = /^\s*(?:[a-z0-9]+)?\.([a-z0-9_-]+)\s*$/i.exec(one); if (m) out.add(m[1].toLowerCase()); }
+        }
+        if (stack.pop()) inMedia--;
+        open = -1; start = k + 1;
+      }
     }
   }
   return out;
 }
-function withoutHidden(html) {
-  let t = html.replace(/<!--\[if\s+(?![^\]]*!)[^\]]*\]>[\s\S]*?<!\[endif\]-->/gi, " ").replace(/<!--[\s\S]*?-->/g, " ");
+// The email without what Outlook alone is shown, <!--[if mso]> … <![endif]--> (not "[if !mso]", which everyone else is
+// shown), and without its comments. One pass: a pattern for it started again at every "<!--[if" when no "<![endif]-->" came.
+function withoutComments(html) {
+  const COND = /<!--\[if\s+(?![^\]]{0,200}!)[^\]]{0,200}\]>/iy, ENDIF = /<!\[endif\]-->/gi;
+  let out = "", from = 0, i = 0, noEndif = false;
+  for (;;) {
+    i = html.indexOf("<!--", i);
+    if (i === -1) break;
+    let end = -1;
+    COND.lastIndex = i;
+    const c = noEndif ? null : COND.exec(html);
+    if (c) { ENDIF.lastIndex = i + c[0].length; const e = ENDIF.exec(html); if (e) end = e.index + e[0].length; else noEndif = true; }
+    if (end === -1) { const e = html.indexOf("-->", i + 4); if (e === -1) break; end = e + 3; }
+    out += html.slice(from, i) + " "; from = i = end;
+  }
+  return from === 0 ? html : out + html.slice(from);
+}
+function withoutHidden(html0) {
+  inTime();
+  const t = withoutComments(tameHtml(html0));
   const classes = hiddenClasses(t);
   const isHidden = (tag) => HIDDEN_STYLE.test(tag) || (classes.size > 0 && [...((/\bclass\s*=\s*["']([^"']*)["']/i.exec(tag) || [])[1] || "").toLowerCase().split(/\s+/)].some((c) => classes.has(c)));
   const OPEN = /<(div|table|span|p|td|tr|tbody|center|section|a|font|ul|li)\b[^>]*>/gi;
+  // (Each kind of tag's opening and closing tags are found once, in order, however many hidden elements there are: looking
+  // for a hidden element's end used to start a new search of the rest of the email each time.)
+  const tagsOf = new Map();
+  const tags = (name) => {
+    if (!tagsOf.has(name)) { const list = [], re = new RegExp("<(/?)" + name + "\\b[^>]*>", "gi"); for (let x; (x = re.exec(t)); ) list.push([x.index, x.index + x[0].length, x[1] ? -1 : 1]); tagsOf.set(name, { list, at: 0 }); }
+    return tagsOf.get(name);
+  };
   let out = "", from = 0, guard = 0;
   for (let m; (m = OPEN.exec(t)) && guard < 5000; guard++) {
     if (!isHidden(m[0])) continue;
     // The hidden element ends at its own closing tag (the same kind of tag, counted through any nested inside it).
-    const name = m[1].toLowerCase(), re = new RegExp("<(/?)" + name + "\\b[^>]*>", "gi");
-    re.lastIndex = m.index + m[0].length;
-    let depth = 1, end = -1;
-    for (let x; (x = re.exec(t)); ) { depth += x[1] ? -1 : 1; if (!depth) { end = x.index + x[0].length; break; } }
+    const own = tags(m[1].toLowerCase()), after = m.index + m[0].length;
+    while (own.at < own.list.length && own.list[own.at][0] < after) own.at++;
+    let depth = 1, end = -1, k = own.at;
+    for (; k < own.list.length; k++) { depth += own.list[k][2]; if (!depth) { end = own.list[k][1]; break; } }
     if (end === -1) break;
+    own.at = k + 1;
     out += t.slice(from, m.index) + " ";
     from = end; OPEN.lastIndex = end;
   }
@@ -333,11 +465,21 @@ function struckPrices(html) {
     return other ? a + b : m;
   });
 }
-function htmlToText(html) {
+// (One email's HTML is turned into text by each of the readers that try it, a refund, a return, a parcel, a receipt: the
+// last two answers are kept, so it is worked out once.)
+const textOf = [];
+function htmlToText(html0) {
+  const html = tameHtml(html0);
+  const had = textOf.find((e) => e[0] === html);
+  if (had) return had[1];
   const shown = struckPrices(withoutHidden(html));
-  return htmlToTextAll(/£|&pound;|&#163;|&#xa3;/i.test(shown) || !/£|&pound;|&#163;|&#xa3;/i.test(html) ? shown : html);
+  const text = htmlToTextAll(/£|&pound;|&#163;|&#xa3;/i.test(shown) || !/£|&pound;|&#163;|&#xa3;/i.test(html) ? shown : html);
+  textOf.unshift([html, text]); textOf.length = Math.min(textOf.length, 2);
+  return text;
 }
-function htmlToTextAll(html) {
+function htmlToTextAll(html0) {
+  inTime();
+  const html = tameHtml(html0);
   // (The words the email shows, to tell a picture that is the only place an item is named from one beside its name.)
   let shown = null;
   const shownText = () => shown ?? (shown = decodeEntities(html.replace(/<(script|style)[\s\S]*?<\/\1>/gi, " ").replace(/<[^>]+>/g, " ")).replace(/\s+/g, " ").toLowerCase());
@@ -375,9 +517,12 @@ function htmlToTextAll(html) {
 function money(str) {
   if (str == null) return null;
   // (Thousands with their commas, "1,184.36", or written without, "1184.36": never only the first three digits of it. Round 15.)
-  const m = String(str).match(/([0-9]{1,3}(?:,[0-9]{3})+(?![0-9])|[0-9]+)(?:\.([0-9]{2}))?/);
+  // (A number given as a number, "price": 12.5 in a shop's order data, is that many pounds: £12.50, never £12.00. And pence
+  // written with one figure, "12.5", are tens of pence. Review, 25 Nov 2026.)
+  if (typeof str === "number") { const p = Math.round(str * 100); return Number.isFinite(str) && str >= 0 && Number.isSafeInteger(p) ? p : null; }
+  const m = String(str).match(/([0-9]{1,3}(?:,[0-9]{3})+(?![0-9])|[0-9]+)(?:\.([0-9]{2})|\.([0-9])(?![0-9]))?/);
   if (!m) return null;
-  const pence = Math.round(Number(m[1].replace(/,/g, "") + "." + (m[2] || "00")) * 100);
+  const pence = Math.round(Number(m[1].replace(/,/g, "") + "." + (m[2] || (m[3] ? m[3] + "0" : "00"))) * 100);
   return Number.isFinite(pence) ? pence : null;
 }
 
@@ -831,6 +976,10 @@ function extractReturns(text, html, orderDate, other = "") {
     let m = sent.match(/within\s+(\d{1,3})(?:\s+|-)(?:calendar\s+|working\s+)?days?(?:\s+(?:starting\s+)?(?:of|from|after)\s+(?:the\s+)?(?:day\s+after\s+(?:the\s+)?(?:date\s+of\s+)?)?(delivery|receiv\w*|dispatch\w*|purchase|order\w*|today))?/i) ||
       sent.match(/(\d{1,3})[-\s]days?\s+(?:free\s+)?returns?/i) || sent.match(/\byou have\s+(\d{1,3})\s+days?\s+to\s+return\b/i);
     if (m && m.index != null && /\brefund(?:ed|s)?(?:\s+(?:to\s+)?(?:you|your\s+(?:card|account|original\s+payment(?:\s+method)?)))?\s*$/i.test(sent.slice(Math.max(0, m.index - 60), m.index))) continue;
+    // (Nor a sentence about the refund itself, "Refunds are processed within 14 days of receiving your return", "Your money
+    // will be back within 5 days": how long the money takes, never how long there is to send something back. Second pass
+    // of the readers' review, 25 Nov 2026: that was a 14-day window from delivery.)
+    if (m && m.index != null && /\b(?:refunds?|money|credit|payment)\b[^.]{0,40}\b(?:processed|issued|made|paid|credited|sent|back|returned|arrive|reach|appear|show)\b[^.]{0,30}$/i.test(sent.slice(0, m.index))) continue;
     if (m) {
       out.windowDays = Number(m[1]);
       const basis = (m[2] || "").toLowerCase();
@@ -869,8 +1018,14 @@ function extractReturns(text, html, orderDate, other = "") {
   const cant = /\b(?:items?|following)[^.\n]{0,40}\bcan(?:'|’|no)?t be returned\b[\s\S]{0,300}?^[ \t]*[-•*][ \t]*(custom (?:or|and) personali[sz]ed (?:orders|items)|personali[sz]ed (?:orders|items))/im.exec(both);
   if (cant) out.excludes = ["personalised"];
   // Explicit date: "return by 14 November 2026".
-  const byDate = flat.match(/return\w*[^.\n]{0,60}?\bby\s+(\d{1,2}(?:st|nd|rd|th)?\s+[A-Za-z]{3,9}\.?,?\s+\d{4}|\d{4}-\d{2}-\d{2})/i);
-  if (byDate) out.deadline = parseDate(byDate[1]);
+  // (Only a date for sending things back: not "your refund will be returned to your card by 5 December", which is when the
+  // money comes, nor what the shop says it will do by then. Second pass of the readers' review, 25 Nov 2026.)
+  for (const m of flat.matchAll(/return\w*[^.\n]{0,60}?\bby\s+(\d{1,2}(?:st|nd|rd|th)?\s+[A-Za-z]{3,9}\.?,?\s+\d{4}|\d{4}-\d{2}-\d{2})/gi)) {
+    const clause = flat.slice(Math.max(0, m.index - 120), m.index + m[0].length).split(/[.!?]\s|\n/).pop();
+    if (/\b(?:refunds?|money|credit|payment)\b|\b(?:we(?:'|’)ll|we will|will be|you(?:'|’)ll (?:receive|get|have)|we aim|we expect)\b/i.test(clause)) continue;
+    out.deadline = parseDate(m[1]);
+    if (out.deadline) break;
+  }
   if (!out.deadline && out.windowDays && out.windowFrom === "order" && orderDate) {
     const d = new Date(orderDate + "T00:00:00Z");
     if (!Number.isNaN(d.getTime())) { d.setUTCDate(d.getUTCDate() + out.windowDays); out.deadline = isoDate(d); }
@@ -895,7 +1050,7 @@ function extractReturns(text, html, orderDate, other = "") {
   // Link to start a return: only https links whose text or address mentions returns.
   if (html) {
     // (An address written without quotes, <a href=https://…>, as some shops' emails do, is read too. Round 17.)
-    for (const a of html.matchAll(/<a\b[^>]*href=(?:["']([^"']+)["']|([^\s"'>]+))[^>]*>([\s\S]*?)<\/a>/gi)) {
+    for (const a of upToLastClose(html, "a").matchAll(/<a\b[^>]*href=(?:["']([^"']+)["']|([^\s"'>]+))[^>]*>([\s\S]*?)<\/a>/gi)) {
       const href = (a[1] || a[2]).replace(/&amp;/g, "&").trim();
       const label = a[3].replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
       if (!/^https:\/\//i.test(href) || href.length > 800) continue;
@@ -904,7 +1059,7 @@ function extractReturns(text, html, orderDate, other = "") {
     }
     // (A digital purchase's way to cancel, the link in Apple's "To cancel your purchase within 14 days …, report a problem":
     // kept apart from a returns page, as where to ask. Round 21.)
-    if (out.cancelWithin) for (const a of html.matchAll(/<a\b[^>]*href=(?:["']([^"']+)["']|([^\s"'>]+))[^>]*>([\s\S]*?)<\/a>/gi)) {
+    if (out.cancelWithin) for (const a of upToLastClose(html, "a").matchAll(/<a\b[^>]*href=(?:["']([^"']+)["']|([^\s"'>]+))[^>]*>([\s\S]*?)<\/a>/gi)) {
       const href = (a[1] || a[2]).replace(/&amp;/g, "&").trim();
       const label = a[3].replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
       if (/^https:\/\//i.test(href) && href.length <= 800 && /^(?:report a problem|request a refund|cancel (?:your |this |the )?(?:purchase|order|subscription))$/i.test(label)) { out.cancelUrl = href; break; }
@@ -1152,7 +1307,7 @@ const AMZ_SKIP = /^(sold by\b|fulfill?ed by\b|condition:|gift (?:wrap|message|no
 function amazonRows(html) {
   // (Every named character, "v&iacute;voactive" as "vívoactive", Round 15; quotes kept plain as before.)
   const decode = (t) => decodeEntities(t.replace(/&#39;|&rsquo;|&lsquo;/g, "'").replace(/&quot;|&ldquo;|&rdquo;/g, '"'));
-  return String(html || "").replace(/<(script|style)[\s\S]*?<\/\1>/gi, " ").split(/<[^>]+>/)
+  return tameHtml(html).replace(/<(script|style)[\s\S]*?<\/\1>/gi, " ").split(/<[^>]+>/)
     .map((t) => decode(t).replace(/[\u034f\u200b-\u200f\u00ad\u2060\ufeff\u202a-\u202e]/g, "").replace(/\s+/g, " ").trim()).filter(Boolean);
 }
 export function amazonItems(html, given) {
@@ -3435,6 +3590,13 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
       result.itemsCheck = { ...checkItems(result.items, moneyOf(fromHtml || text), result.totalPence), ...namesCheck(result.items, { shop: (result.retailer && result.retailer.name) || "" }) };
     }
   }
+  // (Bought in a shop, not online: a till receipt sent by email, or one that says so, "In-store purchase", "Served by",
+  // "Till 4". UK law's 14 days to change your mind are for buying at a distance, so Relay never works them out for one of
+  // these (gmail.js estimateReturnBy); the shop's own stated window still counts. Review, 25 Nov 2026.)
+  {
+    const top = (fromHtml || text).slice(0, 8000);
+    if (tillEReceipt(fromHtml || text) || /\b(?:in[- ]store (?:purchase|receipt|transaction)|(?:your )?(?:store|shop|till) receipt\b|served by\b|cashier\b|till (?:no\.?|number|\d)|store (?:no\.?|number)\s*[:#]?\s*\d|(?:thank you|thanks) for (?:shopping|visiting) (?:in|at) (?:our|the) (?:store|shop))/i.test(top)) result.inStore = true;
+  }
   // (A takeaway's own ordering page's email, "Pcs | Name | Total", each thing over its price and the money added and taken off
   // under the subtotal: its own lines, when they come to the total. Round 20.)
   if (!result.items.length || result.totalPence == null) {
@@ -3924,7 +4086,6 @@ export function trackingLink(carrier, number) {
 
 // Delivery updates: emails from a carrier ("Your parcel from Lululemon EMEA has been delivered") or from the shop
 // ("Your order is out for delivery"). They never make a purchase card; they add "where's my parcel" to one.
-const CARRIER_SENDERS = [["Royal Mail", /royalmail\.com|parcelforce\.com/i], ["Evri", /evri\.com|myhermes/i], ["DPD", /dpd\.co\.uk|dpdlocal/i], ["InPost", /inpost\.co\.uk/i], ["Yodel", /yodel\.co\.uk/i]];
 // Carriers' own addresses, for return parcels (parseReturnParcelEmail): the seven UK carriers shops send returns with.
 // Matched against the sender's domain only (the part after @), so a shop can't pass for a carrier by its display name.
 export const RETURN_CARRIER_SENDERS = [["Parcelforce", /(^|\.)parcelforce\.(com|co\.uk)$/i], ["Royal Mail", /(^|\.)royalmail\.(com|co\.uk)$/i], ["Evri", /(^|\.)(evri\.com|myhermes\.co\.uk)$/i],
@@ -3942,16 +4103,31 @@ export function returnCarrierOf(from) {
 // at once by one ("your refund will…", "your refund can take…", "your refund has not…"); or in a question. `more` adds words for carriers' emails.
 const NOT_YET = "once|when|whenever|as soon as|if|unless|until|till|whether|will|shall|we(?:'|’)ll|you(?:'|’)ll|it(?:'|’)ll|they(?:'|’)ll|should|could|would|need(?:s)? to|to be|due to|expect(?:ed)? to|can (?!confirm)|how to|ready to|remember to|forget to|not|cannot|no";
 const NOT_YET_NEXT = /^\s*(?:(?:has|have|is|was|are|were|did|does)(?:n(?:'|’)t\b|\s+(?:still\s+)?(?:not|never)\b)|will|shall|should|could|would|may|might|is expected|is due|is usually|usually|normally|typically|can take|takes|won(?:'|’)t|can(?:'|’)t|cannot)\b/i;
-function saidNow(text, re, more) {
+// (Review, 25 Nov 2026: `o.never` is words that, anywhere in the same sentence, mean it has not happened, "your refund has
+// been declined", "is pending"; `o.must` is what the sentence has to be about, a carrier's "delivered" counting for a
+// return only in a sentence about the return. When unsure the step is not counted.)
+function saidNow(text, re, more, o = {}) {
   const t = String(text || ""), notYet = new RegExp("\\b(?:" + NOT_YET + (more ? "|" + more : "") + ")\\b|n(?:'|’)t\\b", "i");
   for (const m of t.matchAll(new RegExp(re.source, re.flags.includes("g") ? re.flags : re.flags + "g"))) {
     const before = t.slice(Math.max(0, m.index - 400), m.index).split(/[.!?:]["')\]]?\s+|\n/).pop();
     const after = t.slice(m.index + m[0].length, m.index + m[0].length + 300);
     const end = /[.!?](?=["')\]]?(?:\s|$))|\n/.exec(after);
     if (notYet.test(before + " " + m[0]) || NOT_YET_NEXT.test(after) || (end && end[0] === "?")) continue;
+    const sentence = before + m[0] + (end ? after.slice(0, end.index) : after);
+    if (o.never && o.never.test(sentence)) continue;
+    if (o.must && !o.must(sentence)) continue;
     return true;
   }
   return false;
+}
+// A carrier, by the address its email came from (the part after the @), never by a display name: `"royalmail.com
+// tracking" <x@elsewhere.example>` is not Royal Mail. (Review, 25 Nov 2026: parcel emails were told by the whole From line.)
+const CARRIER_DOMAINS = [["Royal Mail", /(^|\.)(?:royalmail\.(?:com|co\.uk)|parcelforce\.(?:com|co\.uk))$/i], ["Evri", /(^|\.)(?:evri\.com|myhermes\.co\.uk)$/i],
+  ["DPD", /(^|\.)(?:dpd\.co\.uk|dpdlocal\.co\.uk)$/i], ["InPost", /(^|\.)inpost\.co\.uk$/i], ["Yodel", /(^|\.)yodel\.co\.uk$/i]];
+export function deliveryCarrierOf(from) {
+  const s = String(from || ""), addr = ((s.match(/<([^<>\s]+@[^<>\s]+)>/) || [])[1] || (s.match(/([^\s<>"]+@[^\s<>"]+)/) || [])[1] || "").toLowerCase();
+  const domain = (addr.split("@")[1] || "").replace(/[^a-z0-9.-]+$/, "");
+  return domain ? (CARRIER_DOMAINS.find(([, re]) => re.test(domain)) || [])[0] || null : null;
 }
 export function parseDeliveryEmail(rawEmail) {
   const raw = String(rawEmail || "").slice(0, MAX_INPUT);
@@ -3962,12 +4138,14 @@ export function parseDeliveryEmail(rawEmail) {
   const text = shownText(parts, html);
   const subject = headers.subject || "";
   const from = String(headers.from || "");
-  const fromCarrier = (CARRIER_SENDERS.find(([, re]) => re.test(from)) || [])[0] || null;
+  const fromCarrier = deliveryCarrierOf(from);
   const both = subject + "\n" + text.slice(0, 4000);
   let status = null;
   // "Due to be delivered today" is checked first so it is never read as "delivered today".
   if (/\bdue to be delivered\b|\barriving today\b|\bexpected (?:today|on)\b/i.test(subject)) status = "due";
-  else if (/\b(has been|was|been|we(?:'|’)?ve)\s+delivered\b|\bwe delivered\b/i.test(both)) status = "delivered";
+  // (Only when the email says it has been delivered: "We'll email you again when it's been delivered", "once your parcel
+  // has been delivered" and "has not been delivered" are not a delivery. Review, 25 Nov 2026.)
+  else if (saidNow(both, /\b(?:has been|was|been|we(?:'|’)?ve)\s+delivered\b|\bwe delivered\b/i, "after|before|please|can|track|couldn(?:'|’)t be|unable")) status = "delivered";
   // "Delivered: 1 item | Order # …", or a heading that just says "Delivered today".
   else if (/^\s*delivered\s*:/i.test(subject) || /^[|\t\v\f \u00a0\u1680\u2000-\u200a\u202f\u205f\u3000\ufeff]*delivered today[.!]?[\s|]*$/im.test(text.slice(0, 4000))) status = "delivered";
   else if (/\bout for delivery\b/i.test(both)) status = "out_for_delivery";
@@ -4034,25 +4212,36 @@ export function parseReturnEmail(rawEmail) {
 
   // Deadline: "send it back no later than Wednesday, December 24". The year, if absent,
   // comes from the email's own date and is never in the past relative to it.
+  // (Review, 25 Nov 2026: "We'll send you a label by 5 December 2026. Please send it back no later than 20 December 2026."
+  // gave the 5th, the day the shop promised its label. A date counts only in a sentence about the shopper sending the
+  // thing back: not one about what the shop, its courier or the refund will do. "No later than", "on or before" and
+  // "before" lead over a plain "by"; of several that count, the earliest, so nobody is told a later day than the email's.)
   let deadline = null;
+  const dayIn = (written) => {
+    const full = parseDate(written);
+    if (full) return full;
+    const a = written.match(/^([A-Za-z]{3})[a-z]*\.?\s+(\d{1,2})/) || null;
+    const b = written.match(/^(\d{1,2})(?:st|nd|rd|th)?\s+([A-Za-z]{3})/) || null;
+    const mi = a ? MONTHS.indexOf(a[1].toLowerCase()) : b ? MONTHS.indexOf(b[2].toLowerCase()) : -1;
+    const day = a ? Number(a[2]) : b ? Number(b[1]) : 0;
+    if (!(mi >= 0 && day && refDate instanceof Date && !Number.isNaN(refDate.getTime()))) return null;
+    let year = refDate.getUTCFullYear();
+    if (new Date(Date.UTC(year, mi, day)) < new Date(refDate.getTime() - 86400000)) year += 1;
+    return ymdOf(year, mi + 1, day);
+  };
+  const firm = [], plain = [];
   for (const sent of text.split(/(?<=[.!?])\s+|\n+/)) {
     if (!/back|return|send/i.test(sent)) continue;
-    const dm = sent.match(/(?:no later than|by|before|on or before)\s+(?:[A-Za-z]{3,9},?\s+)?([A-Za-z]{3,9}\.?\s+\d{1,2}(?:st|nd|rd|th)?(?:,?\s+\d{4})?|\d{1,2}(?:st|nd|rd|th)?\s+[A-Za-z]{3,9}(?:,?\s+\d{4})?)/i);
+    const dm = sent.match(/(no later than|by|before|on or before)\s+(?:[A-Za-z]{3,9},?\s+)?([A-Za-z]{3,9}\.?\s+\d{1,2}(?:st|nd|rd|th)?(?:,?\s+\d{4})?|\d{1,2}(?:st|nd|rd|th)?\s+[A-Za-z]{3,9}(?:,?\s+\d{4})?)/i);
     if (!dm) continue;
-    deadline = parseDate(dm[1]);
-    if (!deadline) {
-      const a = dm[1].match(/^([A-Za-z]{3})[a-z]*\.?\s+(\d{1,2})/) || null;
-      const b = dm[1].match(/^(\d{1,2})(?:st|nd|rd|th)?\s+([A-Za-z]{3})/) || null;
-      const mi = a ? MONTHS.indexOf(a[1].toLowerCase()) : b ? MONTHS.indexOf(b[2].toLowerCase()) : -1;
-      const day = a ? Number(a[2]) : b ? Number(b[1]) : 0;
-      if (mi >= 0 && day && refDate instanceof Date && !Number.isNaN(refDate.getTime())) {
-        let year = refDate.getUTCFullYear();
-        if (new Date(Date.UTC(year, mi, day)) < new Date(refDate.getTime() - 86400000)) year += 1;
-        deadline = `${year}-${String(mi + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-      }
-    }
-    if (deadline) break;
+    // What the sentence says before the date: the shop's own promise ("we'll send you a label by", "your refund will be
+    // with you by", "our courier will collect it by") is not the shopper's deadline.
+    const clause = sent.slice(0, dm.index);
+    if (/\b(?:we(?:'|’)ll|we will|we(?:'|’)re going to|we aim|we expect|you(?:'|’)ll (?:receive|get|have|hear)|you will (?:receive|get|have|hear)|your (?:refund|label|replacement|exchange) (?:will|should|is|are)|courier will|driver will|will (?:collect|arrive|be collected|be delivered|be refunded|be sent))\b/i.test(clause)) continue;
+    const found = dayIn(dm[2]);
+    if (found) (/^by$/i.test(dm[1]) ? plain : firm).push(found);
   }
+  deadline = (firm.length ? firm : plain).sort()[0] || null;
 
   // The "how to" steps: the lines between the instructions heading and the details heading.
   let steps = [];
@@ -4069,7 +4258,7 @@ export function parseReturnEmail(rawEmail) {
   let trackUrl = null;
   if (html) {
     // (An address written without quotes, <a href=https://…>, as some shops' emails do, is read too. Round 17.)
-    for (const a of html.matchAll(/<a\b[^>]*href=(?:["']([^"']+)["']|([^\s"'>]+))[^>]*>([\s\S]*?)<\/a>/gi)) {
+    for (const a of upToLastClose(html, "a").matchAll(/<a\b[^>]*href=(?:["']([^"']+)["']|([^\s"'>]+))[^>]*>([\s\S]*?)<\/a>/gi)) {
       const href = (a[1] || a[2]).replace(/&amp;/g, "&").trim();
       const label = a[3].replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
       if (/^https:\/\//i.test(href) && href.length <= 800 && /track.{0,12}return/i.test(label)) { trackUrl = href; break; }
@@ -4131,6 +4320,20 @@ function appleCreditNote(headers, text) {
     retailer: { name: "Apple", domain: fwdFrom ? fwdFrom[1].toLowerCase() : retailerFromFrom(headers.from)?.domain || "apple.com" } };
 }
 
+// A refund the shop says it has made. "refund … has been processed" with a few words between, never across "you", "that",
+// "we" and the like ("the refund for the items you sent back" says nothing was refunded).
+const REFUND_GAP = "(?:(?!\\b(?:you|that|which|who|we|if|when|once|request|label|polic(?:y|ies))\\b)(?:[^.\\n]|\\.(?=\\d))){0,60}?";
+const REFUND_DONE = "(?:(?:has|have)(?: now| already| just)? been(?: successfully| now)?|was(?: successfully)?|(?:'|’)s been)\\s+(?:processed|issued|completed|sent|paid|credited|made|refunded)|is (?:now )?(?:complete|on (?:its|the) way)";
+const REFUND_MADE = new RegExp("\\brefund(?:ed)?\\b" + REFUND_GAP + "\\s(?:" + REFUND_DONE + ")\\b" +
+  "|\\b(?:we(?:'|’)?ve|we have) (?:now |just |already |successfully )?(?:processed|issued|sent|completed) (?:your|a|the) (?:full |partial )?refund\\b(?! request)" +
+  "|\\bwe(?: have|(?:'|’)ve)? (?:now |just |already |successfully )?refunded\\b|\\b(?:has|have|(?:'|’)ve) been (?:successfully |fully |partially )?refunded\\b" +
+  "|\\bhere comes the refund\\b|\\bsent you a refund\\b|\\brefund complete\\b|\\brefund (?:of £\\s?[\\d,.]+ )?has been (?:successfully )?initiated\\b" +
+  "|(?:^|\\n|[|:]\\s)\\s*(?:your )?refund (?:processed|issued|completed|sent)\\b|\\b(?:amount|total(?: amount)?) refunded\\b", "i");
+const REFUND_NOT_MADE = /\b(?:declined|rejected|refused|denied|unsuccessful|failed|unable|pending|on hold|awaiting|in progress|under review|being (?:processed|reviewed|assessed|checked|considered|looked at|inspected)|refund request|request(?:ed)? (?:for )?a refund)\b/i;
+const REFUND_STOPPED = /\b(?:declined|rejected|refused|denied|unsuccessful|failed|unable|on hold|under review|being (?:reviewed|assessed|checked|considered|looked at|inspected)|refund request|request(?:ed)? (?:for )?a refund)\b/i;
+const REFUND_UNDER_WAY = new RegExp("\\b(?:we(?:'|’)?re|we are) (?:now |currently )?(?:processing|issuing|sending) (?:your|a|the) (?:full |partial )?refund\\b(?! request)|\\b(?:we(?:'|’)?re|we are) (?:now )?refunding\\b" +
+  "|\\brefund\\b" + REFUND_GAP + "\\sis (?:now |currently )?being (?:processed|credited|paid|sent|issued)\\b", "i");
+const REFUND_REFUSED = /\brefund(?: request)?\b[^.\n]{0,60}\b(?:declined|rejected|refused|denied|unsuccessful|not (?:been )?(?:approved|processed|issued))\b|\b(?:unable|not able|cannot|can(?:'|’)t|couldn(?:'|’)t|could not|won(?:'|’)t be able) to (?:process|issue|offer|give|provide|approve|complete)\b[^.\n]{0,40}\brefund\b|\b(?:declined|rejected|refused|denied) your (?:refund|return)\b/i;
 export function parseReturnUpdateEmail(rawEmail) {
   const raw = String(rawEmail || "").slice(0, MAX_INPUT);
   const { headers, body } = splitMessage(raw);
@@ -4168,8 +4371,18 @@ export function parseReturnUpdateEmail(rawEmail) {
   if (/\brefund request\b|\brequest(?:ed)? (?:for )?a refund\b/i.test(subj) && !/\brefund(?: request)? (?:has been|was|is) (?:approved|granted|issued|processed|completed)\b|\bwe(?:'|’)?ve (?:approved|issued|processed) (?:your|a|the) refund\b|\bwe(?:'|’)?re refunding (?:your|the|this)\b|\byour refund is being (?:credited|paid|sent)\b/i.test(both)) return { ok: false, reason: "refund_request" };
   let stage = null;
   // Only what the shop says it has done (saidNow): "we'll process your refund" isn't a refund.
-  if (saidNow(both, /\brefund(?:ed)?\b[^.\n]{0,40}\b(?:has been|have been|was|is being|been)?\s*(?:processed|issued|approved|completed|sent|on (?:its|the) way)\b|\b(?:we(?:'|’)?ve|we have) (?:processed|issued|sent|completed) (?:your|a|the) refund|\b(?:we(?:'|’)?ve|we have) refunded\b|\brefund confirmation\b|\byour refund\b|\b(?:has|have) been (?:successfully )?refunded\b|\bhere comes the refund\b|\bsent you a refund\b|\brefund complete\b|\brefund (?:of £\s?[\d,.]+ )?has been (?:successfully )?initiated\b/i)) stage = "refunded";
-  else if (saidNow(both, /\b(?:we(?:'|’)?ve|we have) received your return|\byour return (?:has been received|has arrived|is with us)|\breturn (?:received|arrived)\b/i)) stage = "received";
+  // (Review, 25 Nov 2026: "your refund" and "refund confirmation" on their own counted, so "your refund has been declined",
+  // "we are unable to process your refund" and "your refund of £20.00 is pending" were all read as refunded, and with it the
+  // return as received. Now the words must say the refund was made; a sentence that says it was turned down, is waiting or
+  // is still being worked on never counts; and an email that anywhere near its top says the refund was refused is never one.)
+  if (!REFUND_REFUSED.test(subject + "\n" + text.slice(0, 3000)) && saidNow(both, REFUND_MADE, null, { never: REFUND_NOT_MADE })) stage = "refunded";
+  // ("We have received your return request" is the request, not the parcel.)
+  else if (saidNow(both, /\b(?:we(?:'|’)?ve|we have) received your return(?!s?\s+(?:request|label|form|details|application|enquiry|query|instructions))|\byour return (?:has been received|has arrived|is with us)|\breturn (?:received|arrived)\b/i, null, { never: /\breturns? (?:request|label|form)\b/i })) stage = "received";
+  // (A refund the shop says it is making but has not yet made, "we are processing your refund in the amount of £849.00",
+  // "your refund is being credited back … normally completed within 5 working days": kept as "refunding", which ticks
+  // nothing and makes no fact; it only lets money in at the bank be matched to this order. Review, 25 Nov 2026: these were
+  // read as refunded.)
+  else if (!REFUND_REFUSED.test(subject + "\n" + text.slice(0, 3000)) && saidNow(both, REFUND_UNDER_WAY, null, { never: REFUND_STOPPED })) stage = "refunding";
   if (!stage) return { ok: false, reason: "not_a_return_update" };
   const sender = retailerFromFrom(headers.from);
   // A refund email the shopper forwarded from their own mailbox is the shop's: the shop is read from the forwarded
@@ -4182,7 +4395,7 @@ export function parseReturnUpdateEmail(rawEmail) {
   const refDate = headers.date ? new Date(headers.date) : null;
   // (A labelled amount with the money on the line under its label, "Refunded total: |" over "£6.90", is the refund. Round 12.)
   // (The whole refund first, "Total Amount Refunded: £137.95", over the item's "Refund Value: £135.00" above it. Round 15.)
-  const amt = stage === "refunded" ? (both.match(/\btotal (?:amount )?refunded\s*:?[\s|]{0,12}£\s*([0-9][0-9,]*\.[0-9]{2})/i) || both.match(/\b(?:refund(?:ed)? (?:total|amount|value)|total (?:refund(?:ed)?|amount refunded)|amount refunded|refund due)\s*:?[\s|]{0,12}£\s*([0-9][0-9,]*\.[0-9]{2})/i) ||
+  const amt = stage === "refunded" || stage === "refunding" ? (both.match(/\btotal (?:amount )?refunded\s*:?[\s|]{0,12}£\s*([0-9][0-9,]*\.[0-9]{2})/i) || both.match(/\b(?:refund(?:ed)? (?:total|amount|value)|total (?:refund(?:ed)?|amount refunded)|amount refunded|refund due)\s*:?[\s|]{0,12}£\s*([0-9][0-9,]*\.[0-9]{2})/i) ||
     both.match(/refund(?:ed)?[^£\n]{0,60}£\s*([0-9][0-9,]*\.[0-9]{2})/i) || both.match(/£\s*([0-9][0-9,]*\.[0-9]{2})[^.\n]{0,40}\brefund/i) ||
     // ("A refund of £3 has been initiated": whole pounds. Round 15.)
     both.match(/\ba refund of £\s*([0-9][0-9,]{0,8})(?![\d.,])/i) ||
@@ -4232,16 +4445,38 @@ export function parseReturnParcelEmail(rawEmail) {
   const text = shownText(parts, html);
   const lead = text.slice(0, 5000), head = subject + "\n" + lead;
   if (/\breturn(?:ed|ing)? to (?:the )?sender\b/i.test(head)) return no;
-  const aboutReturn = /\breturn(?:s|ed|ing)?\b/i.test(subject) ||
-    /\b(?:your|the|this) return\b|\breturns? (?:parcel|label|item|package|shipment)\b|\breturning (?:your|an?|the)\b|\bon (?:its|it's|the) way back\b|\bback to the (?:retailer|shop|store|seller)\b/i.test(lead);
+  // (Review, 25 Nov 2026. A carrier's email about a parcel coming TO the shopper often ends "Returning an item? Book your
+  // return online": "We've delivered your ASOS parcel" was read as a return received by the shop. A footer's offer is not
+  // what the email is about, and an email that says who the parcel is from, or that it is coming to you, is a delivery.)
+  const subjectReturn = /\breturn(?:s|ed|ing)?\b/i.test(subject);
+  const aboutReturn = subjectReturn ||
+    /\b(?:your|the|this) return\b(?!s? (?:online|here|today|now|policy|options)\b)|\breturns? (?:parcel|label|item|package|shipment)\b|\bon (?:its|it's|the) way back\b|\bback to the (?:retailer|shop|store|seller)\b/i.test(lead.replace(/\b(?:book|start|arrange|create|make|track|manage) (?:your|a|the) return\b[^.\n]*/gi, " "));
   if (!aboutReturn) return no;
-  if (!carrierSender && !/\breturn\b[^\n]{0,40}\b(?:on (?:its|it's|the) way|dropped off|in transit|been sent|been posted)\b|\bdropped off\b|\bon (?:its|it's|the) way back\b/i.test(subject)) return no;
+  const toShopper = /\b(?:parcel|package|order|delivery|item)s? from [A-Z]|\bon (?:its|it's|the) way to you\b|\bdelivered to (?:you\b|your\b)|\b(?:we(?:'|’)?ve|we have) delivered your\b(?! return)/.test(head);
+  if (toShopper && !subjectReturn) return no;
+  // A sentence about the return itself: it names the return, or says the parcel is going back or to a shop.
+  const RETURNISH = /\breturn(?:s|ed)?\b|\bway back\b|\bback to\b|\b(?:retailer|seller|sender)\b/i;
+  const NOT_THE_PARCEL = /\b(?:label|qr code|barcode|replacement|exchange|refund|request|instructions?|confirmation email|form)\b/i;
+  const returnSentence = (sentence) => (subjectReturn || RETURNISH.test(sentence)) && !/\bto you\b|\bto your (?:address|door|home|neighbou?r|safe place|porch)\b/i.test(sentence);
   let stage = null;
   // Only what the email says has happened (saidNow): a label email's "once you've dropped it off" isn't a drop-off.
   const CARRIER_NOT_YET = "after|before|please|can|track";
-  if (carrierSender && saidNow(head, /\b(?:has been|was|been|we(?:'|’)?ve)\s+delivered\b|\bdelivered to\b/i, CARRIER_NOT_YET) && !/\bout for delivery\b|\bdue to be delivered\b/i.test(head)) stage = "received";
-  else if (saidNow(head, /\bdropped off\b|\bthanks for dropping off\b|\breturn\b[^.\n]{0,40}\bis on (?:its|it's|the) way\b|\bdrop[- ]off (?:confirmed|confirmation|receipt)\b|\bhanded (?:it |your parcel |your return )?(?:in|over)\b|\b(?:we(?:'|’)?ve|we have) (?:got|received|collected) your (?:return|parcel)\b|\bcollected your (?:return|parcel)\b|\bon (?:its|it's|the) way back\b|\bon (?:its|it's) way to\b|\bin transit\b|\bhas been (?:posted|sent)\b|\baccepted at\b/i, CARRIER_NOT_YET)) stage = "sent";
-  else if (carrierSender && /\breturn label\b|\byour label\b|\blabel (?:is )?ready\b|\bprint (?:your|the) label\b|\b(?:qr|barcode) code\b/i.test(head)) stage = "started";
+  if (!carrierSender) {
+    // A shop's own email counts only when its subject says the return parcel itself is on its way, dropped off or in
+    // transit: "Your return label has been sent", "Your return: a replacement is on its way" and "Your returned item is on
+    // its way back to you" say nothing about the parcel going back. (Review, 25 Nov 2026: those were read as sent, and a
+    // shop's word makes the on-its-way fact.)
+    const SHOP_SAYS = /\b(?:your|the) return(?:s|ed)?(?: parcel| package| items?| order)?(?: (?:for|of|from) (?:order )?#?[A-Z0-9-]{3,24})? (?:is|has been|was|(?:'|’)s) (?:now )?(?:on (?:its|it's|the) way(?: back)?|dropped off|in transit|handed (?:in|over)|collected)\b(?!\s+to you\b)|\b(?:we can see )?your (?:parcel|return) is on (?:its|it's|the) way back(?: to us)?\b(?!\s+to you\b)/i;
+    if (saidNow(subject, SHOP_SAYS, CARRIER_NOT_YET, { never: new RegExp(NOT_THE_PARCEL.source + "|\\bto you\\b", "i") })) stage = "sent";
+    if (!stage) return no;
+  }
+  // (A carrier's "delivered" counts for a return only in a sentence about the return, or under a subject that names it.)
+  else if (saidNow(head, /\b(?:has been|was|been|we(?:'|’)?ve)\s+delivered\b|\bdelivered to\b/i, CARRIER_NOT_YET, { must: returnSentence }) && !/\bout for delivery\b|\bdue to be delivered\b/i.test(head)) stage = "received";
+  // (Handing a parcel over is the shopper's own doing, whatever the sentence names.)
+  else if (saidNow(head, /\bdropped off\b|\bthanks for dropping off\b|\bdrop[- ]off (?:confirmed|confirmation|receipt)\b|\bhanded (?:it |your parcel |your return )?(?:in|over)\b|\baccepted at\b/i, CARRIER_NOT_YET, { never: /\b(?:label|qr code|barcode) (?:has been|was|is) (?:sent|emailed|created|ready)\b/i }) ||
+    // (On its way, in transit, collected: also what a carrier says of a parcel coming to the shopper, so only of the return.)
+    saidNow(head, /\breturn\b[^.\n]{0,40}\bis on (?:its|it's|the) way\b|\b(?:we(?:'|’)?ve|we have) (?:got|received|collected) your (?:return|parcel)\b|\bcollected your (?:return|parcel)\b|\bon (?:its|it's|the) way back\b|\bon (?:its|it's) way to\b|\bin transit\b|\b(?:return|parcel|package|item) has been (?:posted|sent back)\b/i, CARRIER_NOT_YET, { must: returnSentence, never: NOT_THE_PARCEL })) stage = "sent";
+  else if (/\breturn label\b|\byour label\b|\blabel (?:is )?ready\b|\bprint (?:your|the) label\b|\b(?:qr|barcode) code\b/i.test(head)) stage = "started";
   if (!stage) return no;
   const t = trackingIn(text);
   const other = text.match(/\b(?:tracking|parcel|barcode|consignment)\s*(?:number|no\.?|#|id|code)\s*(?:is\s*)?[:#]?\s*([A-Z0-9]{8,30})\b/i) || text.match(/\b(JJD\d{12,20}|H[0-9A-Z]{15})\b/);
@@ -4312,7 +4547,7 @@ export function parseDispatchEmail(rawEmail) {
   const no = { ok: false, reason: "not_a_dispatch_email" };
   const u = updateParts(rawEmail);
   if (!DISPATCH_SUBJECT.test(u.subject) || NOT_DISPATCH.test(u.subject) || !/\border\b/i.test(u.subject + "\n" + u.text.slice(0, 1500))) return no;
-  if (CARRIER_SENDERS.some(([, re]) => re.test(String(u.headers.from || ""))) || returnCarrierOf(u.headers.from)) return no;
+  if (deliveryCarrierOf(u.headers.from) || returnCarrierOf(u.headers.from)) return no;
   if (!u.orderRef) return no;
   const t = trackingIn(u.text) || trackingIn(String(u.html || "").replace(/&quot;/g, '"').replace(/\\\//g, "/"));
   return { ok: true, kind: "delivery_update", status: "shipped", at: u.at, carrier: (t && t.carrier) || carrierIn(u.text) || null,
@@ -4377,9 +4612,15 @@ function namedOverQuantity(text) {
 export function parseCancellationEmail(rawEmail) {
   const no = { ok: false, reason: "not_a_cancellation" };
   const u = updateParts(rawEmail);
-  if (returnCarrierOf(u.headers.from) || CARRIER_SENDERS.some(([, re]) => re.test(String(u.headers.from || "")))) return no;
+  if (returnCarrierOf(u.headers.from) || deliveryCarrierOf(u.headers.from)) return no;
   const top = u.text.slice(0, 1500).replace(/\s+/g, " ");
   const said = /\bcancell?(?:ed|ation)\b/i.test(u.subject) || NOT_A_PURCHASE_TOP.test(top);
+  // (A request to cancel, or a shop saying it couldn't, "Your cancellation request for order KO-1001", "we were unable to
+  // cancel it": nothing was cancelled unless the email also says it has been. Second pass of the readers' review, 25 Nov 2026:
+  // a request was read as the whole order cancelled, its return date taken away and its money not counted.)
+  const head2 = u.subject + "\n" + top;
+  if (/\bcancell?ation request\b|\brequest(?:ed)? (?:to|for) (?:a |the )?cancel|\basked (?:us )?to cancel\b|\b(?:unable|not able|could not|couldn(?:'|’)t|can(?:'|’)t|cannot|won(?:'|’)t be able) to (?:be )?cancel|\bcould not be cancell?ed\b|\bcan(?:not|(?:'|’)t) be cancell?ed\b|\btoo late to cancel\b/i.test(head2) &&
+    !saidNow(head2, /\b(?:has|have) been (?:successfully )?cancell?ed\b|\b(?:we(?:'|’)?ve|we have) (?:now |successfully )?cancell?ed\b|\b(?:was|is now) cancell?ed\b/i)) return no;
   // (A subscription that will stop, Google Play's "Your Microsoft Word: … subscription will be cancelled" with "will be
   // cancelled on 13 Aug 2019. No refunds will be issued": nothing bought is undone, it just doesn't renew. Kept as news for
   // the subscription's latest payment (gmail.js attachCancellations): the day it ends and that no money comes back. Round 13.)
