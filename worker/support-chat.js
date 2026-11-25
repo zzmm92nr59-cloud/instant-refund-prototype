@@ -39,7 +39,7 @@ export function supportDeleteStatements(db, shopperId) {
 export const chatAvailable = (env) => Boolean(env && env.ANTHROPIC_API_KEY);
 // And not over Relay's monthly AI spending limit (ai-spend.js): then the app says the assistant is off right now, and
 // "Talk to a person" still works.
-const chatOnNow = async (env, now) => chatAvailable(env) && !(await overLimit(env, { feature: "help_chat", reserve: 0.0001, now }).catch(() => null));
+const chatOnNow = async (env, now, shopperId) => chatAvailable(env) && !(await overLimit(env, { feature: "help_chat", shopperId, reserve: 0.0001, now }).catch(() => null));
 const supportAddress = (env) => String(env.SUPPORT_EMAIL || "").trim() || String(env.RELAY_ADMIN_EMAILS || "").split(",").map(s => s.trim()).filter(Boolean)[0] || "";
 
 // The conversation as the app sends it: alternating turns, the person's first (and, for the assistant, last), each
@@ -156,7 +156,7 @@ async function useOne(env, shopper, now, field, cap) {
 export async function handleSupportRoute(path, method, request, env, cors, shopper, o) {
   if (path !== "/relay/my/help/chat" && path !== "/relay/my/help/handoff") return null;
   const now = (o && o.now) || Date.now(), fetchImpl = (o && o.fetchImpl) || fetch;
-  if (path === "/relay/my/help/chat" && method === "GET") return json({ available: await chatOnNow(env, now), handoff: Boolean(env.RESEND_API_KEY && supportAddress(env)) }, 200, cors);
+  if (path === "/relay/my/help/chat" && method === "GET") return json({ available: await chatOnNow(env, now, shopper && shopper.id), handoff: Boolean(env.RESEND_API_KEY && supportAddress(env)) }, 200, cors);
   if (method !== "POST") return json({ error: "not_found" }, 404, cors);
   let body = null; try { body = await request.json(); } catch { body = null; }
   // A hand-off can end with the assistant's answer; the assistant is only ever asked after the person has written.
@@ -196,7 +196,7 @@ export async function handleSupportRoute(path, method, request, env, cors, shopp
       headers: { "x-api-key": env.ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json" },
       body: JSON.stringify({ model: env.SUPPORT_CHAT_MODEL || DEFAULT_MODEL, max_tokens: 300, system,
         messages: turns.map(t => ({ role: t.role, content: t.text })) })
-    });
+    }, { now, shopperId: shopper && shopper.id });
   } catch (e) { console.error("help_chat_failed", String(e && e.name || "error")); return json({ error: "chat_unavailable" }, 502, cors); }
   if (isCapped(res)) return json({ error: "chat_off" }, 503, cors);
   // Why the assistant couldn't answer, for the logs (Anthropic's status, or how its answer stopped), never the chat itself.
