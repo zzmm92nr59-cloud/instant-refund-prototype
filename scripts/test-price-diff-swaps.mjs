@@ -242,20 +242,20 @@ assert.deepEqual({ ...sqlite.prepare("SELECT status, amount_minor, destination F
 // for the line, never its price before the discount, so Relay never refunds more than was paid. Large is £25; this shopper
 // paid £20 for it with a 20% code. Kids is £15: £5 back (not £10).
 {
-  const id = conn + ":order:610";
+  const id = conn + ":order:620";
   sqlite.prepare("INSERT INTO retailer_orders (id, connection_id, external_order_id, ordered_at, amount_minor, currency, payment_processor, status, raw_identifier_keys) VALUES (?,?,?,?,?,?,?,?,?)")
-    .run(id, conn, "610", "2026-10-29T11:00:00Z", 2000, "GBP", "shopify", "unverified", "[]");
+    .run(id, conn, "620", "2026-10-29T11:00:00Z", 2000, "GBP", "shopify", "unverified", "[]");
   sqlite.prepare("INSERT INTO retailer_order_emails (order_id, email_hash, created_at) VALUES (?,?,?)").run(id, alice.emailHash, 1);
   // (The swap code makes the column on first use, as it does on Relay's database.)
   await opts(env, oTwo);
   sqlite.prepare("INSERT INTO order_items (id, order_id, external_line_item_id, product_id, variant_id, title, quantity, price_minor, currency, paid_minor) VALUES (?,?,?,?,?,?,?,?,?,?)")
-    .run(id + ":item:9610", id, "9610", "1", "14", "Logo Cap", 1, 2500, "GBP", 2000);
+    .run(id + ":item:9620", id, "9620", "1", "14", "Logo Cap", 1, 2500, "GBP", 2000);
   x = await opts(env, id);
   assert.deepEqual(x.options.map(v => [v.title, v.priceDiffMinor]), [["Black", 0], ["Kids", -500], ["Navy", 0]], "against the £20 paid, not the £25 price");
   // Agreeing the old (list-price) difference is refused; the paid one goes through and refunds £5.
-  assert.deepEqual((await swapCall(env, "/relay/my/exchange", { orderId: id, lineId: "9610", variantKey: V(15), agreedDiffMinor: -1000 })).body, { error: "price_changed", priceDiffMinor: -500 });
+  assert.deepEqual((await swapCall(env, "/relay/my/exchange", { orderId: id, lineId: "9620", variantKey: V(15), agreedDiffMinor: -1000 })).body, { error: "price_changed", priceDiffMinor: -500 });
   shopifyCalls = [];
-  r = await swapCall(env, "/relay/my/exchange", { orderId: id, lineId: "9610", variantKey: V(15), agreedDiffMinor: -500 });
+  r = await swapCall(env, "/relay/my/exchange", { orderId: id, lineId: "9620", variantKey: V(15), agreedDiffMinor: -500 });
   assert.equal(r.status, 200, JSON.stringify(r.body));
   const refund = shopifyCalls.find(q => /refundCreate/.test(q.query));
   assert.equal(refund.variables.input.transactions[0].amount, "5.00", "£5 refunded: what was paid less the new price");
@@ -263,19 +263,19 @@ assert.deepEqual({ ...sqlite.prepare("SELECT status, amount_minor, destination F
 }
 // What Shopify says the line cost now, when it says, comes first: the swap is re-agreed if Relay's copy was different.
 {
-  const id = conn + ":order:611";
+  const id = conn + ":order:621";
   sqlite.prepare("INSERT INTO retailer_orders (id, connection_id, external_order_id, ordered_at, amount_minor, currency, payment_processor, status, raw_identifier_keys) VALUES (?,?,?,?,?,?,?,?,?)")
-    .run(id, conn, "611", "2026-10-29T11:00:00Z", 2500, "GBP", "shopify", "unverified", "[]");
+    .run(id, conn, "621", "2026-10-29T11:00:00Z", 2500, "GBP", "shopify", "unverified", "[]");
   sqlite.prepare("INSERT INTO retailer_order_emails (order_id, email_hash, created_at) VALUES (?,?,?)").run(id, alice.emailHash, 1);
   // Relay's copy from before it kept what was paid (no paid_minor): it still shows the £25 price.
   sqlite.prepare("INSERT INTO order_items (id, order_id, external_line_item_id, product_id, variant_id, title, quantity, price_minor, currency) VALUES (?,?,?,?,?,?,?,?,?)")
-    .run(id + ":item:9611", id, "9611", "1", "14", "Logo Cap", 1, 2500, "GBP");
-  liveLine = { id: "gid://shopify/LineItem/9611", quantity: 1, discountedUnitPriceAfterAllDiscountsSet: { shopMoney: { amount: "17.50" } } };
+    .run(id + ":item:9621", id, "9621", "1", "14", "Logo Cap", 1, 2500, "GBP");
+  liveLine = { id: "gid://shopify/LineItem/9621", quantity: 1, discountedUnitPriceAfterAllDiscountsSet: { shopMoney: { amount: "17.50" } } };
   shopifyCalls = [];
-  r = await swapCall(env, "/relay/my/exchange", { orderId: id, lineId: "9611", variantKey: V(15), agreedDiffMinor: -1000 });
+  r = await swapCall(env, "/relay/my/exchange", { orderId: id, lineId: "9621", variantKey: V(15), agreedDiffMinor: -1000 });
   assert.deepEqual(r.body, { error: "price_changed", priceDiffMinor: -250 }, "Shopify says £17.50 was paid: £2.50 back, asked again");
   assert.equal(shopifyCalls.filter(q => /refundCreate|orderEditBegin/.test(q.query)).length, 0, "nothing changed at the shop");
-  r = await swapCall(env, "/relay/my/exchange", { orderId: id, lineId: "9611", variantKey: V(15), agreedDiffMinor: -250 });
+  r = await swapCall(env, "/relay/my/exchange", { orderId: id, lineId: "9621", variantKey: V(15), agreedDiffMinor: -250 });
   assert.equal(r.status, 200, JSON.stringify(r.body));
   assert.equal(shopifyCalls.find(q => /refundCreate/.test(q.query)).variables.input.transactions[0].amount, "2.50");
   liveLine = null;
