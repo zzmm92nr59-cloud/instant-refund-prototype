@@ -41,7 +41,7 @@ import { handleTipsRoute, tipsDeleteStatements, ensureTipsTable } from "./tips.j
 import { handleDeliveryRoute, deliveryDeleteStatements, ensureDeliveryTables } from "./delivery.js";
 import { handleAuctionShopperRoute, forgetAuctionBidder } from "./auctions.js";
 import { TOTP_TABLE_SQL, totpDeleteStatements, secondStepFor, twoStepOn, handleTotpAuthRoute, handleTotpShopperRoute } from "./totp.js";
-import { secondStepRequired, secondSteps, hasSecondStep, openWithoutSecondStep } from "./second-step.js";
+import { secondStepRequired, secondSteps, hasSecondStep, openWithoutSecondStep, needsRecheck } from "./second-step.js";
 import { PHONE_TABLE_SQL, phoneDeleteStatements, handlePhoneRoute } from "./phone.js";
 import { PASSKEY_TABLE_SQL, passkeyDeleteStatements, handlePasskeyAuthRoute, handlePasskeyShopperRoute } from "./passkeys.js";
 import { ensureGmailTables, gmailDeleteStatements, revokeAllMailboxes, handleGmailRoute, handleGmailCallback, handleOutlookCallback, outlookConfigured, microsoftRedirect, MS_AUTH,
@@ -146,9 +146,15 @@ async function ensureAuthTablesRun(db) {
   // Wrong guesses at a sign-in code, counted on the code itself (verifyCode).
   try { await db.prepare("ALTER TABLE auth_login_tokens ADD COLUMN attempts INTEGER NOT NULL DEFAULT 0").run(); } catch { /* already there */ }
   try { await db.prepare("ALTER TABLE auth_sessions ADD COLUMN second_step INTEGER NOT NULL DEFAULT 0").run(); } catch { /* already there */ }
+  // When this session last passed a second step itself (a passkey or a code at sign-in, or setting up the account's first
+  // one), for adding a new way in (second-step.js needsRecheck). Empty for sessions from before this, and for a sign-in
+  // approved from a phone: those count as not recent.
+  try { await db.prepare("ALTER TABLE auth_sessions ADD COLUMN checked_at INTEGER").run(); } catch { /* already there */ }
   await ensureGmailTables(db);
 }
 
+const RECHECK_ROUTES = new Set(["/relay/my/passkeys/options", "/relay/my/passkeys/register", "/relay/my/passkeys/remove",
+  "/relay/my/phone/start", "/relay/my/phone/confirm"]);
 function json(body, status = 200, cors = {}) {
   return Response.json(body, { status, headers: { ...cors, "Cache-Control": "no-store" } });
 }
@@ -185,7 +191,8 @@ export async function sessionShopper(request, env, now = Date.now()) {
   const match = /^Bearer ([A-Za-z0-9_-]{43})$/.exec(header);
   if (!match || !env.RELAY_DB) return null;
   const row = await env.RELAY_DB.prepare(
-    `SELECT s.id AS id, s.email AS email, s.email_hash AS emailHash, a.session_hash AS sessionHash, a.expires_at AS expiresAt, a.second_step AS secondStep
+    `SELECT s.id AS id, s.email AS email, s.email_hash AS emailHash, a.session_hash AS sessionHash, a.expires_at AS expiresAt, a.second_step AS secondStep,
+       a.checked_at AS checkedAt
      FROM auth_sessions a JOIN shoppers s ON s.id = a.shopper_id
      WHERE a.session_hash = ? AND a.expires_at > ?`).bind(await sha256Hex(match[1]), now).first();
   if (!row) return null;
@@ -402,8 +409,8 @@ async function startSession(env, email, now, cors, opts = {}) {
   }
   const sessionToken = randomToken();
   await env.RELAY_DB.prepare(
-    "INSERT INTO auth_sessions (session_hash,shopper_id,created_at,expires_at,second_step) VALUES (?,?,?,?,?)")
-    .bind(await sha256Hex(sessionToken), shopper.id, now, now + SESSION_TTL_MS, opts.skipSecondStep ? 1 : 0).run();
+    "INSERT INTO auth_sessions (session_hash,shopper_id,created_at,expires_at,second_step,checked_at) VALUES (?,?,?,?,?,?)")
+    .bind(await sha256Hex(sessionToken), shopper.id, now, now + SESSION_TTL_MS, opts.skipSecondStep ? 1 : 0, opts.skipSecondStep && opts.recent !== false ? now : null).run();
   await env.RELAY_DB.prepare("DELETE FROM auth_sessions WHERE expires_at <= ?").bind(now).run();
   // Old sign-in links and codes: the hourly limits only look back an hour, so a day later they're no longer needed.
   await env.RELAY_DB.prepare("DELETE FROM auth_login_tokens WHERE created_at <= ?").bind(now - 24 * HOUR_MS).run();
@@ -821,6 +828,11 @@ export async function handleAuthRoute(request, env, url, cors = {}, opts = {}) {
         return json({ required: !review, done: review || hasSecondStep(steps), checked: false, ...steps }, 200, cors);
       if (!review && !hasSecondStep(steps)) return json({ error: "second_step_needed" }, 403, cors);
     }
+    // A new way in needs a recent check once the account has a second step (second-step.js needsRecheck). Codes by text
+    // (/relay/my/2fa/text with on: true) and the authenticator app (/relay/my/2fa/setup, /enable) are checked in totp.js,
+    // after its own "one way at a time" refusals.
+    if (request.method === "POST" && RECHECK_ROUTES.has(path) && await needsRecheck(env, shopper, o.now))
+      return json({ error: "recheck_needed" }, 403, cors);
     if (path === "/relay/my/second-step" && request.method === "GET") {
       const steps = await secondSteps(env, shopper.id);
       return json({ required: secondStepRequired(env) && !(await isReviewAddress(env, shopper.email)), done: hasSecondStep(steps), checked: shopper.secondStep, ...steps }, 200, cors);

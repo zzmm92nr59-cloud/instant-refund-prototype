@@ -2085,6 +2085,7 @@
     already_enabled: "That's already on.", not_enabled: "That's already off.",
     not_for_review_account: "This account is for reviewing Relay, so that can't be added to it.",
     last_second_step: "Relay needs at least one second step for signing in. Add another way first, then turn this one off.", second_step_needed: "Set up a second step for signing in first.",
+    recheck_needed: "To keep your account safe, this needs a recent sign-in. Sign out, sign in again, then do this within 15 minutes.",
     text_on: "Codes by text are on. Turn them off first to use an authenticator app instead.", app_on: "The authenticator app is on. Turn it off first to use texts instead.", sign_in_expired: "That sign-in timed out or was cancelled. Please start again." };
   function say(node, text, bad) { node.textContent = text; node.className = "rl-msg" + (bad ? " err" : ""); }
   // Unfinished writing is kept on this device, for this account only, until it's sent: leaving the screen, the app closing
@@ -3221,7 +3222,7 @@
       });
     });
   }
-  function passkeySaveProblem(x) { return x && x.body && x.body.error === "too_many_passkeys" ? "You've reached the limit of 5 passkeys. Remove one first." : "That passkey couldn't be saved. Try again."; }
+  function passkeySaveProblem(x) { var e = x && x.body && x.body.error; return e === "too_many_passkeys" ? "You've reached the limit of 5 passkeys. Remove one first." : e === "recheck_needed" ? errors.recheck_needed : "That passkey couldn't be saved. Try again."; }
   function passkeySection(box, msg) {
     if (!passkeysSupported()) return;
     var list = el("div"), note = el("div", { className: "rl-msg" });
@@ -3652,7 +3653,7 @@
     function setup() {
       say(note, "");
       api("/relay/my/2fa/setup", { method: "POST", body: {} }).then(function (r) {
-        if (!r.ok) return say(note, "Couldn't start setup. Try again.", true);
+        if (!r.ok) return say(note, errors[r.body && r.body.error] || "Couldn't start setup. Try again.", true);
         body.textContent = "";
         body.appendChild(el("p", { text: "1. In your authenticator app, add a new account and enter this key (or tap the link on your phone):" }));
         body.appendChild(el("div", { className: "rl-codes", text: r.body.secret }));
