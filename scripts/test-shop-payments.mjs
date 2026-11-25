@@ -4,6 +4,7 @@
 import { DatabaseSync } from "node:sqlite";
 import { readFileSync, readdirSync } from "node:fs";
 import assert from "node:assert/strict";
+import { ensureShopPlanTable } from "../worker/shopify.js";
 import { handleExchangeRoute, enrichPurchases } from "../worker/exchange.js";
 import { handleRetailerRoute, issueRetailerKey } from "../worker/retailer.js";
 import { stripeReturnPage, shopPay } from "../worker/shop-payments.js";
@@ -97,6 +98,10 @@ payLink = "https://kick-lane.myshopify.com/1234/invoices/abc";
 console.log("PASS price difference paid through the shop's Shopify checkout (any payment method)");
 
 // 2. The shop's settings: switching to instant card payments needs Relay's Stripe keys and a ready Stripe account of the shop's own.
+// Card mode moves only Stripe's test money, so only Relay's own test shops (Shopify development stores) can have it
+// (review E-2). This shop is one; a real shop and an unchecked one are tried below.
+await ensureShopPlanTable(db);
+sqlite.prepare("INSERT INTO shopify_shop_plan (domain, test_shop, plan, checked_at) VALUES (?, 1, 'partner_test', 0)").run(SHOP);
 const key = await issueRetailerKey(env, { provider: "shopify", shopRef: SHOP, storeLabel: "Kick Lane" });
 const sq = await issueRetailerKey(env, { provider: "square", shopRef: "MZARA1", storeLabel: "Zara" });
 const shopCall = async (e, k, method, path, body) => {
@@ -137,6 +142,18 @@ assert.equal(s.status, 200); assert.equal(s.body.method, "card");
 assert.deepEqual(await shopPay(env, SHOP), { method: "card", stripeAccount: "acct_kicklane0001" });
 // Relay's Stripe keys removed: falls back to Shopify checkout rather than failing.
 assert.deepEqual(await shopPay(envOff, SHOP), { method: "shopify", stripeAccount: null });
+// A real shop, or one Relay hasn't checked yet, never gets card mode: not offered it, can't choose it, can't connect
+// Stripe for it, and "card" saved earlier (before this rule) counts for nothing.
+for (const [domain, plan] of [["real-shop.myshopify.com", 0], ["unchecked-shop.myshopify.com", null]]) {
+  if (plan !== null) sqlite.prepare("INSERT INTO shopify_shop_plan (domain, test_shop, plan, checked_at) VALUES (?, ?, 'basic', 0)").run(domain, plan);
+  const k = await issueRetailerKey(env, { provider: "shopify", shopRef: domain, storeLabel: "Real Shop" });
+  const v = (await shopCall(env, k, "GET", "/relay/retailer/payments")).body;
+  assert.equal(v.cardPossible, false, domain); assert.equal(v.method, "shopify");
+  assert.equal((await shopCall(env, k, "POST", "/relay/retailer/payments", { method: "card" })).body.error, "cards_not_available");
+  assert.equal((await shopCall(env, k, "POST", "/relay/retailer/payments/stripe", {})).body.error, "cards_not_available");
+  sqlite.prepare("INSERT OR REPLACE INTO relay_shop_pay (shop, method, stripe_account, stripe_ready, updated_at) VALUES (?, 'card', 'acct_realshop0001', 1, 0)").run(domain);
+  assert.deepEqual(await shopPay(env, domain), { method: "shopify", stripeAccount: null }, "saved as card, still paid at the shop");
+}
 // Stripe later disables the account: back to Shopify checkout.
 acctReady = false;
 s = await shopCall(env, key, "GET", "/relay/retailer/payments");
@@ -169,6 +186,19 @@ assert.deepEqual(res, { returns: 1, swaps: 0 });
 assert.deepEqual({ ...sqlite.prepare("SELECT status, refund_minor, refund_issued_at FROM relay_returns WHERE id = 'ret-1'").get() }, { status: "refunded", refund_minor: 2000, refund_issued_at: 1_800_000_500_000 });
 purchases = await enrichPurchases(env, [{ id: o3, retailer: conn, orderedAt: new Date().toISOString(), items: [{ lineId: "9702", productId: "1", variantId: "11", title: "Logo Cap" }] }]);
 assert.deepEqual(purchases[0].items[0].returnInfo, { status: "refunded", ref: "RLY-AAAA-BBBB", trackingNumber: null, refundMinor: 2000, refundedAt: 1_800_000_500_000 });
+// Shopify delivers the same refund notice twice (it retries): the refund is counted once, by Shopify's own id (review W-1).
+{
+  const o5 = order(705);
+  sqlite.prepare("INSERT INTO relay_returns (id, shopper_id, order_id, line_id, shop, item_title, quantity, price_minor, reason, return_ref, status, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)")
+    .run("ret-5", "alice-id", o5, "9705", SHOP, "Logo Cap", 1, 4000, "wrong_size", "RLY-CCCC-DDDD", "requested", 1);
+  const notice = { id: 880011, order_id: 705, refund_line_items: [{ line_item_id: 9705, quantity: 1, subtotal: "40.00" }], transactions: [{ kind: "refund", status: "success", amount: "40.00" }] };
+  assert.deepEqual(await recordShopRefund(env, SHOP, notice, 1_800_000_600_000), { returns: 1, swaps: 0 });
+  assert.deepEqual(await recordShopRefund(env, SHOP, notice, 1_800_000_700_000), { returns: 0, swaps: 0, duplicate: true }, "the second delivery changes nothing");
+  assert.deepEqual({ ...sqlite.prepare("SELECT refund_minor, refund_issued_at FROM relay_returns WHERE id = 'ret-5'").get() }, { refund_minor: 4000, refund_issued_at: 1_800_000_600_000 }, "£40 refunded, not £80");
+  // A second, different refund on the same line (a part refund, then the rest) still adds up.
+  assert.deepEqual(await recordShopRefund(env, SHOP, { ...notice, id: 880012, refund_line_items: [{ line_item_id: 9705, quantity: 1, subtotal: "2.50" }] }, 1_800_000_800_000), { returns: 1, swaps: 0 });
+  assert.equal(sqlite.prepare("SELECT refund_minor FROM relay_returns WHERE id = 'ret-5'").get().refund_minor, 4250);
+}
 // A refund on an order line with no Relay return changes nothing; nor does a malformed one.
 assert.deepEqual(await recordShopRefund(env, SHOP, { order_id: 999, refund_line_items: [{ line_item_id: 1, subtotal: "5.00" }] }), { returns: 0, swaps: 0 });
 assert.deepEqual(await recordShopRefund(env, SHOP, { order_id: "x' OR 1=1" }), { returns: 0, swaps: 0 });

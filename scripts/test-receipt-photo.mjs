@@ -220,6 +220,18 @@ assert.equal((await up(jess, { id: HM, image: IMG })).status, 200, "a day later"
 resetMemoryLimits();
 console.log("ok - 20 photos a day each");
 
+// 9b. Download my data has the shopper's own receipt photos (review X-1), and only theirs.
+{
+  const kept = sqlite.prepare("SELECT receipt_id, type, data FROM receipt_photos WHERE shopper_id = ? ORDER BY created_at DESC").all(J);
+  const file = await (await call("/relay/my/export", { token: jess })).json();
+  assert.ok(kept.length > 0);
+  assert.equal(file.receiptPhotos.length + (file.receiptPhotosNotInThisFile || 0), kept.length, "every photo is in the file, or counted as left out");
+  assert.equal(file.receiptPhotos[0].receiptId, kept[0].receipt_id);
+  assert.equal(file.receiptPhotos[0].picture, "data:" + kept[0].type + ";base64," + kept[0].data, "the photo itself");
+  assert.deepEqual((await (await call("/relay/my/export", { token: sam })).json()).receiptPhotos, [], "nobody else's");
+  console.log("ok - Download my data has the shopper's own receipt photos");
+}
+
 // 10. Deleting the account deletes the photos.
 assert.equal((await call("/relay/my/delete", { method: "POST", token: jess })).status, 200);
 assert.equal(sqlite.prepare("SELECT COUNT(*) AS n FROM receipt_photos WHERE shopper_id = ?").get(J).n, 0);

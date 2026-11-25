@@ -126,6 +126,10 @@ assert.equal((await get(`/relay/my/resale/listings/${L2}/image`, bob)).status, 4
   const LP = (await ok.json()).id;
   const lp = (await (await get("/relay/my/resale/feed", bob)).json()).listings.find(l => l.id === LP);
   assert.equal(lp.photos, 2); assert.equal(lp.hasImage, true, "a multi-item order gets a picture from the seller's own photo");
+  // Download my data has the seller's own photos on their listing (review X-1), and nobody else's.
+  const mine = (await (await get("/relay/my/export", alice)).json()).swapAndSell.listings.find(l => l.id === LP);
+  assert.deepEqual(mine.photos, [JPG, JPG], "the listing's own photos, as they were added");
+  assert.ok(!JSON.stringify((await (await get("/relay/my/export", bob)).json()).swapAndSell.listings).includes(JPG.slice(0, 60)), "not in another member's file");
   const first = await get(`/relay/my/resale/listings/${LP}/image`, bob);
   assert.equal(first.status, 200); assert.equal(first.headers.get("content-type"), "image/jpeg", "the seller's photo comes first");
   assert.equal((await get(`/relay/my/resale/listings/${LP}/photos/2`, bob)).status, 200);
