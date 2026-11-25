@@ -21,6 +21,7 @@ import { ensureOnce, runAll } from "./once.js";
 import { buildWrapped } from "./wrapped.js";
 import { readShopKinds, learnShopKinds } from "./shop-kind-ai.js";
 import { policyFor, policyForApp, policyReturnBy } from "./return-policies.js";
+import { returnsPageFor, wantsReturnsPage } from "./returns-pages.js";
 import { buildOriginal, buildOriginalOutlook } from "./original.js";
 import { SHARED_EMAILS_SQL, sharedByReceipt, attachShared, sharedCopy, readSummary, namesToHide, sealShared, SHARE_DAYS, SHARES_PER_DAY, SHARES_KEPT } from "./shared-emails.js";
 import { AI_READS_SQL, AI_SETTING_SQL, PICKS_AI_SQL, ITEM_KINDS_SQL, attachAiReads, aiAvailable } from "./ai-reader.js";
@@ -3364,7 +3365,15 @@ async function listReceipts(env, shopperId, timing, opts = {}) {
     // cancel or ask for a refund (Apple's "cancel within 14 days of receiving this invoice"), so it is no return deadline
     // anywhere (cards, Home, reminders, the help chat). The window and the email's words stay for its page. Round 21.
     const noReturn = (c.returns && c.returns.cancelWithin === true) || (group.category === "digital" && !keep.length);
-    const returns = noReturn && c.returns && c.returns.deadline ? { ...c.returns, deadline: null } : c.returns;
+    let returns = noReturn && c.returns && c.returns.deadline ? { ...c.returns, deadline: null } : c.returns;
+    // No returns link in the shop's emails: the shop's own UK returns page when Relay knows the shop for sure
+    // (returns-pages.js), so Start return is still offered. Never for a till receipt or something that doesn't go back,
+    // and the email's own link always wins. Worked out here, so receipts read before the list existed get it too.
+    // (Not when the shop said this order can't be returned: sellerNoReturn, nonRefundable.)
+    if (!noReturn && (group.returnable || keep.length) && wantsReturnsPage(c) && !(returns && (returns.portalUrl || returns.nonRefundable || returns.sellerNoReturn))) {
+      const page = returnsPageFor(retailer, c.currency);
+      if (page) returns = { ...(returns || {}), portalUrl: page.url, portalFrom: "shop_list" };
+    }
     // A photo is only shown when it is of the item bought (not the shop's logo or an advert in the email).
     return { ...c, ...(returns !== c.returns ? { returns } : {}), items, hasImage: Boolean(c.hasImage && c.photoIsItem === true), ...group, categoryLearned: Boolean(learned), storeKey: k,
       ...(keep.length ? { returnableItems: keep } : {}), ...(guess ? { returnBy: guess } : {}), ...(policy ? { returnPolicy: policyForApp(policy) } : {}) };

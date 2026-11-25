@@ -26,6 +26,7 @@ on:
       - 'scripts/test-delete-account.mjs'
       - 'scripts/test-more-inboxes.mjs'
       - 'scripts/test-return-policies.mjs'
+      - 'scripts/test-returns-pages.mjs'
       - 'scripts/test-gifts.mjs'
       - 'scripts/test-order-joins.mjs'
       - 'scripts/test-receipts-list-speed.mjs'
@@ -59,6 +60,7 @@ on:
       - 'scripts/test-delete-account.mjs'
       - 'scripts/test-more-inboxes.mjs'
       - 'scripts/test-return-policies.mjs'
+      - 'scripts/test-returns-pages.mjs'
       - 'scripts/test-gifts.mjs'
       - 'scripts/test-order-joins.mjs'
       - 'scripts/test-receipts-list-speed.mjs'
@@ -126,6 +128,8 @@ jobs:
         run: node scripts/test-mail-push.mjs
       - name: Shops' own returns policies (complete, recent, used only when the emails give no date)
         run: node scripts/test-return-policies.mjs
+      - name: Shops' own UK returns pages (checked list, matched by address or whole name, the email's link wins, none for till receipts)
+        run: node scripts/test-returns-pages.mjs
       - name: Gifts (tagging receipts, who for, Wrapped, own receipts only)
         run: node scripts/test-gifts.mjs
       - name: Same order / different orders (own receipts only, kept through every re-read, undo; likely reading problems on Relay health)
