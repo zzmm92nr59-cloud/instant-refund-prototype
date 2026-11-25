@@ -3,6 +3,8 @@
 //  * Messages are encrypted for that device (RFC 8291) and signed with Relay's own key (VAPID, RFC 8292), so the push service can't read them.
 //  * Relay's signing key is created by the server the first time it is needed and kept encrypted in the database; nobody pastes a key anywhere.
 import { ensureOnce } from "./once.js";
+import { shopifyShopsForDisplay } from "./shopify-connect.js";
+import { squareIsProduction } from "./square-env.js";
 
 const enc = new TextEncoder();
 const PUSH_HOSTS = ["fcm.googleapis.com", "push.services.mozilla.com", "push.apple.com", "notify.windows.com", "web.push.apple.com"];
@@ -104,7 +106,7 @@ export function allowedEndpoint(endpoint) {
 export async function sendPush(env, sub, message, o = {}) {
   const now = o.now || Date.now(), f = o.fetchImpl || ((...a) => fetch(...a));
   const body = await encryptPayload(JSON.stringify(message), sub.p256dh, sub.auth);
-  const res = await f(sub.endpoint, { method: "POST", headers: { Authorization: await vapidAuth(env, sub.endpoint, now), "Content-Encoding": "aes128gcm", "Content-Type": "application/octet-stream", TTL: "86400", Urgency: "normal" }, body });
+  const res = await f(sub.endpoint, { method: "POST", headers: { Authorization: await vapidAuth(env, sub.endpoint, now), "Content-Encoding": "aes128gcm", "Content-Type": "application/octet-stream", TTL: "86400", Urgency: "normal" }, body, signal: AbortSignal.timeout(10000) });
   if (res.status === 404 || res.status === 410) await env.RELAY_DB.prepare("DELETE FROM push_subscriptions WHERE id = ?").bind(sub.id).run();
   let reason = "";
   if (!(res.status >= 200 && res.status < 300)) { try { reason = String(await res.text()).replace(/[^\w ,.:{}"\-]/g, "").slice(0, 120); } catch { /* ignore */ } }
@@ -121,50 +123,71 @@ export function priceText(minor, currency) {
   try { return new Intl.NumberFormat("en-GB", { style: "currency", currency: c }).format(minor / 100); } catch { return c + " " + (minor / 100).toFixed(2); }
 }
 
-// Looks at every watched item (UK shops selling in pounds only). A price lower than the last one Relay saw is a drop; the first look only records the price.
-// Every pound-priced item in every connected shop whose price fell since the last look. The first look only records prices.
-async function catalogueDrops(db, now) {
-  const rows = ((await db.prepare(`SELECT v.id AS key, v.sku, v.title AS variant, v.price_minor AS p, i.title AS product, i.store_label AS store, i.provider
-    FROM retailer_catalog_variants v JOIN retailer_catalog_items i ON i.id = v.item_id
-    WHERE v.price_minor IS NOT NULL AND v.currency = 'GBP' AND (i.provider = 'square_sandbox' OR i.provider LIKE 'shopify:%') LIMIT 5000`).all()).results || []);
-  const seen = new Map(((await db.prepare("SELECT variant_id, price_minor FROM catalogue_price_seen").all()).results || []).map(r => [r.variant_id, r.price_minor]));
+// The shops whose price drops may go to shoppers who chose "price drops at every shop": real shops only. Relay's own test
+// shops (Shopify development stores, a shop Relay hasn't checked yet, and Square's sandbox shop while Square isn't live)
+// are left out, as everywhere else shoppers look (CLAUDE.md rule 15).
+async function shopsForAlerts(env) {
+  const out = (await shopifyShopsForDisplay(env).catch(() => [])).map(s => "shopify:" + s.domain);
+  if (squareIsProduction(env)) out.push("square_sandbox");
+  return out;
+}
+// Every pound-priced item in those shops whose price changed since the last look, in one query. A lower price is a drop;
+// the first look only records the price. only: just this shop (the one that changed).
+async function catalogueDrops(env, db, now, only) {
+  const shops = (await shopsForAlerts(env)).filter(p => !only || p === only).slice(0, 90);
+  if (!shops.length) return [];
+  const rows = ((await db.prepare(`SELECT v.id AS key, v.sku, v.title AS variant, v.price_minor AS p, i.title AS product, i.store_label AS store, i.provider, s.price_minor AS was
+    FROM retailer_catalog_variants v JOIN retailer_catalog_items i ON i.id = v.item_id LEFT JOIN catalogue_price_seen s ON s.variant_id = v.id
+    WHERE v.price_minor IS NOT NULL AND v.currency = 'GBP' AND i.provider IN (${shops.map(() => "?").join(",")})
+      AND (s.variant_id IS NULL OR s.price_minor != v.price_minor) ORDER BY v.id LIMIT 5000`).bind(...shops).all()).results || []);
   const drops = [], updates = [];
   for (const r of rows) {
-    const was = seen.get(r.key);
-    if (was !== undefined && r.p < was) drops.push({ key: r.provider.startsWith("shopify:") ? r.key : (r.sku || r.key), sku: r.sku, product: r.product, variant: r.variant && r.variant !== "Default Title" ? r.variant : null, store: r.store, was, now: r.p });
-    if (was !== r.p) updates.push(db.prepare("INSERT INTO catalogue_price_seen (variant_id, price_minor, seen_at) VALUES (?,?,?) ON CONFLICT(variant_id) DO UPDATE SET price_minor = excluded.price_minor, seen_at = excluded.seen_at").bind(r.key, r.p, now));
+    if (r.was != null && r.p < r.was) drops.push({ key: r.provider.startsWith("shopify:") ? r.key : (r.sku || r.key), sku: r.sku, product: r.product, variant: r.variant && r.variant !== "Default Title" ? r.variant : null, store: r.store, was: r.was, now: r.p });
+    updates.push(db.prepare("INSERT INTO catalogue_price_seen (variant_id, price_minor, seen_at) VALUES (?,?,?) ON CONFLICT(variant_id) DO UPDATE SET price_minor = excluded.price_minor, seen_at = excluded.seen_at").bind(r.key, r.p, now));
   }
   for (let i = 0; i < updates.length; i += 50) await db.batch(updates.slice(i, i + 50));
   return drops;
 }
 
+// Looks at watched items (UK shops selling in pounds only). A price lower than the last one Relay saw is a drop; the first
+// look only records the price. One query finds every watch whose price is no longer the one last seen (each watch against
+// the newest copy of its item), and the changes are saved in batches: the work grows with what changed, not with how many
+// watches there are (checked counts the changed ones; for one shopper, every watch with a price). o.shopperId: one
+// shopper's watches ("Check now"). o.provider: only the shop that just changed
+// ("shopify:<domain>", "square_sandbox"); the hourly check leaves both out.
+const CUR = `(SELECT v.price_minor FROM retailer_catalog_variants v WHERE (v.sku = w.sku OR v.id = w.sku) AND v.price_minor IS NOT NULL AND v.currency = 'GBP' ORDER BY v.updated_at DESC, v.id LIMIT 1)`;
+// A product from a shop's own website (web-shops.js, read about once a day): its price as Relay last read it.
+const WEB = `(SELECT x.price_minor FROM web_shop_items x WHERE x.id = w.sku)`;
 export async function runPriceAlerts(env, o = {}) {
   const db = env.RELAY_DB; if (!db) return { checked: 0, drops: 0, sent: 0 };
   await ensurePushTables(db);
   const now = o.now || Date.now();
-  const rows = ((o.shopperId
-    ? await db.prepare("SELECT * FROM price_watches WHERE shopper_id = ? LIMIT 1000").bind(o.shopperId).all()
-    : await db.prepare("SELECT * FROM price_watches LIMIT 20000").all()).results || []);
-  const byShopper = new Map();
+  const where = [], args = [];
+  if (o.shopperId) { where.push("w.shopper_id = ?"); args.push(o.shopperId); }
+  if (o.provider) { where.push("EXISTS (SELECT 1 FROM retailer_catalog_variants pv JOIN retailer_catalog_items pi ON pi.id = pv.item_id WHERE (pv.sku = w.sku OR pv.id = w.sku) AND pi.provider = ?)"); args.push(o.provider); }
+  const find = (cur) => db.prepare(`SELECT * FROM (SELECT w.shopper_id, w.sku, w.product, w.variant, w.store, w.last_seen_minor, ${cur} AS p FROM price_watches w
+    ${where.length ? "WHERE " + where.join(" AND ") : ""}) WHERE p IS NOT NULL ${o.shopperId ? "" : "AND (last_seen_minor IS NULL OR last_seen_minor != p)"}
+    ORDER BY shopper_id, sku LIMIT ${o.shopperId ? 2000 : 5000}`).bind(...args).all();
+  // (The shops' own websites table isn't there until the preview has run once: then only the shops' catalogues are looked at.)
+  const rows = ((await find(`COALESCE(${CUR}, CASE WHEN w.sku LIKE 'web:%' THEN ${WEB} END)`).catch(() => find(CUR))).results || []);
+  const byShopper = new Map(), updates = [];
   let checked = 0, drops = 0, sent = 0;
   for (const w of rows) {
-    let cur = await db.prepare("SELECT price_minor AS p, currency AS c FROM retailer_catalog_variants WHERE (sku = ? OR id = ?) AND price_minor IS NOT NULL AND currency = 'GBP' ORDER BY updated_at DESC, id LIMIT 1").bind(w.sku, w.sku).first();
-    // A product from a shop's own website (web-shops.js, read about once a day): its price as Relay last read it.
-    if (!cur && /^web:/.test(w.sku)) cur = await db.prepare("SELECT price_minor AS p, 'GBP' AS c FROM web_shop_items WHERE id = ?").bind(w.sku).first().catch(() => null);
-    if (!cur || !Number.isFinite(cur.p)) continue;
+    if (!Number.isFinite(w.p)) continue;
     checked++;
-    if (w.last_seen_minor != null && cur.p < w.last_seen_minor) {
+    if (w.last_seen_minor != null && w.p < w.last_seen_minor) {
       drops++;
-      const l = byShopper.get(w.shopper_id) || []; l.push({ w, was: w.last_seen_minor, now: cur.p, currency: cur.c }); byShopper.set(w.shopper_id, l);
-      await db.prepare("UPDATE price_watches SET last_seen_minor = ?, last_alert_at = ? WHERE shopper_id = ? AND sku = ?").bind(cur.p, now, w.shopper_id, w.sku).run();
-    } else if (w.last_seen_minor !== cur.p) {
-      await db.prepare("UPDATE price_watches SET last_seen_minor = ? WHERE shopper_id = ? AND sku = ?").bind(cur.p, w.shopper_id, w.sku).run();
+      const l = byShopper.get(w.shopper_id) || []; l.push({ w, was: w.last_seen_minor, now: w.p, currency: "GBP" }); byShopper.set(w.shopper_id, l);
+      updates.push(db.prepare("UPDATE price_watches SET last_seen_minor = ?, last_alert_at = ? WHERE shopper_id = ? AND sku = ?").bind(w.p, now, w.shopper_id, w.sku));
+    } else if (w.last_seen_minor !== w.p) {
+      updates.push(db.prepare("UPDATE price_watches SET last_seen_minor = ? WHERE shopper_id = ? AND sku = ?").bind(w.p, w.shopper_id, w.sku));
     }
   }
-  // Shoppers who chose "price drops at every shop": every item that dropped since Relay last looked, anywhere.
+  for (let i = 0; i < updates.length; i += 50) await db.batch(updates.slice(i, i + 50));
+  // Shoppers who chose "price drops at every shop": every item that dropped since Relay last looked, at any real shop.
   // Prices are compared for every shopper at once, so this runs the same whether one shopper or the hourly check asked.
   let everywhere = [];
-  try { everywhere = await catalogueDrops(db, now); } catch (e) { console.error("Catalogue-wide price check skipped", String(e && e.message || e).slice(0, 120)); }
+  try { everywhere = await catalogueDrops(env, db, now, o.provider || null); } catch (e) { console.error("Catalogue-wide price check skipped", String(e && e.message || e).slice(0, 120)); }
   if (everywhere.length) {
     const fans = ((await db.prepare("SELECT shopper_id FROM alert_prefs WHERE all_shops = 1").all()).results || []).map(r => r.shopper_id);
     for (const id of fans) {

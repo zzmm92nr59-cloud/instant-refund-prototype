@@ -73,7 +73,8 @@ async function query(store, q, variables = {}) {
   const response = await fetch("https://" + store.domain + "/admin/api/" + VERSION + "/graphql.json", {
     method: "POST",
     headers: { "X-Shopify-Access-Token": token, "Content-Type": "application/json" },
-    body: JSON.stringify({query:q, variables})
+    body: JSON.stringify({query:q, variables}),
+    signal: AbortSignal.timeout(25000)
   });
   if (!response.ok) throw Error("Shopify API HTTP " + response.status);
   const data = await response.json();
@@ -101,6 +102,14 @@ async function recordSync(env, domain, outcome) {
       "shopify_store", domain, JSON.stringify(outcome)).run();
   } catch (e) { console.error("Could not record Shopify sync outcome"); }
 }
+// Sends a page's worth of writes in a few trips to the database (50 at a time) instead of one trip per product, picture,
+// size and stock row. (A database binding without batch, as some tests use, gets them one by one.)
+async function sendAll(db, statements) {
+  if (typeof db.batch !== "function") { for (const st of statements) await st.run(); return; }
+  for (let i = 0; i < statements.length; i += 50) await db.batch(statements.slice(i, i + 50));
+}
+// How many pages of 30 products one read takes: 1,200 products. A shop with more is logged, and nothing of it is removed.
+const MAX_PAGES = 40;
 async function syncStore(env, store) {
   if (!env.RELAY_DB) throw Error("RELAY_DB missing");
   const db = env.RELAY_DB;
@@ -123,6 +132,7 @@ async function syncStore(env, store) {
   const seenItems = new Set(), seenVariants = new Set();
   do {
     const data = await query(store, gql, {cursor});
+    const writes = [];
     for (const item of data.products?.nodes || []) {
       // Shopify GIDs are only guaranteed unique within a shop. Namespace by domain.
       const id = connection + ":item:" + item.id;
@@ -130,61 +140,64 @@ async function syncStore(env, store) {
       const imageUrl = item.featuredMedia?.preview?.image?.url;
       const safeImage = typeof imageUrl === "string" && /^https:\/\//.test(imageUrl) && imageUrl.length < 600 ? imageUrl : null;
       // The shop's name and picture sit on the item too, so shoppers see which shop it is from and what it looks like.
-      await db.prepare(`INSERT INTO retailer_catalog_items
+      writes.push(db.prepare(`INSERT INTO retailer_catalog_items
         (id,provider,external_item_id,title,description,store_label,image_url) VALUES (?,?,?,?,?,?,?)
         ON CONFLICT(provider,external_item_id) DO UPDATE SET
         title=excluded.title,description=excluded.description,store_label=excluded.store_label,
         image_url=excluded.image_url,updated_at=CURRENT_TIMESTAMP`)
-        .bind(id, connection, item.id, item.title, item.description || null, store.label || null, safeImage).run();
+        .bind(id, connection, item.id, item.title, item.description || null, store.label || null, safeImage));
       products++; seenItems.add(id);
       if (safeImage) {
-        await db.prepare(`INSERT INTO retailer_item_images(item_id,image_url) VALUES (?,?)
+        writes.push(db.prepare(`INSERT INTO retailer_item_images(item_id,image_url) VALUES (?,?)
           ON CONFLICT(item_id) DO UPDATE SET image_url=excluded.image_url,updated_at=CURRENT_TIMESTAMP`)
-          .bind(id, imageUrl).run();
+          .bind(id, imageUrl));
         images++;
       }
       for (const v of item.variants?.nodes || []) {
         const vid = connection + ":variant:" + v.id;
         const price = Math.round(Number(v.price) * 100);
-        await db.prepare(`INSERT INTO retailer_catalog_variants
+        writes.push(db.prepare(`INSERT INTO retailer_catalog_variants
           (id,item_id,external_variant_id,title,sku,price_minor,currency)
           VALUES (?,?,?,?,?,?,?) ON CONFLICT(item_id,external_variant_id) DO UPDATE SET
           title=excluded.title,sku=excluded.sku,price_minor=excluded.price_minor,
           currency=excluded.currency,updated_at=CURRENT_TIMESTAMP`)
           .bind(vid, id, v.id, v.title, v.sku || null,
-            Number.isSafeInteger(price) ? price : null, data.shop?.currencyCode || "GBP").run();
+            Number.isSafeInteger(price) ? price : null, data.shop?.currencyCode || "GBP"));
         variants++; seenVariants.add(vid);
         const qty = v.inventoryQuantity == null ? null : Number(v.inventoryQuantity);
-        await db.prepare(`INSERT INTO retailer_inventory_snapshots
+        writes.push(db.prepare(`INSERT INTO retailer_inventory_snapshots
           (variant_id,connection_id,quantity,inventory_state) VALUES (?,?,?,?)
           ON CONFLICT(variant_id,connection_id) DO UPDATE SET
           quantity=excluded.quantity,inventory_state=excluded.inventory_state,
           observed_at=CURRENT_TIMESTAMP`)
-          .bind(vid, connection, qty !== null && Number.isFinite(qty) ? qty : null, "AGGREGATE").run();
+          .bind(vid, connection, qty !== null && Number.isFinite(qty) ? qty : null, "AGGREGATE"));
         inventorySnapshots++;
       }
     }
+    await sendAll(db, writes);
     pages++;
     more = Boolean(data.products?.pageInfo?.hasNextPage);
     cursor = data.products?.pageInfo?.endCursor || null;
-  } while (more && cursor && pages < 10);
+  } while (more && cursor && pages < MAX_PAGES);
+  if (more) console.log("Shopify catalogue: more products than one read takes at " + store.domain + " (" + products + " read)");
   // Products and sizes the shop has deleted are removed too, but only after a complete read (never on a partial one).
   let removed = 0;
   if (!more) try {
     const items = ((await db.prepare("SELECT id FROM retailer_catalog_items WHERE provider = ?").bind(connection).all()).results || []).map(r => r.id);
     const vars = ((await db.prepare("SELECT v.id FROM retailer_catalog_variants v JOIN retailer_catalog_items i ON i.id = v.item_id WHERE i.provider = ?").bind(connection).all()).results || []).map(r => r.id);
+    const gone = [];
     for (const vid of vars.filter(v => !seenVariants.has(v))) {
-      await db.prepare("DELETE FROM retailer_inventory_snapshots WHERE variant_id = ?").bind(vid).run();
-      await db.prepare("DELETE FROM retailer_catalog_variants WHERE id = ?").bind(vid).run();
+      gone.push(db.prepare("DELETE FROM retailer_inventory_snapshots WHERE variant_id = ?").bind(vid), db.prepare("DELETE FROM retailer_catalog_variants WHERE id = ?").bind(vid));
       removed++;
     }
     for (const id of items.filter(i => !seenItems.has(i))) {
-      await db.prepare("DELETE FROM retailer_inventory_snapshots WHERE variant_id IN (SELECT id FROM retailer_catalog_variants WHERE item_id = ?)").bind(id).run();
-      await db.prepare("DELETE FROM retailer_catalog_variants WHERE item_id = ?").bind(id).run();
-      await db.prepare("DELETE FROM retailer_item_images WHERE item_id = ?").bind(id).run();
-      await db.prepare("DELETE FROM retailer_catalog_items WHERE id = ?").bind(id).run();
+      gone.push(db.prepare("DELETE FROM retailer_inventory_snapshots WHERE variant_id IN (SELECT id FROM retailer_catalog_variants WHERE item_id = ?)").bind(id),
+        db.prepare("DELETE FROM retailer_catalog_variants WHERE item_id = ?").bind(id),
+        db.prepare("DELETE FROM retailer_item_images WHERE item_id = ?").bind(id),
+        db.prepare("DELETE FROM retailer_catalog_items WHERE id = ?").bind(id));
       removed++;
     }
+    await sendAll(db, gone);
   } catch (e) { console.error("Could not tidy removed Shopify products for " + store.domain); }
   return {shop:store.domain, products, variants, images, inventorySnapshots, pages, morePages:more, removed,
     inventoryScope:"shop_aggregate"};
