@@ -12165,6 +12165,19 @@
   function homeFocus() { try { var q = /[?&]focus=(receipts|orders)\b/.exec(location.search); if (q) return q[1]; return localStorage.getItem(HOME_FOCUS_KEY) === "orders" ? "orders" : "receipts"; } catch (e) { return "receipts"; } }
   function setHomeFocus(v) { try { localStorage.setItem(HOME_FOCUS_KEY, v === "orders" ? "orders" : "receipts"); } catch (e) {} }
   function testToolsOn() { try { return window.testTools ? Boolean(window.testTools()) : testingOn(); } catch (e) { return false; } }
+  // Home trials (Connor, 25 Nov 2026: "This front page is awful"): three other ways For you could look, for Relay's team to
+  // try on a phone before one is chosen. Only with testing tools: ?home=a (calm: purchases first, one strip for what needs
+  // you), ?home=b (feed: one column, each order with where it has got to) or ?home=c (now: what's in motion first, then
+  // shelves). Kept on this phone (relay-home-try) until ?home=off. Shoppers always get today's Home.
+  var HOME_TRY_KEY = "relay-home-try";
+  function homeTry() {
+    if (!testToolsOn()) return "";
+    try {
+      var q = /[?&]home=(a|b|c|off)\b/.exec(location.search);
+      if (q) { if (q[1] === "off") localStorage.removeItem(HOME_TRY_KEY); else localStorage.setItem(HOME_TRY_KEY, q[1]); }
+      var v = localStorage.getItem(HOME_TRY_KEY); return v === "a" || v === "b" || v === "c" ? v : "";
+    } catch (e) { return ""; }
+  }
   var tapOnce = function (fn) { var busy = false; return function () { if (busy) return; busy = true; setTimeout(function () { busy = false; }, 600); fn(); }; };
   var hlPic = function (e, cls) { var box = el("span", { className: cls }), art = el("span", { className: "h2-art" }); art.setAttribute("aria-hidden", "true"); box.appendChild(art); if (e.pic) e.pic(art); else if (e.tiles && e.tiles[0]) e.tiles[0].draw(art); return box; };
   // Today: a row per purchase, its picture small, the shop, what it is, and what's happening with it.
@@ -12451,6 +12464,195 @@
     if (h && load() && !h.querySelector(".h2-feed > *:not(.rl-skel)") && memo.receipts) { mountHome(h); return; }
     if (!v.firstElementChild && typeof window.render === "function") { try { window.render(); } catch (e) {} }
   }
+  // ---- Home trials (homeTry): A calm, B feed, C now. For you only; the other chips are today's. ----
+  // All three: no coloured boxes round purchases, the purchase's own photo (a logo whole and small on white, a drawing
+  // for a takeaway, never the delivery app's logo), what's happening with it said once on its picture or under its name,
+  // and what needs you that isn't a purchase kept to one line or one sheet.
+  var trialCss = false;
+  function trialStyle() {
+    if (trialCss) return; trialCss = true;
+    var st = document.createElement("style");
+    st.textContent =
+      ".hx{display:flex;flex-direction:column;min-width:0}.hx-h{margin:22px 2px 12px;font-size:20px;line-height:25px;font-weight:700;color:var(--rl-text)}.hx>.hx-h:first-child{margin-top:6px}" +
+      ".hx-pic{position:relative;flex:none;display:block;width:140px;height:140px;border-radius:16px;overflow:hidden;background:var(--rl-fill)}" +
+      ".hx-pic .h2-art svg{max-width:58%;max-height:58%}.hx-pic .h2-art.rl-has-logo{background:#fff!important;box-shadow:inset 0 0 0 1px var(--rl-line);border-radius:16px}" +
+      ".hx-pic .h2-art>img.rl-logo-img{left:30%!important;top:30%!important;width:40%!important;height:40%!important;object-fit:contain}.hx-pic>img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}" +
+      ".hx-tag{position:absolute;left:8px;bottom:8px;max-width:calc(100% - 16px);box-sizing:border-box;padding:3px 9px;border-radius:12px;font-size:13px;line-height:18px;font-weight:600;background:#fff;color:#101828;box-shadow:0 1px 2px rgba(16,24,40,.16)}" +
+      ".hx-tag.info{background:#2B59C3;color:#fff}.hx-tag.urgent{background:#d92d20;color:#fff}.hx-tag.soon{background:#f5a524;color:#3b2500}.hx-tag.good{background:#067647;color:#fff}" +
+      ".hx-st{display:inline-flex;align-items:center;gap:7px;font-size:14px;line-height:19px;font-weight:600;color:var(--rl-text)}.hx-st::before{content:\"\";flex:none;width:8px;height:8px;border-radius:4px;background:var(--rl-text2)}" +
+      ".hx-st.info{color:#2B59C3}.hx-st.info::before{background:#2B59C3}.hx-st.urgent{color:#b42318}.hx-st.urgent::before{background:#d92d20}.hx-st.soon{color:#93370d}.hx-st.soon::before{background:#f5a524}.hx-st.good{color:#067647}.hx-st.good::before{background:#12b76a}" +
+      // A: the strip, then the purchases two a row.
+      ".hx-needs,.hx-note{all:unset;box-sizing:border-box;cursor:pointer;display:flex;align-items:center;gap:12px;min-height:60px;padding:10px 14px 10px 12px;border-radius:18px;background:var(--rl-card);transition:transform .12s,opacity .12s;-webkit-tap-highlight-color:transparent}" +
+      ".hx-needs:active,.hx-note:active,.hx-sq:active,.hx-row:active,.hx-live:active{transform:scale(.98);opacity:.85}.hx-needs:focus-visible,.hx-note:focus-visible,.hx-sq:focus-visible,.hx-row:focus-visible,.hx-live:focus-visible{outline:2px solid var(--rl-text);outline-offset:2px}" +
+      ".hx-n{flex:none;min-width:32px;height:32px;padding:0 6px;box-sizing:border-box;border-radius:16px;display:grid;place-items:center;font-size:15px;font-weight:700;background:#101828;color:#fff}.hx-n.urgent{background:#d92d20}" +
+      ".hx-t{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}.hx-t b{font-size:15px;line-height:20px;font-weight:600;color:var(--rl-text);overflow-wrap:anywhere}.hx-t span{font-size:14px;line-height:19px;color:var(--rl-text2);overflow-wrap:anywhere}" +
+      ".hx-needs .rl-arow-c,.hx-note .rl-arow-c{flex:none;display:inline-flex;color:var(--rl-text2)}" +
+      ".hx-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px 12px}@media(min-width:720px){.hx-grid{grid-template-columns:repeat(4,minmax(0,1fr))}}" +
+      ".hx-sq{all:unset;box-sizing:border-box;cursor:pointer;display:flex;flex-direction:column;min-width:0;transition:transform .12s,opacity .12s;-webkit-tap-highlight-color:transparent}.hx-grid .hx-pic{width:100%;height:auto;aspect-ratio:1/1}" +
+      ".hx-sq-s{margin-top:9px;font-size:15px;line-height:20px;font-weight:600;color:var(--rl-text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.hx-sq-n{font-size:14px;line-height:19px;color:var(--rl-text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}" +
+      ".hx-sq-p{margin-top:1px;font-size:15px;line-height:20px;font-weight:600;color:var(--rl-text)}.hx-sq-was{margin-left:6px;font-weight:400;color:var(--rl-text2);text-decoration:line-through}" +
+      ".hx-si{flex:none;width:36px;height:36px;border-radius:18px;display:grid;place-items:center;background:var(--rl-fill);color:var(--rl-text)}.hx-si.urgent{background:#fee4e2;color:#b42318}.hx-si.good{background:#dcfae6;color:#067647}" +
+      ".hx-slist{display:flex;flex-direction:column;margin-top:6px}.hx-slist .hx-note{background:none;border-radius:0;padding:10px 0;border-bottom:1px solid var(--rl-line)}.hx-slist .hx-note:last-child{border-bottom:0}" +
+      ".hx-all{margin-top:22px}" +
+      // B: one column of purchases, newest first.
+      ".hx-row{box-sizing:border-box;cursor:pointer;display:flex;gap:14px;padding:16px 0;border-bottom:1px solid var(--rl-line);min-width:0;transition:transform .12s,opacity .12s;-webkit-tap-highlight-color:transparent;outline:none}.hx-b>.hx-row:first-child{padding-top:4px}" +
+      ".hx-row-t{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}.hx-row-h{display:flex;align-items:baseline;gap:10px}.hx-row-h b{flex:1;min-width:0;font-size:15px;line-height:20px;font-weight:600;color:var(--rl-text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}" +
+      ".hx-day{flex:none;font-size:14px;line-height:19px;color:var(--rl-text2)}.hx-row-n{font-size:15px;line-height:20px;color:var(--rl-text);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}" +
+      ".hx-row-p{font-size:15px;line-height:20px;font-weight:600;color:var(--rl-text)}.hx-row-t .hx-st{margin-top:6px}.hx-live .hx-row-t .hx-st{margin-top:auto;padding-top:6px}" +
+      ".hx-row.many{flex-direction:column;gap:6px}.hx-row.many .hx-st{margin:0 0 6px}" +
+      ".hx-strip{display:flex;gap:10px;overflow-x:auto;margin:0 -16px;padding:0 16px;scrollbar-width:none}.hx-strip::-webkit-scrollbar{display:none}" +
+      ".hx-tile{flex:none;width:140px;display:flex;flex-direction:column;gap:6px}.hx-tile>span:last-child{font-size:14px;line-height:19px;font-weight:600;color:var(--rl-text)}" +
+      ".hx-b .hx-note{margin-top:12px}" +
+      // C: what's in motion, then shelves.
+      ".hx-live{box-sizing:border-box;cursor:pointer;display:flex;gap:14px;padding:10px 14px 10px 10px;margin-bottom:10px;border-radius:24px;background:var(--rl-card);transition:transform .12s,opacity .12s;-webkit-tap-highlight-color:transparent;outline:none}" +
+      ".hx-live .hx-row-t{padding:4px 0}.hx-bar{display:flex;gap:4px;margin-top:10px}.hx-bar i{flex:1;height:5px;border-radius:3px;background:var(--rl-fill)}.hx-bar i.on{background:#2B59C3}.hx-live .hx-pic{background:var(--rl-bg)}" +
+      ".hx-next{font-size:14px;line-height:19px;color:var(--rl-text2);margin-top:6px}" +
+      ".hx-shelf{display:flex;gap:12px;overflow-x:auto;margin:0 -16px;padding:0 16px 2px;scrollbar-width:none}.hx-shelf::-webkit-scrollbar{display:none}.hx-shelf .hx-sq{flex:none;width:140px}" +
+      ".hx-c .hx-needs{margin-top:22px}" +
+      "@media(prefers-reduced-motion:reduce){.hx-needs,.hx-note,.hx-sq,.hx-row,.hx-live{transition:none}}";
+    document.head.appendChild(st);
+  }
+  // Where a purchase has got to, in a few words, and its colour; null when nothing is happening with it.
+  function trialStatus(e) {
+    var t = e.tag || "", l = e.line || "";
+    if (e.owes) return { t: "Swap to pay for", k: "urgent" };
+    if (e.nudge) return { t: "Refund not seen yet", k: "urgent" };
+    if (t === "Cancelled") return { t: "Cancelled", k: "" };
+    if (/going back$/.test(t) || t === "Return started" || /^Return started/.test(l)) return { t: "Sending back", k: "info", step: 1, next: "Next: post it back" };
+    if (/sent back$/i.test(t) || /^Sent back/.test(l)) return { t: "Sent back", k: "info", step: 2, next: "Next: the shop gets it" };
+    if (/at the shop$/i.test(t) || /^Back at the shop/.test(l)) return { t: "At the shop", k: "info", step: 3, next: "Next: your refund" };
+    if (t === "Refunded" || /^Refunded/.test(l)) return { t: "Refunded", k: "good", step: 4 };
+    if (e.onWay) return { t: "On its way", k: "info", ship: true, next: l && l !== "On its way" ? l : "" };
+    if (e.strip && e.when) { var d = daysLeft(e.when); return { t: d === 0 ? "Last day to return" : d + (d === 1 ? " day" : " days") + " to return", k: e.stripKind || "soon", left: true, next: "Return by " + dayWords(e.when) }; }
+    if (e.toReturn && e.when) return { t: "Return by " + dayWords(e.when), k: "" };
+    return null;
+  }
+  // What it is, under the shop's name: never the shop again, and for a takeaway the app it was ordered on, said as that.
+  function trialWhat(e) { return e.via ? "Ordered on " + e.via : cleanName(e.title, e.shop) || (e.count > 1 ? e.count + " items" : ""); }
+  function trialPic(e) {
+    var box = el("span", { className: "hx-pic" }), art = el("span", { className: "h2-art" }); art.setAttribute("aria-hidden", "true"); box.appendChild(art);
+    // A takeaway: a drawing of the food, not the delivery app's logo over a restaurant's name.
+    if (e.via) illustrate(art, { items: [{ name: (e.tiles && e.tiles[0] && e.tiles[0].name) || e.title || "" }], retailer: { name: e.shop }, category: e.cat }, 96);
+    else if (e.pic) e.pic(art); else if (e.tiles && e.tiles[0]) e.tiles[0].draw(art);
+    return box;
+  }
+  // A card that isn't a <button> (it holds a sideways row): one tap, Enter or Space, and never twice for a double tap.
+  function trialTap(node, fn) {
+    node.onclick = tapOnce(fn);
+    if (node.tagName !== "BUTTON") { node.setAttribute("role", "button"); node.tabIndex = 0; node.onkeydown = function (ev) { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); node.onclick(); } }; }
+    return node;
+  }
+  function trialByDay(list) { return list.slice().sort(function (a, b) { return a.at < b.at ? 1 : a.at > b.at ? -1 : 0; }); }
+  function trialSquare(e) {
+    var st = trialStatus(e), what = trialWhat(e), price = e.price || "", pic = trialPic(e);
+    if (st) pic.appendChild(el("span", { className: "hx-tag " + st.k, text: st.t }));
+    return trialTap(el("button", { type: "button", className: "hx-sq", "data-hx": "o", ariaLabel: [e.shop, what, price, st && st.t].filter(Boolean).join(". ") },
+      [pic, el("span", { className: "hx-sq-s", text: e.shop }), what ? el("span", { className: "hx-sq-n", text: what }) : null, price ? el("span", { className: "hx-sq-p", text: price }) : null].filter(Boolean)), e.open);
+  }
+  // A watched thing whose price dropped, as a square: its photo, the shop, its name, the price now and before.
+  function trialDropSquare(x) {
+    var f = watchFacts(x.w), pic = watchPic(x.w, 140); pic.className = "hx-pic"; pic.appendChild(el("span", { className: "hx-tag good", text: "Down " + f.by }));
+    return trialTap(el("button", { type: "button", className: "hx-sq", ariaLabel: [x.w.store, f.name, f.now, "Down " + f.by].join(". ") },
+      [pic, el("span", { className: "hx-sq-s", text: x.w.store }), el("span", { className: "hx-sq-n", text: f.name }), el("span", { className: "hx-sq-p" }, [document.createTextNode(f.now), el("span", { className: "hx-sq-was", text: f.was })])]), x.open);
+  }
+  // One quiet row: an icon, what it is and a line under it.
+  function trialNote(x, onTap) {
+    return el("button", { type: "button", className: "hx-note", onclick: tapOnce(onTap || x.open) }, [el("span", { className: "hx-si" + (x.urgent ? " urgent" : x.good ? " good" : "") }, [accIc(x.icon, 20)]),
+      el("span", { className: "hx-t" }, [el("b", { text: x.title })].concat(x.sub ? [el("span", { text: x.sub })] : [])), accIc("chev", 16, "rl-arow-c")]);
+  }
+  // Everything that needs you, in one sheet: a row each, most urgent first; a tap opens that thing's own page.
+  function trialNeedsSheet(needs, title) {
+    open(function (sheet) {
+      sheet.setAttribute("aria-label", title);
+      sheet.appendChild(el("h2", { text: title }));
+      sheet.appendChild(el("div", { className: "hx-slist" }, needs.map(function (x) { return trialNote(x, function () { close(); x.open(); }); })));
+      sheet.appendChild(el("button", { type: "button", className: "rl-btn ghost", text: "Close", style: "margin-top:14px", onclick: close }));
+    });
+  }
+  // The one line for several things: how many, the most urgent named, and the sheet with all of them.
+  // (counted: the number of things leads the line; otherwise the first one's own icon.)
+  function trialStrip(needs, title, counted) {
+    var first = needs[0], n = needs.length, urgent = needs.some(function (x) { return x.urgent; });
+    var sub = n > 1 ? "And " + (n - 1) + (n === 2 ? " more thing" : " more things") : first.sub;
+    var b = el("button", { type: "button", className: "hx-needs", ariaLabel: title + ": " + n + ". " + first.title + ". " + sub },
+      [counted ? el("span", { className: "hx-n" + (urgent ? " urgent" : ""), text: String(n) }) : el("span", { className: "hx-si" + (first.urgent ? " urgent" : first.good ? " good" : "") }, [accIc(first.icon, 20)]), el("span", { className: "hx-t" }, [el("b", { text: first.title }), el("span", { text: sub })]), accIc("chev", 16, "rl-arow-c")]);
+    b.onclick = tapOnce(function () { if (n === 1) first.open(); else trialNeedsSheet(needs, title); });
+    return b;
+  }
+  // B's row for a purchase: one thing has its square with its name and price beside it; several sit in a sideways row,
+  // each with its price, under the shop and where the order has got to. (Only an order from a shop on Relay has a photo
+  // of each thing: an email order of several would be the same logo or drawing three times, so it keeps one square.)
+  function trialRow(e) {
+    var st = trialStatus(e), what = trialWhat(e), many = !e.via && e.key.charAt(0) === "o" && e.tiles && e.tiles.length > 1;
+    var head = el("span", { className: "hx-row-h" }, [el("b", { text: e.shop }), e.at ? el("span", { className: "hx-day", text: dayWords(e.at) }) : null].filter(Boolean));
+    var stEl = st ? el("span", { className: "hx-st " + st.k, text: st.t }) : null;
+    var row = el("div", { className: "hx-row" + (many ? " many" : ""), "data-hx": "o", ariaLabel: [e.shop, what, e.price, st && st.t].filter(Boolean).join(". ") });
+    if (many) {
+      row.appendChild(head); row.appendChild(el("span", { className: "hx-row-n", text: what }));
+      if (stEl) row.appendChild(stEl);
+      row.appendChild(el("div", { className: "hx-strip" }, e.tiles.map(function (t) {
+        var pic = el("span", { className: "hx-pic" }), art = el("span", { className: "h2-art" }); art.setAttribute("aria-hidden", "true"); pic.appendChild(art); t.draw(art);
+        return el("span", { className: "hx-tile" }, [pic, el("span", { text: t.price || "" })]);
+      })));
+    } else {
+      row.appendChild(trialPic(e));
+      row.appendChild(el("span", { className: "hx-row-t" }, [head, what ? el("span", { className: "hx-row-n", text: what }) : null, e.price ? el("span", { className: "hx-row-p", text: e.price }) : null, stEl].filter(Boolean)));
+    }
+    return trialTap(row, e.open);
+  }
+  function trialDropRow(x) {
+    var f = watchFacts(x.w), pic = watchPic(x.w, 140); pic.className = "hx-pic";
+    return trialTap(el("div", { className: "hx-row", ariaLabel: [x.w.store, f.name, f.now, "Down " + f.by].join(". ") }, [pic, el("span", { className: "hx-row-t" }, [
+      el("span", { className: "hx-row-h" }, [el("b", { text: x.w.store })]), el("span", { className: "hx-row-n", text: f.name }),
+      el("span", { className: "hx-row-p" }, [document.createTextNode(f.now), el("span", { className: "hx-sq-was", text: f.was })]), el("span", { className: "hx-st good", text: "Price down " + f.by })])]), x.open);
+  }
+  // C's card for something in motion: its square, the shop, what it is, where it has got to, and for a return or a parcel
+  // a bar of its steps (from what Relay has seen, never a guess) with what comes next.
+  function trialLive(e) {
+    var st = trialStatus(e), what = trialWhat(e), bar = null;
+    if (st.step || st.ship) { bar = el("span", { className: "hx-bar" }); var of = st.ship ? 3 : 4, at = st.ship ? 2 : st.step; for (var k = 0; k < of; k++) bar.appendChild(el("i", { className: k < at ? "on" : "" })); }
+    return trialTap(el("div", { className: "hx-live", "data-hx": "o", ariaLabel: [e.shop, what, st.t, st.next].filter(Boolean).join(". ") }, [trialPic(e), el("span", { className: "hx-row-t" }, [
+      el("span", { className: "hx-row-h" }, [el("b", { text: e.shop })]), what ? el("span", { className: "hx-row-n", text: what }) : null,
+      el("span", { className: "hx-st " + st.k, text: st.t }), bar, st.next ? el("span", { className: "hx-next", text: st.next }) : null].filter(Boolean))]), e.open);
+  }
+  function drawTrial(kind, feed, all, needs, first) {
+    trialStyle();
+    var box = el("div", { className: "hx hx-" + kind }); feed.appendChild(box);
+    if (first) box.appendChild(first);
+    var mine = trialByDay(all), h = function (t) { box.appendChild(el("h2", { className: "hx-h", text: t })); };
+    if (kind === "a") {
+      // A, calm: one line for everything that needs you, then what you bought, newest first, two a row.
+      if (needs.length) box.appendChild(trialStrip(needs, "Needs you", true));
+      if (mine.length) { h("Recent"); box.appendChild(el("div", { className: "hx-grid" }, mine.slice(0, 10).map(trialSquare))); }
+    } else if (kind === "b") {
+      // B, feed: every purchase newest first, where it has got to under its name (a return date, a return, a parcel), a
+      // price drop in among them; what isn't a purchase at the end, a quiet row each.
+      var drops = needs.filter(function (x) { return x.w; }), rest = needs.filter(function (x) { return !x.e && !x.w; });
+      rest.filter(function (x) { return x.urgent; }).forEach(function (x) { box.appendChild(trialNote(x)); });
+      mine.slice(0, 12).forEach(function (e, i) { box.appendChild(trialRow(e)); if (i === 1) drops.forEach(function (x) { box.appendChild(trialDropRow(x)); }); });
+      if (mine.length < 2) drops.forEach(function (x) { box.appendChild(trialDropRow(x)); });
+      rest.filter(function (x) { return !x.urgent; }).forEach(function (x) { box.appendChild(trialNote(x)); });
+    } else {
+      // C, now: what's in motion (a return date this week, a return going back, a parcel), each with its steps; then what
+      // you bought and what dropped in price as shelves; everything else behind one line.
+      var rank = function (e) { var s = trialStatus(e); return !s ? 9 : s.k === "urgent" ? 0 : s.left ? 1 : s.step && s.step < 4 ? 2 : s.ship ? 3 : 9; };
+      var live = all.filter(function (e) { return rank(e) < 9; }).sort(function (a, b) { return rank(a) - rank(b) || (a.when && b.when ? (a.when < b.when ? -1 : 1) : 0) || (a.at < b.at ? 1 : -1); }).slice(0, 4), inLive = {};
+      live.forEach(function (e) { inLive[e.key] = 1; });
+      if (live.length) { h("In progress"); live.forEach(function (e) { box.appendChild(trialLive(e)); }); }
+      var shelf = mine.filter(function (e) { return !inLive[e.key]; }).slice(0, 10);
+      if (shelf.length) { h("Recent"); box.appendChild(el("div", { className: "hx-shelf" }, shelf.map(trialSquare))); }
+      var drop = needs.filter(function (x) { return x.w; });
+      if (drop.length) { h("Price drops"); box.appendChild(el("div", { className: "hx-shelf" }, drop.map(trialDropSquare))); }
+      var other = needs.filter(function (x) { return !x.e && !x.w; });
+      if (other.length) box.appendChild(trialStrip(other, "Also for you"));
+    }
+    if (!mine.length && !first) box.appendChild(el("p", { className: "h2-calm", text: "What you buy shows up here as Relay finds the receipts." }));
+  }
+  function trialAll() {
+    trialStyle();
+    var b = trialNote({ icon: "doc", title: "All receipts", sub: "" }, function () { if (window.go) window.go("receipts"); });
+    b.classList.add("hx-all"); return b;
+  }
   function mountHome(host) {
     if (!host) return;
     unlockPage();
@@ -12494,7 +12696,7 @@
     var draw = function (force) {
       if (!state.both || !document.body.contains(feed)) return;
       var watched = watches();
-      var key = [homeIds(state.both[0]), homeIds(state.both[1]), homeIds(memo.needReceipt), state.connected, state.mail.length, state.wins.length, state.pick, homeLook(), homeFocus(),
+      var key = [homeIds(state.both[0]), homeIds(state.both[1]), homeIds(memo.needReceipt), state.connected, state.mail.length, state.wins.length, state.pick, homeLook(), homeFocus(), homeTry(),
         watched.map(function (w) { return w.sku + ":" + w.nowMinor + ":" + (w.image ? 1 : 0) + ":" + (w.store || "") + ":" + (w.dom || ""); }).join(","), state.watchWaiting ? 1 : 0, aiNoteDue ? 1 : 0].join("|");
       if (!force && key === drawnKey && feed.firstChild && !feed.querySelector(".rl-skel")) return;
       drawnKey = key;
@@ -12508,11 +12710,14 @@
       if (homeLook() !== "cards") all = all.filter(function (e) { return e.onWay || e.swaps || (!e.digital && (!e.noReturn || String(e.at || "").slice(0, 10) >= weekAgo)); });
       // "To return": what can still go back, and returns on their way (with where each has got to).
       var sets = { you: all, back: all.filter(function (e) { return e.toReturn || e.returning; }), way: all.filter(function (e) { return e.onWay; }), swaps: all.filter(function (e) { return e.swaps; }), watch: watched };
+      // (A Home trial: one Returns chip for what can go back and what's going back, so the row of chips fits the phone.)
+      var trial = homeTry();
+      if (trial) { sets.back = all.filter(function (e) { return e.toReturn || e.returning || e.swaps; }); sets.swaps = []; }
       // "To return" runs soonest date first; the others keep the feed's order.
       sets.back.sort(function (a, b) { return a.when === b.when ? 0 : !a.when ? 1 : !b.when ? -1 : a.when < b.when ? -1 : 1; });
       if (!sets[state.pick] || (state.pick !== "you" && state.pick !== "watch" && !sets[state.pick].length)) state.pick = "you";
       chips.textContent = "";
-      [["you", "For you"], ["watch", "Watching"], ["back", "To return"], ["way", "On the way"], ["swaps", "Swaps and returns"]].forEach(function (c) {
+      [["you", "For you"], ["watch", "Watching"], ["back", trial ? "Returns" : "To return"], ["way", "On the way"], ["swaps", "Swaps and returns"]].forEach(function (c) {
         if (c[0] !== "you" && c[0] !== "watch" && !sets[c[0]].length) return;
         var b = el("button", { type: "button", className: "h2-chip", onclick: function () { if (state.pick === c[0]) return; state.pick = memo.homeChip = c[0]; draw(); try { window.scrollTo(0, 0); } catch (e) {} } });
         b.appendChild(el("span", { text: c[1] }));
@@ -12532,7 +12737,7 @@
       feed.textContent = "";
       var look = homeLook(); feed.classList.toggle("hl", look !== "cards" || state.pick === "watch");
       // For you leads with what the chosen focus puts first (Settings, Home layout: Receipts first or Orders first).
-      if (state.pick === "you") { if (homeFocus() === "orders") drawOrders(all); else drawReceipts(all, watched); }
+      if (state.pick === "you") { if (trial) drawTrial(trial, feed, all, trialNeeds(all, watched), isReview() ? reviewCard() : state.connected === false ? startCard() : null); else if (homeFocus() === "orders") drawOrders(all); else drawReceipts(all, watched); }
       if (state.pick === "watch") drawWatching(watched);
       else if (state.pick !== "you") {
         // The other chips: that list, about twelve of it.
@@ -12544,7 +12749,8 @@
         } else shown.forEach(function (e) { feed.appendChild(feedCard(e)); });
         if (!list.length && state.connected !== false && !isReview()) feed.appendChild(el("p", { className: "rl-calm-none h2-none", text: "What you buy shows up here as Relay finds the receipts." }));
       }
-      if (state.pick !== "watch" && (state.both[1].length || state.both[0].length)) feed.appendChild(feedCard({ small: true, icon: "doc", line: "All receipts", open: function () { if (window.go) window.go("receipts"); } }));
+      if (state.pick !== "watch" && (state.both[1].length || state.both[0].length) && trial) feed.appendChild(trialAll());
+      else if (state.pick !== "watch" && (state.both[1].length || state.both[0].length)) feed.appendChild(feedCard({ small: true, icon: "doc", line: "All receipts", open: function () { if (window.go) window.go("receipts"); } }));
       firstScreen();
     };
     // Watching (Connor, 23 Nov 2026: "this page layout is awful. Boxes overlap options etc and it's very laggy"): one list,
@@ -12602,6 +12808,26 @@
     // Relay's answer about it comes with the profile, which may arrive after Home is drawn.
     profileWatchers.push(function () { if (!feed.isConnected) return false; draw(); });
     var receiptsChanged = function () { draw(true); loadBoth().then(function (both) { state.both = both; draw(); }); };
+    // What needs the shopper, for the Home trials: the same things as Needs you, as plain facts each trial draws its own way.
+    // u: how soon it matters in days (as Needs you); e: the purchase it's about, if it is one.
+    var trialNeeds = function (all, watched) {
+      var out = [];
+      all.forEach(function (e) {
+        if (e.owes) out.push({ u: 3.5, e: e, title: e.line, sub: e.shop, icon: "swap", urgent: true, open: e.open });
+        else if (e.rank === 0 && e.strip && e.when) { var d = daysLeft(e.when); out.push({ u: d === null ? 7 : d, e: e, title: "Return " + (cleanName(e.title, e.shop) || e.shop) + " by " + dayWords(e.when), sub: e.strip + (e.shop ? ", " + e.shop : ""), icon: "swap", urgent: e.stripKind === "urgent", soon: true, open: e.open }); }
+        else if (e.returning && e.nudge) out.push({ u: 1.5, e: e, title: "Refund not seen yet", sub: e.shop, icon: "swap", urgent: true, open: e.open });
+      });
+      if (state.wins.length) { var wc = winsCard(); out.push({ u: 0.5, title: wc.querySelector(".h2-line-t b").textContent, sub: "Auctions", icon: "gavel", urgent: true, open: function () { wc.click(); } }); }
+      if (state.mail.length) { var mc = mailCard(); out.push({ u: 8, title: mc.querySelector(".h2-line-t b").textContent, sub: "Relay can't read your email at the moment", icon: "mail", open: function () { mc.click(); } }); }
+      var payments = isReview() ? [] : needReceiptNow();
+      if (payments.length) { var pc = needReceiptCard(payments, receiptsChanged); out.push({ u: 9, title: payments.length === 1 ? "A shop payment with no receipt" : payments.length + " shop payments with no receipt", sub: "Add a photo of the receipt", icon: "camera", count: payments.length, open: function () { pc.click(); } }); }
+      watched.forEach(function (w) {
+        var f = watchFacts(w); if (!f.by) return;
+        out.push({ u: 10, w: w, title: "Price down " + f.by, sub: f.name, icon: "bell", good: true, open: function () { watchSheet(w, function () { draw(true); }); } });
+      });
+      if (aiNoteDue) out.push({ u: 20, title: "AI help is now on", sub: "What it does, and how to switch it off", icon: "spark", open: function () { aiNoteSheet(function () { draw(); }); } });
+      return out.sort(function (a, b) { return a.u - b.u; });
+    };
     // Receipts first (the users-first Home): what needs you, most urgent first; then parcels on their way; then the
     // latest receipts. Only what is really there: when nothing needs you, one calm line says so.
     var drawReceipts = function (all, watched) {
@@ -12617,8 +12843,9 @@
         }
         // Returns Relay is following: a refund not seen 14 days after the shop had it comes near the top; the others,
         // with where each has got to, after the return dates.
+        // (It stays among Recent too, with where the return has got to on its square: an order being sent back is still a
+        // purchase, and was the newest one missing from Home; Connor, 25 Nov 2026: "why's On missing".)
         else if (e.returning) {
-          used[e.key] = 1;
           needs.push({ u: e.nudge ? 1.5 : 7.5, card: feedCard({ small: true, line: e.line, sub: [e.shop, cleanName(e.title, e.shop)].filter(Boolean).join(", "), open: e.open }) });
         }
       });
