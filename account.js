@@ -11890,7 +11890,8 @@
     sheet.insertBefore(go, rows.nextSibling);
     sheet.insertBefore(el("p", { text: "Your phone keeps one copied thing at a time. Come back here to copy the next one, or let your phone's AutoFill fill in your email and address.", style: "margin:8px 0 0;font-size:13px;color:var(--rl-text2);line-height:1.4" }), go.nextSibling);
     // Many shops run their returns page through a returns company (Narvar, Loop, ZigZag…), so the address can look unfamiliar.
-    sheet.appendChild(el("p", { text: "This is the returns link from " + who + "'s own email. Some shops use a returns company, such as Narvar, to run the page.", style: "margin:8px 0 0;font-size:13px;color:var(--rl-text2);line-height:1.4" }));
+    // (A page from Relay's checked list of shops' own UK returns pages, worker/returns-pages.js, when the email had no link.)
+    sheet.appendChild(el("p", { text: x.returns && x.returns.portalFrom === "shop_list" ? "This is " + who + "'s own returns page for UK orders. Your order's email didn't include a returns link." : "This is the returns link from " + who + "'s own email. Some shops use a returns company, such as Narvar, to run the page.", style: "margin:8px 0 0;font-size:13px;color:var(--rl-text2);line-height:1.4" }));
     sheet.appendChild(el("p", { className: "rl-rg-next", text: "What happens next: " + who + " emails you a return QR code or label. Relay shows it on this card, then follows the parcel back and shows when the refund comes through." }));
     sheet.appendChild(el("button", { type: "button", className: "rl-btn ghost", text: "Close", style: "margin-top:12px", onclick: close }));
   }

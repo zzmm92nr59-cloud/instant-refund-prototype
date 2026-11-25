@@ -68,6 +68,7 @@ jobs:
           node scripts/test-flights.mjs
           node scripts/test-gmail.mjs
           node scripts/test-return-policies.mjs
+          node scripts/test-returns-pages.mjs
           node scripts/test-gifts.mjs
           node scripts/test-order-joins.mjs
           node scripts/test-health.mjs

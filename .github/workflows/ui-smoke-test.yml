@@ -27,6 +27,8 @@ on:
       - scripts/test-watching-ui.mjs
       - scripts/test-screens-ui.mjs
       - scripts/fixtures/screens-world.mjs
+      - worker/returns-pages.js
+      - scripts/test-returns-pages-ui.mjs
       - .github/workflows/ui-smoke-test.yml
   pull_request:
   workflow_dispatch:
@@ -180,6 +182,8 @@ jobs:
         run: node --import ./scripts/record-app-requests.mjs scripts/test-tips-ui.mjs
       - name: Test auctions in the shop's dashboard (what happened to each in words, started once, photos made smaller first, plain refusals)
         run: node scripts/test-retailer-auctions-ui.mjs
+      - name: Start return for a big shop whose email had no returns link (On), from Relay's checked list of shops' UK returns pages
+        run: node --import ./scripts/record-app-requests.mjs scripts/test-returns-pages-ui.mjs
       - name: Check everything the app sent passes the server's input rules (worker/validate.js)
         run: node scripts/test-validation.mjs
   # The screen check takes about 12 minutes on its own, so it runs beside browser-smoke instead of inside its time limit.
