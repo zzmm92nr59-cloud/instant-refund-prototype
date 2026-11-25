@@ -154,7 +154,7 @@ const mail = (from, subject, body, d = TODAY) => `From: ${from}\r\nTo: sam@examp
       [["started", null, null, null], ["sent", ago(3), "carrier", "Royal Mail"], ["received", ago(1), "carrier", "Royal Mail"], ["refunded", null, null, null]], "the carrier's word over the shopper's");
     assert.deepEqual([t.trackingNumber, t.carrier, t.trackUrl], ["KO123456789GB", "Royal Mail", "https://www.royalmail.com/track-your-item#/tracking-results/KO123456789GB"]);
     assert.deepEqual(returnFacts({ id: "a", returnTracking: t }), { receiptId: "a", returnInTransit: false, returnReceived: true, confirmedBy: { by: "carrier", name: "Royal Mail", at: ago(1), via: "email", atTime: null },
-      onItsWay: { by: "carrier", name: "Royal Mail", at: ago(3), via: "email", atTime: null }, statement: "On its way: confirmed by Royal Mail's email on " + ago(3), trackingNumber: "KO123456789GB", state: "received" });
+      onItsWay: { by: "carrier", name: "Royal Mail", at: ago(3), via: "email", atTime: null }, payable: false, statement: "On its way: confirmed by Royal Mail's email on " + ago(3), trackingNumber: "KO123456789GB", state: "received" });
   }
   // A carrier email whose number Relay learns from the shop's email (matched by order number) the first time round.
   {
@@ -305,7 +305,7 @@ const mail = (from, subject, body, d = TODAY) => `From: ${from}\r\nTo: sam@examp
   let a = track({ status: "due", at: ago(-2), first_scan: ago(4) + "T09:14:00" });
   assert.deepEqual(a.returnTracking.steps[1], { step: "sent", done: true, at: ago(4), from: { by: "carrier", name: "Royal Mail", via: "tracking" }, atTime: ago(4) + "T09:14:00" });
   assert.deepEqual(returnFacts(a), { receiptId: "a", returnInTransit: true, returnReceived: false, confirmedBy: { by: "carrier", name: "Royal Mail", at: ago(4), via: "tracking", atTime: ago(4) + "T09:14:00" },
-    onItsWay: { by: "carrier", name: "Royal Mail", at: ago(4), via: "tracking", atTime: ago(4) + "T09:14:00" }, statement: "On its way: confirmed by Royal Mail's tracking, first scan " + ago(4) + "T09:14:00", trackingNumber: "KO123456789GB", state: "sent" });
+    onItsWay: { by: "carrier", name: "Royal Mail", at: ago(4), via: "tracking", atTime: ago(4) + "T09:14:00" }, payable: true, statement: "On its way: confirmed by Royal Mail's tracking, first scan " + ago(4) + "T09:14:00", trackingNumber: "KO123456789GB", state: "sent" });
   // A parcel looked up before the scan time was kept: on its way, but Relay doesn't put the expected day in its place.
   // (Review, 25 Nov 2026: this used to be asserted for a number only the shopper typed. With no first scan there is nothing
   // to check against the day they said they sent it, so for a typed number it now confirms nothing (below); it still holds
@@ -428,7 +428,7 @@ const sent = (id, body, token = alice) => call("/relay/my/receipts/" + id + "/re
   const c = await card(alice, RA);
   assert.equal(c.returnTracking.state, "sent", "it's on the receipt in the list too");
   assert.ok(c.returnProgress, "and in the older shape Home reads");
-  assert.deepEqual(await returnFactsFor(env, A, RA), { receiptId: RA, returnInTransit: false, returnReceived: false, confirmedBy: null, onItsWay: null, statement: "Not confirmed on its way", trackingNumber: "KO123456789GB", state: "sent" });
+  assert.deepEqual(await returnFactsFor(env, A, RA), { receiptId: RA, returnInTransit: false, returnReceived: false, confirmedBy: null, onItsWay: null, payable: false, statement: "Not confirmed on its way", trackingNumber: "KO123456789GB", state: "sent" });
   assert.equal(await returnFactsFor(env, B, RA), null, "not bob's");
   console.log("ok - I've sent it back: on its own, with a number and the carrier asked, or with the carrier guessed from Royal Mail's format");
 }

@@ -30,6 +30,7 @@ import { indexBy, among, amongAt, byTime, nearTime, nearTimeAt } from "./list-in
 import { REREADS_SQL, REREADS_PER_DAY, REREAD_AI_PER_DAY, REREAD_AI_ALL_DAY, orderSection, askForItems, acceptAiItems, namedInEmail, rereadsUsed } from "./receipt-reread.js";
 import { PARCEL_TRACKS_SQL, PARCEL_USES_SQL, applyTracked, readTrackedRows, liveParcel } from "./parcel-tracking.js";
 import { RETURN_TRACKS_SQL, attachReturnTracking, readReturnTracks, saveReturnSent, liveReturnParcel, returnFacts } from "./return-tracking.js";
+import { senderCheckOf } from "./mail-auth.js";
 import { aiTypesFor, learnItemKinds } from "./item-kinds.js";
 import { categorise, itemCategories, itemKinds, returnableItems, storeKey, legacyStoreKey, agreedShopNames, agreedNameFor, logoDomainFor, CATEGORIES, shopDisplayName, PERSONAL_MAIL } from "./receipt-category.js";
 import { cleanItems, isVia, nameFitsDomain } from "./receipt-reader.js";
@@ -1163,21 +1164,25 @@ function classifyNow(rawText, ref, lenient = false) {
   const ret = upd.ok || par.ok ? { ok: false } : parseReturnEmail(rawText);
   const del = upd.ok || par.ok || ret.ok ? { ok: false } : parseDeliveryEmail(rawText);
   const receipt = upd.ok || par.ok || ret.ok || del.ok ? { ok: false } : parseReceiptEmail(rawText, { lenient });
+  // Whether a return or parcel email checked out for its own sender, as the receiving mail service wrote down (mail-auth.js;
+  // security review M4). One that fails is never a carrier's or shop's word on a return (return-tracking.js).
+  const check = upd.ok || par.ok || del.ok ? senderCheckOf(rawText) : null;
+  const checked = check ? { senderCheck: check } : {};
   if (upd.ok) {
     details = {
       kind: "return_update", ...ref, stage: upd.stage, at: upd.at, amountPence: upd.amountPence, currency: upd.currency,
       ...(upd.paidPence != null ? { paidPence: upd.paidPence, paidOn: upd.paidOn || null } : {}),
-      orderRef: upd.orderRef, returnId: upd.returnId, retailer: upd.retailer, source: "shopper_email", refundEligible: false, parserVersion: PARSER_VERSION
+      orderRef: upd.orderRef, returnId: upd.returnId, retailer: upd.retailer, source: "shopper_email", refundEligible: false, parserVersion: PARSER_VERSION, ...checked
     };
   } else if (par.ok) {
     details = {
       kind: "return_update", ...ref, stage: par.stage, at: par.at, fromCarrier: par.fromCarrier, carrier: par.carrier, trackingNumber: par.trackingNumber,
-      shopNamed: par.shop, orderRef: par.orderRef, retailer: par.retailer, source: "shopper_email", refundEligible: false, parserVersion: PARSER_VERSION
+      shopNamed: par.shop, orderRef: par.orderRef, retailer: par.retailer, source: "shopper_email", refundEligible: false, parserVersion: PARSER_VERSION, ...checked
     };
   } else if (del.ok) {
     details = {
       kind: "delivery_update", ...ref, status: del.status, at: del.at, carrier: del.carrier, trackingNumber: del.trackingNumber,
-      merchant: del.merchant, retailer: del.retailer, orderRef: del.orderRef, source: "shopper_email", refundEligible: false, parserVersion: PARSER_VERSION
+      merchant: del.merchant, retailer: del.retailer, orderRef: del.orderRef, source: "shopper_email", refundEligible: false, parserVersion: PARSER_VERSION, ...checked
     };
   } else if (ret.ok) {
     details = {

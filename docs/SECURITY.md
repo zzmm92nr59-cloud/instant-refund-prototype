@@ -141,6 +141,14 @@ made: declined, refused, pending, requested or "being processed" never does (bei
 makes no fact). A return email joins an order only by its number and its shop together. No route moves money on these facts: an instant-refund route, when
 built, must read them on the server (never from the app) and needs its own row above.
 
+The shopper owns the inbox Relay reads, so they could put a fake carrier or shop email in it themselves (security review
+M4, 25 Nov 2026). So: a return or parcel email whose receiving mail service (Gmail, Outlook) wrote that it failed DMARC,
+and DKIM and SPF for its own From domain (`Authentication-Results`, topmost only; `worker/mail-auth.js`), is nobody's word:
+it isn't shown as the carrier's or shop's and makes no fact. And `returnFacts` says `payable: true` only when `onItsWay`
+is the carrier's own tracking scan (`via: "tracking"`): a fact from an email, even one that passed (an email put in the
+inbox by its owner keeps whatever headers they wrote), is `payable: false`, and an instant refund must refuse it. Proved
+by `scripts/test-return-email-auth.mjs`.
+
 The prototype test routes are switched off by `worker/legacy-routes.js`. They take no sign-in and some place test payments
 on Relay's Square sandbox account. To use the "Existing API and verification tools" testing page again, set
 `LEGACY_TEST_ROUTES = "on"` under `[vars]` in `worker/wrangler.toml`, deploy, and set it back to `"off"` afterwards.
@@ -401,6 +409,7 @@ appeared in a public commit"). Fix whatever was slow or unclear.
 | `scripts/test-shop-directory.mjs` | The shop directory keeps nothing about anyone; test shops and the reviewer left out | Every pull request and every deploy |
 | `scripts/test-scan-codes.mjs` | Codes to show or scan: found only where the email says what they are for, look-alikes never; the picture fetched with nothing of the shopper's; the owner only (404); deleted with the receipt, inbox, permission and account | Every pull request and every deploy |
 | `scripts/test-bag.mjs` | The shopping bag: the input rules, the owner only, only products Relay shows (never a test shop's), the price check, deleted with the account and in Download my data | Every pull request and every deploy |
+| `scripts/test-return-email-auth.mjs` | Return emails that fail their own sender check (Authentication-Results) make no fact and aren't shown as the carrier's or shop's word; only the carrier's tracking scan is `payable` | Every pull request and every deploy |
 | `scripts/test-return-tracking.mjs` | Return emails only ever on the shopper's own receipt; own receipts only (404); the input rules; `returnInTransit` / `returnReceived` / `onItsWay` never on the shopper's word alone, a label, a promise or a bank payment; a refund seen in the bank only from the shopper's own payments; Ship24 shares the parcel allowance | Every pull request and every deploy |
 | `scripts/test-return-tracking-e2e.mjs` | One return from label to refund through the real server and app (Ship24, the inbox and the bank stand in): a label or a promise confirms nothing, the carrier's first scan does, only the tracking number goes to Ship24, one parcel counted, the real route's input rules, nobody else's receipt (404) | The browser tests on every pull request |
 | `scripts/record-app-requests.mjs` | Records what the app sends during the browser tests, then checks it against the rules | The browser tests on every pull request |

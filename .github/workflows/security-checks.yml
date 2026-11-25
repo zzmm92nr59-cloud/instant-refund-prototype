@@ -66,6 +66,8 @@ jobs:
         run: node scripts/test-signin-claim.mjs
       - name: Connect Gmail / Outlook can only be finished by the session that started it (a consent link sent to someone else connects nothing)
         run: node scripts/test-mail-connect-session.mjs
+      - name: Return emails checked for their own sender (a planted carrier or shop email makes no fact; only the carrier's scan is payable)
+        run: node scripts/test-return-email-auth.mjs
       - name: Two-step sign-in (sessions from before the second step are ended; the first second step signs other devices out)
         run: node scripts/test-second-step.mjs
       - name: Public Shopify status gives counts only (no shop address, order counts or error text)
