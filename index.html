@@ -1354,7 +1354,10 @@ const catKey=()=>"catalogue|"+(testTools()||reviewAccount()?"t":"-")+(testTools(
 const catStore=mode=>new Promise((res,rej)=>{try{const r=indexedDB.open("relay-shell-v1",1);r.onupgradeneeded=()=>{try{r.result.createObjectStore("kept")}catch(e){}};r.onsuccess=()=>{try{const db=r.result,tx=db.transaction("kept",mode);tx.oncomplete=tx.onabort=tx.onerror=()=>{try{db.close()}catch(e){}};res(tx.objectStore("kept"))}catch(e){rej(e)}};r.onerror=()=>rej(r.error)}catch(e){rej(e)}});
 const catKept=key=>catStore("readonly").then(st=>new Promise(res=>{const q=st.get(key);q.onsuccess=()=>res(q.result||null);q.onerror=()=>res(null)})).catch(()=>null);
 const catKeep=(key,v)=>catStore("readwrite").then(st=>{st.put(v,key)}).catch(()=>{});
-const textSig=t=>{let h=5381;for(let i=0;i<t.length;i++)h=((h<<5)+h+t.charCodeAt(i))|0;return t.length+":"+h};
+// The answer's fingerprint, worked out by the browser itself (not a loop over a megabyte of text on the page's own time).
+const textSig=async t=>{try{const d=new Uint8Array(await crypto.subtle.digest("SHA-256",new TextEncoder().encode(t)));let x="";for(let i=0;i<12;i++)x+=d[i].toString(16).padStart(2,"0");return t.length+":"+x}catch(e){return t.length+":"+Date.now()}};
+// Written to the phone when the page has a quiet moment, so copying thousands of products never lands on a tap.
+const whenQuiet=f=>{try{if(typeof requestIdleCallback==="function")return requestIdleCallback(f,{timeout:8000})}catch(e){}setTimeout(f,1500)};
 // The shop catalogue (Discover and price alerts) loads when one of those pages opens, or a few seconds after start, so
 // it doesn't hold up Home and Receipts. After a try that failed, opening one of those pages again tries again (not more
 // than once in 15 seconds).
@@ -1390,7 +1393,7 @@ async function loadCatalog(manual=false){
   const response=await shopifyAsk;
   if(response.ok){
    const text=await response.text(),data=JSON.parse(text);
-   shopOk=true;sig=textSig(text)+(squareAsk?"|sq"+next.length:"");
+   shopOk=true;sig=(await textSig(text))+(squareAsk?"|sq"+next.length:"");
    if(data.published&&Array.isArray(data.products)){
     const published=data.products.filter(p=>p.sku&&Number.isFinite(Number(p.priceMinor))).map(p=>({...p,provider:"shopify",store:p.storeName||p.shopDomain||"Shopify retailer",fixture:false}));
     next.push(...published);
@@ -1398,13 +1401,13 @@ async function loadCatalog(manual=false){
   }
  }catch{}
  if(webAsk)try{const response=await webAsk;if(response.ok){const text=await response.text(),data=JSON.parse(text);const web=(Array.isArray(data.products)?data.products:[]).filter(p=>p.sku&&Number.isFinite(Number(p.priceMinor))&&p.webShop);
-  webOk=true;sig+="|w"+textSig(text);next.push(...web.map(p=>({...p,provider:"web",store:p.storeName,fixture:false})))}}catch{}
+  webOk=true;sig+="|w"+(await textSig(text));next.push(...web.map(p=>({...p,provider:"web",store:p.storeName,fixture:false})))}}catch{}
  if(my!==catalogSeq)return;
  if(shopOk){
   // The shops' websites didn't answer this time: the ones already here stay.
   if(webAsk&&!webOk){next.push(...catalog.filter(p=>p.provider==="web"));sig+="|w-kept"}
   // The same answer as the copy already in use: nothing is rebuilt or written again.
-  if(!(catalogSig&&sig===catalogSig&&(catalogFresh||catalogKeptShown))){const good=next.filter(p=>!p.fixture);catalog=good.concat(demoProducts());if(!webAsk||webOk)catKeep(key,{sig,at:Date.now(),products:good})}
+  if(!(catalogSig&&sig===catalogSig&&(catalogFresh||catalogKeptShown))){const good=next.filter(p=>!p.fixture);catalog=good.concat(demoProducts());if(!webAsk||webOk){const keep={sig,at:Date.now(),products:good};whenQuiet(()=>catKeep(key,keep))}}
   catalogSig=sig;catalogFresh=true;catalogFailed=false;
  }else{catalogFailed=true;catalogRetryAt=Date.now()+15000}
  }finally{if(my===catalogSeq){catalogBusy=false;catalogReady=true;catalogueChanged()}}
