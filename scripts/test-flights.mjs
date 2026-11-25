@@ -149,4 +149,15 @@ const NOW = Date.UTC(2026, 10, 18);
   assert.equal(f.featured.from, "Little Snoring Halt"); assert.equal(f.others.length, 1); assert.deepEqual(f.lines, []);
 }
 console.log("ok - Wrapped: the furthest flight and train journey featured, the rest grouped, totals, nearest sights said as such");
+// What was paid for a booking is the line that says so, never the total of one part of it (second-pass review, F-1):
+// taxes and fees, seats, a discount or a price per passenger printed above it used to be taken as the amount paid.
+{
+  const booking = (lines) => flightBooking({ subject: "Your booking confirmation", senderDomain: "easyjet.com", fromName: "easyJet", refDate: new Date("2026-03-01"),
+    text: ["Booking reference: K7QXPD", "London Gatwick (LGW) to Malaga (AGP)", "Sat 14 Mar 2026 EZY8031", ...lines].join("\n") });
+  for (const lines of [["Total taxes and fees £58.30", "Total paid £245.98"], ["Total for seats £24.00", "Total paid £245.98"], ["Total per passenger £122.99", "Total price £245.98"],
+    ["Total price £260.00", "Total discount £14.02", "Amount charged £245.98"], ["Total paid £245.98"]])
+    assert.deepEqual(booking(lines).paid, { pence: 24598, currency: "GBP" }, lines.join(" / "));
+  assert.equal(booking(["Total taxes and fees £58.30"]).paid, null, "a part's total alone is not what was paid");
+  console.log("ok - the amount paid for a flight is the line that says so, never taxes, seats, a discount or a price per passenger");
+}
 console.log("PASS flights: airline and travel-site bookings read as receipts, never a sale or a check-in; Wrapped's flights, groups and places");

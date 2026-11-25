@@ -14,6 +14,7 @@
 // switched on once Stripe says the account can take payments.
 
 import { ensureOnce } from "./once.js";
+import { ensureShopPlanTable } from "./shopify.js";
 import { paymentsEnabled, stripe } from "./payments.js";
 
 const json = (body, status = 200, cors = {}) => Response.json(body, { status, headers: { ...cors, "Cache-Control": "no-store" } });
@@ -31,10 +32,21 @@ async function row(env, shop) {
   return env.RELAY_DB.prepare("SELECT * FROM relay_shop_pay WHERE shop = ?").bind(shop).first();
 }
 
+// Paying by card through Relay only moves Stripe's test money (payments.js takes test keys only), while the swap changes
+// the shop's real order. So it is only ever for Relay's own test shops (Shopify development stores, shopify.js): a real
+// shop, or one Relay hasn't checked yet, can't choose it, isn't offered it, and never gets it, whatever was saved before.
+export async function cardsAllowed(env, shop) {
+  if (!paymentsEnabled(env)) return false;
+  try {
+    await ensureShopPlanTable(env.RELAY_DB);
+    const plan = await env.RELAY_DB.prepare("SELECT test_shop FROM shopify_shop_plan WHERE domain = ?").bind(shop).first();
+    return Boolean(plan && Number(plan.test_shop) === 1);
+  } catch { return false; }
+}
 // What actually happens for this shop right now. "card" only when it is truly available; otherwise "shopify".
 export async function shopPay(env, shop) {
   const r = await row(env, shop).catch(() => null);
-  const ready = Boolean(r && r.stripe_ready && r.stripe_account && paymentsEnabled(env));
+  const ready = Boolean(r && r.stripe_ready && r.stripe_account && await cardsAllowed(env, shop));
   return { method: r && r.method === "card" && ready ? "card" : "shopify", stripeAccount: ready ? r.stripe_account : null };
 }
 
@@ -60,7 +72,7 @@ async function refreshStripe(env, shop, r, o) {
 
 async function view(env, shop, o) {
   const r = await refreshStripe(env, shop, await row(env, shop), o);
-  const cardPossible = paymentsEnabled(env);
+  const cardPossible = await cardsAllowed(env, shop);
   const ready = Boolean(r && r.stripe_ready && r.stripe_account && cardPossible);
   return { method: r && r.method === "card" && ready ? "card" : "shopify", cardPossible, testMode: cardPossible,
     stripe: { connected: Boolean(r && r.stripe_account), ready, detailsSubmitted: Boolean(r && r.detailsSubmitted) } };
@@ -83,7 +95,7 @@ export async function handleShopPayRoute(request, env, url, cors, shop, o = {}) 
     return json(await view(env, shop, o), 200, cors);
   }
   if (path === "/relay/retailer/payments/stripe" && request.method === "POST") {
-    if (!paymentsEnabled(env)) return json({ error: "cards_not_available" }, 409, cors);
+    if (!(await cardsAllowed(env, shop))) return json({ error: "cards_not_available" }, 409, cors);
     let r = await row(env, shop);
     try {
       if (!r || !r.stripe_account) {

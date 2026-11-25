@@ -81,6 +81,8 @@ async function ensureResaleTablesRun(db) {
     `CREATE TABLE IF NOT EXISTS resale_member_blocks (id TEXT PRIMARY KEY, blocker_id TEXT NOT NULL, blocked_id TEXT NOT NULL, about TEXT, created_at INTEGER NOT NULL, UNIQUE (blocker_id, blocked_id))`,
     `CREATE INDEX IF NOT EXISTS idx_resale_mblock_blocked ON resale_member_blocks(blocked_id)`,
     // How many AI descriptions each member asked for each day (for DESCRIBE_PER_DAY): only the count, gone after two days.
+    `CREATE INDEX IF NOT EXISTS idx_resale_msg_sender ON resale_messages(sender_id, created_at)`,
+    `CREATE INDEX IF NOT EXISTS idx_resale_lreports_reporter ON resale_listing_reports(reporter_id, created_at)`,
     `CREATE TABLE IF NOT EXISTS resale_describe_usage (shopper_id TEXT NOT NULL, day TEXT NOT NULL, n INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (shopper_id, day))`,
     ...ADMIN_TABLE_SQL
   ];
@@ -310,7 +312,7 @@ async function feed(env, shopper) {
 // Counted from the database when asked (opening Relay, opening Swap & resell, pulling down), never on a timer.
 const UNREAD = `SELECT q.id AS request_id, COUNT(m.id) AS n FROM resale_requests q JOIN resale_listings l ON l.id = q.listing_id
     JOIN resale_messages m ON m.request_id = q.id LEFT JOIN resale_reads r ON r.shopper_id = ? AND r.request_id = q.id
-   WHERE (q.asker_id = ? OR l.seller_id = ?) AND q.status IN ('pending','accepted') AND m.sender_id != ? AND m.created_at > COALESCE(r.read_at, 0)
+   WHERE q.id IN ${MY_REQUESTS} AND q.status IN ('pending','accepted') AND m.sender_id != ? AND m.created_at > COALESCE(r.read_at, 0)
    GROUP BY q.id`;
 async function unreadByRequest(env, shopperId) {
   const rows = await env.RELAY_DB.prepare(UNREAD).bind(shopperId, shopperId, shopperId, shopperId).all();
@@ -338,22 +340,27 @@ async function myStuff(env, shopper, markSeen) {
   const listings = await env.RELAY_DB.prepare(
     "SELECT * FROM resale_listings WHERE seller_id = ? AND status IN ('active','matched') ORDER BY created_at DESC LIMIT 60").bind(shopper.id).all();
   const out = [];
-  for (const l of listings.results || []) {
+  // Every listing's requests in one query (the first 50 of each, oldest first), each with how many messages it has and
+  // the item offered in a swap: not a query a listing and another per swap offer.
+  const mineIds = (listings.results || []).map(l => l.id), byListing = new Map();
+  if (mineIds.length) {
     const reqs = await env.RELAY_DB.prepare(
-      `SELECT id, kind, offered_listing_id, message, status, created_at, asker_id, seller_seen,
-         (SELECT COUNT(*) FROM resale_messages m WHERE m.request_id = resale_requests.id) AS said
-         FROM resale_requests WHERE listing_id = ? ORDER BY created_at ASC, rowid ASC LIMIT 50`).bind(l.id).all();
+      `SELECT * FROM (SELECT q.id, q.listing_id, q.kind, q.offered_listing_id, q.message, q.status, q.created_at, q.asker_id, q.seller_seen,
+         (SELECT COUNT(*) FROM resale_messages m WHERE m.request_id = q.id) AS said,
+         o.title AS o_title, o.store AS o_store, o.size AS o_size, o.condition AS o_condition, o.id AS o_id,
+         ROW_NUMBER() OVER (PARTITION BY q.listing_id ORDER BY q.created_at ASC, q.rowid ASC) AS rn
+         FROM resale_requests q LEFT JOIN resale_listings o ON o.id = q.offered_listing_id
+        WHERE q.listing_id IN (${mineIds.map(() => "?").join(",")})) WHERE rn <= 50 ORDER BY listing_id, rn`).bind(...mineIds).all();
+    for (const q of reqs.results || []) { const l = byListing.get(q.listing_id) || []; l.push(q); byListing.set(q.listing_id, l); }
+  }
+  for (const l of listings.results || []) {
     const requests = [];
     let n = 0;
-    for (const q of reqs.results || []) {
+    for (const q of byListing.get(l.id) || []) {
       // A chat someone opened but hasn't written in yet isn't anything for the seller to see.
       if (q.kind === "chat" && !q.said) continue;
       n++;
-      let offered = null;
-      if (q.offered_listing_id) {
-        const o = await env.RELAY_DB.prepare("SELECT title, store, size, condition FROM resale_listings WHERE id = ?").bind(q.offered_listing_id).first();
-        if (o) offered = { title: o.title, store: o.store, size: o.size, condition: o.condition };
-      }
+      const offered = q.offered_listing_id && q.o_id ? { title: q.o_title, store: q.o_store, size: q.o_size, condition: q.o_condition } : null;
       requests.push({ id: q.id, who: "Member " + n, kind: q.kind, message: q.message, status: q.status, createdAt: q.created_at, offered,
         new: q.status === "pending" && q.kind !== "chat" && !q.seller_seen, unread: unread.get(q.id) || 0, messages: Number(q.said) || 0 });
     }
@@ -385,7 +392,7 @@ async function conversations(env, shopper) {
        (SELECT m.body FROM resale_messages m WHERE m.request_id = q.id ORDER BY m.created_at DESC, m.rowid DESC LIMIT 1) AS last_body,
        (SELECT m.sender_id FROM resale_messages m WHERE m.request_id = q.id ORDER BY m.created_at DESC, m.rowid DESC LIMIT 1) AS last_from
        FROM resale_requests q JOIN resale_listings l ON l.id = q.listing_id
-      WHERE (q.asker_id = ? OR l.seller_id = ?) AND (q.status = 'accepted' OR EXISTS (SELECT 1 FROM resale_messages m WHERE m.request_id = q.id))
+      WHERE q.id IN ${MY_REQUESTS} AND (q.status = 'accepted' OR EXISTS (SELECT 1 FROM resale_messages m WHERE m.request_id = q.id))
       ORDER BY COALESCE(last_at, q.created_at) DESC LIMIT 80`).bind(shopper.id, shopper.id).all();
   return (rows.results || []).map(q => {
     const seller = q.seller_id === shopper.id, open = q.status === "accepted" || (q.status === "pending" && q.listing_status === "active");
@@ -503,8 +510,14 @@ async function ask(env, shopper, listingId, body, now, o) {
   if (today && today.n >= MAX_REQUESTS_PER_DAY) return { status: 429, body: { error: "too_many_requests" } };
   // Already chatting with the seller about it: the chat becomes the request (the same conversation carries on).
   const chatting = await env.RELAY_DB.prepare("SELECT id FROM resale_requests WHERE listing_id = ? AND asker_id = ? AND kind = 'chat' AND status = 'pending'").bind(listingId, shopper.id).first();
+  // Asked before, and the seller accepted someone else, but that fell through and the item is on sale again: the member can
+  // ask again (the same conversation carries on). A request the seller declined, or either side ended, stays answered.
+  const lapsed = chatting ? null : await env.RELAY_DB.prepare("SELECT id FROM resale_requests WHERE listing_id = ? AND asker_id = ? AND status = 'declined' AND outcome = 'other'").bind(listingId, shopper.id).first();
   if (chatting) {
     await env.RELAY_DB.prepare("UPDATE resale_requests SET kind = ?, offered_listing_id = ?, message = ?, seller_seen = 0 WHERE id = ?").bind(kind, offered, clean(body.message, 200) || null, chatting.id).run();
+  } else if (lapsed) {
+    await env.RELAY_DB.prepare("UPDATE resale_requests SET kind = ?, offered_listing_id = ?, message = ?, status = 'pending', outcome = NULL, asker_seen = 1, seller_seen = 0 WHERE id = ? AND status = 'declined' AND outcome = 'other'")
+      .bind(kind, offered, clean(body.message, 200) || null, lapsed.id).run();
   } else try {
     await env.RELAY_DB.prepare(
       "INSERT INTO resale_requests (id, listing_id, asker_id, kind, offered_listing_id, message, status, created_at) VALUES (?,?,?,?,?,?,'pending',?)")
@@ -526,7 +539,10 @@ async function startChat(env, shopper, listingId, now) {
   if (!l) return { status: 404, body: { error: "not_found" } };
   if (l.seller_id === shopper.id) return { status: 400, body: { error: "own_listing" } };
   if (await blockedBetween(env, shopper.id, l.seller_id)) return { status: 404, body: { error: "not_found" } };
-  const had = await env.RELAY_DB.prepare("SELECT id, status FROM resale_requests WHERE listing_id = ? AND asker_id = ?").bind(listingId, shopper.id).first();
+  const had = await env.RELAY_DB.prepare("SELECT id, status, outcome FROM resale_requests WHERE listing_id = ? AND asker_id = ?").bind(listingId, shopper.id).first();
+  // (Lost to another member whose match fell through, and the item is on sale again: the conversation opens again, as a chat.)
+  if (had && had.status === "declined" && had.outcome === "other")
+    await env.RELAY_DB.prepare("UPDATE resale_requests SET kind = 'chat', offered_listing_id = NULL, status = 'pending', outcome = NULL, asker_seen = 1 WHERE id = ? AND status = 'declined' AND outcome = 'other'").bind(had.id).run();
   if (had) return { status: 200, body: { ok: true, requestId: had.id } };
   const today = await env.RELAY_DB.prepare("SELECT COUNT(*) AS n FROM resale_requests WHERE asker_id = ? AND created_at > ?").bind(shopper.id, now - DAY).first();
   if (today && today.n >= MAX_REQUESTS_PER_DAY) return { status: 429, body: { error: "too_many_requests" } };
@@ -550,6 +566,7 @@ export const ANSWER_PUSH = {
   declined: title => ({ title: "The seller said no", body: "They declined your request for " + title + ".", url: "./#open=market&tab=mine" }),
   other: title => ({ title: "No longer available", body: "The seller of " + title + " accepted another member's request.", url: "./#open=market&tab=mine" })
 };
+const ACCEPTED = "EXISTS (SELECT 1 FROM resale_requests a WHERE a.id = ? AND a.status = 'accepted')";
 async function decide(env, shopper, requestId, accept, o) {
   // Only the listing's seller can decide, and only while the request is pending.
   const q = await env.RELAY_DB.prepare(
@@ -569,16 +586,18 @@ async function decide(env, shopper, requestId, accept, o) {
   const others = await env.RELAY_DB.prepare(`SELECT q.id, q.asker_id FROM resale_requests q WHERE q.listing_id = ? AND q.id != ? AND q.status = 'pending'
       AND (q.kind != 'chat' OR EXISTS (SELECT 1 FROM resale_messages m WHERE m.request_id = q.id))`).bind(q.listing_id, requestId).all();
   const lost = (others.results || []);
-  const won = await env.RELAY_DB.batch([
-    env.RELAY_DB.prepare("UPDATE resale_requests SET status = 'accepted', outcome = 'accepted', asker_seen = 0 WHERE id = ? AND status = 'pending' RETURNING id").bind(requestId),
-    ...lost.map(x => env.RELAY_DB.prepare("UPDATE resale_requests SET outcome = 'other', asker_seen = 0 WHERE id = ? AND status = 'pending'").bind(x.id)),
-    env.RELAY_DB.prepare("UPDATE resale_requests SET status = 'declined' WHERE listing_id = ? AND id != ? AND status = 'pending'").bind(q.listing_id, requestId),
-    env.RELAY_DB.prepare("UPDATE resale_listings SET status = 'matched' WHERE id = ? AND seller_id = ?").bind(q.listing_id, shopper.id)
+  await env.RELAY_DB.batch([
+    env.RELAY_DB.prepare("UPDATE resale_requests SET status = 'accepted', outcome = 'accepted', asker_seen = 0 WHERE id = ? AND status = 'pending'").bind(requestId),
+    // The rest only happens if that accept did (ACCEPTED): if the member ended their request at the same moment, nobody
+    // else is declined and the listing stays on sale, instead of ending up matched with nobody.
+    ...lost.map(x => env.RELAY_DB.prepare("UPDATE resale_requests SET outcome = 'other', asker_seen = 0 WHERE id = ? AND status = 'pending' AND " + ACCEPTED).bind(x.id, requestId)),
+    env.RELAY_DB.prepare("UPDATE resale_requests SET status = 'declined' WHERE listing_id = ? AND id != ? AND status = 'pending' AND " + ACCEPTED).bind(q.listing_id, requestId, requestId),
+    env.RELAY_DB.prepare("UPDATE resale_listings SET status = 'matched' WHERE id = ? AND seller_id = ? AND " + ACCEPTED).bind(q.listing_id, shopper.id, requestId)
   ]);
-  if (won[0] && won[0].results && won[0].results.length) {
-    await tell(env, q.asker_id, ANSWER_PUSH.accepted(q.title, requestId, q.kind), o);
-    for (const x of lost) await tell(env, x.asker_id, ANSWER_PUSH.other(q.title), o);
-  }
+  const now_ = await env.RELAY_DB.prepare("SELECT status FROM resale_requests WHERE id = ?").bind(requestId).first();
+  if (!now_ || now_.status !== "accepted") return { status: 404, body: { error: "not_found" } };
+  await tell(env, q.asker_id, ANSWER_PUSH.accepted(q.title, requestId, q.kind), o);
+  for (const x of lost) await tell(env, x.asker_id, ANSWER_PUSH.other(q.title), o);
   return { status: 200, body: { ok: true } };
 }
 

@@ -61,6 +61,9 @@ export function ensureReturnsTables(db) {
       ON relay_returns(order_id, line_id)`).run();
     await db.prepare(`CREATE INDEX IF NOT EXISTS idx_relay_returns_shopper
       ON relay_returns(shopper_id)`).run();
+    // One open return per item, held by the database itself (skipped, and logged, if older rows already break it).
+    try { await db.prepare("CREATE UNIQUE INDEX IF NOT EXISTS idx_relay_returns_one ON relay_returns(order_id, line_id) WHERE status != 'cancelled'").run(); }
+    catch (e) { console.error("returns_one_index_failed", String(e && e.message || e).slice(0, 120)); }
   }).then(() => ensureOnce(db, "returns-shop-notified", async () => {
     // When the shop's email about this return was accepted for delivery (null = not told). Added later.
     try { await db.prepare("ALTER TABLE relay_returns ADD COLUMN shop_notified_at INTEGER").run(); } catch { /* already there */ }
@@ -207,15 +210,26 @@ export async function initiateReturn(env, shopper, body, o = {}) {
   const returnId = crypto.randomUUID();
   const now = Date.now();
 
-  await db.prepare(`INSERT INTO relay_returns
-    (id, shopper_id, order_id, line_id, shop, item_title, quantity, price_minor, reason,
-     return_ref, status, carrier, created_at)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
-  `).bind(
-    returnId, shopper.id, check.order.id, check.line.lineId, check.shop,
-    check.line.title, check.line.quantity, check.line.priceMinor,
-    reason || null, returnRef, "requested", null, now
-  ).run();
+  // Saved only if this item has no return already, in the same statement: a double tap (or the app trying again after a slow
+  // answer) can't make two returns, two emails to the shop and two labels the shop pays for.
+  let saved;
+  try {
+    saved = await db.prepare(`INSERT INTO relay_returns
+      (id, shopper_id, order_id, line_id, shop, item_title, quantity, price_minor, reason,
+       return_ref, status, carrier, created_at)
+      SELECT ?,?,?,?,?,?,?,?,?,?,?,?,?
+      WHERE NOT EXISTS (SELECT 1 FROM relay_returns WHERE order_id = ? AND line_id = ? AND status != 'cancelled')
+    `).bind(
+      returnId, shopper.id, check.order.id, check.line.lineId, check.shop,
+      check.line.title, check.line.quantity, check.line.priceMinor,
+      reason || null, returnRef, "requested", null, now, check.order.id, check.line.lineId
+    ).run();
+  } catch (e) {
+    if (/UNIQUE/i.test(String(e && e.message))) return [409, { error: "already_returned" }];
+    throw e;
+  }
+  if ((saved && saved.meta && saved.meta.changes === 0) || !(await db.prepare("SELECT 1 AS x FROM relay_returns WHERE id = ?").bind(returnId).first()))
+    return [409, { error: "already_returned" }];
 
   // A Royal Mail label, only if the shop connected its own Click & Drop account and Royal Mail returned a tracking number.
   let store = null, made = null;

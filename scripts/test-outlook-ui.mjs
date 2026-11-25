@@ -127,6 +127,11 @@ console.log("ok - a non-Outlook address is pointed to the email link");
 // 4. Signed in, not connected: the Receipts page offers both Gmail and Outlook.
 await page.evaluate(() => localStorage.setItem("relay.session.v1", JSON.stringify({ token: "S".repeat(43), email: "jess.tester@outlook.com" })));
 await page.goto(origin + "/index.html"); await page.waitForTimeout(700);
+// Signing out (step 3) forgets what this phone knew about the member's inbox (CLAUDE.md rule 5), so a member with no inbox
+// and no interests saved is asked what they shop for on Home first, as any new member is. "Not now" lets them carry on.
+await page.getByRole("heading", { name: "What do you shop for?" }).waitFor({ timeout: 8000 });
+await page.getByRole("button", { name: "Not now" }).click();
+await page.getByRole("heading", { name: "What do you shop for?" }).waitFor({ state: "detached" });
 await page.evaluate(() => window.go("receipts"));
 await page.getByRole("button", { name: "Connect Outlook" }).waitFor();
 assert.ok(await page.getByRole("button", { name: "Connect Gmail" }).count(), "Gmail still offered");

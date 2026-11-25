@@ -6,9 +6,10 @@
 import { DatabaseSync } from "node:sqlite";
 import { readFileSync, readdirSync } from "node:fs";
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { handleAuthRoute } from "../worker/auth.js";
 import { CONSENT_VERSION } from "../worker/gmail.js";
-import { matchPayments, namesShop, BANK_SCOPES, shopName, isShopping, merchantOf, statementShop, bankForEveryone, pickProvider, BANK_CHOICES } from "../worker/bank.js";
+import { matchPayments, namesShop, BANK_SCOPES, shopName, isShopping, merchantOf, statementShop, bankForEveryone, pickProvider, BANK_CHOICES, connectionLabels } from "../worker/bank.js";
 
 {
   assert.ok(namesShop("SAINSBURYS S/MKTS LONDON", "Sainsbury's", "sainsburys.co.uk"));
@@ -85,6 +86,7 @@ const fetchImpl = async (url, init = {}) => {
   if (url.startsWith("https://api.resend.com/emails")) { emails.push(JSON.parse(init.body)); return new Response("{}"); }
   if (url === "https://auth.truelayer-sandbox.com/connect/token") {
     const f = new URLSearchParams(init.body);
+    if (TL.tokenDown) return new Response("{}", { status: 503 });
     if (f.get("client_secret") !== "tl-secret-test") return new Response("{}", { status: 401 });
     if (f.get("grant_type") === "authorization_code" && f.get("code") === TL.code) return Response.json({ access_token: TL.access, refresh_token: TL.refresh, expires_in: 3600 });
     if (f.get("grant_type") === "refresh_token" && f.get("refresh_token") === TL.refresh) return Response.json({ access_token: "acc-2", refresh_token: "ref-2", expires_in: 3600 });
@@ -95,7 +97,9 @@ const fetchImpl = async (url, init = {}) => {
     if (auth !== "Bearer acc-1" && auth !== "Bearer acc-2") return new Response("{}", { status: 401 });
     const p = new URL(url).pathname;
     if (p === "/data/v1/me") return Response.json({ results: [{ provider: { display_name: "mock" } }] });
-    if (p === "/data/v1/accounts") return Response.json({ results: [{ account_id: "acc0001", display_name: "Current account" }] });
+    if (TL.down && TL.down.test(p)) { if (TL.down === TL.timeout) throw Object.assign(new Error("timed out"), { name: "TimeoutError" }); return new Response("bad gateway", { status: 502 }); }
+    if (TL.broken && p === "/data/v1/accounts/acc0001/transactions" && auth === "Bearer " + TL.broken) return Response.json({ results: [null] });
+    if (p === "/data/v1/accounts") return Response.json({ results: [{ account_id: "acc0001", display_name: "Current account", account_number: { number: "12345678", sort_code: "01-02-03" } }] });
     if (p === "/data/v1/cards") return Response.json({ results: [{ account_id: "card001", display_name: "Credit card", partial_card_number: "4242" }] });
     if (p === "/data/v1/accounts/acc0001/transactions") return Response.json({ results: [
       { transaction_id: "t1", timestamp: "2026-11-03T10:00:00Z", description: "BRINDLE AND CO LONDON", amount: -45.0, currency: "GBP", transaction_type: "DEBIT" },
@@ -158,12 +162,46 @@ assert.match(loc(await call("/relay/bank/callback?code=good-code&state=" + "x".r
   now -= 16 * 60e3;
 }
 assert.match(loc(await call("/relay/bank/callback?error=access_denied&state=" + state)), /#bank=denied$/);
-assert.match(loc(await call("/relay/bank/callback?code=good-code&state=" + state)), /#bank=connected$/);
+// The bank's page coming back connects nothing by itself: it hands the browser a single-use code, and only the app signed in
+// with the very session that started it can finish (review B-2: a link to the bank's page sent to someone else must never
+// read their bank into the sender's account).
+const finishCode = (r0) => (/#bank=finish&bankcode=([A-Za-z0-9_-]{43})$/.exec(loc(r0)) || [])[1];
+{
+  // Someone else's browser comes back from the bank (they were sent Jess's link): signed in as themselves, they can't finish it.
+  const lure = new URL((await (await call("/relay/my/bank/connect", { method: "POST", token: jess })).json()).url).searchParams.get("state");
+  const theirs = finishCode(await call("/relay/bank/callback?code=good-code&state=" + lure));
+  assert.ok(theirs, "the callback answers with a code to finish, not a connection");
+  assert.equal(sqlite.prepare("SELECT COUNT(*) AS n FROM bank_links").get().n, 0, "nothing is connected by the callback alone");
+  env.RELAY_ADMIN_EMAILS = "jess.private@example.com,sam@example.com";
+  const refused = await call("/relay/my/bank/finish", { method: "POST", token: sam, body: { code: theirs } });
+  assert.equal(refused.status, 403); assert.equal((await refused.json()).error, "not_your_link");
+  env.RELAY_ADMIN_EMAILS = "jess.private@example.com";
+  assert.equal(sqlite.prepare("SELECT COUNT(*) AS n FROM bank_links").get().n, 0, "their bank isn't read into anyone's account");
+  assert.equal(sqlite.prepare("SELECT COUNT(*) AS n FROM bank_link_states WHERE token_data IS NOT NULL").get().n, 0, "and the bank's tokens are deleted");
+  assert.equal((await call("/relay/my/bank/finish", { method: "POST", token: jess, body: { code: theirs } })).status, 409, "the code is spent, even for the one who started");
+  // Jess herself on another device (another session of hers): not the browser that started, so refused too.
+  const jessOtherPhone = await signIn("jess.private@example.com", "5.5.5.9");
+  const again = new URL((await (await call("/relay/my/bank/connect", { method: "POST", token: jess })).json()).url).searchParams.get("state");
+  const code2 = finishCode(await call("/relay/bank/callback?code=good-code&state=" + again));
+  assert.equal((await call("/relay/my/bank/finish", { method: "POST", token: jessOtherPhone, body: { code: code2 } })).status, 403, "only the session that started it");
+  assert.equal((await call("/relay/my/bank/finish", { method: "POST", token: jess, body: { code: "x".repeat(43) } })).status, 409, "a made-up code");
+  assert.equal((await call("/relay/my/bank/finish", { method: "POST", body: { code: code2 } })).status, 401, "not signed in");
+  // A state from before this rule (no session kept with it) can't be finished.
+  const oldState = "o".repeat(43);
+  sqlite.prepare("INSERT INTO bank_link_states (state_hash, shopper_id, expires_at) VALUES (?,?,?)").run(createHash("sha256").update(oldState).digest("hex"), J, now + 60e3);
+  assert.match(loc(await call("/relay/bank/callback?code=good-code&state=" + oldState)), /#bank=failed$/);
+  assert.equal(sqlite.prepare("SELECT COUNT(*) AS n FROM bank_links").get().n, 0);
+}
+const finishing = finishCode(await call("/relay/bank/callback?code=good-code&state=" + state));
+assert.ok(finishing);
 assert.match(loc(await call("/relay/bank/callback?code=good-code&state=" + state)), /#bank=failed$/, "single-use");
+const finished = await call("/relay/my/bank/finish", { method: "POST", token: jess, body: { code: finishing } });
+assert.equal(finished.status, 200); assert.equal((await finished.json()).ok, true);
+assert.equal((await call("/relay/my/bank/finish", { method: "POST", token: jess, body: { code: finishing } })).status, 409, "the code works once");
 const row = sqlite.prepare("SELECT * FROM bank_links WHERE shopper_id = ?").get(J);
 assert.equal(row.bank, "Mock Bank");
 for (const secret of ["acc-1", "ref-1"]) assert.ok(!JSON.stringify(row).includes(secret), "tokens kept encrypted");
-console.log("ok - connect: the bank's own page, read-only, single-use state, tokens kept encrypted");
+console.log("ok - connect: the bank's own page, read-only, single-use state, tokens kept encrypted; only the session that started it can finish it");
 
 // 2b. A bank chosen in Relay goes straight to that bank (TrueLayer's own id for it, from TrueLayer's list); anything
 // else, or the list not answering, shows TrueLayer's list of banks as before.
@@ -240,6 +278,83 @@ assert.deepEqual([brindle(pr).notMine, brindle(pr).match], [null, "sure"]);
 assert.equal(sqlite.prepare("SELECT COUNT(*) AS n FROM bank_not_mine WHERE shopper_id = ?").get(J).n, 0, "and the shop rule goes too");
 await call("/relay/my/bank/not-mine", { method: "POST", token: jess, body: { id: bid, on: true } });
 console.log("ok - Not mine: a payment or every payment from a shop, left out of matching; undone by This is mine");
+
+// 3c. A read that only partly works never deletes what was read before, and never looks like a read that happened
+// (review B-1). Then: one bank's read going wrong never stops the others (why every connection said "Read 8 days ago").
+{
+  const paymentsNow = () => sqlite.prepare("SELECT payment_id FROM bank_payments WHERE shopper_id = ? ORDER BY payment_id").all(J).map((x) => x.payment_id);
+  const conn = () => sqlite.prepare("SELECT * FROM bank_links WHERE shopper_id = ? ORDER BY connected_at").all(J);
+  const before = paymentsNow(), readAt = conn()[0].synced_at;
+  assert.ok(before.length >= 3 && readAt);
+  // The card's payments don't answer (the bank is busy); the account's do.
+  now += 11 * 60e3; TL.down = /^\/data\/v1\/cards\/card001\/transactions$/;
+  let sync = await (await call("/relay/my/bank/sync", { method: "POST", token: jess })).json();
+  assert.equal(sync.failed, 1, "the answer says a bank couldn't be read");
+  assert.deepEqual(paymentsNow(), before, "the card's payments are still there");
+  assert.equal(conn()[0].synced_at, readAt, "not marked as read");
+  let view = (await (await call("/relay/my/bank", { token: jess })).json()).connections[0];
+  assert.equal(view.readProblem, "bank"); assert.equal(view.triedAt, new Date(now).toISOString()); assert.equal(view.needsReconnect, false, "busy isn't 'connect again'");
+  assert.equal(Date.parse(view.syncedAt), readAt);
+  // Nothing answers at all (TrueLayer down, then timing out): everything stays, and it's tried again a minute later.
+  for (const mode of [/^\/data\//, "timeout"]) {
+    now += 61e3; TL.down = mode === "timeout" ? (TL.timeout = /^\/data\//) : mode;
+    sync = await (await call("/relay/my/bank/sync", { method: "POST", token: jess })).json();
+    assert.equal(sync.failed, 1);
+    assert.deepEqual(paymentsNow(), before, "nothing deleted when the bank can't be read");
+    assert.equal(conn()[0].synced_at, readAt); assert.equal(conn()[0].status, "ok");
+  }
+  calls = []; now += 10e3;
+  await call("/relay/my/bank/sync", { method: "POST", token: jess });
+  assert.equal(calls.filter((c) => c.url.includes("truelayer")).length, 0, "a failed read isn't hammered: once a minute");
+  // Renewing access while TrueLayer is down is "couldn't ask", not "connect again".
+  now += 2 * 3600e3; TL.down = null; TL.tokenDown = true;
+  await call("/relay/my/bank/sync", { method: "POST", token: jess });
+  assert.equal(conn()[0].status, "ok", "TrueLayer being down never tells anyone to reconnect");
+  assert.deepEqual(paymentsNow(), before);
+  TL.tokenDown = false; now += 61e3;
+  sync = await (await call("/relay/my/bank/sync", { method: "POST", token: jess })).json();
+  assert.equal(sync.failed, undefined); assert.equal(conn()[0].synced_at, now, "a whole read marks it read");
+  assert.deepEqual(paymentsNow(), before);
+  assert.equal((await (await call("/relay/my/bank", { token: jess })).json()).connections[0].readProblem, undefined);
+
+  // A second connection to the same bank. The first one's read now blows up inside Relay: the second is still read, the
+  // failure is written on the first, and the request answers instead of failing.
+  const st2 = new URL((await (await call("/relay/my/bank/connect", { method: "POST", token: jess })).json()).url).searchParams.get("state");
+  TL.access = "acc-1";
+  assert.equal((await call("/relay/my/bank/finish", { method: "POST", token: jess, body: { code: finishCode(await call("/relay/bank/callback?code=good-code&state=" + st2)) } })).status, 200);
+  const second = conn()[1];
+  // The stand-in tells the two apart by their access: the first connection's (renewed above) gets data Relay chokes on.
+  now += 11 * 60e3;
+  TL.broken = "acc-2";
+  const answer = await call("/relay/my/bank/sync", { method: "POST", token: jess });
+  assert.equal(answer.status, 200, "one bank failing doesn't fail the request");
+  TL.broken = null;
+  const after = conn();
+  assert.equal(after[0].problem, "error"); assert.equal(after[0].synced_at < now, true, "the broken one isn't marked read");
+  assert.equal(after[1].synced_at, now, "the other bank was still read (it asks which cards first, so nothing to break)");
+  assert.deepEqual(paymentsNow().filter((id) => id.startsWith(after[0].id)), before, "and the broken one kept its payments");
+  // Two connections with the same bank name are told apart by what the bank says is on each, never by a made-up number.
+  view = (await (await call("/relay/my/bank", { token: jess })).json()).connections;
+  assert.deepEqual(view.map((c) => c.bank), ["Mock Bank", "Mock Bank"]);
+  assert.deepEqual(view.map((c) => c.label), ["Mock Bank", "Mock Bank"], "the same account and card on both: nothing true tells them apart, so nothing is invented");
+  assert.deepEqual(view[0].accounts, ["Current account ending 5678", "Credit card ending 4242"], "the bank's own names and last four digits");
+  assert.deepEqual(connectionLabels([{ bank: "Santander Personal", accounts: ["Everyday Current Account ending 4321"] }, { bank: "Santander Personal", accounts: ["All in One Credit Card ending 9876"] },
+    { bank: "Monzo", accounts: ["Personal Account ending 1111"] }]).map((c) => c.label),
+    ["Santander Personal, Everyday Current Account ending 4321", "Santander Personal, All in One Credit Card ending 9876", "Monzo"]);
+  assert.deepEqual(connectionLabels([{ bank: "Santander Personal", accounts: [] }, { bank: "Santander Personal", accounts: ["Current Account"] }]).map((c) => c.label),
+    ["Santander Personal", "Santander Personal, Current Account"], "nothing read yet: the plain name");
+  assert.equal((await call("/relay/my/bank/disconnect", { method: "POST", token: jess, body: { id: second.id } })).status, 200);
+  now += 61e3;
+  sync = await (await call("/relay/my/bank/sync", { method: "POST", token: jess })).json();
+  assert.equal(sync.failed, undefined); assert.deepEqual(paymentsNow(), before);
+  console.log("ok - a partly failed read deletes nothing and isn't marked read; one bank failing never stops the others; same-named connections told apart only by the bank's own data");
+}
+// Shop names from bank text (review B-3): a name that is also an ordinary word is only recognised as the whole name.
+assert.deepEqual(["COSTAS BARBERS", "ACOSTA LTD", "APPLE TREE NURSERY", "WALKING BOOTS CO", "MCDONALD BUTCHERS", "SPARKS ELECTRICAL", "NEXT DAY FLOWERS", "ZARA KEBAB HOUSE", "PRETTY NAILS"].map((d) => shopName(d, null)),
+  ["Costas Barbers", "Acosta", "Apple Tree Nursery", "Walking Boots Co", "Mcdonald Butchers", "Sparks Electrical", "Next Day Flowers", "Zara Kebab House", "Pretty Nails"], "the bank's own words, tidied, when it isn't surely that shop");
+assert.deepEqual(["COSTA COFFEE 43012", "COSTA", "BOOTS 1234", "BOOTS THE CHEMIST", "APPLE STORE R123", "NIKE.COM", "ZARA", "SPAR", "PRET A MANGER", "MCDONALDS 123", "GREGGS PLC"].map((d) => shopName(d, null)),
+  ["Costa", "Costa", "Boots", "Boots", "Apple", "Nike", "Zara", "Spar", "Pret", "McDonald's", "Greggs"], "and the real ones are still recognised");
+console.log("ok - bank text is only called a known shop when it is that shop's whole name");
 
 // 4. Reading again: not more than every 10 minutes; an expired token is renewed; a bank that ended the permission says so.
 calls = [];

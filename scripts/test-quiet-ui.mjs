@@ -91,7 +91,10 @@ async function shopper({ testingTools = false, hash = "", market = false } = {})
 }
 // Lets what's on its way arrive (real time), then moves the app's clock on.
 const settle = async (page, ms = 350) => { await page.waitForTimeout(ms); };
-const pass = async (page, ms) => { await page.clock.runFor(ms); await settle(page); };
+// The app's clock is moved on 5 seconds at a time, with a moment of real time between, as on a phone: there a request is
+// answered within seconds. Moved on in one jump, a minute passed in an instant, so a look sent at 30 seconds could be given
+// up on (api() gives up on a read after 30 seconds) before the real answer had even been asked for.
+const pass = async (page, ms) => { for (let left = ms; left > 0; left -= 5000) { await page.clock.runFor(Math.min(5000, left)); await page.waitForTimeout(25); } await settle(page); };
 const count = (re) => log.filter(x => re.test(x)).length;
 const until = async (page, f, what) => { for (let i = 0; i < 60; i++) { if (f()) return; await page.waitForTimeout(100); } assert.fail("timed out waiting for " + what + "; asked for so far: " + JSON.stringify(log.slice(-12))); };
 const hide = (page, hidden) => page.evaluate((h) => {

@@ -102,7 +102,10 @@ async function connect(token, code) {
   const had = new Set((await get("/relay/my/bank", token)).connections.map((c) => c.id));
   now += 60e3;
   const state = new URL((await (await call("/relay/my/bank/connect", { method: "POST", token })).json()).url).searchParams.get("state");
-  assert.match((await call("/relay/bank/callback?code=" + code + "&state=" + state)).headers.get("location"), /#bank=connected$/);
+  // The callback hands back a single-use code; the app, signed in with the session that started, finishes with it.
+  const fin = /#bank=finish&bankcode=([A-Za-z0-9_-]{43})$/.exec((await call("/relay/bank/callback?code=" + code + "&state=" + state)).headers.get("location"));
+  assert.ok(fin, "the callback answers with a code to finish");
+  assert.equal((await call("/relay/my/bank/finish", { method: "POST", token, body: { code: fin[1] } })).status, 200);
   const added = (await get("/relay/my/bank", token)).connections.filter((c) => !had.has(c.id));
   assert.equal(added.length, 1);
   return added[0];
